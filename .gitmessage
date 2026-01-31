@@ -1,0 +1,5 @@
+# Conventional commit: <type>(<scope>): <description>
+# Types: feat, fix, docs, refactor, style, test, chore
+# Example: feat(frontend): add sync history filter by source
+#
+# <type>(<scope>): <description>

@@ -107,15 +107,19 @@ See the [Architecture](https://0xsysr3ll.github.io/scroblarr/docs/architecture) 
 
 1. **Keep changes focused** — One logical change per branch (one feature or one fix).
 
-2. **Use conventional commits** — Use a type and short description so the changelog stays consistent:
+2. **Use conventional commits** — All commit messages in this repo use the conventional format so the changelog (git-cliff) stays consistent:
 
    ```
-   feat: add filter by source in sync history
-   fix: correct UTC week start in dashboard stats
-   docs: update Docker Compose example
+   <type>(<scope>): <description>
    ```
 
-   Common types: `feat`, `fix`, `docs`, `refactor`, `style`, `test`, `chore`. Scope and body are optional. See [Conventional Commits](https://www.conventionalcommits.org).
+   Examples:
+   - `feat(frontend): add filter by source in sync history`
+   - `fix(backend): correct UTC week start in dashboard stats`
+   - `docs: update Docker Compose example`
+   - `chore: initial commit`
+
+   Common types: `feat`, `fix`, `docs`, `refactor`, `style`, `test`, `chore`. Scope and body are optional. See [Conventional Commits](https://www.conventionalcommits.org). To use the project’s commit template: `git config commit.template .gitmessage` (from repo root).
 
 3. **Push your branch** and open a **Pull Request against `develop`** on the main repo (development happens on `develop` only; `main` is for releases).
 
