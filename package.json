@@ -1,0 +1,40 @@
+{
+  "name": "scroblarr",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Media scrobbling service for Plex, Jellyfin, and Emby",
+  "scripts": {
+    "dev": "pnpm --filter './packages/*' dev",
+    "dev:backend": "pnpm --filter '@scroblarr/backend' dev",
+    "dev:frontend": "pnpm --filter '@scroblarr/frontend' dev",
+    "dev:docs": "pnpm --filter '@scroblarr/website' start",
+    "build": "pnpm --filter './packages/*' build",
+    "build:docs": "pnpm --filter '@scroblarr/website' build",
+    "lint": "pnpm --filter './packages/*' lint",
+    "lint:fix": "pnpm --filter './packages/*' lint:fix",
+    "lint:all": "pnpm --filter '@scroblarr/backend' lint:eslint && pnpm --filter '@scroblarr/frontend' lint:eslint && pnpm --filter '@scroblarr/shared' lint:eslint",
+    "type-check": "pnpm --filter './packages/*' type-check",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md,mdx}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md,mdx}\"",
+    "check": "pnpm lint && pnpm format:check && pnpm type-check",
+    "i18n:extract": "pnpm --filter '@scroblarr/frontend' i18n:extract"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@types/node": "^25.0.3",
+    "typescript-eslint": "^8.18.0",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "prettier": "^3.7.4",
+    "typescript": "^5.3.3",
+    "ts-morph": "^24.0.0",
+    "tsx": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@10.24.0+sha512.01ff8ae71b4419903b65c60fb2dc9d34cf8bb6e06d03bde112ef38f7a34d6904c424ba66bea5cdcf12890230bf39f9580473140ed9c946fef328b6e5238a345a"
+}

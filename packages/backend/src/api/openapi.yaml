@@ -1,0 +1,1929 @@
+openapi: 3.0.0
+info:
+  title: Scroblarr API
+  version: 1.0.0
+  description: |
+    API documentation for Scroblarr - Media scrobbling service for Plex, Jellyfin, and Emby.
+
+    This API allows you to manage users, sync media watching history across services, and configure integrations with TVTime and Trakt.
+
+servers:
+  - url: http://localhost:3000
+    description: Development server
+
+security:
+  - bearerAuth: []
+  - apiKeyAuth: []
+
+tags:
+  - name: Auth
+    description: Authentication endpoints
+  - name: Users
+    description: User management endpoints (Admin only)
+  - name: Settings
+    description: Application settings (Admin only)
+  - name: Sync
+    description: Sync history and operations
+  - name: TVTime
+    description: TVTime integration endpoints
+  - name: Trakt
+    description: Trakt integration endpoints
+  - name: Webhooks
+    description: Webhook endpoints for media server events
+  - name: Logs
+    description: Application logs
+  - name: Avatars
+    description: User avatar endpoints
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Bearer token (Plex or Jellyfin access token)
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Global API key for API authentication
+
+  schemas:
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error message
+        details:
+          type: array
+          items:
+            type: object
+          description: Validation error details (if applicable)
+
+    Success:
+      type: object
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          nullable: true
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          description: User ID
+        username:
+          type: string
+          nullable: true
+          description: Primary username (Plex or Jellyfin)
+        displayName:
+          type: string
+          nullable: true
+          description: Display name
+        email:
+          type: string
+          nullable: true
+          format: email
+          description: Email address
+        isAdmin:
+          type: boolean
+          description: Whether user is an admin
+        enabled:
+          type: boolean
+          description: Whether user is enabled
+        plexUsername:
+          type: string
+          nullable: true
+        jellyfinUsername:
+          type: string
+          nullable: true
+        tvtimeUsername:
+          type: string
+          nullable: true
+        thumb:
+          type: string
+          nullable: true
+          description: User avatar URL (proxied through /api/v1/avatars)
+        tvtimeMarkMoviesAsRewatched:
+          type: boolean
+          nullable: true
+        tvtimeMarkEpisodesAsRewatched:
+          type: boolean
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    UserUpdate:
+      type: object
+      properties:
+        displayName:
+          type: string
+        email:
+          type: string
+          format: email
+        tvtimeMarkMoviesAsRewatched:
+          type: boolean
+        tvtimeMarkEpisodesAsRewatched:
+          type: boolean
+
+    UserCreate:
+      type: object
+      required:
+        - plexUsername
+      properties:
+        plexUsername:
+          type: string
+        displayName:
+          type: string
+        email:
+          type: string
+          format: email
+        tvtimeUsername:
+          type: string
+        enabled:
+          type: boolean
+          default: true
+
+    Settings:
+      type: object
+      properties:
+        plexServerUrl:
+          type: string
+          nullable: true
+          format: uri
+        syncHistoryLimit:
+          type: integer
+          nullable: true
+        jellyfinHost:
+          type: string
+          nullable: true
+          format: uri
+        jellyfinPort:
+          type: integer
+          nullable: true
+        jellyfinUseSsl:
+          type: boolean
+          nullable: true
+        jellyfinUrlBase:
+          type: string
+          nullable: true
+        jellyfinApiKey:
+          type: string
+          nullable: true
+        apiKey:
+          type: string
+          nullable: true
+          description: Global API key for API authentication
+
+    SettingsUpdate:
+      type: object
+      properties:
+        plexServerUrl:
+          type: string
+          format: uri
+        syncHistoryLimit:
+          type: integer
+          minimum: 10
+          maximum: 10000
+        jellyfinHost:
+          type: string
+          format: uri
+        jellyfinPort:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        jellyfinUseSsl:
+          type: boolean
+        jellyfinUrlBase:
+          type: string
+        jellyfinApiKey:
+          type: string
+        apiKey:
+          type: string
+          minLength: 1
+          description: Global API key for API authentication
+
+    SyncHistoryItem:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        username:
+          type: string
+        mediaType:
+          type: string
+          enum: [episode, movie]
+        mediaTitle:
+          type: string
+        source:
+          type: string
+          enum: [plex, jellyfin]
+        tvdbEpisodeId:
+          type: string
+          nullable: true
+        tvdbMovieId:
+          type: string
+          nullable: true
+        imdbMovieId:
+          type: string
+          nullable: true
+        imdbEpisodeId:
+          type: string
+          nullable: true
+        tmdbMovieId:
+          type: string
+          nullable: true
+        tmdbSeriesId:
+          type: string
+          nullable: true
+        posterUrl:
+          type: string
+          nullable: true
+        seasonNumber:
+          type: integer
+          nullable: true
+        episodeNumber:
+          type: integer
+          nullable: true
+        year:
+          type: integer
+          nullable: true
+        success:
+          type: boolean
+        errorMessage:
+          type: string
+          nullable: true
+        wasRewatched:
+          type: boolean
+        destinations:
+          type: array
+          items:
+            type: string
+          nullable: true
+        syncedAt:
+          type: string
+          format: date-time
+
+    SyncHistoryResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncHistoryItem'
+        pagination:
+          type: object
+          properties:
+            page:
+              type: integer
+            pageSize:
+              type: integer
+            total:
+              type: integer
+            totalPages:
+              type: integer
+
+    SyncStatistics:
+      type: object
+      properties:
+        total:
+          type: integer
+        successful:
+          type: integer
+        failed:
+          type: integer
+        byMediaType:
+          type: object
+          properties:
+            episode:
+              type: integer
+            movie:
+              type: integer
+        bySource:
+          type: object
+          properties:
+            plex:
+              type: integer
+            jellyfin:
+              type: integer
+
+    TVTimeStatus:
+      type: object
+      properties:
+        linked:
+          type: boolean
+        email:
+          type: string
+          nullable: true
+        username:
+          type: string
+          nullable: true
+
+    TVTimeProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          nullable: true
+        username:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        image:
+          type: string
+          nullable: true
+
+    TraktStatus:
+      type: object
+      properties:
+        linked:
+          type: boolean
+        username:
+          type: string
+          nullable: true
+        image:
+          type: string
+          nullable: true
+        hasCredentials:
+          type: boolean
+
+    LogEntry:
+      type: object
+      properties:
+        level:
+          type: integer
+        time:
+          type: integer
+        msg:
+          type: string
+        label:
+          type: string
+          nullable: true
+
+    LogsResponse:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: '#/components/schemas/LogEntry'
+        pagination:
+          type: object
+          properties:
+            page:
+              type: integer
+            pageSize:
+              type: integer
+            total:
+              type: integer
+            totalPages:
+              type: integer
+
+paths:
+  /api/v1/auth/check-admin:
+    get:
+      summary: Check if admin user exists
+      tags: [Auth]
+      responses:
+        '200':
+          description: Admin check result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hasAdmin:
+                    type: boolean
+                  configuredService:
+                    type: string
+                    enum: [plex, jellyfin, null]
+                    nullable: true
+                  jellyfinSettings:
+                    type: object
+                    nullable: true
+                    properties:
+                      hostname:
+                        type: string
+                      port:
+                        type: integer
+                      useSsl:
+                        type: boolean
+                      urlBase:
+                        type: string
+        '500':
+          description: Internal server error
+
+  /api/v1/auth/providers:
+    get:
+      summary: Get available authentication providers
+      tags: [Auth]
+      responses:
+        '200':
+          description: Available providers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hasAdmin:
+                    type: boolean
+                  jellyfinConfigured:
+                    type: boolean
+                  plexConfigured:
+                    type: boolean
+
+  /api/v1/auth/plex/pin:
+    post:
+      summary: Create Plex OAuth PIN
+      tags: [Auth]
+      responses:
+        '200':
+          description: PIN created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pinId:
+                    type: string
+                  code:
+                    type: string
+        '500':
+          description: Internal server error
+
+  /api/v1/auth/plex/token:
+    post:
+      summary: Get Plex token from PIN
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - pinId
+              properties:
+                pinId:
+                  type: string
+      responses:
+        '200':
+          description: Token obtained
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  accessToken:
+                    type: string
+        '202':
+          description: PIN not yet authorized
+        '400':
+          description: Bad request
+        '403':
+          description: Access denied
+        '500':
+          description: Internal server error
+
+  /api/v1/auth/plex:
+    post:
+      summary: Authenticate with Plex (direct token)
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - authToken
+              properties:
+                authToken:
+                  type: string
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Bad request
+        '403':
+          description: Access denied
+        '500':
+          description: Internal server error
+
+  /api/v1/auth/plex/link:
+    post:
+      summary: Link Plex account to current user
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - authToken
+              properties:
+                authToken:
+                  type: string
+      responses:
+        '200':
+          description: Account linked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/auth/plex/setup-admin:
+    post:
+      summary: Setup admin with Plex (first time setup)
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - pinId
+              properties:
+                pinId:
+                  type: string
+      responses:
+        '200':
+          description: Admin setup successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  accessToken:
+                    type: string
+        '202':
+          description: PIN not yet authorized
+        '400':
+          description: Bad request
+        '500':
+          description: Internal server error
+
+  /api/v1/auth/plex/unlink:
+    post:
+      summary: Unlink Plex account
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Account unlinked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          description: Cannot unlink (admin must have at least one account)
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/auth/jellyfin:
+    post:
+      summary: Authenticate with Jellyfin
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                hostname:
+                  type: string
+                port:
+                  type: integer
+                useSsl:
+                  type: boolean
+                urlBase:
+                  type: string
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                allOf:
+                  - $ref: '#/components/schemas/User'
+                  - type: object
+                    properties:
+                      accessToken:
+                        type: string
+        '400':
+          description: Bad request
+        '401':
+          description: Invalid credentials
+        '403':
+          description: Access denied
+        '500':
+          description: Internal server error
+
+  /api/v1/auth/jellyfin/setup-admin:
+    post:
+      summary: Setup admin with Jellyfin (first time setup)
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+                - hostname
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                hostname:
+                  type: string
+                port:
+                  type: integer
+                useSsl:
+                  type: boolean
+                urlBase:
+                  type: string
+      responses:
+        '200':
+          description: Admin setup successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  accessToken:
+                    type: string
+        '400':
+          description: Bad request
+        '401':
+          description: Invalid credentials
+        '500':
+          description: Internal server error
+
+  /api/v1/auth/jellyfin/link:
+    post:
+      summary: Link Jellyfin account to current user
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                hostname:
+                  type: string
+                port:
+                  type: integer
+                useSsl:
+                  type: boolean
+                urlBase:
+                  type: string
+      responses:
+        '200':
+          description: Account linked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized or invalid credentials
+        '500':
+          description: Internal server error
+
+  /api/v1/auth/jellyfin/unlink:
+    post:
+      summary: Unlink Jellyfin account
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Account unlinked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          description: Cannot unlink (admin must have at least one account)
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/auth/me:
+    get:
+      summary: Get current user profile
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+
+    patch:
+      summary: Update current user profile
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: User profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/users:
+    get:
+      summary: List all users
+      tags: [Users]
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not admin)
+        '500':
+          description: Internal server error
+
+    post:
+      summary: Create a new user
+      tags: [Users]
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not admin)
+        '500':
+          description: Internal server error
+
+    delete:
+      summary: Bulk delete users
+      tags: [Users]
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ids
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Users deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  deleted:
+                    type: integer
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not admin)
+        '500':
+          description: Internal server error
+
+  /api/v1/users/servers:
+    get:
+      summary: Get Plex servers
+      tags: [Users]
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      responses:
+        '200':
+          description: List of Plex servers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    url:
+                      type: string
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not admin)
+        '500':
+          description: Internal server error
+
+  /api/v1/users/plex-users:
+    get:
+      summary: Get Plex server users
+      tags: [Users]
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - name: serverUrl
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uri
+      responses:
+        '200':
+          description: List of Plex users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    username:
+                      type: string
+                    displayName:
+                      type: string
+                    email:
+                      type: string
+                    thumb:
+                      type: string
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not admin)
+        '500':
+          description: Internal server error
+
+  /api/v1/users/jellyfin-users:
+    get:
+      summary: Get Jellyfin users
+      tags: [Users]
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      responses:
+        '200':
+          description: List of Jellyfin users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    username:
+                      type: string
+                    displayName:
+                      type: string
+                    email:
+                      type: string
+                      nullable: true
+                    thumb:
+                      type: string
+                      nullable: true
+                    isImported:
+                      type: boolean
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not admin)
+        '500':
+          description: Internal server error
+
+  /api/v1/users/import:
+    post:
+      summary: Import Plex users
+      tags: [Users]
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - serverUrl
+                - usernames
+              properties:
+                serverUrl:
+                  type: string
+                  format: uri
+                usernames:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Users imported
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  imported:
+                    type: integer
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not admin)
+        '500':
+          description: Internal server error
+
+  /api/v1/users/import-jellyfin:
+    post:
+      summary: Import Jellyfin users
+      tags: [Users]
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - usernames
+              properties:
+                usernames:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Users imported
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  imported:
+                    type: integer
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not admin)
+        '500':
+          description: Internal server error
+
+  /api/v1/users/{id}:
+    get:
+      summary: Get user by ID
+      tags: [Users]
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          description: User not found
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not admin)
+        '500':
+          description: Internal server error
+
+    patch:
+      summary: Update user
+      tags: [Users]
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                tvtimeUsername:
+                  type: string
+                enabled:
+                  type: boolean
+                tvtimeMarkMoviesAsRewatched:
+                  type: boolean
+                tvtimeMarkEpisodesAsRewatched:
+                  type: boolean
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Validation error
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not admin)
+        '404':
+          description: User not found
+        '500':
+          description: Internal server error
+
+    delete:
+      summary: Delete user
+      tags: [Users]
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: User deleted
+        '400':
+          description: Bad request (cannot delete admin or self)
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not admin)
+        '404':
+          description: User not found
+        '500':
+          description: Internal server error
+
+  /api/v1/settings:
+    get:
+      summary: Get all settings
+      tags: [Settings]
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not admin)
+        '500':
+          description: Internal server error
+
+    patch:
+      summary: Update settings
+      tags: [Settings]
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SettingsUpdate'
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not admin)
+        '500':
+          description: Internal server error
+
+  /api/v1/settings/plex:
+    delete:
+      summary: Remove Plex server configuration
+      tags: [Settings]
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      responses:
+        '200':
+          description: Configuration removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not admin)
+        '500':
+          description: Internal server error
+
+  /api/v1/settings/jellyfin:
+    delete:
+      summary: Remove Jellyfin server configuration
+      tags: [Settings]
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      responses:
+        '200':
+          description: Configuration removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not admin)
+        '500':
+          description: Internal server error
+
+  /api/v1/sync/history:
+    get:
+      summary: Get sync history
+      tags: [Sync]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: mediaType
+          in: query
+          schema:
+            type: string
+            enum: [episode, movie]
+        - name: success
+          in: query
+          schema:
+            type: boolean
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            default: syncedAt
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: DESC
+      responses:
+        '200':
+          description: Sync history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncHistoryResponse'
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+    delete:
+      summary: Delete sync history
+      tags: [Sync]
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: History deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  deleted:
+                    type: integer
+                    nullable: true
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/sync/history/{id}:
+    delete:
+      summary: Delete sync history item
+      tags: [Sync]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Item deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Item not found
+        '500':
+          description: Internal server error
+
+  /api/v1/sync/statistics:
+    get:
+      summary: Get sync statistics
+      tags: [Sync]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncStatistics'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/sync/poster/{id}:
+    get:
+      summary: Get poster image for sync history item
+      tags: [Sync]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Poster image
+          content:
+            image/jpeg: {}
+            image/png: {}
+        '302':
+          description: Redirect to poster URL
+        '403':
+          description: Authentication required
+        '404':
+          description: Not found
+        '500':
+          description: Internal server error
+
+  /api/v1/tvtime/link:
+    post:
+      summary: Link TVTime account
+      tags: [TVTime]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Account linked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          description: Validation error
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/tvtime/unlink:
+    post:
+      summary: Unlink TVTime account
+      tags: [TVTime]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Account unlinked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/tvtime/status:
+    get:
+      summary: Get TVTime account status
+      tags: [TVTime]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Account status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TVTimeStatus'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/tvtime/profile:
+    get:
+      summary: Get TVTime profile
+      tags: [TVTime]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Profile data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TVTimeProfile'
+        '400':
+          description: Account not linked
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/trakt/authorize:
+    get:
+      summary: Get Trakt authorization URL
+      tags: [Trakt]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: clientId
+          in: query
+          schema:
+            type: string
+        - name: clientSecret
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Authorization URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authUrl:
+                    type: string
+                    format: uri
+        '400':
+          description: Bad request (missing credentials)
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/trakt/link:
+    post:
+      summary: Link Trakt account
+      tags: [Trakt]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+              properties:
+                code:
+                  type: string
+                clientId:
+                  type: string
+                clientSecret:
+                  type: string
+      responses:
+        '200':
+          description: Account linked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          description: Validation error or missing credentials
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/trakt/unlink:
+    post:
+      summary: Unlink Trakt account
+      tags: [Trakt]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Account unlinked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/trakt/status:
+    get:
+      summary: Get Trakt account status
+      tags: [Trakt]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Account status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraktStatus'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/webhooks/plex:
+    post:
+      summary: Plex webhook endpoint
+      tags: [Webhooks]
+      security:
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                payload:
+                  type: string
+      responses:
+        '200':
+          description: Webhook processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          description: Bad request
+        '500':
+          description: Internal server error
+
+  /api/v1/webhooks/jellyfin:
+    post:
+      summary: Jellyfin webhook endpoint
+      tags: [Webhooks]
+      security:
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Webhook processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          description: Bad request
+        '500':
+          description: Internal server error
+
+  /api/v1/logs:
+    get:
+      summary: Get application logs
+      tags: [Logs]
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 100
+            minimum: 1
+            maximum: 1000
+        - name: level
+          in: query
+          schema:
+            type: string
+            enum: [debug, info, warn, error, fatal]
+        - name: label
+          in: query
+          schema:
+            type: string
+            enum: [webhook, sync, auth, api, database, tvtime, plex, system, migration]
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Logs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogsResponse'
+        '400':
+          description: Validation error
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not admin)
+        '500':
+          description: Internal server error
+
+  /api/v1/logs/files:
+    get:
+      summary: Get list of log files
+      tags: [Logs]
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      responses:
+        '200':
+          description: List of log files
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  files:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        size:
+                          type: integer
+                        modified:
+                          type: string
+                          format: date-time
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not admin)
+        '500':
+          description: Internal server error
+
+  /api/v1/logs/download/{filename}:
+    get:
+      summary: Download log file
+      tags: [Logs]
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Log file
+          content:
+            text/plain: {}
+            application/gzip: {}
+        '400':
+          description: Invalid filename
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not admin)
+        '500':
+          description: Internal server error
+
+  /api/v1/avatars/jellyfin/{userId}:
+    get:
+      summary: Get Jellyfin user avatar
+      tags: [Avatars]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Avatar image
+          content:
+            image/jpeg: {}
+            image/png: {}
+        '400':
+          description: Invalid user ID
+        '503':
+          description: Jellyfin not configured
+        '500':
+          description: Internal server error
+
+  /api/v1/avatars/plex/{userId}:
+    get:
+      summary: Get Plex user avatar
+      tags: [Avatars]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Avatar image
+          content:
+            image/jpeg: {}
+            image/png: {}
+        '302':
+          description: Redirect to public Plex CDN URL
+        '403':
+          description: Plex authentication required
+        '404':
+          description: User or avatar not found
+        '500':
+          description: Internal server error
+
+  /api/v1/avatars/trakt/{userId}:
+    get:
+      summary: Get Trakt user avatar
+      tags: [Avatars]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Avatar image
+          content:
+            image/jpeg: {}
+            image/png: {}
+        '404':
+          description: User or avatar not found
+        '500':
+          description: Internal server error
+
+  /api/v1/avatars/tvtime/{userId}:
+    get:
+      summary: Get TVTime user avatar
+      tags: [Avatars]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Avatar image
+          content:
+            image/jpeg: {}
+            image/png: {}
+        '404':
+          description: User or avatar not found
+        '500':
+          description: Internal server error

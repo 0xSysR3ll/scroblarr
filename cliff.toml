@@ -1,0 +1,67 @@
+# git-cliff ~ configuration
+# https://git-cliff.org/docs/configuration
+
+[changelog]
+body = """
+{% if version %}\
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+## [unreleased]
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim | upper_first }}
+{% for commit in commits %}
+- {% if commit.scope %}*({{ commit.scope }})* {% endif %}\
+{% if commit.breaking %}[**breaking**] {% endif %}\
+{{ commit.message | upper_first }}\
+{% if commit.remote.username %} by [@{{ commit.remote.username }}](https://github.com/{{ commit.remote.username }}){% endif %}\
+{% if commit.remote.pr_number %} in [#{{ commit.remote.pr_number }}](https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}/pull/{{ commit.remote.pr_number }}){% endif %}
+
+{% endfor %}
+{% endfor %}
+{% if github.contributors is defined and github.contributors | length > 0 %}
+{% set first_time = github.contributors | filter(attribute="is_first_time", value=true) %}
+{% if first_time | length > 0 %}
+### New Contributors
+{% for contributor in first_time %}
+* [@{{ contributor.username }}](https://github.com/{{ contributor.username }}) made their first contribution in [#{{ contributor.pr_number }}](https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}/pull/{{ contributor.pr_number }})
+{% endfor %}
+{% endif %}
+
+### Contributors
+{% for contributor in github.contributors %}
+* [@{{ contributor.username }}](https://github.com/{{ contributor.username }})
+{% endfor %}
+{% endif %}
+"""
+trim = true
+render_always = true
+postprocessors = [
+    { pattern = '#(\\d+)', replace = "[#${1}](https://github.com/0xsysr3ll/scroblarr/issues/${1})" },
+]
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+require_conventional = false
+commit_preprocessors = []
+protect_breaking_commits = false
+commit_parsers = [
+    { message = "^feat", group = "Features" },
+    { message = "^fix", group = "Bug Fixes" },
+    { message = "^doc", group = "Documentation" },
+    { message = "^perf", group = "Performance" },
+    { message = "^refactor", group = "Refactor" },
+    { message = "^style", group = "Styling" },
+    { message = "^test", group = "Testing" },
+    { message = "^chore\\(release\\)", skip = true },
+    { message = "^chore\\(deps", skip = true },
+    { message = "^chore|^ci", group = "Miscellaneous" },
+    { body = ".*security", group = "Security" },
+    { message = "^revert", group = "Revert" },
+    { message = ".*", group = "Other" },
+]
+filter_commits = false
+fail_on_unmatched_commit = false
+topo_order_commits = true
+sort_commits = "oldest"

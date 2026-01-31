@@ -1,0 +1,48 @@
+# Dependencies (reinstalled in image)
+node_modules/
+
+# Build outputs (rebuilt in image)
+dist/
+dev-dist/
+build/
+website/build/
+website/.docusaurus/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Data and logs (mounted at runtime)
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Git and IDE
+.git/
+.github/
+.vscode/
+.idea/
+
+# Docs and tooling (not needed for app image)
+website/
+docs/
+*.md
+!README.md
+
+# Tests and scripts (not needed for runtime)
+**/*.test.ts
+**/*.spec.ts
+coverage/
+.nyc_output/
+scripts/
+
+# Misc
+.DS_Store
+*.swp
+*.swo
+tmp/
+temp/

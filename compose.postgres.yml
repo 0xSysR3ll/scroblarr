@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: scroblarr-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: scroblarr
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-scroblarr}
+      POSTGRES_DB: scroblarr
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scroblarr -d scroblarr"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  scroblarr:
+    image: ghcr.io/0xsysr3ll/scroblarr:latest
+    container_name: scroblarr
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: scroblarr
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-scroblarr}
+      POSTGRES_DATABASE: scroblarr
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres-data:

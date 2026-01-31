@@ -1,0 +1,15 @@
+services:
+  scroblarr:
+    image: ghcr.io/0xsysr3ll/scroblarr:latest
+    container_name: scroblarr
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /app/data
+    volumes:
+      - scroblarr-data:/app/data
+
+volumes:
+  scroblarr-data:

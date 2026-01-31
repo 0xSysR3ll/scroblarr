@@ -1,0 +1,14 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="SCROBLARR logo">
+  <defs>
+    <linearGradient id="blueGradientSquare" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60a5fa"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="#020617"/>
+  <g transform="translate(512 512) scale(2.0)">
+    <path d=" M -180 -120 Q -240 0 -180 120 L -60 60 Q -90 0 -60 -60 Z " fill="url(#blueGradientSquare)"/>
+    <path d=" M -60 -180 Q 0 -240 120 -180 L 60 -60 Q 0 -90 -60 -60 Z " fill="url(#blueGradientSquare)"/>
+    <path d=" M 180 -60 Q 240 0 180 120 L 60 60 Q 90 0 60 -60 Z " fill="url(#blueGradientSquare)"/>
+  </g>
+</svg>

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:base",
+    "group:allNonMajor",
+    "schedule:earlyMondays",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "automerge": false,
+  "timezone": "UTC",
+  "semanticCommits": "enabled",
+  "labels": ["dependencies"],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on the first day of the month"]
+  },
+  "packageRules": [
+    {
+      "description": "Keep Docker base images pinned by digest",
+      "managers": ["dockerfile"],
+      "pinDigests": true
+    },
+    {
+      "description": "Group pnpm and Node (engines) version updates",
+      "managers": ["npm"],
+      "matchDepTypes": ["packageManager", "engines"],
+      "groupName": "pnpm and lockfile"
+    }
+  ]
+}
