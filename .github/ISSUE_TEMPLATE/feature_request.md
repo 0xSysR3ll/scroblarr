@@ -1,6 +1,7 @@
 ---
 name: Feature request
 description: Suggest a new feature or improvement
+about: Suggest a new feature or improvement for Scroblarr
 title: "[Feature]: "
 labels: ["enhancement"]
 assignees: []

@@ -1,6 +1,7 @@
 ---
 name: Bug report
 description: Report a bug or unexpected behavior
+about: Report a bug or unexpected behavior in Scroblarr
 title: "[Bug]: "
 labels: ["bug"]
 assignees: []
