@@ -32,7 +32,7 @@ All users from your configured media servers can use Scroblarr. Each user's watc
     backgroundColor: 'var(--ifm-color-emphasis-100)',
     borderRadius: '8px',
   }}>
-    <img src="/img/logos/plex.svg" alt="Plex" style={{ width: '24px', height: '24px' }} />
+    <img src="img/logos/plex.svg" alt="Plex" style={{ width: '24px', height: '24px' }} />
     <span><strong>Plex</strong> (webhooks)</span>
   </div>
   <div style={{
@@ -43,7 +43,7 @@ All users from your configured media servers can use Scroblarr. Each user's watc
     backgroundColor: 'var(--ifm-color-emphasis-100)',
     borderRadius: '8px',
   }}>
-    <img src="/img/logos/jellyfin.svg" alt="Jellyfin" style={{ width: '24px', height: '24px' }} />
+    <img src="img/logos/jellyfin.svg" alt="Jellyfin" style={{ width: '24px', height: '24px' }} />
     <span><strong>Jellyfin</strong> (webhooks)</span>
   </div>
 </div>
@@ -66,7 +66,7 @@ All users from your configured media servers can use Scroblarr. Each user's watc
     backgroundColor: 'var(--ifm-color-emphasis-100)',
     borderRadius: '8px',
   }}>
-    <img src="/img/logos/trakt.svg" alt="Trakt" style={{ width: '24px', height: '24px' }} />
+    <img src="img/logos/trakt.svg" alt="Trakt" style={{ width: '24px', height: '24px' }} />
     <span><strong>Trakt</strong></span>
   </div>
   <div style={{
@@ -77,7 +77,7 @@ All users from your configured media servers can use Scroblarr. Each user's watc
     backgroundColor: 'var(--ifm-color-emphasis-100)',
     borderRadius: '8px',
   }}>
-    <img src="/img/logos/tvtime.png" alt="TVTime" style={{ width: '24px', height: '24px' }} />
+    <img src="img/logos/tvtime.png" alt="TVTime" style={{ width: '24px', height: '24px' }} />
     <span><strong>TVTime</strong></span>
   </div>
 </div>
@@ -145,7 +145,7 @@ Both sources and destinations can be configured simultaneously. Multiple users a
   width: '100%',
 }}>
   <a
-    href="/docs/installation"
+    href="docs/installation"
     style={{
       display: 'inline-block',
       padding: '0.75rem 2rem',
