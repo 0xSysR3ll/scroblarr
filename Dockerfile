@@ -19,9 +19,6 @@ COPY packages/shared packages/shared/
 
 RUN pnpm build
 
-ENV CI=true
-RUN pnpm prune --prod
-
 FROM node:20-alpine@sha256:09e2b3d9726018aecf269bd35325f46bf75046a643a66d28360ec71132750ec8 AS runner
 
 RUN corepack enable && corepack prepare pnpm@10.24.0 --activate
