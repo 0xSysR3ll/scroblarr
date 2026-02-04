@@ -2,7 +2,6 @@
   <img src="website/static/img/logo.svg" alt="Scroblarr" width="200" />
 </p>
 
-
 # Scroblarr
 
 [![License](https://img.shields.io/github/license/0xsysr3ll/scroblarr)](LICENSE)
@@ -37,7 +36,7 @@ Scroblarr automatically syncs your watch history from Plex and Jellyfin to Trakt
 
 ### Docker
 
-**Standalone (SQLite):**
+**Quick start (single container, SQLite):**
 
 ```bash
 docker run -d \
@@ -47,14 +46,62 @@ docker run -d \
   ghcr.io/0xsysr3ll/scroblarr:latest
 ```
 
-**Docker Compose:**
+Then open **http://localhost:3000**.
 
-- **SQLite:** `compose.yml` — `docker compose up -d` (Scroblarr only, data in a volume).
-- **PostgreSQL:** `compose.postgres.yml` — `docker compose -f compose.postgres.yml up -d` (Scroblarr + Postgres). Optionally set `POSTGRES_PASSWORD` in a `.env` file.
+**Docker Compose (recommended):**
 
-Web UI: **http://localhost:3000**
+Use this example for a full setup with healthcheck and optional PostgreSQL. Save as `compose.yml` and run `docker compose up -d`:
 
-See the [installation guide](https://0xsysr3ll.github.io/scroblarr/docs/installation) for details and production deployment.
+```yaml
+services:
+  scroblarr:
+    image: ghcr.io/0xsysr3ll/scroblarr:latest
+    container_name: scroblarr
+    ports:
+      - "3000:3000"
+    volumes:
+      - scroblarr-data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      # Optional: PostgreSQL instead of SQLite
+      # - POSTGRES_HOST=postgres
+      # - POSTGRES_PORT=5432
+      # - POSTGRES_USER=scroblarr
+      # - POSTGRES_PASSWORD=your_password
+      # - POSTGRES_DATABASE=scroblarr
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:3000/api/v1/auth/check-admin || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # Optional: PostgreSQL for production
+  # postgres:
+  #   image: postgres:17-alpine
+  #   container_name: scroblarr-postgres
+  #   environment:
+  #     - POSTGRES_USER=scroblarr
+  #     - POSTGRES_PASSWORD=your_password
+  #     - POSTGRES_DB=scroblarr
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   restart: unless-stopped
+
+volumes:
+  scroblarr-data:
+  # postgres-data:
+```
+
+Or use the repo’s ready-made files: **`compose.yml`** (SQLite only) or **`compose.postgres.yml`** (Scroblarr + PostgreSQL). For the latter: `docker compose -f compose.postgres.yml up -d` and set `POSTGRES_PASSWORD` in a `.env` file if needed.
+
+See the [installation guide](https://0xsysr3ll.github.io/scroblarr/docs/installation) for volumes, env vars, updating, and production deployment.
 
 ### From source
 

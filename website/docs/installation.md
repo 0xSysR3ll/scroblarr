@@ -86,10 +86,10 @@ volumes:
   # postgres-data:
 ```
 
-Save this as `docker-compose.yml` and run:
+Save this as `compose.yml` and run:
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 ### Docker volumes
@@ -117,8 +117,8 @@ To update Scroblarr:
 
 ```bash
 docker pull ghcr.io/0xsysr3ll/scroblarr:latest
-docker-compose down
-docker-compose up -d
+docker compose down
+docker compose up -d
 ```
 
 Or if using `docker run`:
