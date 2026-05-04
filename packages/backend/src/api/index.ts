@@ -21,9 +21,24 @@ import { userRoutes } from "./routes/users";
 import { webhookRoutes } from "./routes/webhooks";
 import { setupSwagger } from "./swagger";
 
+function shouldTrustProxy(env: ReturnType<typeof getEnv>): boolean {
+  const v = env.TRUST_PROXY?.trim().toLowerCase();
+  if (v === "false" || v === "0" || v === "no") {
+    return false;
+  }
+  if (v === "true" || v === "1" || v === "yes") {
+    return true;
+  }
+  return env.NODE_ENV === "production";
+}
+
 export function createApp(): Express {
   const app = express();
   const env = getEnv();
+
+  if (shouldTrustProxy(env)) {
+    app.set("trust proxy", 1);
+  }
 
   const allowedOrigins =
     env.CORS_ALLOWED_ORIGINS?.split(",")

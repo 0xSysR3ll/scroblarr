@@ -15,6 +15,7 @@ const envSchema = z.object({
   POSTGRES_PASSWORD: z.string().optional(),
   POSTGRES_DATABASE: z.string().optional(),
   POSTGRES_SSL: z.string().optional(),
+  TRUST_PROXY: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
