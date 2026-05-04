@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: scroblarr-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: scroblarr
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-scroblarr}
+      POSTGRES_DB: scroblarr
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scroblarr -d scroblarr"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  scroblarr:
+    # image: ghcr.io/0xsysr3ll/scroblarr:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: scroblarr
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: scroblarr
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-scroblarr}
+      POSTGRES_DATABASE: scroblarr
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:3000/api/v1/auth/check-admin || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  postgres-data:

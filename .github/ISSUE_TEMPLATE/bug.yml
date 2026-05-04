@@ -1,0 +1,112 @@
+name: 🐛 Bug report
+description: Report a bug or unexpected behavior in Scroblarr
+labels:
+  - bug
+  - awaiting-triage
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug!
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear description of the bug.
+      placeholder: Describe what went wrong…
+    validations:
+      required: true
+
+  - type: input
+    id: scroblarr_version
+    attributes:
+      label: Scroblarr version / commit
+      description: e.g. Docker `latest` or specific commit/tag if from source.
+      placeholder: "e.g. docker: latest, or commit hash"
+    validations:
+      required: true
+
+  - type: input
+    id: node_version
+    attributes:
+      label: Node version (if from source)
+      placeholder: e.g. v22.3.0
+
+  - type: dropdown
+    id: media_server
+    attributes:
+      label: Media server
+      description: Which media server are you using?
+      options:
+        - Plex
+        - Jellyfin
+        - Other / Not applicable
+    validations:
+      required: true
+
+  - type: input
+    id: media_server_version
+    attributes:
+      label: Media server version
+      placeholder: e.g. 1.40.2.9200, 10.8.13
+
+  - type: dropdown
+    id: database
+    attributes:
+      label: Database
+      description: Which database backend are you using?
+      options:
+        - SQLite
+        - PostgreSQL
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps_to_reproduce
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce the behavior?
+      placeholder: |
+        1. Go to '...'
+        2. Do '...'
+        3. See error
+      render: bash
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+      placeholder: Describe the expected behavior…
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual_behavior
+    attributes:
+      label: Actual behavior
+      description: What actually happened?
+      placeholder: Describe what actually happened…
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs_screenshots
+    attributes:
+      label: Logs / screenshots
+      description: If applicable, paste relevant log output or add screenshots.
+      placeholder: |
+        Paste logs here…
+      render: shell
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional context
+      description: Any other context about the problem.

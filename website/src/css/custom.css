@@ -1,0 +1,209 @@
+:root {
+  color-scheme: light;
+  --ifm-font-family-base:
+    "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --ifm-heading-font-family:
+    "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --ifm-font-weight-semibold: 600;
+  --ifm-font-weight-bold: 700;
+  --ifm-line-height-base: 1.6;
+  --ifm-global-radius: 0.625rem;
+  --ifm-button-border-radius: 0.625rem;
+  --ifm-code-border-radius: 0.5rem;
+  --ifm-card-border-radius: 0.625rem;
+
+  --ifm-color-primary: #2563eb;
+  --ifm-color-primary-dark: #1d4ed8;
+  --ifm-color-primary-darker: #1e40af;
+  --ifm-color-primary-darkest: #1e3a8a;
+  --ifm-color-primary-light: #3b82f6;
+  --ifm-color-primary-lighter: #60a5fa;
+  --ifm-color-primary-lightest: #93c5fd;
+
+  /* Mapped from app tokens */
+  --ifm-background-color: oklch(0.985 0.006 265);
+  --ifm-background-surface-color: oklch(0.998 0.004 265);
+  --ifm-font-color-base: oklch(0.2 0.03 265);
+  --ifm-heading-color: oklch(0.2 0.03 265);
+  --ifm-color-content: oklch(0.2 0.03 265);
+  --ifm-color-content-secondary: oklch(0.45 0.03 265);
+  --ifm-color-emphasis-100: oklch(0.955 0.012 265);
+  --ifm-color-emphasis-200: oklch(0.93 0.014 265);
+  --ifm-color-emphasis-300: oklch(0.9 0.015 265);
+  --ifm-color-emphasis-600: oklch(0.55 0.03 265);
+
+  --ifm-navbar-background-color: oklch(0.998 0.004 265 / 90%);
+  --ifm-navbar-shadow: 0 1px 2px 0 oklch(0.2 0.03 265 / 8%);
+  --ifm-footer-background-color: oklch(0.998 0.004 265);
+  --ifm-footer-color: oklch(0.45 0.03 265);
+  --ifm-footer-link-color: oklch(0.45 0.03 265);
+  --ifm-footer-padding-vertical: 1.5rem;
+  --ifm-card-background-color: oklch(0.998 0.004 265);
+  --ifm-alert-border-color: oklch(0.9 0.015 265);
+
+  --ifm-code-font-size: 95%;
+  --ifm-code-background: oklch(0.955 0.012 265);
+  --ifm-code-color: oklch(0.2 0.03 265);
+  --docusaurus-highlighted-code-line-bg: oklch(0.55 0.03 265 / 11%);
+}
+
+/*
+ * Dark tokens must live on `html[data-theme="dark"]`, not `[data-theme="dark"]` alone.
+ * PostCSS wide-gamut output uses `@supports (color: …) { :root { … } }` for P3 fallbacks; that
+ * `:root` block matches `html` with the same specificity as `[data-theme="dark"]` and can win
+ * by source order — which resets `--ifm-navbar-background-color` to the light value in dark mode.
+ */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --ifm-color-primary: #60a5fa;
+  --ifm-color-primary-dark: #3b82f6;
+  --ifm-color-primary-darker: #2563eb;
+  --ifm-color-primary-darkest: #1d4ed8;
+  --ifm-color-primary-light: #93c5fd;
+  --ifm-color-primary-lighter: #bfdbfe;
+  --ifm-color-primary-lightest: #dbeafe;
+
+  --ifm-background-color: oklch(0.145 0.035 268);
+  --ifm-background-surface-color: oklch(0.19 0.04 268);
+  --ifm-font-color-base: oklch(0.96 0.02 265);
+  --ifm-heading-color: oklch(0.96 0.02 265);
+  --ifm-color-content: oklch(0.96 0.02 265);
+  --ifm-color-content-secondary: oklch(0.72 0.03 265);
+  --ifm-color-emphasis-100: oklch(0.24 0.035 268);
+  --ifm-color-emphasis-200: oklch(1 0 0 / 10%);
+  --ifm-color-emphasis-300: oklch(1 0 0 / 14%);
+  --ifm-color-emphasis-600: oklch(0.65 0.03 265);
+
+  /* Opaque: matches surface; avoids “see-through” over scrolling content + survives P3 :root. */
+  --ifm-navbar-background-color: oklch(0.19 0.04 268);
+  --ifm-navbar-shadow: 0 1px 2px 0 oklch(0.05 0.03 268 / 50%);
+  --ifm-footer-background-color: oklch(0.17 0.04 268);
+  --ifm-footer-color: oklch(0.72 0.03 265);
+  --ifm-footer-link-color: oklch(0.72 0.03 265);
+  --ifm-footer-padding-vertical: 1.5rem;
+  --ifm-card-background-color: oklch(0.19 0.04 268);
+  --ifm-alert-border-color: oklch(1 0 0 / 12%);
+
+  --ifm-code-background: oklch(0.24 0.04 268);
+  --ifm-code-color: oklch(0.96 0.02 265);
+  --docusaurus-highlighted-code-line-bg: oklch(1 0 0 / 9%);
+
+  background-color: oklch(0.145 0.035 268);
+}
+
+html,
+body {
+  font-family: var(--ifm-font-family-base);
+}
+
+* {
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.prism-code {
+  background-color: var(--ifm-code-background) !important;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: var(--ifm-code-border-radius);
+}
+
+.card {
+  background-color: var(--ifm-card-background-color);
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: var(--ifm-card-border-radius);
+  box-shadow: 0 1px 2px 0 oklch(0.2 0.03 265 / 6%);
+}
+
+html[data-theme="dark"] .card {
+  box-shadow: 0 1px 2px 0 oklch(0.02 0.02 268 / 45%);
+}
+
+.navbar {
+  background-color: var(--ifm-navbar-background-color);
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+  box-shadow: var(--ifm-navbar-shadow);
+}
+
+/* Light mode only: glass blur reads fine on pale chrome. Dark mode often looks muddy / odd with blur. */
+html[data-theme="light"] .navbar {
+  backdrop-filter: saturate(180%) blur(8px);
+}
+
+/*
+ * Infima paints a solid light background on the inner row; in dark mode that sits on top of the
+ * token-driven .navbar fill and reads as a “white bar”. Clear it so the outer bar's color shows.
+ */
+html[data-theme="dark"] .navbar__inner {
+  background: transparent;
+}
+
+table {
+  border-color: var(--ifm-color-emphasis-200);
+}
+
+table thead {
+  background-color: var(--ifm-color-emphasis-100);
+}
+
+table tbody tr {
+  border-color: var(--ifm-color-emphasis-200);
+}
+
+a:hover {
+  color: var(--ifm-color-primary-light);
+}
+
+.button {
+  border-radius: var(--ifm-button-border-radius);
+  font-weight: 600;
+}
+
+.theme-doc-markdown h1,
+.theme-doc-markdown h2,
+.theme-doc-markdown h3 {
+  letter-spacing: -0.01em;
+}
+
+.footer {
+  background-color: var(--ifm-footer-background-color) !important;
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+  margin-top: 3rem;
+}
+
+.footer__copyright {
+  font-size: 0.875rem;
+  color: var(--ifm-color-content-secondary) !important;
+}
+
+.footer__logo {
+  opacity: 0.8;
+  filter: brightness(1);
+}
+
+.footer__logo:hover {
+  opacity: 1;
+}
+
+.footer--dark {
+  background-color: var(--ifm-footer-background-color) !important;
+}
+
+.footer__title {
+  color: var(--ifm-color-content-secondary) !important;
+}
+
+.footer__link-item {
+  color: var(--ifm-color-content-secondary) !important;
+}
+
+html[data-theme="dark"] .footer {
+  background-color: oklch(0.17 0.04 268) !important;
+}
+
+html[data-theme="light"] .footer {
+  background-color: oklch(0.998 0.004 265) !important;
+}

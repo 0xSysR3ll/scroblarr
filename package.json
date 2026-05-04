@@ -1,0 +1,69 @@
+{
+  "name": "scroblarr",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Media scrobbling service for Plex, Jellyfin, and Emby",
+  "scripts": {
+    "preinstall": "npx only-allow pnpm",
+    "prepare": "husky",
+    "dev": "pnpm --filter './packages/*' dev",
+    "start": "NODE_ENV=production PUBLIC_DIR=../frontend/dist pnpm --filter '@scroblarr/backend' start",
+    "dev:backend": "pnpm --filter '@scroblarr/backend' dev",
+    "dev:frontend": "pnpm --filter '@scroblarr/frontend' dev",
+    "dev:docs": "pnpm --filter '@scroblarr/website' start",
+    "build": "pnpm --filter './packages/*' build",
+    "build:docs": "pnpm --filter '@scroblarr/website' build",
+    "lint": "pnpm --filter './packages/*' lint",
+    "lint:fix": "pnpm --filter './packages/*' lint:fix",
+    "lint:all": "pnpm --filter '@scroblarr/backend' lint:eslint && pnpm --filter '@scroblarr/frontend' lint:eslint && pnpm --filter '@scroblarr/shared' lint:eslint",
+    "type-check": "pnpm --filter './packages/*' type-check",
+    "format": "prettier --log-level warn --write --cache \"**/*.{ts,tsx,js,jsx,json,css,md,mdx}\"",
+    "format:check": "prettier --log-level warn --check --cache \"**/*.{ts,tsx,js,jsx,json,css,md,mdx}\"",
+    "check": "pnpm lint && pnpm format:check && pnpm type-check",
+    "i18n:extract": "pnpm --filter '@scroblarr/frontend' i18n:extract"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express-rate-limit": "^6.0.2",
+    "@types/helmet": "^4.0.0",
+    "@types/node": "^25.5.0",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2",
+    "prettier": "^3.8.1",
+    "ts-morph": "^24.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.57.0"
+  },
+  "lint-staged": {
+    "**/*.{ts,tsx,js,jsx}": [
+      "prettier --write",
+      "eslint --fix --no-warn-ignored"
+    ],
+    "**/*.{json,css,md,mdx}": [
+      "prettier --write"
+    ]
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@10.24.0+sha512.01ff8ae71b4419903b65c60fb2dc9d34cf8bb6e06d03bde112ef38f7a34d6904c424ba66bea5cdcf12890230bf39f9580473140ed9c946fef328b6e5238a345a",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sqlite3"
+    ]
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "express-rate-limit": "^8.3.1",
+    "helmet": "^8.1.0"
+  }
+}

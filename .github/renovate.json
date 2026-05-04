@@ -1,0 +1,91 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":timezone(UTC)",
+    "group:allNonMajor",
+    "schedule:earlyMondays",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "suppressNotifications": ["prEditedNotification", "prIgnoreNotification"],
+  "minimumReleaseAge": "7 days",
+  "rebaseWhen": "conflicted",
+  "automerge": false,
+  "semanticCommits": "enabled",
+  "labels": ["dependencies"],
+  "postUpdateOptions": ["pnpmDedupe"],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on the first day of the month"]
+  },
+  "packageRules": [
+    {
+      "description": "Docker base images: pin digests and allow major updates",
+      "managers": ["dockerfile"],
+      "pinDigests": true,
+      "allowMajorVersionUpgrade": true
+    },
+    {
+      "description": "Group pnpm and Node (engines) updates",
+      "managers": ["npm"],
+      "matchDepTypes": ["packageManager", "engines"],
+      "groupName": "pnpm and lockfile"
+    },
+    {
+      "description": "Group Node.js version updates",
+      "matchPackageNames": ["node"],
+      "matchManagers": ["dockerfile", "npm"],
+      "groupName": "Node.js"
+    },
+    {
+      "description": "Group database-related packages",
+      "matchPackageNames": ["pg", "sqlite3", "typeorm"],
+      "groupName": "Database"
+    },
+    {
+      "description": "Group GitHub Actions updates",
+      "managers": ["github-actions"],
+      "groupName": "GitHub Actions"
+    },
+    {
+      "description": "Label npm updates",
+      "managers": ["npm"],
+      "addLabels": ["javascript"]
+    },
+    {
+      "description": "Label GitHub Actions updates",
+      "managers": ["github-actions"],
+      "addLabels": ["github_actions"]
+    },
+    {
+      "description": "Label Docker updates",
+      "managers": ["dockerfile"],
+      "addLabels": ["docker"]
+    },
+    {
+      "description": "Semantic commit for npm dependencies",
+      "managers": ["npm"],
+      "matchPackagePatterns": ["*"],
+      "semanticCommitType": "chore",
+      "semanticCommitScope": "deps"
+    },
+    {
+      "description": "Semantic commit for Node version",
+      "matchPackageNames": ["node"],
+      "semanticCommitType": "build",
+      "semanticCommitScope": "node"
+    },
+    {
+      "description": "Semantic commit for GitHub Actions",
+      "managers": ["github-actions"],
+      "semanticCommitType": "ci",
+      "semanticCommitScope": "actions"
+    },
+    {
+      "description": "Semantic commit for Docker",
+      "managers": ["dockerfile"],
+      "semanticCommitType": "build",
+      "semanticCommitScope": "docker"
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+name: 📚 Documentation
+description: Report a docs problem or suggest a docs improvement
+title: "[Docs]: "
+labels:
+  - documentation
+  - awaiting-triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve the docs! Use this for documentation issues (typos, unclear steps, missing info).
+        For app bugs or feature ideas, please use the other templates.
+
+  - type: input
+    id: doc-location
+    attributes:
+      label: Page / location
+      description: Link to the docs page or file (e.g. https://0xsysr3ll.github.io/scroblarr/docs/... or path in repo)
+      placeholder: "https://0xsysr3ll.github.io/scroblarr/docs/..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: doc-area
+    attributes:
+      label: Docs area
+      options:
+        - docs site
+        - README / repo docs
+        - API / configuration
+        - other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's wrong or missing?
+      description: Describe the issue in the docs.
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggested-fix
+    attributes:
+      label: Suggested change
+      description: If you know what should be changed, describe it or paste proposed wording.
+    validations:
+      required: false

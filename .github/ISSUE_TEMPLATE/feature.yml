@@ -1,0 +1,46 @@
+name: 🚀 Feature request
+description: Suggest a new feature or improvement for Scroblarr
+labels:
+  - enhancement
+  - awaiting-triage
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to suggest a feature!
+
+  - type: textarea
+    id: problem_or_use_case
+    attributes:
+      label: Problem or use case
+      description: A clear description of the problem or use case.
+      placeholder: |
+        e.g. "I want to sync to X" or "It would help if..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Proposed solution
+      description: Describe the feature or improvement you'd like.
+      placeholder: Describe the feature or change you're proposing…
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives_considered
+    attributes:
+      label: Alternatives considered
+      description: Any alternative solutions or workarounds you've considered.
+      placeholder: List any alternatives or workarounds you've tried…
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional context
+      description: Screenshots, examples from other apps, or links to relevant docs.
+      placeholder: Add any extra details, screenshots, or links here…
+

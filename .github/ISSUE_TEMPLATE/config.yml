@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://0xsysr3ll.github.io/scroblarr/docs
+    about: Installation, configuration, and troubleshooting
+  - name: GitHub Discussions
+    url: https://github.com/0xsysr3ll/scroblarr/discussions
+    about: Ask questions and discuss with the community

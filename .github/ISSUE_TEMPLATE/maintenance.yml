@@ -1,0 +1,52 @@
+name: 🧰 Maintenance / chore
+description: CI, GitHub Actions, build, dependencies, refactors (non-feature work)
+title: "[Chore]: "
+labels:
+  - maintenance
+  - awaiting-triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for internal tasks (CI, workflows, tooling, refactors). For user-facing bugs or features, use the other templates.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - CI / GitHub Actions
+        - build / packaging
+        - dependencies
+        - release process
+        - refactor / tech debt
+        - tooling / scripts
+        - other
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What needs doing and why?
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: What does "done" look like? (optional)
+      placeholder: |
+        - [ ] ...
+    validations:
+      required: false
+
+  - type: input
+    id: related
+    attributes:
+      label: Related links
+      description: PRs, workflow runs, or relevant issues.
+    validations:
+      required: false

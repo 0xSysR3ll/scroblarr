@@ -1,0 +1,29 @@
+# Ephemeral stack for CI smoke tests (image must be built locally as scroblarr:ci first).
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: scroblarr
+      POSTGRES_PASSWORD: scroblarr_ci
+      POSTGRES_DB: scroblarr
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scroblarr -d scroblarr"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  scroblarr:
+    image: scroblarr:ci
+    ports:
+      - "18080:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: scroblarr
+      POSTGRES_PASSWORD: scroblarr_ci
+      POSTGRES_DATABASE: scroblarr
+    depends_on:
+      postgres:
+        condition: service_healthy
