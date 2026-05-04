@@ -30,6 +30,9 @@ RUN pnpm build
 FROM node:20-bookworm-slim AS runner
 
 ARG PNPM_VERSION
+ARG GIT_TAG=
+ENV GIT_TAG=${GIT_TAG}
+
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 
 RUN apt-get update \
@@ -67,7 +70,8 @@ ENV PUBLIC_DIR=/app/public
 
 LABEL org.opencontainers.image.title="scroblarr" \
   org.opencontainers.image.description="Media scrobbling service for Plex, Jellyfin, and Emby" \
-  org.opencontainers.image.source="https://github.com/0xsysr3ll/scroblarr"
+  org.opencontainers.image.source="https://github.com/0xsysr3ll/scroblarr" \
+  org.opencontainers.image.version="${GIT_TAG}"
 
 EXPOSE 3000
 

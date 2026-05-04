@@ -80,6 +80,8 @@ jobs:
         with:
           context: .
           push: true
+          build-args: |
+            GIT_TAG=${{ github.ref_name }}
           tags: |
             ${{ env.REGISTRY }}/${{ steps.meta.outputs.repo }}:${{ github.ref_name }}
             ${{ env.REGISTRY }}/${{ steps.meta.outputs.repo }}:latest

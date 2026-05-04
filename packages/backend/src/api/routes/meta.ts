@@ -20,8 +20,9 @@ function resolveGitTag(): string | null {
     return cachedTag;
   }
 
-  if (process.env.GIT_TAG) {
-    cachedTag = process.env.GIT_TAG;
+  const fromEnv = process.env.GIT_TAG?.trim();
+  if (fromEnv) {
+    cachedTag = fromEnv;
     return cachedTag;
   }
 
