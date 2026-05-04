@@ -103,14 +103,15 @@ The **`scroblarr-data`** volume is where SQLite (if you use it), logs, and app d
 
 Examples of what you might actually set:
 
-| Variable               | Example                                                 | What it's for                                                                                                                           |
-| ---------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `PORT`                 | `3000`                                                  | HTTP port inside the container                                                                                                          |
-| `DATA_DIR`             | _(default `/app/data` in the image)_                    | Where SQLite + logs + app files go                                                                                                      |
-| `DATABASE_PATH`        | `/app/data/custom.db`                                   | Full path to a specific SQLite file                                                                                                     |
-| `POSTGRES_*`           | host `postgres`, user `scroblarr`, …                    | Switch to Postgres instead of SQLite                                                                                                    |
-| `CORS_ALLOWED_ORIGINS` | `https://app.example.com,https://scroblarr.example.com` | Only needed when the **browser** loads the UI from a different scheme/host/port than the API (see [Configuration](/docs/configuration)) |
-| `PUBLIC_DIR`           | `/app/public`                                           | The image already ships the built UI here; you'd only change this for a custom build layout                                             |
+| Variable               | Example                                                 | What it's for                                                                                                                                                                                                                                                                                                                             |
+| ---------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PORT`                 | `3000`                                                  | HTTP port inside the container                                                                                                                                                                                                                                                                                                            |
+| `DATA_DIR`             | _(default `/app/data` in the image)_                    | Where SQLite + logs + app files go                                                                                                                                                                                                                                                                                                        |
+| `DATABASE_PATH`        | `/app/data/custom.db`                                   | Full path to a specific SQLite file                                                                                                                                                                                                                                                                                                       |
+| `POSTGRES_*`           | host `postgres`, user `scroblarr`, …                    | Switch to Postgres instead of SQLite                                                                                                                                                                                                                                                                                                      |
+| `CORS_ALLOWED_ORIGINS` | `https://app.example.com,https://scroblarr.example.com` | Only needed when the **browser** loads the UI from a different scheme/host/port than the API (see [Configuration](/docs/configuration))                                                                                                                                                                                                   |
+| `PUBLIC_DIR`           | `/app/public`                                           | The image already ships the built UI here; you'd only change this for a custom build layout                                                                                                                                                                                                                                               |
+| `TRUST_PROXY`          | `false`                                                 | Optional. In production the app **trusts one proxy hop** by default when behind a reverse proxy. Set to `false` / `0` / `no` only if Node is exposed directly without a proxy. Set to `true` / `1` / `yes` in non-production if a dev tunnel sends `X-Forwarded-For`. See [Configuration — Trust proxy](/docs/configuration#trust-proxy). |
 
 ### Updating Docker image
 
@@ -204,6 +205,9 @@ PORT=3000
 
 # Example: UI is https://app.example.com but API is https://api.example.com
 # CORS_ALLOWED_ORIGINS=https://app.example.com
+
+# Optional: dev behind a tunnel/proxy that sends X-Forwarded-For (NODE_ENV not production)
+# TRUST_PROXY=true
 ```
 
 If you **do** set `DATA_DIR` to something like **`/var/lib/scroblarr`**, create it first:
