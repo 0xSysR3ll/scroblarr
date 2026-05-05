@@ -29,6 +29,27 @@ interface PlexResourcesResponse {
   MediaContainer?: PlexResourcesMediaContainer;
 }
 
+type ParsedPlexConnection = {
+  protocol: string;
+  address: string;
+  port: number;
+  uri: string;
+  local: boolean;
+  relay?: boolean;
+  reachable?: boolean;
+};
+
+type DiscoveredPlexServer = {
+  name: string;
+  address: string;
+  port: string;
+  localAddresses?: string;
+  machineIdentifier: string;
+  version: string;
+  url: string;
+  connections: ParsedPlexConnection[];
+};
+
 interface PlexAccount {
   id?: string | number;
   name?: string;
@@ -75,6 +96,7 @@ export interface PlexOAuthToken {
 export class PlexOAuth {
   private clientIdentifier: string;
   private baseUrl = "https://plex.tv";
+  private static readonly MAX_CONNECTIONS_PER_SERVER = 6;
 
   constructor(clientIdentifier?: string) {
     this.clientIdentifier = clientIdentifier || this.generateClientIdentifier();
@@ -254,92 +276,72 @@ export class PlexOAuth {
     };
   }
 
-  async getServers(accessToken: string): Promise<
-    Array<{
-      name: string;
-      address: string;
-      port: string;
-      localAddresses?: string;
-      machineIdentifier: string;
-      version: string;
-      url: string;
-      connections: Array<{
-        protocol: string;
-        address: string;
-        port: number;
-        uri: string;
-        local: boolean;
-        relay?: boolean;
-      }>;
-    }>
-  > {
-    const response = await fetch(
-      `${this.baseUrl}/api/resources?includeHttps=1&includeRelay=1`,
-      {
-        headers: {
-          "X-Plex-Token": accessToken,
-        },
-      }
-    );
+  async getServers(accessToken: string): Promise<DiscoveredPlexServer[]> {
+    const resourceResults = await Promise.allSettled([
+      this.fetchResources(accessToken, true),
+      this.fetchResources(accessToken, false),
+    ]);
+    const [httpsResult, httpResult] = resourceResults;
 
-    if (!response.ok) {
-      const text = await response.text();
-      logger.plex.error(
-        {
-          status: response.status,
-          statusText: response.statusText,
-          errorText: text.substring(0, 500),
-        },
-        "Failed to get Plex servers"
-      );
-      throw new Error(
-        `Failed to get servers: ${response.status} ${
-          response.statusText
-        } - ${text.substring(0, 200)}`
-      );
+    if (httpsResult.status === "rejected" && httpResult.status === "rejected") {
+      throw new Error("Failed to fetch Plex servers");
     }
 
-    const xmlText = await response.text();
+    const httpsData =
+      httpsResult.status === "fulfilled" ? httpsResult.value : undefined;
+    const httpData =
+      httpResult.status === "fulfilled" ? httpResult.value : undefined;
 
-    const data = await new Promise<PlexResourcesResponse>((resolve, reject) => {
-      parseString(
-        xmlText,
-        { explicitArray: false, mergeAttrs: true },
-        (err, result) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(result as PlexResourcesResponse);
-          }
-        }
-      );
-    });
+    const servers: DiscoveredPlexServer[] = [];
 
-    const servers: Array<{
-      name: string;
-      address: string;
-      port: string;
-      localAddresses?: string;
-      machineIdentifier: string;
-      version: string;
-      url: string;
-      connections: Array<{
-        protocol: string;
-        address: string;
-        port: number;
-        uri: string;
-        local: boolean;
-        relay?: boolean;
-      }>;
-    }> = [];
+    const devicesFromHttps = httpsData?.MediaContainer?.Device;
+    const devicesFromHttp = httpData?.MediaContainer?.Device;
 
-    if (!data.MediaContainer || !data.MediaContainer.Device) {
+    if (!devicesFromHttps && !devicesFromHttp) {
       return servers;
     }
 
-    const devices = Array.isArray(data.MediaContainer.Device)
-      ? data.MediaContainer.Device
-      : [data.MediaContainer.Device];
+    const normalizeDevices = (
+      devices: PlexDevice | PlexDevice[] | undefined
+    ): PlexDevice[] => {
+      if (!devices) return [];
+      return Array.isArray(devices) ? devices : [devices];
+    };
+
+    const allDevices = [
+      ...normalizeDevices(devicesFromHttps),
+      ...normalizeDevices(devicesFromHttp),
+    ];
+
+    const devicesByMachineIdentifier = new Map<string, PlexDevice>();
+    const rawConnectionsByMachineIdentifier = new Map<
+      string,
+      PlexConnection[]
+    >();
+    const getDeviceId = (device: PlexDevice): string =>
+      device.clientIdentifier || device.machineIdentifier || device.name || "";
+    const collectRawConnections = (d: PlexDevice): PlexConnection[] =>
+      Array.isArray(d.Connection)
+        ? d.Connection
+        : d.Connection
+          ? [d.Connection]
+          : [];
+
+    for (const device of allDevices) {
+      const id = getDeviceId(device);
+      if (!id) continue;
+      if (!devicesByMachineIdentifier.has(id)) {
+        devicesByMachineIdentifier.set(id, device);
+      }
+      const existingConnections =
+        rawConnectionsByMachineIdentifier.get(id) || [];
+      rawConnectionsByMachineIdentifier.set(id, [
+        ...existingConnections,
+        ...collectRawConnections(device),
+      ]);
+    }
+
+    const devices = Array.from(devicesByMachineIdentifier.values());
 
     for (const device of devices) {
       const provides = device.provides || "";
@@ -353,38 +355,66 @@ export class PlexOAuth {
         continue;
       }
 
-      const rawConnections: PlexConnection[] = Array.isArray(device.Connection)
-        ? device.Connection
-        : device.Connection
-          ? [device.Connection]
-          : [];
+      const rawConnections =
+        rawConnectionsByMachineIdentifier.get(getDeviceId(device)) || [];
 
-      const parsedConnections = rawConnections.map((c) => ({
-        protocol: c.protocol || "http",
-        address: c.address || "",
-        port: Number(c.port || "32400"),
-        uri:
-          c.uri ||
-          `${c.protocol || "http"}://${c.address || ""}:${c.port || "32400"}`,
-        local: c.local === "1" || c.local === true || c.local === "true",
-        relay: c.relay === "1" || c.relay === true || c.relay === "true",
-      }));
+      const connectionMap = new Map<string, ParsedPlexConnection>();
+
+      for (const c of rawConnections) {
+        const protocol = c.protocol || "http";
+        const address = c.address || "";
+        const port = Number(c.port || "32400");
+        const uri = c.uri || `${protocol}://${address}:${port}`;
+        const local = c.local === "1" || c.local === true || c.local === "true";
+        const relay = c.relay === "1" || c.relay === true || c.relay === "true";
+        const key = `${protocol}|${address}|${port}|${local ? "1" : "0"}|${
+          relay ? "1" : "0"
+        }`;
+
+        connectionMap.set(key, {
+          protocol,
+          address,
+          port,
+          uri,
+          local,
+          relay,
+        });
+      }
+
+      const parsedConnections = this.compactAndSortConnections(
+        Array.from(connectionMap.values())
+      );
 
       if (parsedConnections.length === 0) {
         continue;
       }
 
-      // Prefer non-local connection (plex.direct) for remote access, fallback to local
-      // plex.direct URLs work from anywhere, local IPs only work on same network
-      const remoteConnection = parsedConnections.find(
+      const connectionsWithReachability =
+        await this.annotateConnectionReachability(
+          parsedConnections,
+          accessToken
+        );
+
+      const localSecureConnection = connectionsWithReachability.find(
+        (c) => c.local && c.protocol === "https"
+      );
+      const localConnection = connectionsWithReachability.find((c) => c.local);
+      const remoteSecureConnection = connectionsWithReachability.find(
+        (c) => !c.local && c.protocol === "https"
+      );
+      const remotePlexDirectConnection = connectionsWithReachability.find(
         (c) => !c.local && c.uri && c.uri.includes("plex.direct")
       );
-      const localConnection = parsedConnections.find((c) => c.local);
-      const anyConnection = parsedConnections[0];
+      const anyConnection = connectionsWithReachability[0];
 
-      // Prefer remote plex.direct, then local, then any
+      // Prefer local connection by default because it's usually reachable
+      // from self-hosted containers, then fallback to remote options.
       const preferredConnection =
-        remoteConnection || localConnection || anyConnection;
+        localSecureConnection ||
+        localConnection ||
+        remoteSecureConnection ||
+        remotePlexDirectConnection ||
+        anyConnection;
 
       servers.push({
         name: device.name,
@@ -398,10 +428,133 @@ export class PlexOAuth {
           device.clientIdentifier || device.machineIdentifier || "",
         version: device.productVersion || device.version || "",
         url: preferredConnection.uri,
-        connections: parsedConnections,
+        connections: connectionsWithReachability,
       });
     }
     return servers;
+  }
+
+  private async annotateConnectionReachability(
+    connections: ParsedPlexConnection[],
+    accessToken: string
+  ): Promise<ParsedPlexConnection[]> {
+    const timeoutMs = 1500;
+    return Promise.all(
+      connections.map(async (connection) => {
+        try {
+          const identityUrl = `${connection.uri}/identity`;
+          const response = await fetch(identityUrl, {
+            headers: {
+              "X-Plex-Token": accessToken,
+            },
+            signal: AbortSignal.timeout(timeoutMs),
+          });
+          return {
+            ...connection,
+            // Any HTTP response means the endpoint is reachable.
+            reachable: response.status > 0,
+          };
+        } catch {
+          return { ...connection, reachable: false };
+        }
+      })
+    );
+  }
+
+  private async fetchResources(
+    accessToken: string,
+    includeHttps: boolean
+  ): Promise<PlexResourcesResponse> {
+    const query = includeHttps
+      ? "includeHttps=1&includeRelay=1"
+      : "includeRelay=1";
+    const response = await fetch(`${this.baseUrl}/api/resources?${query}`, {
+      headers: {
+        "X-Plex-Token": accessToken,
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      logger.plex.error(
+        {
+          status: response.status,
+          statusText: response.statusText,
+          errorText: text.substring(0, 500),
+          includeHttps,
+        },
+        "Failed to get Plex servers"
+      );
+      throw new Error(
+        `Failed to get servers: ${response.status} ${
+          response.statusText
+        } - ${text.substring(0, 200)}`
+      );
+    }
+
+    const xmlText = await response.text();
+    return new Promise<PlexResourcesResponse>((resolve, reject) => {
+      parseString(
+        xmlText,
+        { explicitArray: false, mergeAttrs: true },
+        (err, result) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(result as PlexResourcesResponse);
+          }
+        }
+      );
+    });
+  }
+
+  private compactAndSortConnections(
+    connections: ParsedPlexConnection[]
+  ): ParsedPlexConnection[] {
+    const scoreConnection = (connection: ParsedPlexConnection): number => {
+      if (connection.local && connection.protocol === "http") return 0;
+      if (connection.local && connection.protocol === "https") return 1;
+      if (
+        !connection.local &&
+        !connection.relay &&
+        connection.protocol === "https"
+      )
+        return 2;
+      if (
+        !connection.local &&
+        !connection.relay &&
+        connection.protocol === "http"
+      )
+        return 3;
+      return 4;
+    };
+
+    const sorted = [...connections].sort((a, b) => {
+      const byScore = scoreConnection(a) - scoreConnection(b);
+      if (byScore !== 0) return byScore;
+      return a.uri.localeCompare(b.uri);
+    });
+
+    const picked: typeof sorted = [];
+    const seenAddressPort = new Set<string>();
+    for (const connection of sorted) {
+      const addressPort = `${connection.address}:${connection.port}`;
+      const shouldKeepDuplicateAddressPort =
+        connection.local && connection.protocol === "https";
+
+      if (seenAddressPort.has(addressPort) && !shouldKeepDuplicateAddressPort) {
+        continue;
+      }
+
+      picked.push(connection);
+      seenAddressPort.add(addressPort);
+
+      if (picked.length >= PlexOAuth.MAX_CONNECTIONS_PER_SERVER) {
+        break;
+      }
+    }
+
+    return picked;
   }
 
   async getServerUsers(

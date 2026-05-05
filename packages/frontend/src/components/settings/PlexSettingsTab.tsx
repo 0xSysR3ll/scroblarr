@@ -16,7 +16,12 @@ import type { PlexServer } from "@services/api";
 import { showSuccess, showError } from "@utils/toast";
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { FaTrash, FaCheck, FaExclamationCircle } from "react-icons/fa";
+import {
+  FaTrash,
+  FaCheck,
+  FaExclamationCircle,
+  FaSyncAlt,
+} from "react-icons/fa";
 
 interface PlexSettingsTabProps {
   servers: PlexServer[];
@@ -29,6 +34,8 @@ interface PlexSettingsTabProps {
   hasPlexAccount: boolean;
   onPlexAuthenticate: () => void;
   plexAuthLoading: boolean;
+  plexRefreshLoading: boolean;
+  onRefreshPlexServers: () => void;
   plexLinkError: string | null;
   onSettingsUpdated?: () => void;
 }
@@ -44,6 +51,8 @@ export function PlexSettingsTab({
   hasPlexAccount,
   onPlexAuthenticate,
   plexAuthLoading,
+  plexRefreshLoading,
+  onRefreshPlexServers,
   plexLinkError,
   onSettingsUpdated,
 }: PlexSettingsTabProps) {
@@ -52,6 +61,7 @@ export function PlexSettingsTab({
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [manualServerUrl, setManualServerUrl] = useState(selectedServerUrl);
   const [authProviders, setAuthProviders] = useState<{
     hasAdmin: boolean;
     plexConfigured: boolean;
@@ -75,6 +85,10 @@ export function PlexSettingsTab({
     }
     loadAuthProviders();
   }, []);
+
+  useEffect(() => {
+    setManualServerUrl(selectedServerUrl);
+  }, [selectedServerUrl]);
 
   async function handleSave() {
     if (!selectedServerUrl || !hasUnsavedChanges) return;
@@ -225,9 +239,29 @@ export function PlexSettingsTab({
             </p>
           </div>
         </div>
-        {isConfigured && (
+        {hasPlexAccount && (
           <div className="mt-3 sm:mt-0 sm:absolute sm:top-0 sm:right-0 flex items-center gap-2">
-            {hasUnsavedChanges && (
+            <button
+              type="button"
+              onClick={onRefreshPlexServers}
+              disabled={plexRefreshLoading}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {plexRefreshLoading ? (
+                <>
+                  <Spinner size="sm" />
+                  {t("common.loading", { defaultValue: "Loading..." })}
+                </>
+              ) : (
+                <>
+                  <FaSyncAlt className="w-3 h-3" />
+                  {t("settings.refreshServers", {
+                    defaultValue: "Refresh servers",
+                  })}
+                </>
+              )}
+            </button>
+            {isConfigured && hasUnsavedChanges && (
               <button
                 type="button"
                 onClick={handleSave}
@@ -247,26 +281,28 @@ export function PlexSettingsTab({
                 )}
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => setShowRemoveModal(true)}
-              disabled={!canRemove}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              title={
-                !canRemove
-                  ? t("settings.cannotRemoveOnlyServer", {
-                      service: "Jellyfin",
-                      defaultValue:
-                        "Cannot remove the only configured server. Configure Jellyfin first.",
-                    })
-                  : undefined
-              }
-            >
-              <FaTrash className="w-4 h-4" />
-              {t("settings.removePlexServer", {
-                defaultValue: "Remove Server",
-              })}
-            </button>
+            {isConfigured && (
+              <button
+                type="button"
+                onClick={() => setShowRemoveModal(true)}
+                disabled={!canRemove}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                title={
+                  !canRemove
+                    ? t("settings.cannotRemoveOnlyServer", {
+                        service: "Jellyfin",
+                        defaultValue:
+                          "Cannot remove the only configured server. Configure Jellyfin first.",
+                      })
+                    : undefined
+                }
+              >
+                <FaTrash className="w-4 h-4" />
+                {t("settings.removePlexServer", {
+                  defaultValue: "Remove Server",
+                })}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -283,6 +319,42 @@ export function PlexSettingsTab({
       )}
 
       <div className="space-y-4">
+        <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
+          <label className="mb-2 block text-sm font-medium text-foreground">
+            {t("settings.manualConnectionUrl", {
+              defaultValue: "Manual Connection URL",
+            })}
+          </label>
+          <div>
+            <input
+              type="url"
+              value={manualServerUrl}
+              onChange={(e) => setManualServerUrl(e.target.value)}
+              onBlur={() => {
+                const trimmed = manualServerUrl.trim();
+                if (trimmed && trimmed !== selectedServerUrl) {
+                  onSelectedServerUrlChange(trimmed);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                const trimmed = manualServerUrl.trim();
+                if (trimmed && trimmed !== selectedServerUrl) {
+                  onSelectedServerUrlChange(trimmed);
+                }
+              }}
+              placeholder="http://192.168.1.10:32400"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {t("settings.manualConnectionHelp", {
+              defaultValue:
+                "Use this if auto-discovered Plex connections are unreachable from your Docker network.",
+            })}
+          </p>
+        </div>
+
         {servers.map((server) => {
           const isEditing = editingServer === server.machineIdentifier;
           const selectedConnection = getSelectedConnection(server);
@@ -371,13 +443,27 @@ export function PlexSettingsTab({
                                     Local
                                   </span>
                                 )}
+                                {connection.reachable === false && (
+                                  <span className="whitespace-nowrap rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800 dark:bg-red-900 dark:text-red-200">
+                                    {t("settings.unreachableConnection", {
+                                      defaultValue: "Unreachable",
+                                    })}
+                                  </span>
+                                )}
+                                {connection.reachable === true && (
+                                  <span className="whitespace-nowrap rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
+                                    {t("settings.reachableConnection", {
+                                      defaultValue: "Reachable",
+                                    })}
+                                  </span>
+                                )}
                                 {connection.relay && (
                                   <span className="px-2 py-0.5 text-xs font-semibold rounded bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 whitespace-nowrap">
                                     Relay
                                   </span>
                                 )}
                                 {!connection.local && !connection.relay && (
-                                  <span className="px-2 py-0.5 text-xs font-semibold rounded bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 whitespace-nowrap">
+                                  <span className="px-2 py-0.5 text-xs font-semibold rounded bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 whitespace-nowrap">
                                     Remote
                                   </span>
                                 )}

@@ -260,7 +260,15 @@
       "releases": "All releases",
       "license": "License (MIT)",
       "trademarkDisclaimer": "Plex, Jellyfin, Trakt, TVTime, and related marks are trademarks of their respective owners. Scroblarr is an independent project and is not sponsored, endorsed, or affiliated with those services."
-    }
+    },
+    "manualConnectionUrl": "Manual Connection URL",
+    "useManualConnection": "Use URL",
+    "manualConnectionHelp": "Use this if auto-discovered Plex connections are unreachable from your Docker network.",
+    "unreachableConnection": "Unreachable",
+    "reachableConnection": "Reachable",
+    "refreshServers": "Refresh servers",
+    "plexServersRefreshed": "Plex servers refreshed",
+    "refreshPlexServersFailed": "Failed to refresh Plex servers"
   },
   "theme": {
     "auto": "Auto (system)",

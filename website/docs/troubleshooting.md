@@ -68,6 +68,8 @@ If the Profile → Integrations page shows a message like "Profile details could
 
 - **Check media server connection**: Make sure Plex/Jellyfin is properly configured in Settings
 - **Check authentication**: For Plex, make sure you've authenticated and selected a server
+- **Check reachability badge**: In **Settings -> Media Server**, prefer a Plex connection marked **Reachable**. Connections marked **Unreachable** are visible but may timeout from your current network/container.
+- **Use manual Plex URL if needed**: If all discovered endpoints are unreachable, set **Manual Connection URL** to a LAN-reachable address (for example `http://192.168.x.x:32400`) and save.
 - **Check API access**: Scroblarr needs API access to fetch users. Verify your API keys are correct
 - **Try manual import**: You can manually add users if automatic import isn't working
 

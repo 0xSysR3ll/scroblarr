@@ -22,6 +22,7 @@ export interface PlexServerConnection {
   uri: string;
   local: boolean;
   relay?: boolean;
+  reachable?: boolean;
 }
 
 export interface PlexServer {

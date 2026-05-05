@@ -16,6 +16,14 @@ Configure Plex as a source for Scroblarr. This involves setting up the Plex serv
 
 When you save, Scroblarr stores your chosen server's **machine identifier** (Plex's `machineIdentifier` / webhook `Server.uuid`) when Plex provides it.
 
+### Connection list behavior
+
+Scroblarr merges Plex-discovered HTTP and HTTPS connections, then keeps a compact, prioritized list to avoid showing too many duplicate URLs.
+
+- Local connections are prioritized for self-hosted and Docker setups.
+- Each connection now shows a **Reachable** or **Unreachable** badge based on a quick connection check.
+- If discovery does not produce a usable URL for your network, you can set a **Manual Connection URL** (for example `http://192.168.x.x:32400`) and save it.
+
 ### Server identity and webhooks
 
 If a machine identifier is stored, Scroblarr **rejects** Plex webhooks whose payload `Server.uuid` does not match that value (**401** / `Invalid server identity`). That prevents another Plex server from posting to your webhook URL if your API key were ever exposed.
