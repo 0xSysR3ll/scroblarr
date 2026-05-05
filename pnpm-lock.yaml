@@ -187,8 +187,8 @@ importers:
         specifier: ^23.7.6
         version: 23.16.8
       i18next-browser-languagedetector:
-        specifier: ^7.2.0
-        version: 7.2.2
+        specifier: ^8.0.0
+        version: 8.2.1
       radix-ui:
         specifier: ^1.4.3
         version: 1.4.3(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -6060,8 +6060,8 @@ packages:
     resolution: {integrity: sha512-Y93lCzHYgGWdrJ66yIktxiaGULYc6oGiABxhcO5AufBeOyoIdZF7bIfLaOrbM0iGIOXQQgxxRrFEnb+Y6w1n4A==}
     engines: {node: '>=10.18'}
 
-  i18next-browser-languagedetector@7.2.2:
-    resolution: {integrity: sha512-6b7r75uIJDWCcCflmbof+sJ94k9UQO4X0YR62oUfqGI/GjCLVzlCwu8TFdRZIqVLzWbzNcmkmhfqKEr4TLz4HQ==}
+  i18next-browser-languagedetector@8.2.1:
+    resolution: {integrity: sha512-bZg8+4bdmaOiApD7N7BPT9W8MLZG+nPTOFlLiJiT8uzKXFjhxw4v2ierCXOwB5sFDMtuA5G4kgYZ0AznZxQ/cw==}
 
   i18next-scanner@4.6.0:
     resolution: {integrity: sha512-I/xKcwKfii3L3is3bUvfaIU0QA/wYhpZnjppfrzyb61QQddxkcpspASEtmfnxSYvE6yIaAxDlIxg0EHV7mxssg==}
@@ -17259,7 +17259,7 @@ snapshots:
 
   hyperdyperid@1.2.0: {}
 
-  i18next-browser-languagedetector@7.2.2:
+  i18next-browser-languagedetector@8.2.1:
     dependencies:
       '@babel/runtime': 7.29.2
 
