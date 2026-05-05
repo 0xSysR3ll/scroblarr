@@ -21,9 +21,8 @@
   "packageRules": [
     {
       "description": "Docker base images: pin digests and allow major updates",
-      "managers": ["dockerfile"],
-      "pinDigests": true,
-      "allowMajorVersionUpgrade": true
+      "managers": ["dockerfile", "docker-compose"],
+      "pinDigests": true
     },
     {
       "description": "Group pnpm and Node (engines) updates",
@@ -59,7 +58,7 @@
     },
     {
       "description": "Label Docker updates",
-      "managers": ["dockerfile"],
+      "managers": ["dockerfile", "docker-compose"],
       "addLabels": ["docker"]
     },
     {
@@ -83,9 +82,16 @@
     },
     {
       "description": "Semantic commit for Docker",
-      "managers": ["dockerfile"],
+      "managers": ["dockerfile", "docker-compose"],
       "semanticCommitType": "build",
       "semanticCommitScope": "docker"
+    },
+    {
+      "description": "Prioritize security fixes",
+      "matchJsonata": ["isVulnerabilityAlert = true"],
+      "dependencyDashboardApproval": false,
+      "automerge": false,
+      "labels": ["dependencies", "security"]
     }
   ]
 }
