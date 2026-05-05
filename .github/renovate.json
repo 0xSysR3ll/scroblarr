@@ -21,12 +21,12 @@
   "packageRules": [
     {
       "description": "Docker base images: pin digests and allow major updates",
-      "managers": ["dockerfile", "docker-compose"],
+      "matchManagers": ["dockerfile", "docker-compose"],
       "pinDigests": true
     },
     {
       "description": "Group pnpm and Node (engines) updates",
-      "managers": ["npm"],
+      "matchManagers": ["npm"],
       "matchDepTypes": ["packageManager", "engines"],
       "groupName": "pnpm and lockfile"
     },
@@ -43,27 +43,27 @@
     },
     {
       "description": "Group GitHub Actions updates",
-      "managers": ["github-actions"],
+      "matchManagers": ["github-actions"],
       "groupName": "GitHub Actions"
     },
     {
       "description": "Label npm updates",
-      "managers": ["npm"],
+      "matchManagers": ["npm"],
       "addLabels": ["javascript"]
     },
     {
       "description": "Label GitHub Actions updates",
-      "managers": ["github-actions"],
+      "matchManagers": ["github-actions"],
       "addLabels": ["github_actions"]
     },
     {
       "description": "Label Docker updates",
-      "managers": ["dockerfile", "docker-compose"],
+      "matchManagers": ["dockerfile", "docker-compose"],
       "addLabels": ["docker"]
     },
     {
       "description": "Semantic commit for npm dependencies",
-      "managers": ["npm"],
+      "matchManagers": ["npm"],
       "matchPackagePatterns": ["*"],
       "semanticCommitType": "chore",
       "semanticCommitScope": "deps"
@@ -76,13 +76,13 @@
     },
     {
       "description": "Semantic commit for GitHub Actions",
-      "managers": ["github-actions"],
+      "matchManagers": ["github-actions"],
       "semanticCommitType": "ci",
       "semanticCommitScope": "actions"
     },
     {
       "description": "Semantic commit for Docker",
-      "managers": ["dockerfile", "docker-compose"],
+      "matchManagers": ["dockerfile", "docker-compose"],
       "semanticCommitType": "build",
       "semanticCommitScope": "docker"
     },
