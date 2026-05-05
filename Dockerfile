@@ -8,6 +8,9 @@ RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 WORKDIR /app
 
 ENV PUPPETEER_SKIP_DOWNLOAD=true
+# sqlite3 often installs a prebuilt .node linked against newer glibc than
+# Debian bookworm (2.36); loading then fails and TypeORM reports "not installed".
+ENV npm_config_build_from_source=true
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ ca-certificates \
