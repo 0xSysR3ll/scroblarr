@@ -91,7 +91,7 @@
       "matchJsonata": ["isVulnerabilityAlert = true"],
       "dependencyDashboardApproval": false,
       "automerge": false,
-      "labels": ["dependencies", "security"]
+      "addLabels": ["security"]
     }
   ]
 }
