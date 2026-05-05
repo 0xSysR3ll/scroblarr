@@ -277,15 +277,25 @@ export class PlexOAuth {
   }
 
   async getServers(accessToken: string): Promise<DiscoveredPlexServer[]> {
-    const [httpsData, httpData] = await Promise.all([
+    const resourceResults = await Promise.allSettled([
       this.fetchResources(accessToken, true),
       this.fetchResources(accessToken, false),
     ]);
+    const [httpsResult, httpResult] = resourceResults;
+
+    if (httpsResult.status === "rejected" && httpResult.status === "rejected") {
+      throw new Error("Failed to fetch Plex servers");
+    }
+
+    const httpsData =
+      httpsResult.status === "fulfilled" ? httpsResult.value : undefined;
+    const httpData =
+      httpResult.status === "fulfilled" ? httpResult.value : undefined;
 
     const servers: DiscoveredPlexServer[] = [];
 
-    const devicesFromHttps = httpsData.MediaContainer?.Device;
-    const devicesFromHttp = httpData.MediaContainer?.Device;
+    const devicesFromHttps = httpsData?.MediaContainer?.Device;
+    const devicesFromHttp = httpData?.MediaContainer?.Device;
 
     if (!devicesFromHttps && !devicesFromHttp) {
       return servers;
