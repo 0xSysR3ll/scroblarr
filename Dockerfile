@@ -1,6 +1,6 @@
 ARG PNPM_VERSION=10.24.0
 
-FROM node:20-bookworm-slim AS builder
+FROM node:20-bookworm-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0 AS builder
 
 ARG PNPM_VERSION
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
@@ -27,7 +27,7 @@ COPY packages/shared packages/shared/
 
 RUN pnpm build
 
-FROM node:20-bookworm-slim AS runner
+FROM node:20-bookworm-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0 AS runner
 
 ARG PNPM_VERSION
 ARG GIT_TAG=
