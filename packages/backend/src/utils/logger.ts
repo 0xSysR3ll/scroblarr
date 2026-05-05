@@ -74,8 +74,10 @@ if (process.env.LOG_TO_FILE !== "false") {
     const maxSize = parseLogSize(process.env.LOG_MAX_SIZE);
     const maxFiles = parseInt(process.env.LOG_MAX_FILES || "5", 10);
 
-    const filenameGenerator = (time: number | Date | null, _index?: number) => {
-      // Format: scroblarr-YYYYMMDD.log
+    const filenameGenerator = (time: number | Date | null, index?: number) => {
+      // Format:
+      // - current stream: scroblarr-YYYYMMDD.log
+      // - size rotations: scroblarr-YYYYMMDD-<index>.log
       const date = time
         ? time instanceof Date
           ? time
@@ -84,7 +86,8 @@ if (process.env.LOG_TO_FILE !== "false") {
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, "0");
       const day = String(date.getDate()).padStart(2, "0");
-      return `scroblarr-${year}${month}${day}.log`;
+      const suffix = typeof index === "number" && index > 0 ? `-${index}` : "";
+      return `scroblarr-${year}${month}${day}${suffix}.log`;
     };
 
     const rotatingStream = createStream(filenameGenerator, {
