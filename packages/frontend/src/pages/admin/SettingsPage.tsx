@@ -60,6 +60,7 @@ export function SettingsPage() {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [refreshingPlexServers, setRefreshingPlexServers] = useState(false);
   const [plexLinkError, setPlexLinkError] = useState<string | null>(null);
   const [linkingPlex, setLinkingPlex] = useState(false);
   const [versionInfo, setVersionInfo] = useState<AppVersionInfo | null>(null);
@@ -71,17 +72,8 @@ export function SettingsPage() {
         setServers(serversData);
 
         if (configuredServerUrl) {
-          const isValid = serversData.some((server) =>
-            server.connections.some((conn) => conn.uri === configuredServerUrl)
-          );
-          if (isValid) {
-            setSelectedServerUrl(configuredServerUrl);
-          } else if (
-            serversData.length > 0 &&
-            serversData[0].connections.length > 0
-          ) {
-            setSelectedServerUrl(serversData[0].url);
-          }
+          // Keep custom/manual URLs even if they are not in discovered connections.
+          setSelectedServerUrl(configuredServerUrl);
         } else if (
           serversData.length > 0 &&
           serversData[0].connections.length > 0
@@ -262,6 +254,28 @@ export function SettingsPage() {
     }
   }
 
+  async function handleRefreshPlexServers() {
+    try {
+      setRefreshingPlexServers(true);
+      await fetchAndSetPlexServers(selectedServerUrl || settings.plexServerUrl);
+      showSuccess(
+        t("settings.plexServersRefreshed", {
+          defaultValue: "Plex servers refreshed",
+        })
+      );
+    } catch (err) {
+      showError(
+        err instanceof Error
+          ? err.message
+          : t("settings.refreshPlexServersFailed", {
+              defaultValue: "Failed to refresh Plex servers",
+            })
+      );
+    } finally {
+      setRefreshingPlexServers(false);
+    }
+  }
+
   if (!isAdmin) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -398,6 +412,8 @@ export function SettingsPage() {
               hasPlexAccount={!!user?.plexUsername}
               onPlexAuthenticate={plexLogin}
               plexAuthLoading={plexLoading || linkingPlex}
+              plexRefreshLoading={refreshingPlexServers}
+              onRefreshPlexServers={handleRefreshPlexServers}
               plexLinkError={plexLinkError}
               settings={settings}
               onJellyfinSettingsChange={setJellyfinSettings}

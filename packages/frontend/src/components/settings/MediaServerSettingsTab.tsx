@@ -15,6 +15,8 @@ interface MediaServerSettingsTabProps {
   hasPlexAccount: boolean;
   onPlexAuthenticate: () => void;
   plexAuthLoading: boolean;
+  plexRefreshLoading: boolean;
+  onRefreshPlexServers: () => void;
   plexLinkError: string | null;
   // Jellyfin props
   settings: Settings;
@@ -39,6 +41,8 @@ export function MediaServerSettingsTab({
   hasPlexAccount,
   onPlexAuthenticate,
   plexAuthLoading,
+  plexRefreshLoading,
+  onRefreshPlexServers,
   plexLinkError,
   settings,
   onJellyfinSettingsChange,
@@ -59,6 +63,8 @@ export function MediaServerSettingsTab({
           hasPlexAccount={hasPlexAccount}
           onPlexAuthenticate={onPlexAuthenticate}
           plexAuthLoading={plexAuthLoading}
+          plexRefreshLoading={plexRefreshLoading}
+          onRefreshPlexServers={onRefreshPlexServers}
           plexLinkError={plexLinkError}
           onSettingsUpdated={onSettingsUpdated}
         />
