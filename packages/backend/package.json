@@ -17,7 +17,8 @@
     "migration:run": "tsx src/scripts/runMigrations.ts",
     "migration:generate": "tsx ../../node_modules/typeorm/cli.js migration:generate -d typeorm.config.ts",
     "migration:revert": "tsx ../../node_modules/typeorm/cli.js migration:revert -d typeorm.config.ts",
-    "seed": "tsx src/scripts/seedDatabase.ts"
+    "seed": "tsx src/scripts/seedDatabase.ts",
+    "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
     "@scroblarr/shared": "workspace:*",

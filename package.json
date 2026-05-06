@@ -21,6 +21,7 @@
     "format": "prettier --log-level warn --write --cache \"**/*.{ts,tsx,js,jsx,json,css,md,mdx}\"",
     "format:check": "prettier --log-level warn --check --cache \"**/*.{ts,tsx,js,jsx,json,css,md,mdx}\"",
     "check": "pnpm lint && pnpm format:check && pnpm type-check",
+    "test": "pnpm --filter '@scroblarr/backend' test && pnpm --filter '@scroblarr/frontend' test",
     "i18n:extract": "pnpm --filter '@scroblarr/frontend' i18n:extract"
   },
   "devDependencies": {
@@ -29,6 +30,7 @@
     "@types/express-rate-limit": "^6.0.2",
     "@types/helmet": "^4.0.0",
     "@types/node": "^25.5.0",
+    "@types/supertest": "^7.2.0",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.4",
@@ -37,10 +39,13 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.0.0",
     "prettier": "^3.8.1",
+    "supertest": "^7.2.2",
     "ts-morph": "^24.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.57.0"
+    "typescript-eslint": "^8.57.0",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^3.2.4"
   },
   "lint-staged": {
     "**/*.{ts,tsx,js,jsx}": [
