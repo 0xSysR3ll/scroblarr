@@ -1,7 +1,6 @@
 import type { MediaEvent } from "@scroblarr/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-
 const userRepositoryMocks = vi.hoisted(() => ({
   findBySourceUsername: vi.fn(),
   findByJellyfinUserId: vi.fn(),
