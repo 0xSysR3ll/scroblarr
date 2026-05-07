@@ -42,6 +42,14 @@ Check out the documentation for installation (Docker or build from source), conf
 - Check the [documentation](https://0xsysr3ll.github.io/scroblarr/docs) first — your question might already be covered.
 - [GitHub Issues](https://github.com/0xsysr3ll/scroblarr/issues) — bugs and feature requests.
 
+## Testing
+
+- Run all baseline tests from the repository root: `pnpm test`
+- Run backend tests only: `pnpm --filter '@scroblarr/backend' test`
+- Run frontend tests only: `pnpm --filter '@scroblarr/frontend' test`
+- Place tests next to source files using `*.test.ts` / `*.test.tsx`
+- For core-path changes (auth/session checks, API cache/state logic), add or update at least one focused test
+
 ## Contributing
 
 Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
