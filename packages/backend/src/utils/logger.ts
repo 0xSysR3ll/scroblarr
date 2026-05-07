@@ -99,6 +99,7 @@ if (process.env.LOG_TO_FILE !== "false") {
       path: logDir,
       size: maxSize,
       interval: "1d",
+      intervalUTC: true,
       maxFiles,
       compress: "gzip",
       omitExtension: false,
