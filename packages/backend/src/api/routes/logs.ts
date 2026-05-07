@@ -2,7 +2,7 @@ import { createReadStream } from "fs";
 import { readFile, readdir, stat } from "fs/promises";
 import { join, resolve, sep } from "path";
 
-import { logger } from "@utils/logger";
+import { formatDateUTC, logger } from "@utils/logger";
 import { getDataDir } from "@utils/paths";
 import { Router, Request, Response } from "express";
 import { z } from "zod";
@@ -11,13 +11,6 @@ import { adminAuth } from "../middleware/adminAuth";
 
 const router = Router();
 const logDir = join(getDataDir(), "logs");
-
-const formatDateUTC = (date: Date): string => {
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  return `${year}${month}${day}`;
-};
 
 const getLogsQuerySchema = z.object({
   page: z
