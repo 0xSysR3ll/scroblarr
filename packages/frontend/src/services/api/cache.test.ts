@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   getCached,
@@ -8,6 +8,10 @@ import {
 } from "./cache";
 
 describe("api cache store", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("stores and returns cached values before expiry", () => {
     setCached("sync:status", { ok: true });
     expect(getCached<{ ok: boolean }>("sync:status")).toEqual({ ok: true });
@@ -22,8 +26,6 @@ describe("api cache store", () => {
 
     vi.setSystemTime(new Date(now.getTime() + 5 * 60 * 1000 + 1));
     expect(getCached("sync:profile")).toBeNull();
-
-    vi.useRealTimers();
   });
 
   it("invalidates entries by prefix", () => {
