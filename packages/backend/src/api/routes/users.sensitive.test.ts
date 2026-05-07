@@ -69,6 +69,7 @@ describe("sensitive user deletion routes", () => {
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ error: "Cannot delete your own account" });
+    expect(userRepositoryMocks.delete).not.toHaveBeenCalled();
   });
 
   it("rejects deleting admin users", async () => {
