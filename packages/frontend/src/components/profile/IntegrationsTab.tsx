@@ -463,13 +463,13 @@ export function IntegrationsTab({
             <img
               src="/logos/tvtime.png"
               alt="TVTime"
-              className="w-8 h-8 object-contain flex-shrink-0"
+              className="w-8 h-8 object-contain shrink-0"
             />
             <div className="flex-1 min-w-0">
               <h3 className="text-base font-semibold text-foreground">
                 TVTime
               </h3>
-              <p className="text-xs text-muted-foreground break-words">
+              <p className="text-xs text-muted-foreground wrap-break-word">
                 {t("tvtime.description", {
                   defaultValue:
                     "Sync your watched episodes automatically. Your credentials are stored securely.",
@@ -478,7 +478,7 @@ export function IntegrationsTab({
             </div>
           </div>
           {tvtimeStatus?.linked && (
-            <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
+            <div className="hidden sm:flex items-center gap-3 shrink-0">
               <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                 <FaCheckCircle className="w-5 h-5" />
                 <span className="text-sm font-medium">
@@ -524,7 +524,7 @@ export function IntegrationsTab({
                     <img
                       src={tvtimeProfile.image}
                       alt="Profile"
-                      className="w-16 h-16 rounded-full flex-shrink-0"
+                      className="w-16 h-16 rounded-full shrink-0"
                     />
                   )}
                   <div className="flex-1 space-y-2">
@@ -749,7 +749,7 @@ export function IntegrationsTab({
                             : "text-muted-foreground/70"
                       }`}
                     >
-                      <div className="flex-shrink-0">
+                      <div className="shrink-0">
                         {index < linkProgress.currentStep ? (
                           <FaCheckCircle className="w-4 h-4" />
                         ) : index === linkProgress.currentStep ? (
@@ -771,7 +771,7 @@ export function IntegrationsTab({
       {error && (
         <div className="bg-red-50 dark:bg-red-950 border-l-4 border-red-400 dark:border-red-600 p-4 rounded">
           <div className="flex">
-            <div className="flex-shrink-0">
+            <div className="shrink-0">
               <FaTimesCircle className="h-5 w-5 text-red-400 dark:text-red-500" />
             </div>
             <div className="ml-3">
@@ -788,7 +788,7 @@ export function IntegrationsTab({
             <img
               src="/logos/trakt.svg"
               alt="Trakt"
-              className="w-8 h-8 object-contain flex-shrink-0"
+              className="w-8 h-8 object-contain shrink-0"
               onError={(e) => {
                 // Fallback if logo doesn't exist
                 (e.target as HTMLImageElement).style.display = "none";
@@ -796,7 +796,7 @@ export function IntegrationsTab({
             />
             <div className="flex-1 min-w-0">
               <h3 className="text-base font-semibold text-foreground">Trakt</h3>
-              <p className="text-xs text-muted-foreground break-words">
+              <p className="text-xs text-muted-foreground wrap-break-word">
                 {t("trakt.description", {
                   defaultValue:
                     "Sync your watched movies and episodes to Trakt. Uses OAuth for secure authentication.",
@@ -805,7 +805,7 @@ export function IntegrationsTab({
             </div>
           </div>
           {traktStatus?.linked && (
-            <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
+            <div className="hidden sm:flex items-center gap-3 shrink-0">
               <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                 <FaCheckCircle className="w-5 h-5" />
                 <span className="text-sm font-medium">
@@ -840,7 +840,7 @@ export function IntegrationsTab({
                 <img
                   src={traktStatus.image}
                   alt="Profile"
-                  className="w-16 h-16 rounded-full flex-shrink-0"
+                  className="w-16 h-16 rounded-full shrink-0"
                 />
               )}
               <div className="flex-1 space-y-2">
@@ -909,7 +909,7 @@ export function IntegrationsTab({
             {traktError && (
               <div className="p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg">
                 <div className="flex items-start gap-2">
-                  <FaTimesCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                  <FaTimesCircle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <p className="text-sm text-red-800 dark:text-red-200 mb-2">
                       {traktError}
