@@ -100,6 +100,7 @@ if (process.env.LOG_TO_FILE !== "false") {
       size: maxSize,
       interval: "1d",
       intervalUTC: true,
+      intervalBoundary: true,
       maxFiles,
       compress: "gzip",
       omitExtension: false,
