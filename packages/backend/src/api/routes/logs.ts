@@ -12,6 +12,13 @@ import { adminAuth } from "../middleware/adminAuth";
 const router = Router();
 const logDir = join(getDataDir(), "logs");
 
+const formatDateUTC = (date: Date): string => {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}${month}${day}`;
+};
+
 const getLogsQuerySchema = z.object({
   page: z
     .string()
@@ -53,11 +60,8 @@ router.get("/", async (req: Request, res: Response) => {
         .json({ error: "Page size must be between 1 and 1000" });
     }
 
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const day = String(now.getDate()).padStart(2, "0");
-    const logFilePath = join(logDir, `scroblarr-${year}${month}${day}.log`);
+    const todayUtc = formatDateUTC(new Date());
+    const logFilePath = join(logDir, `scroblarr-${todayUtc}.log`);
 
     try {
       await stat(logFilePath);

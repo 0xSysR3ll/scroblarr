@@ -69,6 +69,13 @@ const parseLogSize = (value: string | undefined): LogSize => {
   return `${amount}${unit}` as LogSize;
 };
 
+const formatDateUTC = (date: Date): string => {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}${month}${day}`;
+};
+
 if (process.env.LOG_TO_FILE !== "false") {
   try {
     const maxSize = parseLogSize(process.env.LOG_MAX_SIZE);
@@ -83,11 +90,9 @@ if (process.env.LOG_TO_FILE !== "false") {
           ? time
           : new Date(time)
         : new Date();
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
+      const dateKey = formatDateUTC(date);
       const suffix = typeof index === "number" && index > 0 ? `-${index}` : "";
-      return `scroblarr-${year}${month}${day}${suffix}.log`;
+      return `scroblarr-${dateKey}${suffix}.log`;
     };
 
     const rotatingStream = createStream(filenameGenerator, {
@@ -96,6 +101,7 @@ if (process.env.LOG_TO_FILE !== "false") {
       interval: "1d",
       maxFiles,
       compress: "gzip",
+      omitExtension: false,
     });
 
     rotatingStream.on("error", (error: unknown) => {
