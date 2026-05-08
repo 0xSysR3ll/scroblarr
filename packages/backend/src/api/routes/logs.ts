@@ -2,7 +2,7 @@ import { createReadStream } from "fs";
 import { readFile, readdir, stat } from "fs/promises";
 import { join, resolve, sep } from "path";
 
-import { formatDateUTC, logger } from "@utils/logger";
+import { logger, formatDateUTC } from "@utils/logger";
 import { getDataDir } from "@utils/paths";
 import { Router, Request, Response } from "express";
 import { z } from "zod";
@@ -30,7 +30,9 @@ const getLogsQuerySchema = z.object({
       "api",
       "database",
       "tvtime",
+      "trakt",
       "plex",
+      "jellyfin",
       "system",
       "migration",
     ])
@@ -53,8 +55,10 @@ router.get("/", async (req: Request, res: Response) => {
         .json({ error: "Page size must be between 1 and 1000" });
     }
 
-    const todayUtc = formatDateUTC(new Date());
-    const logFilePath = join(logDir, `scroblarr-${todayUtc}.log`);
+    const logFilePath = join(
+      logDir,
+      `scroblarr-${formatDateUTC(new Date())}.log`
+    );
 
     try {
       await stat(logFilePath);

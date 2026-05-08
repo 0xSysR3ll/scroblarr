@@ -2,14 +2,41 @@ import { mkdirSync, existsSync } from "fs";
 import { hostname } from "os";
 import { join } from "path";
 
-import pino, { LevelWithSilent } from "pino";
-import { createStream } from "rotating-file-stream";
+import winston from "winston";
+import DailyRotateFile from "winston-daily-rotate-file";
 
 import { getDataDir } from "./paths";
 
+export const formatDateUTC = (date: Date): string => {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}${month}${day}`;
+};
+
 const isDevelopment = process.env.NODE_ENV !== "production";
 
-type LogLevel = LevelWithSilent;
+const winstonLevels = {
+  fatal: 0,
+  error: 1,
+  warn: 2,
+  info: 3,
+  debug: 4,
+  trace: 5,
+} as const;
+
+type WinstonLevel = keyof typeof winstonLevels;
+
+const levelToPinoNumber: Record<string, number> = {
+  fatal: 60,
+  error: 50,
+  warn: 40,
+  info: 30,
+  debug: 20,
+  trace: 10,
+};
+
+type LogLevel = WinstonLevel | "silent";
 
 const isValidLogLevel = (value: string): value is LogLevel => {
   return (
@@ -23,7 +50,7 @@ const isValidLogLevel = (value: string): value is LogLevel => {
   );
 };
 
-const resolvedLogLevel = (() => {
+const resolvedLogLevel = ((): LogLevel => {
   const envLevel = process.env.LOG_LEVEL;
   if (envLevel && isValidLogLevel(envLevel)) {
     return envLevel;
@@ -41,155 +68,141 @@ try {
   console.error("Failed to create log directory:", error);
 }
 
-const streams: Array<{ level: LogLevel; stream: unknown }> = [
-  {
-    level: resolvedLogLevel,
-    stream: pino.destination({
-      sync: false,
-      dest: 1, // stdout
-    }),
-  },
-];
-
-let fileStreamCreated = false;
-
-type LogSize = `${number}B` | `${number}K` | `${number}M` | `${number}G`;
-
-const parseLogSize = (value: string | undefined): LogSize => {
-  const defaultSize: LogSize = "10M";
-  if (!value) {
-    return defaultSize;
-  }
-  const normalized = value.toUpperCase();
-  const match = normalized.match(/^(\d+)([BKMG])$/);
+const parseMaxSize = (): string => {
+  const raw = (process.env.LOG_MAX_SIZE || "10M").trim().toUpperCase();
+  const match = raw.match(/^(\d+)([BKMG])$/);
   if (!match) {
-    return defaultSize;
+    return "10m";
   }
   const [, amount, unit] = match;
-  return `${amount}${unit}` as LogSize;
+  return `${amount}${unit.toLowerCase()}`;
 };
 
-export const formatDateUTC = (date: Date): string => {
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  return `${year}${month}${day}`;
-};
+const maxFiles = parseInt(process.env.LOG_MAX_FILES || "5", 10);
 
-if (process.env.LOG_TO_FILE !== "false") {
-  try {
-    const maxSize = parseLogSize(process.env.LOG_MAX_SIZE);
-    const maxFiles = parseInt(process.env.LOG_MAX_FILES || "5", 10);
-
-    const filenameGenerator = (time: number | Date | null, index?: number) => {
-      // Format:
-      // - current stream: scroblarr-YYYYMMDD.log
-      // - size rotations: scroblarr-YYYYMMDD-<index>.log
-      const date = time
-        ? time instanceof Date
-          ? time
-          : new Date(time)
-        : new Date();
-      const dateKey = formatDateUTC(date);
-      const suffix = typeof index === "number" && index > 0 ? `-${index}` : "";
-      return `scroblarr-${dateKey}${suffix}.log`;
+function normalizeErrorMeta(
+  meta: Record<string, unknown>
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...meta };
+  const err = out.error;
+  if (err instanceof Error) {
+    out.error = {
+      type: err.name,
+      message: err.message,
+      stack: err.stack,
     };
+  }
+  return out;
+}
 
-    const rotatingStream = createStream(filenameGenerator, {
-      path: logDir,
-      size: maxSize,
-      interval: "1d",
-      intervalUTC: true,
-      intervalBoundary: true,
-      maxFiles,
-      compress: "gzip",
-      omitExtension: false,
-    });
+const pinoCompatFormat = winston.format((info) => {
+  const out = info as unknown as Record<string, unknown>;
+  const levelStr = String(info.level);
+  const pinoLevel = levelToPinoNumber[levelStr];
+  if (pinoLevel !== undefined) {
+    out.level = pinoLevel;
+    out.severity = levelStr.toUpperCase();
+  }
+  if (info.message != null && out.msg == null) {
+    out.msg = info.message;
+  }
+  delete out.message;
+  if (info.timestamp != null) {
+    const parsed = Date.parse(String(info.timestamp));
+    out.time = Number.isNaN(parsed) ? Date.now() : parsed;
+    delete out.timestamp;
+  }
+  return info;
+});
 
-    rotatingStream.on("error", (error: unknown) => {
-      console.error("Log file stream error:", error);
-    });
+const jsonLogFormat = winston.format.combine(
+  winston.format.timestamp(),
+  winston.format.errors({ stack: true }),
+  pinoCompatFormat(),
+  winston.format.json()
+);
 
-    streams.push({
-      level: resolvedLogLevel,
-      stream: rotatingStream,
-    });
+const prettyConsoleFormat = winston.format.combine(
+  winston.format.timestamp({ format: "HH:mm:ss.SSS" }),
+  winston.format.printf((raw) => {
+    const info = raw as Record<string, unknown>;
+    const ts = String(info.timestamp ?? "");
+    const lvl = String(info.level ?? "");
+    const lbl =
+      info.label != null && String(info.label) !== ""
+        ? `[${String(info.label)}]`
+        : "";
+    const msg = info.message != null ? String(info.message) : "";
+    const copy = { ...info };
+    for (const k of [
+      "timestamp",
+      "level",
+      "message",
+      "label",
+      "name",
+      "hostname",
+      "pid",
+    ]) {
+      delete copy[k];
+    }
+    const tail = Object.keys(copy).length > 0 ? ` ${JSON.stringify(copy)}` : "";
+    return `${ts} ${lvl} ${lbl} ${msg}${tail}`.trim();
+  })
+);
 
-    fileStreamCreated = true;
+const transports: winston.transport[] = [];
+const isFileLoggingEnabled =
+  process.env.LOG_TO_FILE === "true" || process.env.LOG_TO_FILE === "1";
+
+if (isFileLoggingEnabled) {
+  try {
+    transports.push(
+      new DailyRotateFile({
+        dirname: logDir,
+        filename: "scroblarr-%DATE%.log",
+        datePattern: "YYYYMMDD",
+        utc: true,
+        zippedArchive: true,
+        maxSize: parseMaxSize(),
+        maxFiles,
+        format: jsonLogFormat,
+      })
+    );
   } catch (error) {
-    console.error("Failed to create rotating file stream:", error);
+    console.error("Failed to create rotating log transport:", error);
   }
 }
 
-const pinoConfig: pino.LoggerOptions = {
-  level: resolvedLogLevel,
-  base: {
+transports.unshift(
+  new winston.transports.Console({
+    format: isDevelopment ? prettyConsoleFormat : jsonLogFormat,
+  })
+);
+
+const rootLogger = winston.createLogger({
+  level: resolvedLogLevel === "silent" ? "trace" : resolvedLogLevel,
+  levels: winstonLevels,
+  silent: resolvedLogLevel === "silent",
+  defaultMeta: {
     name: "scroblarr",
     hostname: hostname(),
     pid: process.pid,
   },
-  timestamp: pino.stdTimeFunctions.isoTime,
-  formatters: {
-    level: (label, number) => {
-      return { level: number, severity: label.toUpperCase() };
-    },
-  },
-  serializers: {
-    error: (err: unknown) => {
-      if (err instanceof Error) {
-        return pino.stdSerializers.err(err);
-      }
-      if (err && typeof err === "object") {
-        const objectError = err as Record<string, unknown> & {
-          message?: unknown;
-          stack?: unknown;
-          name?: unknown;
-        };
-        return {
-          ...objectError,
-          message:
-            typeof objectError.message === "string"
-              ? objectError.message
-              : String(err),
-          stack:
-            typeof objectError.stack === "string"
-              ? objectError.stack
-              : undefined,
-          name:
-            typeof objectError.name === "string" ? objectError.name : "Error",
-        };
-      }
-      return {
-        message: String(err),
-        type: typeof err,
-      };
-    },
-  },
-};
+  transports,
+});
 
-let baseLogger: pino.Logger;
-
-if (streams.length > 1) {
-  baseLogger = pino(
-    pinoConfig,
-    pino.multistream(streams as Parameters<typeof pino.multistream>[0])
-  );
-} else if (isDevelopment) {
-  baseLogger = pino({
-    ...pinoConfig,
-    transport: {
-      target: "pino-pretty",
-      options: {
-        colorize: true,
-        translateTime: "HH:MM:ss.l",
-        ignore: "pid,hostname",
-        singleLine: false,
-        hideObject: false,
-      },
-    },
-  });
-} else {
-  baseLogger = pino(pinoConfig);
+function dispatch(
+  w: winston.Logger,
+  level: WinstonLevel,
+  first: string | Record<string, unknown>,
+  second?: string
+): void {
+  if (typeof first === "string") {
+    w.log(level, first);
+    return;
+  }
+  const message = second ?? "";
+  w.log({ level, message, ...normalizeErrorMeta(first) });
 }
 
 export type LogLabel =
@@ -205,37 +218,38 @@ export type LogLabel =
   | "system"
   | "migration";
 
-const createLabeledLogger = (label: LogLabel) => {
-  return baseLogger.child({ label });
-};
+function wrapLabeled(w: winston.Logger) {
+  return {
+    fatal: (a: string | Record<string, unknown>, b?: string) =>
+      dispatch(w, "fatal", a, b),
+    error: (a: string | Record<string, unknown>, b?: string) =>
+      dispatch(w, "error", a, b),
+    warn: (a: string | Record<string, unknown>, b?: string) =>
+      dispatch(w, "warn", a, b),
+    info: (a: string | Record<string, unknown>, b?: string) =>
+      dispatch(w, "info", a, b),
+    debug: (a: string | Record<string, unknown>, b?: string) =>
+      dispatch(w, "debug", a, b),
+    trace: (a: string | Record<string, unknown>, b?: string) =>
+      dispatch(w, "trace", a, b),
+  };
+}
+
+const labeled = (label: LogLabel) => wrapLabeled(rootLogger.child({ label }));
 
 const logger = {
-  webhook: createLabeledLogger("webhook"),
-  sync: createLabeledLogger("sync"),
-  auth: createLabeledLogger("auth"),
-  api: createLabeledLogger("api"),
-  database: createLabeledLogger("database"),
-  tvtime: createLabeledLogger("tvtime"),
-  trakt: createLabeledLogger("trakt"),
-  plex: createLabeledLogger("plex"),
-  jellyfin: createLabeledLogger("jellyfin"),
-  system: createLabeledLogger("system"),
-  migration: createLabeledLogger("migration"),
-  flush: () => baseLogger.flush(),
+  webhook: labeled("webhook"),
+  sync: labeled("sync"),
+  auth: labeled("auth"),
+  api: labeled("api"),
+  database: labeled("database"),
+  tvtime: labeled("tvtime"),
+  trakt: labeled("trakt"),
+  plex: labeled("plex"),
+  jellyfin: labeled("jellyfin"),
+  system: labeled("system"),
+  migration: labeled("migration"),
+  flush: () => Promise.resolve(),
 } as const;
-
-if (fileStreamCreated) {
-  process.on("SIGINT", () => {
-    logger.system.debug("Received SIGINT, flushing logs...");
-    logger.flush();
-    process.exit(0);
-  });
-
-  process.on("SIGTERM", () => {
-    logger.system.debug("Received SIGTERM, flushing logs...");
-    logger.flush();
-    process.exit(0);
-  });
-}
 
 export { logger };

@@ -50,7 +50,9 @@ export function LogsTab() {
     | "api"
     | "database"
     | "tvtime"
+    | "trakt"
     | "plex"
+    | "jellyfin"
     | "system"
     | "migration"
     | ""
@@ -218,7 +220,9 @@ export function LogsTab() {
                     | "api"
                     | "database"
                     | "tvtime"
+                    | "trakt"
                     | "plex"
+                    | "jellyfin"
                     | "system"
                     | "migration"
                     | ""
@@ -235,7 +239,9 @@ export function LogsTab() {
               <option value="api">API</option>
               <option value="database">Database</option>
               <option value="tvtime">TVTime</option>
+              <option value="trakt">Trakt</option>
               <option value="plex">Plex</option>
+              <option value="jellyfin">Jellyfin</option>
               <option value="system">System</option>
               <option value="migration">Migration</option>
             </select>

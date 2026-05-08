@@ -40,7 +40,9 @@ export async function getLogs(params?: {
     | "api"
     | "database"
     | "tvtime"
+    | "trakt"
     | "plex"
+    | "jellyfin"
     | "system"
     | "migration";
   search?: string;
