@@ -150,10 +150,11 @@ const prettyConsoleFormat = winston.format.combine(
   })
 );
 
-let fileStreamCreated = false;
 const transports: winston.transport[] = [];
+const isFileLoggingEnabled =
+  process.env.LOG_TO_FILE === "true" || process.env.LOG_TO_FILE === "1";
 
-if (process.env.LOG_TO_FILE !== "false") {
+if (isFileLoggingEnabled) {
   try {
     transports.push(
       new DailyRotateFile({
@@ -167,7 +168,6 @@ if (process.env.LOG_TO_FILE !== "false") {
         format: jsonLogFormat,
       })
     );
-    fileStreamCreated = true;
   } catch (error) {
     console.error("Failed to create rotating log transport:", error);
   }
@@ -175,8 +175,7 @@ if (process.env.LOG_TO_FILE !== "false") {
 
 transports.unshift(
   new winston.transports.Console({
-    format:
-      isDevelopment && !fileStreamCreated ? prettyConsoleFormat : jsonLogFormat,
+    format: isDevelopment ? prettyConsoleFormat : jsonLogFormat,
   })
 );
 
