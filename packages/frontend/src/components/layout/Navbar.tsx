@@ -44,7 +44,7 @@ export function Navbar() {
   }
 
   return (
-    <nav className="relative border-b border-border bg-card/90 shadow-sm backdrop-blur-md">
+    <nav className="relative border-b border-border bg-card/90 shadow-sm backdrop-blur-md pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center gap-4 md:gap-8">
@@ -185,7 +185,7 @@ function NavLinks({
       >
         <DialogContent
           id="mobile-primary-nav"
-          className="fixed inset-x-0 top-16 bottom-auto z-50 max-h-[min(85vh,calc(100dvh-4rem))] w-full max-w-none translate-x-0 translate-y-0 gap-0 overflow-y-auto rounded-none border-x-0 border-b border-t-0 p-0 sm:max-w-none md:hidden"
+          className="fixed inset-x-0 top-[calc(4rem+env(safe-area-inset-top))] bottom-auto z-50 max-h-[min(85vh,calc(100dvh-4rem-env(safe-area-inset-top)))] w-full max-w-none translate-x-0 translate-y-0 gap-0 overflow-y-auto rounded-none border-x-0 border-b border-t-0 p-0 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] sm:max-w-none md:hidden"
         >
           <DialogTitle className="sr-only">
             {t("nav.mobileNavTitle", {

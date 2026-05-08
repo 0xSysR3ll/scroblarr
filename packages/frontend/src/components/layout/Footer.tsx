@@ -19,7 +19,7 @@ export function Footer() {
   }
 
   return (
-    <footer className="mt-auto border-t border-border bg-card/80 backdrop-blur-sm">
+    <footer className="mt-auto border-t border-border bg-card/80 backdrop-blur-sm pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       <div className="container mx-auto px-4 py-4">
         <div className="flex flex-col items-center justify-center gap-4 text-sm text-muted-foreground sm:flex-row sm:gap-8">
           <span className="font-medium text-foreground">Scroblarr</span>
