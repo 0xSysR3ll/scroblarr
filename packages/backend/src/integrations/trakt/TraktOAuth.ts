@@ -15,6 +15,8 @@ export interface TraktTokens {
   expiresAt: number;
 }
 
+const TRAKT_USER_AGENT = "Scroblarr/1.0.0";
+
 export class TraktOAuth {
   private clientId: string;
   private clientSecret: string;
@@ -47,7 +49,9 @@ export class TraktOAuth {
     const response = await fetch(`${this.baseUrl}/oauth/token`, {
       method: "POST",
       headers: {
+        Accept: "application/json",
         "Content-Type": "application/json",
+        "User-Agent": TRAKT_USER_AGENT,
         "trakt-api-version": "2",
         "trakt-api-key": this.clientId,
       },
@@ -84,7 +88,9 @@ export class TraktOAuth {
     const response = await fetch(`${this.baseUrl}/oauth/token`, {
       method: "POST",
       headers: {
+        Accept: "application/json",
         "Content-Type": "application/json",
+        "User-Agent": TRAKT_USER_AGENT,
         "trakt-api-version": "2",
         "trakt-api-key": this.clientId,
       },
