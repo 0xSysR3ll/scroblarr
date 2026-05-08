@@ -39,7 +39,7 @@
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@types/validator": "^13.11.10",
-    "@vitejs/plugin-react": "^4.2.1",
+    "@vitejs/plugin-react": "^6.0.0",
     "eslint-plugin-i18next": "^6.1.0",
     "eslint-plugin-react": "^7.37.3",
     "eslint-plugin-react-hooks": "^5.1.0",
