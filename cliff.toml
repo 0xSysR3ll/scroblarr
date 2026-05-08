@@ -31,7 +31,26 @@ body = """
 {% endif %}\
 
 {% for group, commits in commits | group_by(attribute="group") %}
+    {# Add emojis per group #}
+    {% if group | striptags | trim | upper_first == "Features" %}
+    ### 🚀 {{ group | striptags | trim | upper_first }}
+    {% elif group | striptags | trim | upper_first == "Bug Fixes" %}
+    ### 🐛 {{ group | striptags | trim | upper_first }}
+    {% elif group | striptags | trim | upper_first == "Documentation" %}
+    ### 📝 {{ group | striptags | trim | upper_first }}
+    {% elif group | striptags | trim | upper_first == "Performance" %}
+    ### ⚡ {{ group | striptags | trim | upper_first }}
+    {% elif group | striptags | trim | upper_first == "Refactor" %}
+    ### 🚜 {{ group | striptags | trim | upper_first }}
+    {% elif group | striptags | trim | upper_first == "Testing" %}
+    ### 🧪 {{ group | striptags | trim | upper_first }}
+    {% elif group | striptags | trim | upper_first == "Security" %}
+    ### 🔐 {{ group | striptags | trim | upper_first }}
+    {% elif group | striptags | trim | upper_first == "Dependencies" %}
+    ### 📦 {{ group | striptags | trim | upper_first }}
+    {% else %}
     ### {{ group | striptags | trim | upper_first }}
+    {% endif %}
     {% for commit in commits | filter(attribute="scope") | sort(attribute="scope") %}
         {{ self::print_commit(commit=commit) }}
     {% endfor %}
@@ -42,7 +61,11 @@ body = """
     {% endfor %}
 {% endfor %}
 {% if github.contributors is defined and github.contributors | length > 0 %}
-{% set first_time = github.contributors | filter(attribute="is_first_time", value=true) %}
+{# Filter to first-time human contributors (skip bots like renovate[bot]) #}
+{% set first_time = github.contributors
+    | filter(attribute="is_first_time", value=true)
+    | filter(attribute="username", value="renovate[bot]", not=true)
+%}
 {% if first_time | length > 0 %}
   ## New Contributors
 {% for contributor in first_time %}
@@ -72,13 +95,14 @@ protect_breaking_commits = false
 commit_parsers = [
     { message = "^feat", group = "Features" },
     { message = "^fix", group = "Bug Fixes" },
-    { message = "^doc", group = "Documentation" },
+    # Match both `doc:` and `docs:` prefixes
+    { message = "^docs?", group = "Documentation" },
     { message = "^perf", group = "Performance" },
     { message = "^refactor", group = "Refactor" },
     { message = "^style", group = "Styling" },
     { message = "^test", group = "Testing" },
     { message = "^chore\\(release\\)", skip = true },
-    { message = "^chore\\(deps", skip = true },
+    { message = "^chore\\(deps", group = "Dependencies" },
     { message = "^chore|^ci", group = "Miscellaneous" },
     { body = ".*security", group = "Security" },
     { message = "^revert", group = "Revert" },
