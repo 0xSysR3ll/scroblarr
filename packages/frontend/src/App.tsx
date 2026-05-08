@@ -177,7 +177,8 @@ export function App() {
           <Toaster
             position="top-right"
             containerStyle={{
-              top: "80px",
+              top: "calc(80px + env(safe-area-inset-top))",
+              right: "calc(0px + env(safe-area-inset-right))",
             }}
             toastOptions={{
               duration: 3000,
