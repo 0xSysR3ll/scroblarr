@@ -131,6 +131,7 @@ export function IntegrationsTab({
   );
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMarkMoviesAsRewatched(tvtimeMarkMoviesAsRewatched);
     setMarkEpisodesAsRewatched(tvtimeMarkEpisodesAsRewatched);
   }, [tvtimeMarkMoviesAsRewatched, tvtimeMarkEpisodesAsRewatched]);

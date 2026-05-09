@@ -106,13 +106,13 @@ export function LogsTab() {
   };
 
   useEffect(() => {
-    loadLogs();
-    loadLogFiles();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadLogFiles();
   }, []);
 
   useEffect(() => {
-    loadLogs();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadLogs();
   }, [loadLogs]);
 
   useEffect(() => {

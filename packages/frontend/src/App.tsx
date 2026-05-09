@@ -62,11 +62,13 @@ function AppRoutes() {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     checkAdmin();
   }, [t]);
 
   useEffect(() => {
     if (isAuthenticated && !hasAdmin) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       checkAdmin();
     }
   }, [isAuthenticated, hasAdmin]);
