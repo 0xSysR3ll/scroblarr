@@ -588,7 +588,7 @@ router.patch(
       if (error instanceof z.ZodError) {
         res
           .status(400)
-          .json({ error: "Validation error", details: error.errors });
+          .json({ error: "Validation error", details: error.issues });
         return;
       }
       logger.auth.error({ error }, "Error updating user profile");

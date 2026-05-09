@@ -3,6 +3,7 @@ import { SettingsRepository } from "@repositories/SettingsRepository";
 import { SyncHistoryRepository } from "@repositories/SyncHistoryRepository";
 import { isPlexServerUrl } from "@scroblarr/shared";
 import { logger } from "@utils/logger";
+import { routeParam } from "@utils/routeParams";
 import { Router, Request, Response } from "express";
 
 const router = Router();
@@ -137,7 +138,10 @@ router.delete("/history/:id", auth, async (req: Request, res: Response) => {
     if (!user) {
       return res.status(401).json({ error: "Unauthorized" });
     }
-    const id = req.params.id;
+    const id = routeParam(req.params.id);
+    if (!id) {
+      return res.status(400).json({ error: "Missing id" });
+    }
 
     const deleted = await syncHistoryRepository.deleteById(id, user.id);
     if (!deleted) {
@@ -173,7 +177,10 @@ router.get("/poster/:id", auth, async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const id = req.params.id;
+    const id = routeParam(req.params.id);
+    if (!id) {
+      return res.status(400).json({ error: "Missing id" });
+    }
     const syncHistory = await syncHistoryRepository.findById(id);
 
     if (!syncHistory) {

@@ -6,6 +6,7 @@ import { PlexOAuth } from "@integrations/plex/PlexOAuth";
 import { SettingsRepository } from "@repositories/SettingsRepository";
 import { UserRepository } from "@repositories/UserRepository";
 import { logger } from "@utils/logger";
+import { routeParam } from "@utils/routeParams";
 import { sanitizeUser, sanitizeUsers } from "@utils/userSanitizer";
 import { Router, Request, Response } from "express";
 import { z } from "zod";
@@ -191,7 +192,11 @@ router.get("/jellyfin-users", async (req: Request, res: Response) => {
 
 router.get("/:id", async (req: Request, res: Response) => {
   try {
-    const user = await userRepository.findById(req.params.id);
+    const id = routeParam(req.params.id);
+    if (!id) {
+      return res.status(400).json({ error: "Missing user id" });
+    }
+    const user = await userRepository.findById(id);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -220,7 +225,7 @@ router.post("/", async (req: Request, res: Response) => {
     if (error instanceof z.ZodError) {
       return res
         .status(400)
-        .json({ error: "Validation error", details: error.errors });
+        .json({ error: "Validation error", details: error.issues });
     }
     logger.api.error({ error }, "Error creating user");
     return res.status(500).json({ error: "Internal server error" });
@@ -378,8 +383,12 @@ router.post("/import", async (req: Request, res: Response) => {
 router.patch("/:id", async (req: Request, res: Response) => {
   try {
     const validated = updateUserSchema.parse(req.body);
-    const beforeUser = await userRepository.findById(req.params.id);
-    const user = await userRepository.update(req.params.id, validated);
+    const id = routeParam(req.params.id);
+    if (!id) {
+      return res.status(400).json({ error: "Missing user id" });
+    }
+    const beforeUser = await userRepository.findById(id);
+    const user = await userRepository.update(id, validated);
     logger.api.info(
       {
         userId: user.id,
@@ -397,7 +406,7 @@ router.patch("/:id", async (req: Request, res: Response) => {
     if (error instanceof z.ZodError) {
       return res
         .status(400)
-        .json({ error: "Validation error", details: error.errors });
+        .json({ error: "Validation error", details: error.issues });
     }
     logger.api.error({ error }, "Error updating user");
     return res.status(500).json({ error: "Internal server error" });
@@ -470,7 +479,10 @@ router.delete("/:id", async (req: Request, res: Response) => {
     if (!user) {
       return res.status(401).json({ error: "Invalid token" });
     }
-    const userIdToDelete = req.params.id;
+    const userIdToDelete = routeParam(req.params.id);
+    if (!userIdToDelete) {
+      return res.status(400).json({ error: "Missing user id" });
+    }
 
     if (userIdToDelete === user.id) {
       return res.status(400).json({ error: "Cannot delete your own account" });

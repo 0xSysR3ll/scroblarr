@@ -110,7 +110,7 @@ router.patch("/", async (req: Request, res: Response): Promise<void> => {
     if (error instanceof z.ZodError) {
       res
         .status(400)
-        .json({ error: "Validation error", details: error.errors });
+        .json({ error: "Validation error", details: error.issues });
       return;
     }
     logger.api.error({ error }, "Error updating settings");
