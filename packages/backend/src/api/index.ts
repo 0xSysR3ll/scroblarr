@@ -115,7 +115,7 @@ export function createApp(): Express {
   const publicDir = env.PUBLIC_DIR ? path.resolve(env.PUBLIC_DIR) : undefined;
   if (env.NODE_ENV === "production" && publicDir && existsSync(publicDir)) {
     app.use(express.static(publicDir));
-    app.get("*", (_req, res) => {
+    app.get("/{*path}", (_req, res) => {
       res.sendFile(path.join(publicDir, "index.html"));
     });
   }
