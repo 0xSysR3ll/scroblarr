@@ -37,7 +37,7 @@
     "winston": "^3.19.0",
     "winston-daily-rotate-file": "^5.0.0",
     "xml2js": "^0.6.2",
-    "zod": "^3.22.4"
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
