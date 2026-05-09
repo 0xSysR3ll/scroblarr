@@ -7,6 +7,7 @@
     "schedule:earlyMondays",
     "helpers:pinGitHubActionDigests"
   ],
+  "gitAuthor": "Renovate Bot <29139614+renovate[bot]@users.noreply.github.com>",
   "suppressNotifications": ["prEditedNotification", "prIgnoreNotification"],
   "minimumReleaseAge": "7 days",
   "rebaseWhen": "conflicted",

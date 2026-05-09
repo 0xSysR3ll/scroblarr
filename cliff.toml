@@ -6,8 +6,7 @@ owner = "0xsysr3ll"
 repo = "scroblarr"
 
 [changelog]
-body = """
-{%- macro remote_url() -%}
+body = """{%- macro remote_url() -%}
   https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
 {%- endmacro -%}
 
@@ -16,8 +15,7 @@ body = """
         {% if commit.breaking %}[**breaking**] {% endif %}\
         {{ commit.message | upper_first }}\
         {% if commit.message is not ending_with(".") and commit.message is not ending_with("!") %}.{% endif %} - \
-        ([{{ commit.id | truncate(length=7, end="") }}]({{ self::remote_url() }}/commit/{{ commit.id }}))
-{% endmacro -%}
+        ([{{ commit.id | truncate(length=7, end="") }}]({{ self::remote_url() }}/commit/{{ commit.id }})){%- endmacro -%}
 
 {% if version %}\
     {% if previous.version %}\
@@ -30,24 +28,48 @@ body = """
     ## [unreleased]
 {% endif %}\
 
-{% for group, commits in commits | group_by(attribute="group") %}
-    ### {{ group | striptags | trim | upper_first }}
-    {% for commit in commits | filter(attribute="scope") | sort(attribute="scope") %}
-        {{ self::print_commit(commit=commit) }}
-    {% endfor %}
-    {% for commit in commits %}
-        {% if not commit.scope %}
-        {{ self::print_commit(commit=commit) }}
-        {% endif %}
-    {% endfor %}
-{% endfor %}
-{% if github.contributors is defined and github.contributors | length > 0 %}
-{% set first_time = github.contributors | filter(attribute="is_first_time", value=true) %}
-{% if first_time | length > 0 %}
-  ## New Contributors
+{%- for group, commits in commits | group_by(attribute="group") %}
+{# Add emojis per group #}
+{%- if group | striptags | trim | upper_first == "Features" %}
+### 🚀 {{ group | striptags | trim | upper_first }}
+{%- elif group | striptags | trim | upper_first == "Bug Fixes" %}
+### 🐛 {{ group | striptags | trim | upper_first }}
+{%- elif group | striptags | trim | upper_first == "Documentation" %}
+### 📖 {{ group | striptags | trim | upper_first }}
+{%- elif group | striptags | trim | upper_first == "Performance" %}
+### ⚡ {{ group | striptags | trim | upper_first }}
+{%- elif group | striptags | trim | upper_first == "Refactor" %}
+### 🚜 {{ group | striptags | trim | upper_first }}
+{%- elif group | striptags | trim | upper_first == "Testing" %}
+### 🧪 {{ group | striptags | trim | upper_first }}
+{%- elif group | striptags | trim | upper_first == "Security" %}
+### 🔐 {{ group | striptags | trim | upper_first }}
+{%- elif group | striptags | trim | upper_first == "Dependencies" %}
+### 📦 {{ group | striptags | trim | upper_first }}
+{%- else %}
+### {{ group | striptags | trim | upper_first }}
+{%- endif %}
+
+{%- for commit in commits | filter(attribute="scope") | sort(attribute="scope") %}
+{{ self::print_commit(commit=commit) }}
+{%- endfor %}
+{%- for commit in commits %}
+{%- if not commit.scope %}
+{{ self::print_commit(commit=commit) }}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}
+{%- if github.contributors is defined and github.contributors | length > 0 %}
+{# Filter to first-time human contributors (skip bots like renovate[bot]) #}
+{%- set first_time = github.contributors
+    | filter(attribute="is_first_time", value=true)
+    | filter(attribute="username", value="renovate[bot]", not=true)
+%}
+{%- if first_time | length > 0 %}
+
+## New Contributors ❤️
 {% for contributor in first_time %}
-  * @{{ contributor.username }} made their first contribution\
-    {% if contributor.pr_number %} in [#{{ contributor.pr_number }}]({{ self::remote_url() }}/pull/{{ contributor.pr_number }}){% endif %}
+  * @{{ contributor.username }} made their first contribution{% if contributor.pr_number %} in [#{{ contributor.pr_number }}]({{ self::remote_url() }}/pull/{{ contributor.pr_number }}){% endif %}
 {% endfor %}
 {% endif %}
 {% endif %}
@@ -72,13 +94,13 @@ protect_breaking_commits = false
 commit_parsers = [
     { message = "^feat", group = "Features" },
     { message = "^fix", group = "Bug Fixes" },
-    { message = "^doc", group = "Documentation" },
+    { message = "^docs?(\\([^)]+\\))?(!)?:\\s*", group = "Documentation" },
     { message = "^perf", group = "Performance" },
     { message = "^refactor", group = "Refactor" },
     { message = "^style", group = "Styling" },
     { message = "^test", group = "Testing" },
     { message = "^chore\\(release\\)", skip = true },
-    { message = "^chore\\(deps", skip = true },
+    { message = "^chore\\(deps", group = "Dependencies" },
     { message = "^chore|^ci", group = "Miscellaneous" },
     { body = ".*security", group = "Security" },
     { message = "^revert", group = "Revert" },
