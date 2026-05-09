@@ -7,7 +7,7 @@ import {
   type SyncHistoryItem,
 } from "@services/api/sync";
 import { formatMediaTitle, formatRelativeTime } from "@utils/syncHistory";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ComponentType } from "react";
 import { useTranslation } from "react-i18next";
 import {
   FaCheckCircle,
@@ -36,6 +36,69 @@ const DAY_NAMES = [
   "Friday",
   "Saturday",
 ];
+
+function StatCard({
+  title,
+  value,
+  icon: Icon,
+  color = "blue",
+  subtitle,
+  primary = false,
+}: {
+  title: string;
+  value: string | number;
+  icon: ComponentType<{ className?: string }>;
+  color?: "blue" | "green" | "red" | "purple" | "yellow";
+  subtitle?: string;
+  primary?: boolean;
+}) {
+  const colorClasses = {
+    blue: "bg-primary/15 text-primary",
+    green: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+    red: "bg-destructive/15 text-destructive",
+    purple: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
+    yellow: "bg-amber-500/15 text-amber-800 dark:text-amber-300",
+  };
+
+  return (
+    <div
+      className={`rounded-xl border border-border/60 bg-card text-card-foreground shadow-sm p-6 ${
+        primary ? "ring-2 ring-primary/25 border-primary/30" : ""
+      }`}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
+        <div className={`p-2 rounded-lg ${colorClasses[color]}`}>
+          <Icon className="w-5 h-5" />
+        </div>
+      </div>
+      <p
+        className={
+          primary
+            ? "text-4xl font-bold text-foreground tracking-tight"
+            : "text-3xl font-bold text-foreground"
+        }
+      >
+        {value}
+      </p>
+      {subtitle && (
+        <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
+      )}
+    </div>
+  );
+}
+
+function StatCardSkeleton() {
+  return (
+    <div className="rounded-xl border border-border/60 bg-card p-6 text-card-foreground shadow-sm">
+      <div className="mb-2 flex items-center justify-between">
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-9 w-9 rounded-lg" />
+      </div>
+      <Skeleton className="mt-2 h-9 w-20" />
+    </div>
+  );
+}
 
 export function DashboardPage() {
   const { t } = useTranslation();
@@ -90,67 +153,6 @@ export function DashboardPage() {
       loadDashboard();
     }
   }, [user, loadDashboard]);
-
-  const StatCard = ({
-    title,
-    value,
-    icon: Icon,
-    color = "blue",
-    subtitle,
-    primary = false,
-  }: {
-    title: string;
-    value: string | number;
-    icon: React.ComponentType<{ className?: string }>;
-    color?: "blue" | "green" | "red" | "purple" | "yellow";
-    subtitle?: string;
-    primary?: boolean;
-  }) => {
-    const colorClasses = {
-      blue: "bg-primary/15 text-primary",
-      green: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
-      red: "bg-destructive/15 text-destructive",
-      purple: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
-      yellow: "bg-amber-500/15 text-amber-800 dark:text-amber-300",
-    };
-
-    return (
-      <div
-        className={`rounded-xl border border-border/60 bg-card text-card-foreground shadow-sm p-6 ${
-          primary ? "ring-2 ring-primary/25 border-primary/30" : ""
-        }`}
-      >
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
-          <div className={`p-2 rounded-lg ${colorClasses[color]}`}>
-            <Icon className="w-5 h-5" />
-          </div>
-        </div>
-        <p
-          className={
-            primary
-              ? "text-4xl font-bold text-foreground tracking-tight"
-              : "text-3xl font-bold text-foreground"
-          }
-        >
-          {value}
-        </p>
-        {subtitle && (
-          <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
-        )}
-      </div>
-    );
-  };
-
-  const StatCardSkeleton = () => (
-    <div className="rounded-xl border border-border/60 bg-card p-6 text-card-foreground shadow-sm">
-      <div className="mb-2 flex items-center justify-between">
-        <Skeleton className="h-4 w-24" />
-        <Skeleton className="h-9 w-9 rounded-lg" />
-      </div>
-      <Skeleton className="mt-2 h-9 w-20" />
-    </div>
-  );
 
   return (
     <div className="container mx-auto px-4 py-4 sm:py-8">
