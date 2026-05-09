@@ -61,7 +61,7 @@ router.get("/authorize", async (req: Request, res: Response) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         error: "Validation error",
-        details: error.errors,
+        details: error.issues,
       });
     }
     logger.trakt.error({ error }, "Error getting Trakt authorization URL");
@@ -173,7 +173,7 @@ router.post("/link", async (req: Request, res: Response) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         error: "Validation error",
-        details: error.errors,
+        details: error.issues,
       });
     }
     const errorMessage =

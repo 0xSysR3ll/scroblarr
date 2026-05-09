@@ -3,6 +3,7 @@ import { readFile, readdir, stat } from "fs/promises";
 import { join, resolve, sep } from "path";
 
 import { logger, formatDateUTC } from "@utils/logger";
+import { routeParam } from "@utils/routeParams";
 import { getDataDir } from "@utils/paths";
 import { Router, Request, Response } from "express";
 import { z } from "zod";
@@ -138,7 +139,7 @@ router.get("/", async (req: Request, res: Response) => {
     if (error instanceof z.ZodError) {
       return res
         .status(400)
-        .json({ error: "Validation error", details: error.errors });
+        .json({ error: "Validation error", details: error.issues });
     }
     logger.api.error({ error }, "Error fetching logs");
     return res.status(500).json({ error: "Internal server error" });
@@ -177,7 +178,7 @@ router.get("/files", async (_req: Request, res: Response) => {
 
 router.get("/download/:filename", async (req: Request, res: Response) => {
   try {
-    const { filename } = req.params;
+    const filename = routeParam(req.params.filename);
     if (!filename || !filename.startsWith("scroblarr")) {
       return res.status(400).json({ error: "Invalid filename" });
     }

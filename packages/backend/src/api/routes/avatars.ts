@@ -3,6 +3,7 @@ import { SettingsRepository } from "@repositories/SettingsRepository";
 import { UserRepository } from "@repositories/UserRepository";
 import { isPlexServerUrl } from "@scroblarr/shared";
 import { logger } from "@utils/logger";
+import { routeParam } from "@utils/routeParams";
 import { Router, Request, Response } from "express";
 
 import { auth } from "../middleware/auth";
@@ -26,7 +27,10 @@ router.use(auth);
 
 router.get("/jellyfin/:userId", async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = routeParam(req.params.userId);
+    if (!userId) {
+      return res.status(400).json({ error: "Missing user id" });
+    }
     if (!canAccessUserAvatar(req, userId)) {
       return res.status(403).json({ error: "Forbidden" });
     }
@@ -79,7 +83,10 @@ router.get("/jellyfin/:userId", async (req: Request, res: Response) => {
 
 router.get("/plex/:userId", async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = routeParam(req.params.userId);
+    if (!userId) {
+      return res.status(400).json({ error: "Missing user id" });
+    }
     if (!canAccessUserAvatar(req, userId)) {
       return res.status(403).json({ error: "Forbidden" });
     }
@@ -152,7 +159,10 @@ router.get("/plex/:userId", async (req: Request, res: Response) => {
 
 router.get("/trakt/:userId", async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = routeParam(req.params.userId);
+    if (!userId) {
+      return res.status(400).json({ error: "Missing user id" });
+    }
     if (!canAccessUserAvatar(req, userId)) {
       return res.status(403).json({ error: "Forbidden" });
     }
@@ -196,7 +206,10 @@ router.get("/trakt/:userId", async (req: Request, res: Response) => {
 
 router.get("/tvtime/:userId", async (req: Request, res: Response) => {
   try {
-    const { userId } = req.params;
+    const userId = routeParam(req.params.userId);
+    if (!userId) {
+      return res.status(400).json({ error: "Missing user id" });
+    }
     if (!canAccessUserAvatar(req, userId)) {
       return res.status(403).json({ error: "Forbidden" });
     }
