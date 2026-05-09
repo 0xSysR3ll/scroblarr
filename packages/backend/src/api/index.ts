@@ -98,6 +98,14 @@ export function createApp(): Express {
     legacyHeaders: false,
   });
 
+  // Per-IP cap on SPA `sendFile` (client assets are served by `express.static` first).
+  const spaFallbackLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
   setupSwagger(app);
 
   app.use("/api/v1/webhooks", webhookLimiter, webhookRoutes);
@@ -115,7 +123,7 @@ export function createApp(): Express {
   const publicDir = env.PUBLIC_DIR ? path.resolve(env.PUBLIC_DIR) : undefined;
   if (env.NODE_ENV === "production" && publicDir && existsSync(publicDir)) {
     app.use(express.static(publicDir));
-    app.get("*", (_req, res) => {
+    app.get("/{*path}", spaFallbackLimiter, (_req, res) => {
       res.sendFile(path.join(publicDir, "index.html"));
     });
   }
