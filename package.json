@@ -25,13 +25,13 @@
     "i18n:extract": "pnpm --filter '@scroblarr/frontend' i18n:extract"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.4",
+    "@eslint/js": "9.39.4",
     "@types/cookie-parser": "^1.4.10",
     "@types/express-rate-limit": "^6.0.2",
     "@types/helmet": "^4.0.0",
     "@types/node": "^25.5.0",
     "@types/supertest": "^7.2.0",
-    "eslint": "^9.39.4",
+    "eslint": "9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
