@@ -87,7 +87,6 @@ export function PlexSettingsTab({
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setManualServerUrl(selectedServerUrl);
   }, [selectedServerUrl]);
 

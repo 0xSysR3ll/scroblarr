@@ -90,7 +90,6 @@ export function JellyfinSettingsTab({
     const parsedUrlBase = settings.jellyfinUrlBase || "";
     const parsedApiKey = settings.jellyfinApiKey || "";
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHostname(parsedHostname);
     setPort(parsedPort);
     setUseSsl(parsedUseSsl);
