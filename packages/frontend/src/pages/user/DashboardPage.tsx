@@ -150,7 +150,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     if (user) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       loadDashboard();
     }
   }, [user, loadDashboard]);
@@ -513,17 +513,18 @@ export function DashboardPage() {
                           i === 0
                             ? t("dashboard.sparklineToday", {
                                 count,
-                                defaultValue: `Today: ${count} syncs`,
+                                defaultValue: "Today: {{count}} syncs",
                               })
                             : i === 1
                               ? t("dashboard.sparklineYesterday", {
                                   count,
-                                  defaultValue: `Yesterday: ${count} syncs`,
+                                  defaultValue: "Yesterday: {{count}} syncs",
                                 })
                               : t("dashboard.sparklineDaysAgo", {
                                   days: i,
                                   count,
-                                  defaultValue: `${i} days ago: ${count} syncs`,
+                                  defaultValue:
+                                    "{{days}} days ago: {{count}} syncs",
                                 });
                         return (
                           <div
