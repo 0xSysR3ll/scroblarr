@@ -9,7 +9,14 @@ import { LoginPage } from "@pages/auth/LoginPage";
 import { SetupPage } from "@pages/auth/SetupPage";
 import { DashboardPage } from "@pages/user/DashboardPage";
 import { showError } from "@utils/toast";
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Toaster } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
@@ -36,15 +43,23 @@ function AppRoutes() {
   const { isAuthenticated, loading } = useAuth();
   const [hasAdmin, setHasAdmin] = useState<boolean | null>(null);
   const [checkingAdmin, setCheckingAdmin] = useState(true);
+  const isCheckingAdminRef = useRef(false);
 
   const checkAdmin = useCallback(async () => {
+    if (isCheckingAdminRef.current) {
+      return;
+    }
+    isCheckingAdminRef.current = true;
     try {
       const response = await fetch("/api/v1/auth/check-admin");
-      const data = response.ok ? await response.json() : null;
-      setHasAdmin(data?.hasAdmin ?? false);
+      if (response.ok) {
+        const data = await response.json();
+        setHasAdmin(data?.hasAdmin ?? false);
+      }
     } catch {
-      setHasAdmin(false);
+      // Keep previous hasAdmin value on transient fetch errors.
     } finally {
+      isCheckingAdminRef.current = false;
       setCheckingAdmin(false);
     }
   }, []);
