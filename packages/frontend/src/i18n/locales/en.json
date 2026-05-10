@@ -149,7 +149,7 @@
     "sparklineYesterday_other": "Yesterday: {{count}} syncs",
     "sparklineDaysAgo_one": "{{days}} days ago: {{count}} syncs",
     "sparklineDaysAgo_other": "{{days}} days ago: {{count}} syncs",
-    "topThisMonthEpisodes_one": "{{count}} episodes",
+    "topThisMonthEpisodes_one": "{{count}} episode",
     "topThisMonthEpisodes_other": "{{count}} episodes",
     "topThisMonthMovies_one": "{{count}} watch",
     "topThisMonthMovies_other": "{{count}} watch"
