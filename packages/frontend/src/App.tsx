@@ -62,13 +62,13 @@ function AppRoutes() {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     checkAdmin();
   }, [t]);
 
   useEffect(() => {
     if (isAuthenticated && !hasAdmin) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       checkAdmin();
     }
   }, [isAuthenticated, hasAdmin]);
@@ -179,7 +179,7 @@ export function App() {
           <Toaster
             position="top-right"
             containerStyle={{
-              top: "calc(80px + env(safe-area-inset-top))",
+              top: "calc(4.25rem + env(safe-area-inset-top))",
               right: "calc(0px + env(safe-area-inset-right))",
             }}
             toastOptions={{
