@@ -53,7 +53,8 @@
     "mobileNavDescription": "Links to sections of the app.",
     "toggleMenu": "Toggle menu",
     "sync": "Sync",
-    "user": "User"
+    "user": "User",
+    "mobileBottomLabel": "Primary navigation"
   },
   "footer": {
     "documentation": "Documentation",
@@ -141,7 +142,17 @@
     "topThisMonthMovies_plural": "{{count}} watch",
     "sparklineToday_plural": "Today:  syncs",
     "sparklineYesterday_plural": "Yesterday:  syncs",
-    "sparklineDaysAgo_plural": " days ago:  syncs"
+    "sparklineDaysAgo_plural": " days ago:  syncs",
+    "sparklineToday_one": "Today:  syncs",
+    "sparklineToday_other": "Today:  syncs",
+    "sparklineYesterday_one": "Yesterday:  syncs",
+    "sparklineYesterday_other": "Yesterday:  syncs",
+    "sparklineDaysAgo_one": " days ago:  syncs",
+    "sparklineDaysAgo_other": " days ago:  syncs",
+    "topThisMonthEpisodes_one": "{{count}} episodes",
+    "topThisMonthEpisodes_other": "{{count}} episodes",
+    "topThisMonthMovies_one": "{{count}} watch",
+    "topThisMonthMovies_other": "{{count}} watch"
   },
   "users": {
     "title": "Users",
@@ -177,7 +188,9 @@
       "bulkDeleteTitle": "Delete Selected Users",
       "bulkDeleteMessage": "Are you sure you want to delete {{count}} user{{plural}}? This action cannot be undone.",
       "bulkDeleteMessage_plural": "Are you sure you want to delete {{count}} user{{plural}}? This action cannot be undone.",
-      "delete": "Delete"
+      "delete": "Delete",
+      "bulkDeleteMessage_one": "Are you sure you want to delete {{count}} user{{plural}}? This action cannot be undone.",
+      "bulkDeleteMessage_other": "Are you sure you want to delete {{count}} user{{plural}}? This action cannot be undone."
     },
     "deleteSelected": "Delete Selected"
   },
@@ -410,7 +423,9 @@
     "noLogs": "No logs available",
     "additionalFieldsSummary": "{{count}} additional field{{plural}}",
     "additionalFieldsSummary_plural": "{{count}} additional field{{plural}}",
-    "title": "Logs"
+    "title": "Logs",
+    "additionalFieldsSummary_one": "{{count}} additional field{{plural}}",
+    "additionalFieldsSummary_other": "{{count}} additional field{{plural}}"
   },
   "sync": {
     "pagination": {
@@ -496,7 +511,9 @@
       "bulkDeleteMessage": "Are you sure you want to delete {{count}} sync history item{{plural}}? This action cannot be undone.",
       "bulkDeleteMessage_plural": "Are you sure you want to delete {{count}} sync history item{{plural}}? This action cannot be undone.",
       "deleting": "Deleting...",
-      "delete": "Delete"
+      "delete": "Delete",
+      "bulkDeleteMessage_one": "Are you sure you want to delete {{count}} sync history item{{plural}}? This action cannot be undone.",
+      "bulkDeleteMessage_other": "Are you sure you want to delete {{count}} sync history item{{plural}}? This action cannot be undone."
     },
     "time": {
       "justNow": "Just now",
@@ -506,7 +523,13 @@
       "hoursAgo_plural": "{{count}}h ago",
       "yesterday": "Yesterday",
       "daysAgo": "{{count}}d ago",
-      "daysAgo_plural": "{{count}}d ago"
+      "daysAgo_plural": "{{count}}d ago",
+      "minutesAgo_one": "{{count}}m ago",
+      "minutesAgo_other": "{{count}}m ago",
+      "hoursAgo_one": "{{count}}h ago",
+      "hoursAgo_other": "{{count}}h ago",
+      "daysAgo_one": "{{count}}d ago",
+      "daysAgo_other": "{{count}}d ago"
     }
   },
   "userImport": {
@@ -532,6 +555,10 @@
     "allUsersImported": "All users from this server have already been imported.",
     "importUsers": "Import {{count}} User{{plural}}",
     "importUsers_plural": "Import {{count}} User{{plural}}",
-    "importUsersButton": "Import Users"
+    "importUsersButton": "Import Users",
+    "usersSelected_one": "{{count}} user{{plural}} selected",
+    "usersSelected_other": "{{count}} user{{plural}} selected",
+    "importUsers_one": "Import {{count}} User{{plural}}",
+    "importUsers_other": "Import {{count}} User{{plural}}"
   }
 }
