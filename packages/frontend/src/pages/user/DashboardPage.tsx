@@ -150,7 +150,6 @@ export function DashboardPage() {
 
   useEffect(() => {
     if (user) {
-       
       loadDashboard();
     }
   }, [user, loadDashboard]);

@@ -88,7 +88,6 @@ export function SyncDashboardPage() {
     const mediaType = searchParams.get("mediaType");
     const source = searchParams.get("source");
     if (filter === "failed") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setQuickFilter("failed");
     } else if (filter === "success") {
       setQuickFilter("success");
@@ -151,12 +150,10 @@ export function SyncDashboardPage() {
   }, [filters, sortBy, sortOrder, t]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPage(1);
   }, [filters, sortBy, sortOrder, quickFilter, searchQuery]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadHistory();
   }, [loadHistory]);
 

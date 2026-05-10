@@ -44,7 +44,6 @@ function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (themeMode === "auto") {
       const systemTheme = getSystemPreference();
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setResolvedTheme(systemTheme);
     } else {
       setResolvedTheme(themeMode);

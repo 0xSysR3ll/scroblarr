@@ -106,12 +106,10 @@ export function LogsTab() {
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadLogFiles();
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadLogs();
   }, [loadLogs]);
 
