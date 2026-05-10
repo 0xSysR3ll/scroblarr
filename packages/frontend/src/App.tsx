@@ -9,7 +9,14 @@ import { LoginPage } from "@pages/auth/LoginPage";
 import { SetupPage } from "@pages/auth/SetupPage";
 import { DashboardPage } from "@pages/user/DashboardPage";
 import { showError } from "@utils/toast";
-import { lazy, Suspense, useEffect, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Toaster } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
@@ -36,18 +43,26 @@ function AppRoutes() {
   const { isAuthenticated, loading } = useAuth();
   const [hasAdmin, setHasAdmin] = useState<boolean | null>(null);
   const [checkingAdmin, setCheckingAdmin] = useState(true);
+  const isCheckingAdminRef = useRef(false);
 
-  const checkAdmin = async () => {
+  const checkAdmin = useCallback(async () => {
+    if (isCheckingAdminRef.current) {
+      return;
+    }
+    isCheckingAdminRef.current = true;
     try {
       const response = await fetch("/api/v1/auth/check-admin");
-      const data = response.ok ? await response.json() : null;
-      setHasAdmin(data?.hasAdmin ?? false);
+      if (response.ok) {
+        const data = await response.json();
+        setHasAdmin(data?.hasAdmin ?? false);
+      }
     } catch {
-      setHasAdmin(false);
+      // Keep previous hasAdmin value on transient fetch errors.
     } finally {
+      isCheckingAdminRef.current = false;
       setCheckingAdmin(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -62,16 +77,21 @@ function AppRoutes() {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    checkAdmin();
-  }, [t]);
+    const id = requestAnimationFrame(() => {
+      void checkAdmin();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [t, checkAdmin]);
 
   useEffect(() => {
-    if (isAuthenticated && !hasAdmin) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      checkAdmin();
+    if (!(isAuthenticated && !hasAdmin)) {
+      return;
     }
-  }, [isAuthenticated, hasAdmin]);
+    const id = requestAnimationFrame(() => {
+      void checkAdmin();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [isAuthenticated, hasAdmin, checkAdmin]);
 
   if (checkingAdmin || loading) {
     return (
@@ -179,7 +199,7 @@ export function App() {
           <Toaster
             position="top-right"
             containerStyle={{
-              top: "calc(80px + env(safe-area-inset-top))",
+              top: "calc(4.25rem + env(safe-area-inset-top))",
               right: "calc(0px + env(safe-area-inset-right))",
             }}
             toastOptions={{
