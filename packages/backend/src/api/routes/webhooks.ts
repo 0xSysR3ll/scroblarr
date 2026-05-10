@@ -20,7 +20,8 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 router.post("/plex", upload.any(), async (req: Request, res: Response) => {
   try {
-    const apiKey = req.query.apiKey as string | undefined;
+    const apiKey =
+      typeof req.query.apiKey === "string" ? req.query.apiKey : undefined;
     const storedApiKey = await settingsRepository.get("apiKey");
 
     if (!storedApiKey) {
@@ -142,13 +143,13 @@ router.post("/jellyfin", async (req: Request, res: Response) => {
       }
     }
 
-    const apiKeyFromHeader = req.headers["x-api-key"] as string | undefined;
-    let apiKey = apiKeyFromHeader;
-
+    let apiKey =
+      typeof req.headers["x-api-key"] === "string"
+        ? req.headers["x-api-key"]
+        : undefined;
     if (!apiKey) {
-      const payloadWithApiKey = payload as Record<string, unknown>;
-      const bodyApiKey = payloadWithApiKey?.apiKey as string | undefined;
-      apiKey = bodyApiKey;
+      const k = (payload as Record<string, unknown>).apiKey;
+      apiKey = typeof k === "string" ? k : undefined;
     }
 
     const storedApiKey = await settingsRepository.get("apiKey");
