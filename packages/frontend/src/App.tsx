@@ -9,7 +9,7 @@ import { LoginPage } from "@pages/auth/LoginPage";
 import { SetupPage } from "@pages/auth/SetupPage";
 import { DashboardPage } from "@pages/user/DashboardPage";
 import { showError } from "@utils/toast";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { Toaster } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
@@ -37,7 +37,7 @@ function AppRoutes() {
   const [hasAdmin, setHasAdmin] = useState<boolean | null>(null);
   const [checkingAdmin, setCheckingAdmin] = useState(true);
 
-  const checkAdmin = async () => {
+  const checkAdmin = useCallback(async () => {
     try {
       const response = await fetch("/api/v1/auth/check-admin");
       const data = response.ok ? await response.json() : null;
@@ -47,7 +47,7 @@ function AppRoutes() {
     } finally {
       setCheckingAdmin(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -62,16 +62,21 @@ function AppRoutes() {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
-     
-    checkAdmin();
-  }, [t]);
+    const id = requestAnimationFrame(() => {
+      void checkAdmin();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [t, checkAdmin]);
 
   useEffect(() => {
-    if (isAuthenticated && !hasAdmin) {
-       
-      checkAdmin();
+    if (!(isAuthenticated && !hasAdmin)) {
+      return;
     }
-  }, [isAuthenticated, hasAdmin]);
+    const id = requestAnimationFrame(() => {
+      void checkAdmin();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [isAuthenticated, hasAdmin, checkAdmin]);
 
   if (checkingAdmin || loading) {
     return (
