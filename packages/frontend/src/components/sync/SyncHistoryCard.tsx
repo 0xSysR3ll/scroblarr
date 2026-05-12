@@ -1,3 +1,4 @@
+import { SyncHistoryPoster } from "@components/sync/SyncHistoryPoster";
 import { CustomCheckbox } from "@components/ui/CustomCheckbox";
 import { Spinner } from "@components/ui/spinner";
 import type { SyncHistoryItem } from "@services/api";
@@ -5,7 +6,6 @@ import {
   formatMediaTitle,
   formatRelativeTime,
   getMediaLinks,
-  getPosterUrl,
 } from "@utils/syncHistory";
 import { useTranslation } from "react-i18next";
 import {
@@ -54,16 +54,7 @@ export function SyncHistoryCard({
         <div className="pt-0.5">
           <CustomCheckbox checked={isSelected} onChange={onSelect} />
         </div>
-        {getPosterUrl(item) && (
-          <img
-            src={getPosterUrl(item)}
-            alt={formatMediaTitle(item)}
-            className="w-12 h-16 object-cover rounded flex-shrink-0 shadow-sm"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
-          />
-        )}
+        <SyncHistoryPoster item={item} size="compact" />
         <div className="flex-1 min-w-0">
           {/* Header: Title + Status + Delete */}
           <div className="flex items-start justify-between gap-2 mb-1.5">

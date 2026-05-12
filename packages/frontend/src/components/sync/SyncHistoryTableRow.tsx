@@ -1,3 +1,4 @@
+import { SyncHistoryPoster } from "@components/sync/SyncHistoryPoster";
 import { CustomCheckbox } from "@components/ui/CustomCheckbox";
 import { Spinner } from "@components/ui/spinner";
 import type { SyncHistoryItem } from "@services/api";
@@ -5,7 +6,6 @@ import {
   formatMediaTitle,
   formatRelativeTime,
   getMediaLinks,
-  getPosterUrl,
 } from "@utils/syncHistory";
 import { useTranslation } from "react-i18next";
 import {
@@ -60,16 +60,7 @@ export function SyncHistoryTableRow({
       </td>
       <td className="px-4 py-2.5">
         <div className="flex items-center gap-2.5">
-          {getPosterUrl(item) && (
-            <img
-              src={getPosterUrl(item)}
-              alt={formatMediaTitle(item)}
-              className="w-14 h-20 object-cover rounded flex-shrink-0 shadow-sm"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-            />
-          )}
+          <SyncHistoryPoster item={item} size="default" />
           <div className="flex flex-col gap-1 min-w-0">
             <span className="truncate text-sm font-semibold text-foreground">
               {formatMediaTitle(item)}
