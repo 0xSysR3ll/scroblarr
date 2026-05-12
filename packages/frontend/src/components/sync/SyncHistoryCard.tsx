@@ -3,6 +3,7 @@ import { CustomCheckbox } from "@components/ui/CustomCheckbox";
 import { Spinner } from "@components/ui/spinner";
 import type { SyncHistoryItem } from "@services/api";
 import {
+  formatDate,
   formatMediaTitle,
   formatRelativeTime,
   getMediaLinks,
@@ -112,7 +113,10 @@ export function SyncHistoryCard({
 
           {/* Metadata: Time + Type + Rewatched */}
           <div className="flex items-center gap-1.5 mb-2">
-            <span className="text-xs text-muted-foreground">
+            <span
+              className="text-xs text-muted-foreground"
+              title={formatDate(item.syncedAt)}
+            >
               {formatRelativeTime(item.syncedAt, t)}
             </span>
             <span className="text-xs text-muted-foreground/50">•</span>

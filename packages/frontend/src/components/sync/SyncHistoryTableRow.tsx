@@ -3,6 +3,7 @@ import { CustomCheckbox } from "@components/ui/CustomCheckbox";
 import { Spinner } from "@components/ui/spinner";
 import type { SyncHistoryItem } from "@services/api";
 import {
+  formatDate,
   formatMediaTitle,
   formatRelativeTime,
   getMediaLinks,
@@ -54,7 +55,10 @@ export function SyncHistoryTableRow({
         <CustomCheckbox checked={isSelected} onChange={onSelect} />
       </td>
       <td className="px-4 py-2.5 whitespace-nowrap">
-        <div className="text-xs text-muted-foreground">
+        <div
+          className="text-xs text-muted-foreground"
+          title={formatDate(item.syncedAt)}
+        >
           {formatRelativeTime(item.syncedAt, t)}
         </div>
       </td>
