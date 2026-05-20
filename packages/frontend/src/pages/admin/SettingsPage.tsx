@@ -66,9 +66,16 @@ export function SettingsPage() {
   const [versionInfo, setVersionInfo] = useState<AppVersionInfo | null>(null);
 
   const fetchAndSetPlexServers = useCallback(
-    async (configuredServerUrl?: string) => {
+    async (
+      configuredServerUrl?: string,
+      shouldApplyResult: () => boolean = () => true
+    ) => {
       try {
         const serversData = await getPlexServers();
+        if (!shouldApplyResult()) {
+          return;
+        }
+
         setServers(serversData);
 
         if (configuredServerUrl) {
@@ -145,16 +152,18 @@ export function SettingsPage() {
   });
 
   useEffect(() => {
+    let isMounted = true;
+
     async function loadData() {
       try {
         setLoading(true);
-        const [settingsData, version] = await Promise.all([
-          getSettings(),
-          getAppVersion().catch(() => null),
-        ]);
+        const settingsData = await getSettings();
+
+        if (!isMounted) {
+          return;
+        }
 
         setSettings(settingsData);
-        setVersionInfo(version);
 
         if (settingsData.syncHistoryLimit) {
           setSyncHistoryLimit(parseInt(settingsData.syncHistoryLimit, 10));
@@ -185,23 +194,45 @@ export function SettingsPage() {
         }
 
         if (settingsData.plexServerUrl && user?.plexUsername) {
-          await fetchAndSetPlexServers(settingsData.plexServerUrl);
+          setSelectedServerUrl(settingsData.plexServerUrl);
+          void fetchAndSetPlexServers(
+            settingsData.plexServerUrl,
+            () => isMounted
+          );
         } else {
           setServers([]);
           setSelectedServerUrl("");
         }
+
+        void getAppVersion()
+          .then((version) => {
+            if (isMounted) {
+              setVersionInfo(version);
+            }
+          })
+          .catch(() => {
+            if (isMounted) {
+              setVersionInfo(null);
+            }
+          });
       } catch (err) {
         showError(
           err instanceof Error ? err.message : "Failed to load settings"
         );
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
 
     if (isAdmin) {
       loadData();
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [isAdmin, user?.plexUsername, fetchAndSetPlexServers]);
 
   async function handleSave() {
