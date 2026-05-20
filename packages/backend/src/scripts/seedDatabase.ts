@@ -78,6 +78,12 @@ async function fetchPopularPeople(): Promise<TMDBPerson[]> {
 
 const sources = ["plex", "jellyfin"];
 const destinations = ["Trakt", "TVTime"];
+const partialSyncErrors: Record<string, string> = {
+  Trakt:
+    'Trakt API error: 409 - {"watched_at":"2026-05-11T19:40:00.000Z","expires_at":"2026-05-11T20:38:00.000Z"}',
+  TVTime:
+    "TVTime API error: Bad Gateway - TVTime service temporarily unavailable",
+};
 
 function randomDate(start: Date, end: Date): Date {
   return new Date(
@@ -201,25 +207,23 @@ async function seedDatabase() {
     for (let i = 0; i < 250; i++) {
       const isMovie = Math.random() > 0.4;
       const mediaType = isMovie ? "movie" : "episode";
-      const success = randomBoolean();
+      const isPartialSync = i < 12;
+      const success = isPartialSync || randomBoolean();
       const source = randomElement(sources);
 
-      // Always ensure at least one destination
-      const dests: string[] = [];
-      const primaryDest = randomElement(destinations);
-      dests.push(primaryDest);
+      const successfulDestinations = success
+        ? [randomElement(destinations)]
+        : [];
+      const successfulDestination = successfulDestinations[0];
 
-      // For successful syncs, 40% chance of syncing to both destinations
-      if (success && Math.random() > 0.6) {
-        const otherDest = destinations.find((d) => d !== primaryDest);
+      // For successful syncs, 40% chance of syncing to both destinations.
+      // Partial syncs keep only the successful destination here and store the
+      // failed destination in errorMessage, matching production history rows.
+      if (success && !isPartialSync && Math.random() > 0.6) {
+        const otherDest = destinations.find((d) => d !== successfulDestination);
         if (otherDest) {
-          dests.push(otherDest);
+          successfulDestinations.push(otherDest);
         }
-      }
-
-      // Ensure destinations array is never empty
-      if (dests.length === 0) {
-        dests.push(randomElement(destinations));
       }
 
       let mediaTitle: string;
@@ -272,16 +276,18 @@ async function seedDatabase() {
         syncedAt = randomDate(oneYearAgo, now);
       }
 
-      const wasRewatched = Math.random() > 0.85;
-      const errorMessage = success
-        ? undefined
-        : randomElement([
-            "Failed to connect to Trakt API",
-            "TVTime authentication expired",
-            "Media not found in destination service",
-            "Rate limit exceeded",
-            "Network timeout",
-          ]);
+      const failedDestination = isPartialSync
+        ? destinations.find(
+            (destination) => destination !== successfulDestination
+          )
+        : success
+          ? undefined
+          : randomElement(destinations);
+      const errorMessage = failedDestination
+        ? `${failedDestination}: ${partialSyncErrors[failedDestination]}`
+        : undefined;
+      const wasRewatched =
+        successfulDestinations.includes("TVTime") && Math.random() > 0.85;
 
       historyEntries.push({
         userId: user.id,
@@ -302,9 +308,9 @@ async function seedDatabase() {
         errorMessage,
         wasRewatched,
         destinations:
-          dests.length > 0
-            ? JSON.stringify(dests)
-            : JSON.stringify([randomElement(destinations)]),
+          successfulDestinations.length > 0
+            ? JSON.stringify(successfulDestinations)
+            : undefined,
         syncedAt,
       });
     }

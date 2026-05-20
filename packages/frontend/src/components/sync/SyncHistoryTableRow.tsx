@@ -1,3 +1,4 @@
+import { SyncDestinationBadges } from "@components/sync/SyncDestinationBadges";
 import { SyncHistoryPoster } from "@components/sync/SyncHistoryPoster";
 import { CustomCheckbox } from "@components/ui/CustomCheckbox";
 import { Spinner } from "@components/ui/spinner";
@@ -7,6 +8,8 @@ import {
   formatMediaTitle,
   formatRelativeTime,
   getMediaLinks,
+  getSyncStatus,
+  shouldShowRewatchedBadge,
 } from "@utils/syncHistory";
 import { useTranslation } from "react-i18next";
 import {
@@ -40,6 +43,13 @@ export function SyncHistoryTableRow({
   const { t } = useTranslation();
   const isConfirming = confirmDeleteId === item.id;
   const isDeleting = deleting === item.id;
+  const syncStatus = getSyncStatus(item);
+  const statusLabel =
+    syncStatus === "success"
+      ? t("common.success", { defaultValue: "Success" })
+      : syncStatus === "partial"
+        ? t("sync.statuses.partial", { defaultValue: "Partial" })
+        : t("common.failed", { defaultValue: "Failed" });
 
   return (
     <tr
@@ -137,55 +147,27 @@ export function SyncHistoryTableRow({
       </td>
       <td className="px-4 py-2.5 whitespace-nowrap">
         <div className="flex items-center justify-center gap-1.5 flex-wrap">
-          {item.destinations && item.destinations.length > 0 ? (
-            <>
-              {item.destinations.includes("TVTime") && (
-                <div className="flex items-center gap-1 px-1.5 py-0.5 bg-yellow-100 dark:bg-yellow-900 rounded">
-                  <img
-                    src="/logos/tvtime.png"
-                    alt="TVTime"
-                    className="w-2.5 h-2.5"
-                  />
-                  <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300">
-                    {t("sync.destinations.tvtime", {
-                      defaultValue: "TVTime",
-                    })}
-                  </span>
-                </div>
-              )}
-              {item.destinations.includes("Trakt") && (
-                <div className="flex items-center gap-1 px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900 rounded">
-                  <img
-                    src="/logos/trakt.svg"
-                    alt="Trakt"
-                    className="w-2.5 h-2.5"
-                  />
-                  <span className="text-xs font-medium text-purple-700 dark:text-purple-300">
-                    {t("sync.destinations.trakt", {
-                      defaultValue: "Trakt",
-                    })}
-                  </span>
-                </div>
-              )}
-            </>
-          ) : (
-            <span className="text-xs text-muted-foreground/50">-</span>
-          )}
+          <SyncDestinationBadges
+            item={item}
+            emptyFallback={
+              <span className="text-xs text-muted-foreground/50">-</span>
+            }
+          />
         </div>
       </td>
       <td className="px-4 py-2.5 whitespace-nowrap">
-        <div className="flex items-center gap-2">
-          {item.success ? (
+        <div className="flex items-center gap-2" title={item.errorMessage}>
+          {syncStatus === "success" ? (
             <FaCheckCircle className="h-4 w-4 text-green-500 dark:text-green-400" />
+          ) : syncStatus === "partial" ? (
+            <FaExclamationCircle className="h-4 w-4 text-yellow-500 dark:text-yellow-400" />
           ) : (
             <FaExclamationCircle className="h-4 w-4 text-red-500 dark:text-red-400" />
           )}
           <span className="text-xs font-medium text-foreground/90">
-            {item.success
-              ? t("common.success", { defaultValue: "Success" })
-              : t("common.failed", { defaultValue: "Failed" })}
+            {statusLabel}
           </span>
-          {item.success && item.wasRewatched && (
+          {shouldShowRewatchedBadge(item) && (
             <span
               className="px-1.5 py-0.5 text-xs rounded bg-teal-100 dark:bg-teal-900 text-teal-700 dark:text-teal-300 font-medium"
               title={t("sync.rewatched", {

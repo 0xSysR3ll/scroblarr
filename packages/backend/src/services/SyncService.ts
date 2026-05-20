@@ -247,10 +247,15 @@ export class SyncService {
 
     const allSuccessful = syncResults.every((r) => r.success);
     const atLeastOneSuccess = syncResults.some((r) => r.success);
+    const successfulDestinations = syncResults
+      .filter((r) => r.success)
+      .map((r) => r.destination);
+    const tvtimeSucceeded = successfulDestinations.includes("TVTime");
     const wasRewatched =
-      event.media.type === "movie"
+      tvtimeSucceeded &&
+      (event.media.type === "movie"
         ? user.tvtimeMarkMoviesAsRewatched && hasExistingSync
-        : user.tvtimeMarkEpisodesAsRewatched && hasExistingSync;
+        : user.tvtimeMarkEpisodesAsRewatched && hasExistingSync);
 
     const errorMessage = allSuccessful
       ? undefined
@@ -258,10 +263,6 @@ export class SyncService {
           .filter((r) => !r.success)
           .map((r) => `${r.destination}: ${r.error}`)
           .join("; ");
-
-    const successfulDestinations = syncResults
-      .filter((r) => r.success)
-      .map((r) => r.destination);
 
     await this.saveSyncHistory(
       user.id,
