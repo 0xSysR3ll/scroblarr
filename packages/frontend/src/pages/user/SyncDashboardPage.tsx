@@ -202,7 +202,7 @@ export function SyncDashboardPage() {
               now.getTime() - itemDate.getTime() <= 30 * 24 * 60 * 60 * 1000
             );
           case "failed":
-            return getSyncStatus(item) !== "success";
+            return getSyncStatus(item) === "failed";
           case "success":
             return getSyncStatus(item) === "success";
           default:
