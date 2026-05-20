@@ -207,13 +207,13 @@ describe("SyncService", () => {
       enabled: true,
       plexUsername: "plex-user",
       tvtimeAccessToken: "tv-token",
-      tvtimeMarkMoviesAsRewatched: false,
+      tvtimeMarkMoviesAsRewatched: true,
       tvtimeMarkEpisodesAsRewatched: false,
       traktClientId: "trakt-client-id",
       traktClientSecret: "trakt-secret",
       traktAccessToken: "trakt-token",
     });
-    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(true);
     tvtimeTokenManagerMocks.getValidAccessToken.mockResolvedValue(
       "tvtime-valid-token"
     );
@@ -231,6 +231,7 @@ describe("SyncService", () => {
         userId: "u1",
         success: true,
         errorMessage: expect.stringContaining("TVTime: TVTime failed"),
+        wasRewatched: false,
         destinations: JSON.stringify(["Trakt"]),
       })
     );

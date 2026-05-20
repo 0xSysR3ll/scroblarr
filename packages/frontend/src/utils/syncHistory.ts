@@ -3,6 +3,84 @@ import type { SyncHistoryItem } from "@services/api";
 import { API_BASE_URL } from "@services/api/common";
 import { TFunction } from "i18next";
 
+const SYNC_DESTINATIONS = ["TVTime", "Trakt"] as const;
+
+export type SyncDestinationName = (typeof SYNC_DESTINATIONS)[number];
+export type SyncItemStatus = "success" | "partial" | "failed";
+
+export interface SyncDestinationResult {
+  name: SyncDestinationName;
+  status: "success" | "failed";
+  errorMessage?: string;
+}
+
+function getDestinationError(
+  errorMessage: string | undefined,
+  destination: SyncDestinationName
+): string | undefined {
+  if (!errorMessage) {
+    return undefined;
+  }
+
+  const marker = `${destination}:`;
+  const start = errorMessage.indexOf(marker);
+
+  if (start === -1) {
+    return undefined;
+  }
+
+  const errorStart = start + marker.length;
+  const nextDestinationStart = SYNC_DESTINATIONS.filter(
+    (name) => name !== destination
+  )
+    .map((name) => errorMessage.indexOf(`; ${name}:`, errorStart))
+    .find((index) => index !== -1);
+
+  return (
+    errorMessage.slice(errorStart, nextDestinationStart).trim() || undefined
+  );
+}
+
+export function getSyncStatus(item: SyncHistoryItem): SyncItemStatus {
+  if (!item.success) {
+    return "failed";
+  }
+
+  return item.errorMessage ? "partial" : "success";
+}
+
+export function getDestinationResults(
+  item: SyncHistoryItem
+): SyncDestinationResult[] {
+  const successfulDestinations = new Set(
+    item.success ? (item.destinations ?? []) : []
+  );
+
+  return SYNC_DESTINATIONS.filter((destination) => {
+    const errorMessage = getDestinationError(item.errorMessage, destination);
+
+    return successfulDestinations.has(destination) || errorMessage;
+  }).map((destination) => {
+    const errorMessage = getDestinationError(item.errorMessage, destination);
+
+    if (errorMessage || !item.success) {
+      return {
+        name: destination,
+        status: "failed",
+        errorMessage: errorMessage ?? item.errorMessage,
+      };
+    }
+
+    return { name: destination, status: "success" };
+  });
+}
+
+export function shouldShowRewatchedBadge(item: SyncHistoryItem): boolean {
+  return Boolean(
+    item.success && item.wasRewatched && item.destinations?.includes("TVTime")
+  );
+}
+
 /**
  * Generates a proxy URL for poster images if they're from Plex or Jellyfin
  * Otherwise returns the original URL

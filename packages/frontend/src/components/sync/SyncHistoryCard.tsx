@@ -1,3 +1,4 @@
+import { SyncDestinationBadges } from "@components/sync/SyncDestinationBadges";
 import { SyncHistoryPoster } from "@components/sync/SyncHistoryPoster";
 import { CustomCheckbox } from "@components/ui/CustomCheckbox";
 import { Spinner } from "@components/ui/spinner";
@@ -7,6 +8,8 @@ import {
   formatMediaTitle,
   formatRelativeTime,
   getMediaLinks,
+  getSyncStatus,
+  shouldShowRewatchedBadge,
 } from "@utils/syncHistory";
 import { useTranslation } from "react-i18next";
 import {
@@ -40,6 +43,7 @@ export function SyncHistoryCard({
   const { t } = useTranslation();
   const isConfirming = confirmDeleteId === item.id;
   const isDeleting = deleting === item.id;
+  const syncStatus = getSyncStatus(item);
 
   return (
     <div
@@ -64,11 +68,16 @@ export function SyncHistoryCard({
                 {formatMediaTitle(item)}
               </div>
             </div>
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              {item.success ? (
-                <FaCheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 flex-shrink-0" />
+            <div
+              className="flex items-center gap-1.5 shrink-0"
+              title={item.errorMessage}
+            >
+              {syncStatus === "success" ? (
+                <FaCheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 shrink-0" />
+              ) : syncStatus === "partial" ? (
+                <FaExclamationCircle className="h-4 w-4 text-yellow-500 dark:text-yellow-400 shrink-0" />
               ) : (
-                <FaExclamationCircle className="h-4 w-4 text-red-500 dark:text-red-400 flex-shrink-0" />
+                <FaExclamationCircle className="h-4 w-4 text-red-500 dark:text-red-400 shrink-0" />
               )}
               {isConfirming ? (
                 <div className="flex items-center gap-1">
@@ -123,7 +132,7 @@ export function SyncHistoryCard({
             <span className="rounded px-1.5 py-0.5 text-xs uppercase tracking-wide bg-muted text-muted-foreground">
               {item.mediaType}
             </span>
-            {item.success && item.wasRewatched && (
+            {shouldShowRewatchedBadge(item) && (
               <>
                 <span className="text-xs text-muted-foreground/50">•</span>
                 <span
@@ -176,38 +185,10 @@ export function SyncHistoryCard({
           )}
 
           {/* Destinations */}
-          {item.destinations && item.destinations.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5 mb-2">
-              {item.destinations.includes("TVTime") && (
-                <div className="flex items-center gap-1 px-1.5 py-0.5 bg-yellow-100 dark:bg-yellow-900 rounded">
-                  <img
-                    src="/logos/tvtime.png"
-                    alt="TVTime"
-                    className="w-2.5 h-2.5"
-                  />
-                  <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300">
-                    {t("sync.destinations.tvtime", {
-                      defaultValue: "TVTime",
-                    })}
-                  </span>
-                </div>
-              )}
-              {item.destinations.includes("Trakt") && (
-                <div className="flex items-center gap-1 px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900 rounded">
-                  <img
-                    src="/logos/trakt.svg"
-                    alt="Trakt"
-                    className="w-2.5 h-2.5"
-                  />
-                  <span className="text-xs font-medium text-purple-700 dark:text-purple-300">
-                    {t("sync.destinations.trakt", {
-                      defaultValue: "Trakt",
-                    })}
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
+          <SyncDestinationBadges
+            item={item}
+            className="mb-2 flex flex-wrap items-center gap-1.5"
+          />
 
           {/* External Links */}
           {getMediaLinks(item).length > 0 && (

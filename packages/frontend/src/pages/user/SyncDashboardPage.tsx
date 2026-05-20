@@ -20,6 +20,7 @@ import {
   formatDate,
   exportToCSV,
   exportToJSON,
+  getSyncStatus,
 } from "@utils/syncHistory";
 import { showError, showSuccess } from "@utils/toast";
 import React, {
@@ -96,8 +97,6 @@ export function SyncDashboardPage() {
       const next = { ...prev };
       if (mediaType != null && mediaType !== "") next.mediaType = mediaType;
       if (source != null && source !== "") next.source = source;
-      if (filter === "failed") next.success = false;
-      else if (filter === "success") next.success = true;
       return next;
     });
   }, [searchParams]);
@@ -203,9 +202,9 @@ export function SyncDashboardPage() {
               now.getTime() - itemDate.getTime() <= 30 * 24 * 60 * 60 * 1000
             );
           case "failed":
-            return !item.success;
+            return getSyncStatus(item) !== "success";
           case "success":
-            return item.success;
+            return getSyncStatus(item) === "success";
           default:
             return true;
         }

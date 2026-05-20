@@ -486,6 +486,9 @@
     "episodes": "Episodes",
     "movies": "Movies",
     "status": "Status",
+    "statuses": {
+      "partial": "Partial"
+    },
     "largeHistoryNotice": "You have more than 500 sync history items. Search and quick filters work on the most recent 500 items. Use advanced filters and pagination to view older items.",
     "noResults": "No results found",
     "noHistory": "No sync history available",
