@@ -91,10 +91,10 @@ const config = {
             label: "Documentation",
           },
           {
-            type: "doc",
-            docId: "api/scroblarr-api",
+            type: "docSidebar",
+            sidebarId: "apiSidebar",
             position: "left",
-            label: "API",
+            label: "API Reference",
           },
           {
             href: "https://github.com/0xsysr3ll/scroblarr",
