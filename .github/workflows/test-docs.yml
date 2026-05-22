@@ -12,6 +12,9 @@ on:
       - "packages/backend/openapi.yaml"
       - ".github/workflows/test-docs.yml"
 
+permissions:
+  contents: read
+
 jobs:
   test-deploy:
     name: Test docs build
