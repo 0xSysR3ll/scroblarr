@@ -23,7 +23,7 @@ Plex/Jellyfin → Webhook → Scroblarr → Trakt/TVTime
 - **[Configuration](/docs/configuration)** — Media servers, API key, Trakt, TVTime
 - **[How it works](/docs/how-it-works)** — Flow, multi-user, what gets synced
 - **[Architecture](/docs/architecture)** — Monorepo layout and API overview
-- **[REST API](/docs/api/scroblarr-api)** — Reference generated from OpenAPI (try requests from the live app at `/api-docs`)
+- **[API Reference](/docs/api/scroblarr-api)** — OpenAPI-generated endpoint reference grouped by area (try requests from the live app at `/api-docs`)
 - **[Troubleshooting](/docs/troubleshooting)** — Webhooks, syncs, database
 
 ## Need help?
