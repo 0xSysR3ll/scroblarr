@@ -22,6 +22,7 @@
     "format:check": "prettier --log-level warn --check --cache \"**/*.{ts,tsx,js,jsx,json,css,md,mdx}\"",
     "check": "pnpm lint && pnpm format:check && pnpm type-check",
     "test": "pnpm --filter '@scroblarr/backend' test && pnpm --filter '@scroblarr/frontend' test",
+    "test:coverage": "pnpm --filter '@scroblarr/frontend' test:coverage",
     "i18n:extract": "pnpm --filter '@scroblarr/frontend' i18n:extract"
   },
   "devDependencies": {
