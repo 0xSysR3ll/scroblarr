@@ -4,15 +4,11 @@
 
 # Scroblarr
 
-[![License](https://img.shields.io/github/license/0xsysr3ll/scroblarr)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
-[![pnpm](https://img.shields.io/badge/pnpm-8%2B-orange)](https://pnpm.io)
-[![Docker](https://img.shields.io/badge/docker-ghcr.io-blue)](https://ghcr.io/0xsysr3ll/scroblarr)
-[![Docs](https://img.shields.io/badge/docs-available-blue)](https://0xsysr3ll.github.io/scroblarr/docs)
-[![CI](https://github.com/0xsysr3ll/scroblarr/actions/workflows/ci.yml/badge.svg)](https://github.com/0xsysr3ll/scroblarr/actions)
-[![codecov](https://codecov.io/github/0xSysR3ll/scroblarr/graph/badge.svg?token=33KWA8F92B)](https://codecov.io/github/0xSysR3ll/scroblarr)
-[![Release](https://img.shields.io/github/v/release/0xsysr3ll/scroblarr)](https://github.com/0xsysr3ll/scroblarr/releases)
-[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![CI](https://img.shields.io/github/actions/workflow/status/0xsysr3ll/scroblarr/ci.yml?branch=develop&label=ci&logo=githubactions&logoColor=white&style=flat-square)](https://github.com/0xsysr3ll/scroblarr/actions)
+[![codecov](https://codecov.io/github/0xSysR3ll/scroblarr/graph/badge.svg?token=33KWA8F92B&style=flat-square)](https://codecov.io/github/0xSysR3ll/scroblarr)
+[![Release](https://img.shields.io/github/v/release/0xsysr3ll/scroblarr?label=release&logo=github&logoColor=white&style=flat-square)](https://github.com/0xsysr3ll/scroblarr/releases)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io%2F0xsysr3ll%2Fscroblarr-2496ED?logo=docker&logoColor=white&style=flat-square)](https://github.com/0xSysR3ll/scroblarr/pkgs/container/scroblarr)
+[![License](https://img.shields.io/github/license/0xsysr3ll/scroblarr?style=flat-square)](LICENSE)
 
 **Scroblarr** automatically syncs your watch history from [Plex](https://plex.tv) and [Jellyfin](https://jellyfin.org) to [Trakt](https://trakt.tv) and [TVTime](https://www.tvtime.com). \
 No manual logging — just watch and sync.
