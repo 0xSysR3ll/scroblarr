@@ -7,6 +7,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SyncDashboardPage } from "./SyncDashboardPage";
 
+const syncHistoryTableRowMock = vi.hoisted(() => ({
+  renderRows: false,
+}));
+
 vi.mock("@components/sync/SyncHistoryCard", () => ({
   SyncHistoryCard: ({ item }: { item: SyncHistoryItem }) => (
     <article>{item.mediaTitle}</article>
@@ -14,7 +18,12 @@ vi.mock("@components/sync/SyncHistoryCard", () => ({
 }));
 
 vi.mock("@components/sync/SyncHistoryTableRow", () => ({
-  SyncHistoryTableRow: () => null,
+  SyncHistoryTableRow: ({ item }: { item: SyncHistoryItem }) =>
+    syncHistoryTableRowMock.renderRows ? (
+      <tr data-testid="sync-history-table-row">
+        <td>{item.mediaTitle}</td>
+      </tr>
+    ) : null,
 }));
 
 vi.mock("@services/api", async (importOriginal) => {
@@ -72,6 +81,7 @@ function syncHistoryResponse(data = history): SyncHistoryResponse {
 
 describe("SyncDashboardPage", () => {
   beforeEach(() => {
+    syncHistoryTableRowMock.renderRows = false;
     vi.mocked(getSyncHistory).mockReset();
     vi.mocked(getSyncHistory).mockResolvedValue(syncHistoryResponse());
   });
@@ -104,5 +114,16 @@ describe("SyncDashboardPage", () => {
 
     expect(screen.getByText("Broken Episode")).toBeVisible();
     expect(screen.queryByText("Example Movie")).not.toBeInTheDocument();
+  });
+
+  it("renders sync history rows in the table view", async () => {
+    syncHistoryTableRowMock.renderRows = true;
+
+    renderWithProviders(<SyncDashboardPage />, { route: "/sync" });
+
+    expect(await screen.findByText("Media")).toBeVisible();
+    await waitFor(() => {
+      expect(screen.getAllByTestId("sync-history-table-row")).toHaveLength(2);
+    });
   });
 });

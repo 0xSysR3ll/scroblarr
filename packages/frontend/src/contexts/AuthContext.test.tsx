@@ -43,6 +43,9 @@ function renderAuthProvider() {
 
 describe("AuthContext", () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    localStorage.clear();
     vi.mocked(getCurrentUser).mockReset();
   });
 

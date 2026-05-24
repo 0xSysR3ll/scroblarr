@@ -21,7 +21,7 @@ vi.mock("@services/api", () => ({
   setupJellyfinAdmin: vi.fn(),
 }));
 
-function mockAuth() {
+function mockAuth(overrides: Partial<ReturnType<typeof useAuth>> = {}) {
   vi.mocked(useAuth).mockReturnValue({
     user: null,
     loading: false,
@@ -30,6 +30,7 @@ function mockAuth() {
     setUserFromLogin: vi.fn(),
     isAuthenticated: false,
     isAdmin: false,
+    ...overrides,
   });
 }
 
@@ -64,14 +65,9 @@ describe("SetupPage", () => {
     const user = userEvent.setup();
     const checkAuth = vi.fn().mockResolvedValue(undefined);
     const setUserFromLogin = vi.fn();
-    vi.mocked(useAuth).mockReturnValue({
-      user: null,
-      loading: false,
-      logout: vi.fn(),
+    mockAuth({
       checkAuth,
       setUserFromLogin,
-      isAuthenticated: false,
-      isAdmin: false,
     });
     vi.mocked(setupJellyfinAdmin).mockResolvedValue({
       user: {

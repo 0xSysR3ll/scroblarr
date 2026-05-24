@@ -1,18 +1,14 @@
+import { jsonResponse } from "@test/jsonResponse";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+
+import { getAuthHeaders } from "./common";
 import {
   getSettings,
   removeJellyfinServer,
   removePlexServer,
   updateSettings,
 } from "./settings";
-
-function jsonResponse(body: unknown, ok = true): Response {
-  return {
-    ok,
-    json: vi.fn().mockResolvedValue(body),
-  } as unknown as Response;
-}
 
 describe("settings api", () => {
   const fetchMock = vi.fn();
@@ -28,8 +24,9 @@ describe("settings api", () => {
 
     await expect(getSettings()).resolves.toEqual(settings);
 
+    const expectedHeaders = getAuthHeaders();
     expect(fetchMock).toHaveBeenCalledWith("/api/v1/settings", {
-      headers: { "Content-Type": "application/json" },
+      headers: expectedHeaders,
     });
   });
 
@@ -39,9 +36,10 @@ describe("settings api", () => {
 
     await expect(updateSettings(settings)).resolves.toEqual(settings);
 
+    const expectedHeaders = getAuthHeaders();
     expect(fetchMock).toHaveBeenCalledWith("/api/v1/settings", {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: expectedHeaders,
       body: JSON.stringify(settings),
     });
   });
@@ -54,13 +52,14 @@ describe("settings api", () => {
     await removePlexServer();
     await removeJellyfinServer();
 
+    const expectedHeaders = getAuthHeaders();
     expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/v1/settings/plex", {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" },
+      headers: expectedHeaders,
     });
     expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/v1/settings/jellyfin", {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" },
+      headers: expectedHeaders,
     });
   });
 

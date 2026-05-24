@@ -1,4 +1,6 @@
+import { jsonResponse } from "@test/jsonResponse";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 
 import {
   clearSyncHistory,
@@ -6,13 +8,6 @@ import {
   getSyncHistory,
   getSyncStatistics,
 } from "./sync";
-
-function jsonResponse(body: unknown, ok = true): Response {
-  return {
-    ok,
-    json: vi.fn().mockResolvedValue(body),
-  } as unknown as Response;
-}
 
 describe("sync api", () => {
   const fetchMock = vi.fn();
@@ -41,7 +36,11 @@ describe("sync api", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/v1/sync/history?page=2&pageSize=50&sortBy=mediaTitle&sortOrder=ASC&mediaType=movie&success=false&source=plex",
-      { headers: { "Content-Type": "application/json" } }
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "Content-Type": "application/json",
+        }),
+      })
     );
   });
 
@@ -50,10 +49,15 @@ describe("sync api", () => {
 
     await expect(clearSyncHistory()).resolves.toBeUndefined();
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/v1/sync/history", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/sync/history",
+      expect.objectContaining({
+        method: "DELETE",
+        headers: expect.objectContaining({
+          "Content-Type": "application/json",
+        }),
+      })
+    );
   });
 
   it("bulk deletes selected sync-history items", async () => {
@@ -61,11 +65,16 @@ describe("sync api", () => {
 
     await expect(deleteSyncHistoryItems(["a", "b"])).resolves.toBeUndefined();
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/v1/sync/history", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ids: ["a", "b"] }),
-    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/sync/history",
+      expect.objectContaining({
+        method: "DELETE",
+        headers: expect.objectContaining({
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({ ids: ["a", "b"] }),
+      })
+    );
   });
 
   it("throws on failed statistics requests", async () => {

@@ -80,7 +80,7 @@ describe("sync history utils", () => {
     ).toBe("/api/v1/sync/poster/poster-1");
   });
 
-  it("formats episode and movie titles with missing metadata", () => {
+  it("formats episode and movie titles with complete metadata", () => {
     expect(
       formatMediaTitle(
         syncItem({
@@ -102,12 +102,31 @@ describe("sync history utils", () => {
     ).toBe("Example Movie (2026)");
   });
 
+  it("formats media titles with missing metadata", () => {
+    expect(formatMediaTitle(syncItem({ mediaTitle: "Example Show" }))).toBe(
+      "Example Show"
+    );
+
+    expect(
+      formatMediaTitle(
+        syncItem({
+          mediaType: "movie",
+          mediaTitle: "Example Movie",
+        })
+      )
+    ).toBe("Example Movie");
+  });
+
   it("formats relative times with translation fallbacks", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-01T12:30:00.000Z"));
-    const t = vi.fn((_key: string, options: { defaultValue: string }) => {
-      return options.defaultValue.replace("{{count}}", "30");
-    }) as unknown as TFunction;
+    const t = vi.fn(
+      (key: string, options: { count: number; defaultValue: string }) => {
+        expect(key).toBe("sync.time.minutesAgo");
+        expect(options.count).toBe(30);
+        return options.defaultValue.replace("{{count}}", String(options.count));
+      }
+    ) as unknown as TFunction;
 
     expect(formatRelativeTime("2026-01-01T12:00:00.000Z", t)).toBe("30m ago");
   });

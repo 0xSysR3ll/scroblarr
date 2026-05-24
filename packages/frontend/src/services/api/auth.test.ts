@@ -1,4 +1,6 @@
+import { jsonResponse } from "@test/jsonResponse";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 
 import {
   getCurrentUser,
@@ -7,14 +9,6 @@ import {
   loginWithPlex,
   setupJellyfinAdmin,
 } from "./auth";
-
-function jsonResponse(body: unknown, ok = true, status = 200): Response {
-  return {
-    ok,
-    status,
-    json: vi.fn().mockResolvedValue(body),
-  } as unknown as Response;
-}
 
 describe("auth api", () => {
   const fetchMock = vi.fn();

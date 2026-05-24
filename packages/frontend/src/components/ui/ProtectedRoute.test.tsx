@@ -61,6 +61,15 @@ describe("ProtectedRoute", () => {
     expect(screen.getByTestId("location")).toHaveTextContent("/login");
   });
 
+  it("shows loading state without redirecting", () => {
+    mockAuth({ loading: true });
+
+    renderRoute();
+
+    expect(screen.getByRole("status", { name: "Loading" })).toBeVisible();
+    expect(screen.getByTestId("location")).toHaveTextContent("/protected");
+  });
+
   it("redirects non-admin users away from admin-only routes", () => {
     mockAuth({ isAuthenticated: true, isAdmin: false });
 

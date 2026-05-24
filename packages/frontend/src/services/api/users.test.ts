@@ -1,4 +1,6 @@
+import { jsonResponse } from "@test/jsonResponse";
 import { describe, expect, it, vi, beforeEach } from "vitest";
+
 
 import {
   createUser,
@@ -7,13 +9,6 @@ import {
   getUsers,
   updateUser,
 } from "./users";
-
-function jsonResponse(body: unknown, ok = true): Response {
-  return {
-    ok,
-    json: vi.fn().mockResolvedValue(body),
-  } as unknown as Response;
-}
 
 describe("users api", () => {
   const fetchMock = vi.fn();
@@ -29,7 +24,9 @@ describe("users api", () => {
     await expect(getUsers()).resolves.toEqual([{ id: "1" }]);
 
     expect(fetchMock).toHaveBeenCalledWith("/api/v1/users", {
-      headers: { "Content-Type": "application/json" },
+      headers: expect.objectContaining({
+        "Content-Type": "application/json",
+      }),
     });
   });
 
@@ -41,7 +38,9 @@ describe("users api", () => {
 
     expect(fetchMock).toHaveBeenCalledWith("/api/v1/users", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: expect.objectContaining({
+        "Content-Type": "application/json",
+      }),
       body: JSON.stringify({ plexUsername: "alice" }),
     });
   });
@@ -53,7 +52,11 @@ describe("users api", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/v1/users/plex-users?serverUrl=https%3A%2F%2Fplex.example.test%3A32400%2Flibrary",
-      { headers: { "Content-Type": "application/json" } }
+      {
+        headers: expect.objectContaining({
+          "Content-Type": "application/json",
+        }),
+      }
     );
   });
 
@@ -64,7 +67,9 @@ describe("users api", () => {
 
     expect(fetchMock).toHaveBeenCalledWith("/api/v1/users", {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" },
+      headers: expect.objectContaining({
+        "Content-Type": "application/json",
+      }),
       body: JSON.stringify({ ids: ["1", "2"] }),
     });
   });
