@@ -1,7 +1,6 @@
 import { jsonResponse } from "@test/jsonResponse";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-
 import {
   getCurrentUser,
   getAuthProviders,
