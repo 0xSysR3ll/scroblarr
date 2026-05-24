@@ -98,15 +98,21 @@ describe("SetupPage", () => {
         jellyfinUsername: "admin",
       });
     });
-    expect(setupJellyfinAdmin).toHaveBeenCalledWith(
-      "admin",
-      "secret",
-      "jellyfin.local",
-      8096,
-      false,
-      ""
-    );
-    expect(checkAuth).toHaveBeenCalled();
-    expect(localStorage.getItem("authSource")).toBe("jellyfin");
+    await waitFor(() => {
+      expect(setupJellyfinAdmin).toHaveBeenCalledWith(
+        "admin",
+        "secret",
+        "jellyfin.local",
+        8096,
+        false,
+        ""
+      );
+    });
+    await waitFor(() => {
+      expect(checkAuth).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(localStorage.getItem("authSource")).toBe("jellyfin");
+    });
   });
 });

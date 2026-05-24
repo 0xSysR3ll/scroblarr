@@ -49,14 +49,17 @@ describe("users api", () => {
 
     await getServerUsers("https://plex.example.test:32400/library");
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/v1/users/plex-users?serverUrl=https%3A%2F%2Fplex.example.test%3A32400%2Flibrary",
-      {
-        headers: expect.objectContaining({
-          "Content-Type": "application/json",
-        }),
-      }
+    const actualUrl = new URL(String(fetchMock.mock.calls[0][0]), "http://app");
+
+    expect(actualUrl.pathname).toBe("/api/v1/users/plex-users");
+    expect(actualUrl.searchParams.get("serverUrl")).toBe(
+      "https://plex.example.test:32400/library"
     );
+    expect(fetchMock).toHaveBeenCalledWith(expect.any(String), {
+      headers: expect.objectContaining({
+        "Content-Type": "application/json",
+      }),
+    });
   });
 
   it("bulk deletes users by request body", async () => {

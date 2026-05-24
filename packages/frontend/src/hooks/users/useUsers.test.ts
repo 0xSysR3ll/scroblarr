@@ -19,34 +19,37 @@ vi.mock("@services/api", () => ({
   updateUser: vi.fn(),
 }));
 
-const users: User[] = [
-  {
-    id: "1",
-    plexUsername: "alice",
-    isAdmin: true,
-    enabled: true,
-    createdAt: "2026-01-01T00:00:00.000Z",
-    updatedAt: "2026-01-01T00:00:00.000Z",
-  },
-  {
-    id: "2",
-    plexUsername: "bob",
-    isAdmin: false,
-    enabled: true,
-    createdAt: "2026-01-01T00:00:00.000Z",
-    updatedAt: "2026-01-01T00:00:00.000Z",
-  },
-];
+function createUsersFixture(): User[] {
+  return [
+    {
+      id: "1",
+      plexUsername: "alice",
+      isAdmin: true,
+      enabled: true,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "2",
+      plexUsername: "bob",
+      isAdmin: false,
+      enabled: true,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  ];
+}
 
 async function renderUseUsersWithInitialUsers() {
-  vi.mocked(getUsers).mockResolvedValue(users);
+  const initialUsers = createUsersFixture();
+  vi.mocked(getUsers).mockResolvedValue(initialUsers);
   const hook = renderHook(() => useUsers());
 
   await waitFor(() => {
     expect(hook.result.current.loading).toBe(false);
   });
 
-  return hook;
+  return { ...hook, initialUsers };
 }
 
 describe("useUsers", () => {
@@ -59,7 +62,8 @@ describe("useUsers", () => {
   });
 
   it("loads users on mount", async () => {
-    vi.mocked(getUsers).mockResolvedValue(users);
+    const initialUsers = createUsersFixture();
+    vi.mocked(getUsers).mockResolvedValue(initialUsers);
 
     const { result } = renderHook(() => useUsers());
 
@@ -67,12 +71,13 @@ describe("useUsers", () => {
       expect(result.current.loading).toBe(false);
     });
     expect(getUsers).toHaveBeenCalledTimes(1);
-    expect(result.current.users).toEqual(users);
+    expect(result.current.users).toEqual(initialUsers);
     expect(result.current.error).toBeNull();
   });
 
   it("adds, updates, and removes users in local state", async () => {
-    vi.mocked(getUsers).mockResolvedValue(users);
+    const initialUsers = createUsersFixture();
+    vi.mocked(getUsers).mockResolvedValue(initialUsers);
     const newUser: User = {
       id: "3",
       plexUsername: "carol",
@@ -82,7 +87,10 @@ describe("useUsers", () => {
       updatedAt: "2026-01-01T00:00:00.000Z",
     };
     vi.mocked(createUser).mockResolvedValue(newUser);
-    vi.mocked(updateUser).mockResolvedValue({ ...users[1], enabled: false });
+    vi.mocked(updateUser).mockResolvedValue({
+      ...initialUsers[1],
+      enabled: false,
+    });
     vi.mocked(deleteUser).mockResolvedValue(undefined);
     vi.mocked(deleteUsers).mockResolvedValue({ deleted: 1 });
 
@@ -125,7 +133,7 @@ describe("useUsers", () => {
   it("preserves users and exposes create errors", async () => {
     const error = new Error("create failed");
     vi.mocked(createUser).mockRejectedValue(error);
-    const { result } = await renderUseUsersWithInitialUsers();
+    const { result, initialUsers } = await renderUseUsersWithInitialUsers();
 
     await act(async () => {
       await expect(
@@ -134,14 +142,14 @@ describe("useUsers", () => {
     });
 
     expect(createUser).toHaveBeenCalledWith({ plexUsername: "carol" });
-    expect(result.current.users).toEqual(users);
+    expect(result.current.users).toEqual(initialUsers);
     expect(result.current.error).toBe(error);
   });
 
   it("preserves users and exposes update errors", async () => {
     const error = new Error("update failed");
     vi.mocked(updateUser).mockRejectedValue(error);
-    const { result } = await renderUseUsersWithInitialUsers();
+    const { result, initialUsers } = await renderUseUsersWithInitialUsers();
 
     await act(async () => {
       await expect(
@@ -150,14 +158,14 @@ describe("useUsers", () => {
     });
 
     expect(updateUser).toHaveBeenCalledWith("2", { enabled: false });
-    expect(result.current.users).toEqual(users);
+    expect(result.current.users).toEqual(initialUsers);
     expect(result.current.error).toBe(error);
   });
 
   it("preserves users and exposes delete errors", async () => {
     const error = new Error("delete failed");
     vi.mocked(deleteUser).mockRejectedValue(error);
-    const { result } = await renderUseUsersWithInitialUsers();
+    const { result, initialUsers } = await renderUseUsersWithInitialUsers();
 
     await act(async () => {
       await expect(result.current.removeUser("1")).rejects.toThrow(
@@ -166,14 +174,14 @@ describe("useUsers", () => {
     });
 
     expect(deleteUser).toHaveBeenCalledWith("1");
-    expect(result.current.users).toEqual(users);
+    expect(result.current.users).toEqual(initialUsers);
     expect(result.current.error).toBe(error);
   });
 
   it("preserves users and exposes bulk-delete errors", async () => {
     const error = new Error("bulk delete failed");
     vi.mocked(deleteUsers).mockRejectedValue(error);
-    const { result } = await renderUseUsersWithInitialUsers();
+    const { result, initialUsers } = await renderUseUsersWithInitialUsers();
 
     await act(async () => {
       await expect(result.current.removeUsers(["3"])).rejects.toThrow(
@@ -182,7 +190,7 @@ describe("useUsers", () => {
     });
 
     expect(deleteUsers).toHaveBeenCalledWith(["3"]);
-    expect(result.current.users).toEqual(users);
+    expect(result.current.users).toEqual(initialUsers);
     expect(result.current.error).toBe(error);
   });
 

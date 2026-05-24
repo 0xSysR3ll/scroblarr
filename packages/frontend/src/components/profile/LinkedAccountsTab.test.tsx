@@ -77,9 +77,9 @@ describe("LinkedAccountsTab", () => {
 
     await waitFor(() => {
       expect(linkJellyfinAccount).toHaveBeenCalledWith("alice", "secret");
+      expect(checkAuth).toHaveBeenCalled();
+      expect(onAccountLinked).toHaveBeenCalled();
     });
-    expect(checkAuth).toHaveBeenCalled();
-    expect(onAccountLinked).toHaveBeenCalled();
   });
 
   it("shows an error when Jellyfin linking fails", async () => {
@@ -123,9 +123,9 @@ describe("LinkedAccountsTab", () => {
 
     await waitFor(() => {
       expect(unlinkPlexAccount).toHaveBeenCalled();
+      expect(checkAuth).toHaveBeenCalled();
+      expect(onAccountLinked).toHaveBeenCalled();
     });
-    expect(checkAuth).toHaveBeenCalled();
-    expect(onAccountLinked).toHaveBeenCalled();
   });
 
   it("shows an error toast when Plex unlinking fails", async () => {

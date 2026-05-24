@@ -33,8 +33,18 @@ describe("sync api", () => {
       )
     ).resolves.toEqual(response);
 
+    const actualUrl = new URL(String(fetchMock.mock.calls[0][0]), "http://app");
+
+    expect(actualUrl.pathname).toBe("/api/v1/sync/history");
+    expect(actualUrl.searchParams.get("page")).toBe("2");
+    expect(actualUrl.searchParams.get("pageSize")).toBe("50");
+    expect(actualUrl.searchParams.get("sortBy")).toBe("mediaTitle");
+    expect(actualUrl.searchParams.get("sortOrder")).toBe("ASC");
+    expect(actualUrl.searchParams.get("mediaType")).toBe("movie");
+    expect(actualUrl.searchParams.get("success")).toBe("false");
+    expect(actualUrl.searchParams.get("source")).toBe("plex");
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/v1/sync/history?page=2&pageSize=50&sortBy=mediaTitle&sortOrder=ASC&mediaType=movie&success=false&source=plex",
+      expect.any(String),
       expect.objectContaining({
         headers: expect.objectContaining({
           "Content-Type": "application/json",
