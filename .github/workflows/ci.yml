@@ -75,6 +75,17 @@ jobs:
       - name: Run automated tests
         run: pnpm test
 
+      - name: Run frontend coverage
+        run: pnpm test:coverage
+
+      - name: Upload frontend coverage
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: packages/frontend/coverage/lcov.info
+          flags: frontend
+          fail_ci_if_error: true
+
   docker-build:
     name: Docker image build
     runs-on: ubuntu-24.04

@@ -10,6 +10,7 @@
 [![Docker](https://img.shields.io/badge/docker-ghcr.io-blue)](https://ghcr.io/0xsysr3ll/scroblarr)
 [![Docs](https://img.shields.io/badge/docs-available-blue)](https://0xsysr3ll.github.io/scroblarr/docs)
 [![CI](https://github.com/0xsysr3ll/scroblarr/actions/workflows/ci.yml/badge.svg)](https://github.com/0xsysr3ll/scroblarr/actions)
+[![codecov](https://codecov.io/github/0xSysR3ll/scroblarr/graph/badge.svg?token=33KWA8F92B)](https://codecov.io/github/0xSysR3ll/scroblarr)
 [![Release](https://img.shields.io/github/v/release/0xsysr3ll/scroblarr)](https://github.com/0xsysr3ll/scroblarr/releases)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
