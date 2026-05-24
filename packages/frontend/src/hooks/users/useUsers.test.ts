@@ -195,13 +195,14 @@ describe("useUsers", () => {
   });
 
   it("exposes load errors", async () => {
-    vi.mocked(getUsers).mockRejectedValue(new Error("Network failed"));
+    const error = new Error("Network failed");
+    vi.mocked(getUsers).mockRejectedValue(error);
 
     const { result } = renderHook(() => useUsers());
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });
-    expect(result.current.error).toEqual(new Error("Network failed"));
+    expect(result.current.error).toBe(error);
   });
 });
