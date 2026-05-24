@@ -26,6 +26,7 @@
       "@hooks/*": ["./hooks/*"],
       "@contexts/*": ["./contexts/*"],
       "@utils/*": ["./utils/*"],
+      "@test/*": ["./test/*"],
       "@i18n/*": ["./i18n/*"]
     }
   },
