@@ -263,6 +263,9 @@ export function LogsTab() {
               <CustomCheckbox
                 checked={autoRefresh}
                 onChange={() => setAutoRefresh(!autoRefresh)}
+                ariaLabel={t("logs.autoRefresh", {
+                  defaultValue: "Auto Refresh",
+                })}
               />
               <span className="text-sm font-medium text-foreground">
                 {t("logs.autoRefresh", { defaultValue: "Auto Refresh" })}

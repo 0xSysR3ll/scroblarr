@@ -36,7 +36,7 @@ export function SyncHistoryPoster({
   });
 
   const showImage = Boolean(posterUrl) && !loadFailed;
-  const frame = `${sizeClasses[size]} flex-shrink-0 overflow-hidden rounded shadow-sm border border-border/60 bg-muted`;
+  const frame = `${sizeClasses[size]} shrink-0 overflow-hidden rounded shadow-sm border border-border/60 bg-muted`;
 
   if (showImage) {
     return (

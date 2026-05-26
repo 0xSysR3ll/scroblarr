@@ -4,12 +4,14 @@ interface CustomCheckboxProps {
   checked: boolean;
   onChange: () => void;
   disabled?: boolean;
+  ariaLabel?: string;
 }
 
 export function CustomCheckbox({
   checked,
   onChange,
   disabled = false,
+  ariaLabel,
 }: CustomCheckboxProps) {
   return (
     <label className="relative inline-flex items-center cursor-pointer">
@@ -18,6 +20,7 @@ export function CustomCheckbox({
         checked={checked}
         onChange={onChange}
         disabled={disabled}
+        aria-label={ariaLabel}
         className="sr-only"
       />
       <div

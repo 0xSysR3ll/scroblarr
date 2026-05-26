@@ -186,7 +186,7 @@ export function JellyfinSettingsTab({
     return (
       <div className="space-y-4 sm:space-y-6">
         <div className="flex items-center gap-3 mb-4 sm:mb-6">
-          <div className="flex-shrink-0 rounded-lg bg-primary/15 p-2">
+          <div className="shrink-0 rounded-lg bg-primary/15 p-2">
             <img src="/logos/jellyfin.svg" alt="Jellyfin" className="w-5 h-5" />
           </div>
           <div>
@@ -229,7 +229,7 @@ export function JellyfinSettingsTab({
     <div className="space-y-4 sm:space-y-6">
       <div className="mb-4 sm:mb-6 relative">
         <div className="flex items-center gap-3">
-          <div className="flex-shrink-0 rounded-lg bg-primary/15 p-2">
+          <div className="shrink-0 rounded-lg bg-primary/15 p-2">
             <img src="/logos/jellyfin.svg" alt="Jellyfin" className="w-5 h-5" />
           </div>
           <div className="flex-1 min-w-0">
@@ -314,6 +314,9 @@ export function JellyfinSettingsTab({
               <CustomCheckbox
                 checked={useSsl}
                 onChange={() => handleSslChange(!useSsl)}
+                ariaLabel={t("auth.jellyfin.useSsl", {
+                  defaultValue: "Use SSL",
+                })}
               />
               <span className="ml-2">
                 {t("auth.jellyfin.useSsl", { defaultValue: "Use SSL" })}

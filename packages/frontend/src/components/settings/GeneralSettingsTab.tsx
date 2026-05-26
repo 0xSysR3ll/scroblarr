@@ -22,7 +22,7 @@ export function GeneralSettingsTab({
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center gap-3 mb-2 sm:mb-4">
-        <div className="flex-shrink-0 rounded-lg bg-primary/15 p-2">
+        <div className="shrink-0 rounded-lg bg-primary/15 p-2">
           <FaHistory className="h-5 w-5 text-primary" />
         </div>
         <div>

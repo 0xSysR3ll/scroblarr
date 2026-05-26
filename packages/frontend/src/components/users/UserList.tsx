@@ -133,7 +133,11 @@ export function UserList({
       <div className="md:hidden space-y-3">
         {onBulkDelete && deletableUsers.length > 0 && (
           <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-card p-3 text-card-foreground shadow-sm">
-            <CustomCheckbox checked={allSelected} onChange={handleSelectAll} />
+            <CustomCheckbox
+              checked={allSelected}
+              onChange={handleSelectAll}
+              ariaLabel={t("users.selectAll", { defaultValue: "Select All" })}
+            />
             <span className="text-sm font-medium text-foreground">
               {allSelected
                 ? t("users.deselectAll", { defaultValue: "Deselect All" })
@@ -165,6 +169,10 @@ export function UserList({
                       checked={isSelected}
                       onChange={() => handleSelectItem(user.id)}
                       disabled={!canSelect}
+                      ariaLabel={t("users.selectUser", {
+                        defaultValue: "Select {{name}}",
+                        name: user.displayName || user.plexUsername,
+                      })}
                     />
                   )}
                   <img
@@ -195,7 +203,7 @@ export function UserList({
                   </div>
                 </div>
                 {onDelete && canDelete && (
-                  <div className="flex-shrink-0">
+                  <div className="shrink-0">
                     {confirmDeleteId === user.id ? (
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-red-600 dark:text-red-400">
@@ -206,6 +214,9 @@ export function UserList({
                         <button
                           onClick={() => handleDelete(user.id)}
                           disabled={deletingId === user.id}
+                          aria-label={t("users.confirmDelete", {
+                            defaultValue: "Confirm delete",
+                          })}
                           className="text-red-600 dark:text-red-500 hover:text-red-900 dark:hover:text-red-400 disabled:opacity-50"
                           title={t("users.confirmDelete", {
                             defaultValue: "Confirm delete",
@@ -231,6 +242,9 @@ export function UserList({
                     ) : (
                       <button
                         onClick={() => handleDelete(user.id)}
+                        aria-label={t("users.deleteUserTitle", {
+                          defaultValue: "Delete user",
+                        })}
                         className="text-red-600 dark:text-red-500 hover:text-red-900 dark:hover:text-red-400"
                         title={t("users.deleteUserTitle", {
                           defaultValue: "Delete user",
@@ -359,6 +373,9 @@ export function UserList({
                     <CustomCheckbox
                       checked={allSelected}
                       onChange={handleSelectAll}
+                      ariaLabel={t("users.selectAll", {
+                        defaultValue: "Select All",
+                      })}
                     />
                   </th>
                 )}
@@ -403,6 +420,10 @@ export function UserList({
                           checked={isSelected}
                           onChange={() => handleSelectItem(user.id)}
                           disabled={!canSelect}
+                          ariaLabel={t("users.selectUser", {
+                            defaultValue: "Select {{name}}",
+                            name: user.displayName || user.plexUsername,
+                          })}
                         />
                       </td>
                     )}
@@ -566,6 +587,9 @@ export function UserList({
                               <button
                                 onClick={() => handleDelete(user.id)}
                                 disabled={deletingId === user.id}
+                                aria-label={t("users.confirmDelete", {
+                                  defaultValue: "Confirm delete",
+                                })}
                                 className="text-red-600 dark:text-red-500 hover:text-red-900 dark:hover:text-red-400 disabled:opacity-50"
                                 title={t("users.confirmDelete", {
                                   defaultValue: "Confirm delete",
@@ -591,6 +615,9 @@ export function UserList({
                           ) : (
                             <button
                               onClick={() => handleDelete(user.id)}
+                              aria-label={t("users.deleteUserTitle", {
+                                defaultValue: "Delete user",
+                              })}
                               className="text-red-600 dark:text-red-500 hover:text-red-900 dark:hover:text-red-400"
                               title={t("users.deleteUserTitle", {
                                 defaultValue: "Delete user",
