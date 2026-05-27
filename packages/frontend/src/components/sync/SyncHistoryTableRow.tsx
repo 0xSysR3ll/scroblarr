@@ -62,7 +62,14 @@ export function SyncHistoryTableRow({
       }
     >
       <td className="px-4 py-2.5 whitespace-nowrap">
-        <CustomCheckbox checked={isSelected} onChange={onSelect} />
+        <CustomCheckbox
+          checked={isSelected}
+          onChange={onSelect}
+          ariaLabel={t("sync.selectHistoryItem", {
+            defaultValue: "Select {{title}}",
+            title: formatMediaTitle(item),
+          })}
+        />
       </td>
       <td className="px-4 py-2.5 whitespace-nowrap">
         <div

@@ -615,6 +615,9 @@ export function IntegrationsTab({
                       onChange={() =>
                         setMarkMoviesAsRewatched(!markMoviesAsRewatched)
                       }
+                      ariaLabel={t("tvtime.settings.markMoviesAsRewatched", {
+                        defaultValue: "Mark movies as rewatched",
+                      })}
                     />
                   </div>
                   <div>
@@ -639,6 +642,9 @@ export function IntegrationsTab({
                       onChange={() =>
                         setMarkEpisodesAsRewatched(!markEpisodesAsRewatched)
                       }
+                      ariaLabel={t("tvtime.settings.markEpisodesAsRewatched", {
+                        defaultValue: "Mark episodes as rewatched",
+                      })}
                     />
                   </div>
                   <div>

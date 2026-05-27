@@ -192,7 +192,8 @@
       "bulkDeleteMessage_one": "Are you sure you want to delete {{count}} user{{plural}}? This action cannot be undone.",
       "bulkDeleteMessage_other": "Are you sure you want to delete {{count}} user{{plural}}? This action cannot be undone."
     },
-    "deleteSelected": "Delete Selected"
+    "deleteSelected": "Delete Selected",
+    "selectUser": "Select {{name}}"
   },
   "settings": {
     "title": "Settings",
@@ -534,7 +535,8 @@
       "daysAgo_one": "{{count}}d ago",
       "daysAgo_other": "{{count}}d ago"
     },
-    "posterPlaceholder": "No poster available"
+    "posterPlaceholder": "No poster available",
+    "selectHistoryItem": "Select {{title}}"
   },
   "userImport": {
     "loadSettingsFailed": "Failed to load settings",
@@ -563,6 +565,7 @@
     "usersSelected_one": "{{count}} user{{plural}} selected",
     "usersSelected_other": "{{count}} user{{plural}} selected",
     "importUsers_one": "Import {{count}} User{{plural}}",
-    "importUsers_other": "Import {{count}} User{{plural}}"
+    "importUsers_other": "Import {{count}} User{{plural}}",
+    "selectUser": "Select {{name}}"
   }
 }

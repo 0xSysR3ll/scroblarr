@@ -217,7 +217,7 @@ export function DashboardPage() {
                   className="flex items-center gap-2 text-sm text-muted-foreground"
                   title={new Date(statistics.lastSyncedAt).toLocaleString()}
                 >
-                  <FaClock className="w-4 h-4 flex-shrink-0" />
+                  <FaClock className="w-4 h-4 shrink-0" />
                   {t("dashboard.lastSynced", {
                     defaultValue: "Last synced",
                   })}{" "}
@@ -759,7 +759,7 @@ export function DashboardPage() {
                             <span className="text-foreground font-medium truncate">
                               {item.mediaTitle}
                             </span>
-                            <span className="text-sm text-muted-foreground flex-shrink-0">
+                            <span className="text-sm text-muted-foreground shrink-0">
                               {item.mediaType === "episode"
                                 ? t("dashboard.topThisMonthEpisodes", {
                                     count: item.count,
@@ -815,7 +815,7 @@ export function DashboardPage() {
                             <span className="text-foreground truncate">
                               {formatMediaTitle(item)}
                             </span>
-                            <span className="flex items-center gap-2 flex-shrink-0">
+                            <span className="flex items-center gap-2 shrink-0">
                               {item.success ? (
                                 <FaCheckCircle className="w-4 h-4 text-green-500" />
                               ) : (

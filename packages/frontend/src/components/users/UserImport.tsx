@@ -390,7 +390,7 @@ export function UserImport({
           ) : configuredServices.length === 0 ? (
             <div className="bg-yellow-50 dark:bg-yellow-950 border-l-4 border-yellow-400 dark:border-yellow-600 p-4 rounded">
               <div className="flex">
-                <div className="flex-shrink-0">
+                <div className="shrink-0">
                   <FaExclamationTriangle className="h-5 w-5 text-yellow-400 dark:text-yellow-500" />
                 </div>
                 <div className="ml-3">
@@ -489,7 +489,7 @@ export function UserImport({
                               : "border-border bg-card hover:border-primary/30 hover:shadow-sm"
                           }`}
                         >
-                          <div className="flex-shrink-0 mr-3">
+                          <div className="shrink-0 mr-3">
                             <CustomCheckbox
                               checked={isSelected}
                               onChange={() => {
@@ -499,9 +499,13 @@ export function UserImport({
                                   handleJellyfinUserToggle(user.username);
                                 }
                               }}
+                              ariaLabel={t("userImport.selectUser", {
+                                defaultValue: "Select {{name}}",
+                                name: user.displayName || user.username,
+                              })}
                             />
                           </div>
-                          <div className="flex-shrink-0 mr-3">
+                          <div className="shrink-0 mr-3">
                             {user.thumb ? (
                               <img
                                 src={user.thumb}
@@ -533,7 +537,7 @@ export function UserImport({
                             )}
                           </div>
                           {isSelected && (
-                            <div className="flex-shrink-0 ml-2">
+                            <div className="shrink-0 ml-2">
                               <FaCheckCircle className="h-5 w-5 text-primary" />
                             </div>
                           )}

@@ -348,6 +348,9 @@ export function SetupPage() {
                         port: !jellyfinFormData.useSsl ? 443 : 8096,
                       })
                     }
+                    ariaLabel={t("auth.jellyfin.useSsl", {
+                      defaultValue: "Use SSL",
+                    })}
                   />
                   <span className="ml-2">
                     {t("auth.jellyfin.useSsl", { defaultValue: "Use SSL" })}

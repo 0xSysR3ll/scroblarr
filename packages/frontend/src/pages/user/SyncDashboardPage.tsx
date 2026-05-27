@@ -755,7 +755,7 @@ export function SyncDashboardPage() {
       {allHistory.length >= 500 && (
         <div className="mb-4 bg-yellow-50 dark:bg-yellow-950 border-l-4 border-yellow-400 dark:border-yellow-600 p-4 rounded">
           <div className="flex">
-            <div className="flex-shrink-0">
+            <div className="shrink-0">
               <FaTimesCircle className="h-5 w-5 text-yellow-400 dark:text-yellow-500" />
             </div>
             <div className="ml-3">
@@ -814,6 +814,9 @@ export function SyncDashboardPage() {
                     selectedIds.size === displayHistory.length
                   }
                   onChange={handleSelectAll}
+                  ariaLabel={t("sync.selectAll", {
+                    defaultValue: "Select All",
+                  })}
                 />
                 <span className="text-sm font-medium text-foreground">
                   {selectedIds.size === displayHistory.length
@@ -860,6 +863,9 @@ export function SyncDashboardPage() {
                           selectedIds.size === displayHistory.length
                         }
                         onChange={handleSelectAll}
+                        ariaLabel={t("sync.selectAll", {
+                          defaultValue: "Select All",
+                        })}
                       />
                     </th>
                     <th

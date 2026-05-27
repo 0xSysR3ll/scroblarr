@@ -57,7 +57,14 @@ export function SyncHistoryCard({
     >
       <div className="flex items-start gap-2.5">
         <div className="pt-0.5">
-          <CustomCheckbox checked={isSelected} onChange={onSelect} />
+          <CustomCheckbox
+            checked={isSelected}
+            onChange={onSelect}
+            ariaLabel={t("sync.selectHistoryItem", {
+              defaultValue: "Select {{title}}",
+              title: formatMediaTitle(item),
+            })}
+          />
         </div>
         <SyncHistoryPoster item={item} size="compact" />
         <div className="flex-1 min-w-0">

@@ -165,7 +165,7 @@ export function PlexSettingsTab({
     return (
       <div className="space-y-4 sm:space-y-6">
         <div className="flex items-center gap-3 mb-4 sm:mb-6">
-          <div className="flex-shrink-0 rounded-lg bg-primary/15 p-2">
+          <div className="shrink-0 rounded-lg bg-primary/15 p-2">
             <img src="/logos/plex.svg" alt="Plex" className="w-5 h-5" />
           </div>
           <div>
@@ -216,7 +216,7 @@ export function PlexSettingsTab({
     <div className="space-y-4 sm:space-y-6">
       <div className="mb-4 sm:mb-6 relative">
         <div className="flex items-center gap-3">
-          <div className="flex-shrink-0 rounded-lg bg-primary/15 p-2">
+          <div className="shrink-0 rounded-lg bg-primary/15 p-2">
             <img src="/logos/plex.svg" alt="Plex" className="w-5 h-5" />
           </div>
           <div className="flex-1 min-w-0">
@@ -386,7 +386,7 @@ export function PlexSettingsTab({
                     onClick={() =>
                       onEditingServerChange(server.machineIdentifier)
                     }
-                    className="flex-shrink-0 whitespace-nowrap rounded px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/10 hover:text-primary/80"
+                    className="shrink-0 whitespace-nowrap rounded px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/10 hover:text-primary/80"
                   >
                     {t("settings.changeConnection", { defaultValue: "Change" })}
                   </button>
@@ -394,7 +394,7 @@ export function PlexSettingsTab({
                 {isEditing && (
                   <button
                     onClick={onCancelEdit}
-                    className="flex-shrink-0 whitespace-nowrap rounded px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    className="shrink-0 whitespace-nowrap rounded px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   >
                     {t("common.cancel", { defaultValue: "Cancel" })}
                   </button>
@@ -422,7 +422,7 @@ export function PlexSettingsTab({
                               : "border-border bg-card hover:border-muted-foreground/40"
                           }`}
                         >
-                          <div className="mr-3 flex-shrink-0 mt-0.5 sm:mt-0">
+                          <div className="mr-3 shrink-0 mt-0.5 sm:mt-0">
                             <CustomRadio
                               name={`server-${server.machineIdentifier}`}
                               value={connection.uri}
