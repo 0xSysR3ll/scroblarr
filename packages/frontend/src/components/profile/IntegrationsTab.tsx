@@ -1096,7 +1096,7 @@ export function IntegrationsTab({
           <DialogDescription>
             {t("tvtime.unlinkConfirmMessage", {
               defaultValue:
-                "This will remove your TVTime account connection and all associated data. You will need to link your account again to sync watched episodes.",
+                "Are you sure you want to unlink your TVTime account? This will stop syncing to TVTime.",
             })}
           </DialogDescription>
           <div className="flex justify-end gap-3">
