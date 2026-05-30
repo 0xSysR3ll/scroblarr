@@ -10,6 +10,7 @@ const userRepositoryMocks = vi.hoisted(() => ({
 const syncHistoryRepositoryMocks = vi.hoisted(() => ({
   hasExistingSync: vi.fn(),
   create: vi.fn(),
+  save: vi.fn(),
   clearOldByUser: vi.fn(),
 }));
 
@@ -46,6 +47,7 @@ vi.mock("@repositories/SyncHistoryRepository", () => ({
   SyncHistoryRepository: class {
     hasExistingSync = syncHistoryRepositoryMocks.hasExistingSync;
     create = syncHistoryRepositoryMocks.create;
+    save = syncHistoryRepositoryMocks.save;
     clearOldByUser = syncHistoryRepositoryMocks.clearOldByUser;
   },
 }));
@@ -140,6 +142,7 @@ describe("SyncService", () => {
     expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: "u1",
+        originalMediaId: "m1",
         success: false,
         errorMessage: "User account is disabled",
       })
@@ -161,6 +164,7 @@ describe("SyncService", () => {
     expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: "u1",
+        originalMediaId: "m1",
         success: false,
         errorMessage: "No sync destinations configured",
       })
@@ -194,11 +198,121 @@ describe("SyncService", () => {
     expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: "u1",
+        originalMediaId: "m1",
         success: true,
         wasRewatched: true,
         destinations: JSON.stringify(["TVTime"]),
       })
     );
+  });
+
+  it("retries a failed history item using the linked media server account", async () => {
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    tvtimeTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "tvtime-valid-token"
+    );
+    tvtimeClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    const result = await service.retryHistoryItem({
+      id: "sync-history-id",
+      userId: "u1",
+      user: {
+        id: "u1",
+        enabled: true,
+        plexUsername: "plex-user",
+        tvtimeAccessToken: "tv-token",
+        tvtimeMarkMoviesAsRewatched: false,
+        tvtimeMarkEpisodesAsRewatched: false,
+        traktAccessToken: null,
+      },
+      mediaType: "movie",
+      mediaTitle: "Interstellar",
+      source: "plex",
+      originalMediaId: "plex-media-id",
+      tvdbMovieId: "123",
+      tmdbMovieId: "456",
+      posterUrl: "https://img/poster.jpg",
+      year: 2014,
+      success: false,
+      syncedAt: new Date("2026-01-01T00:00:00.000Z"),
+    } as never);
+
+    expect(result).toEqual({
+      success: true,
+      destinations: ["TVTime"],
+      errorMessage: undefined,
+    });
+    expect(tvtimeClientMocks.scrobble).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "scrobble",
+        source: "plex",
+        userId: "plex-user",
+        media: expect.objectContaining({
+          id: "plex-media-id",
+          type: "movie",
+          title: "Interstellar",
+          tvdbMovieId: 123,
+          tmdbMovieId: 456,
+        }),
+      }),
+      "tvtime-valid-token",
+      expect.any(Object)
+    );
+    expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "u1",
+        originalMediaId: "plex-media-id",
+        success: true,
+        destinations: JSON.stringify(["TVTime"]),
+      })
+    );
+    expect(syncHistoryRepositoryMocks.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "sync-history-id",
+        success: true,
+        errorMessage: undefined,
+        retriedAt: expect.any(Date),
+        destinations: JSON.stringify(["TVTime"]),
+      })
+    );
+  });
+
+  it("does not create another history item when a retry fails completely", async () => {
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    tvtimeTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "tvtime-valid-token"
+    );
+    tvtimeClientMocks.scrobble.mockRejectedValue(new Error("TVTime failed"));
+
+    const service = new SyncService();
+    const result = await service.retryHistoryItem({
+      id: "sync-history-id",
+      userId: "u1",
+      user: {
+        id: "u1",
+        enabled: true,
+        plexUsername: "plex-user",
+        tvtimeAccessToken: "tv-token",
+        tvtimeMarkMoviesAsRewatched: false,
+        tvtimeMarkEpisodesAsRewatched: false,
+        traktAccessToken: null,
+      },
+      mediaType: "movie",
+      mediaTitle: "Interstellar",
+      source: "plex",
+      tvdbMovieId: "123",
+      success: false,
+      syncedAt: new Date("2026-01-01T00:00:00.000Z"),
+    } as never);
+
+    expect(result).toEqual({
+      success: false,
+      destinations: [],
+      errorMessage: "TVTime: TVTime failed",
+    });
+    expect(syncHistoryRepositoryMocks.create).not.toHaveBeenCalled();
+    expect(syncHistoryRepositoryMocks.save).not.toHaveBeenCalled();
   });
 
   it("records partial failure when one destination fails", async () => {
@@ -229,6 +343,7 @@ describe("SyncService", () => {
     expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: "u1",
+        originalMediaId: "m1",
         success: true,
         errorMessage: expect.stringContaining("TVTime: TVTime failed"),
         wasRewatched: false,

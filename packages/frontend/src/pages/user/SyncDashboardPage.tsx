@@ -13,6 +13,7 @@ import {
   clearSyncHistory,
   deleteSyncHistoryItem,
   deleteSyncHistoryItems,
+  retrySyncHistoryItem,
   type SyncHistoryItem,
 } from "@services/api";
 import {
@@ -66,6 +67,7 @@ export function SyncDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showClearModal, setShowClearModal] = useState(false);
@@ -83,6 +85,7 @@ export function SyncDashboardPage() {
   const [groupByDate, setGroupByDate] = useState(true);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const retryInFlightRef = useRef(false);
 
   useEffect(() => {
     const filter = searchParams.get("filter");
@@ -424,6 +427,53 @@ export function SyncDashboardPage() {
 
   function cancelDelete() {
     setConfirmDeleteId(null);
+  }
+
+  async function handleRetryItem(item: SyncHistoryItem) {
+    if (retryInFlightRef.current || retrying !== null) {
+      return;
+    }
+
+    try {
+      retryInFlightRef.current = true;
+      setRetrying(item.id);
+      const result = await retrySyncHistoryItem(item.id);
+      await loadHistory();
+
+      if (!result.success) {
+        showError(
+          result.errorMessage ||
+            t("sync.errors.retryFailed", {
+              defaultValue: "Failed to retry sync history item",
+            })
+        );
+        return;
+      }
+
+      if (result.errorMessage) {
+        showSuccess(
+          t("sync.success.retryPartialSuccess", {
+            defaultValue: "Sync retry partially succeeded",
+          })
+        );
+        return;
+      }
+
+      showSuccess(
+        t("sync.success.retrySuccess", {
+          defaultValue: "Sync retried successfully",
+        })
+      );
+    } catch {
+      showError(
+        t("sync.errors.retryFailed", {
+          defaultValue: "Failed to retry sync history item",
+        })
+      );
+    } finally {
+      retryInFlightRef.current = false;
+      setRetrying(null);
+    }
   }
 
   async function handleBulkDelete() {
@@ -840,9 +890,11 @@ export function SyncDashboardPage() {
                       isSelected={selectedIds.has(item.id)}
                       confirmDeleteId={confirmDeleteId}
                       deleting={deleting}
+                      retrying={retrying}
                       onSelect={() => handleSelectItem(item.id)}
                       onDelete={() => handleDeleteItem(item.id)}
                       onCancelDelete={cancelDelete}
+                      onRetry={() => handleRetryItem(item)}
                     />
                   ))}
                 </div>
@@ -941,9 +993,11 @@ export function SyncDashboardPage() {
                           isSelected={selectedIds.has(item.id)}
                           confirmDeleteId={confirmDeleteId}
                           deleting={deleting}
+                          retrying={retrying}
                           onSelect={() => handleSelectItem(item.id)}
                           onDelete={() => handleDeleteItem(item.id)}
                           onCancelDelete={cancelDelete}
+                          onRetry={() => handleRetryItem(item)}
                         />
                       ))}
                     </React.Fragment>

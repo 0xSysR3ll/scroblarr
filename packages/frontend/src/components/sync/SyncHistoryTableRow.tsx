@@ -19,6 +19,7 @@ import {
   FaCheckCircle,
   FaExclamationCircle,
   FaExternalLinkAlt,
+  FaRedo,
 } from "react-icons/fa";
 
 interface SyncHistoryTableRowProps {
@@ -26,9 +27,11 @@ interface SyncHistoryTableRowProps {
   isSelected: boolean;
   confirmDeleteId: string | null;
   deleting: string | null;
+  retrying: string | null;
   onSelect: () => void;
   onDelete: () => void;
   onCancelDelete: () => void;
+  onRetry: () => void;
 }
 
 export function SyncHistoryTableRow({
@@ -36,13 +39,17 @@ export function SyncHistoryTableRow({
   isSelected,
   confirmDeleteId,
   deleting,
+  retrying,
   onSelect,
   onDelete,
   onCancelDelete,
+  onRetry,
 }: SyncHistoryTableRowProps) {
   const { t } = useTranslation();
   const isConfirming = confirmDeleteId === item.id;
   const isDeleting = deleting === item.id;
+  const isRetrying = retrying === item.id;
+  const isAnyRetrying = retrying !== null;
   const syncStatus = getSyncStatus(item);
   const statusLabel =
     syncStatus === "success"
@@ -121,7 +128,7 @@ export function SyncHistoryTableRow({
         {item.source ? (
           <div className="flex items-center justify-center">
             {item.source === "plex" ? (
-              <div className="flex items-center gap-1 rounded bg-[var(--plex-chip-bg)] px-2 py-0.5 text-[var(--plex-chip-fg)]">
+              <div className="flex items-center gap-1 rounded bg-(--plex-chip-bg) px-2 py-0.5 text-(--plex-chip-fg)">
                 <img src="/logos/plex.svg" alt="Plex" className="w-3 h-3" />
                 <span className="text-xs font-medium">
                   {t("sync.sources.plex", {
@@ -220,15 +227,38 @@ export function SyncHistoryTableRow({
             </button>
           </div>
         ) : (
-          <button
-            onClick={onDelete}
-            className="p-1 text-muted-foreground transition-colors hover:text-destructive"
-            title={t("sync.deleteItemTitle", {
-              defaultValue: "Delete this item",
-            })}
-          >
-            <FaTrash className="h-4 w-4" />
-          </button>
+          <div className="flex items-center justify-end gap-1.5">
+            {syncStatus === "failed" && (
+              <button
+                type="button"
+                onClick={onRetry}
+                disabled={isAnyRetrying}
+                className="p-1 text-muted-foreground transition-colors hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                title={t("sync.retryItemTitle", {
+                  defaultValue: "Retry this sync",
+                })}
+                aria-label={t("sync.retryItemTitle", {
+                  defaultValue: "Retry this sync",
+                })}
+              >
+                {isRetrying ? (
+                  <Spinner size="md" />
+                ) : (
+                  <FaRedo className="h-4 w-4" />
+                )}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onDelete}
+              className="p-1 text-muted-foreground transition-colors hover:text-destructive"
+              title={t("sync.deleteItemTitle", {
+                defaultValue: "Delete this item",
+              })}
+            >
+              <FaTrash className="h-4 w-4" />
+            </button>
+          </div>
         )}
       </td>
     </tr>
