@@ -104,6 +104,14 @@ describe("sync api", () => {
     );
   });
 
+  it("throws when retrying a sync-history item fails", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, false, 400));
+
+    await expect(retrySyncHistoryItem("sync-id")).rejects.toThrow(
+      "Failed to retry sync history item"
+    );
+  });
+
   it("throws on failed statistics requests", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({}, false));
 

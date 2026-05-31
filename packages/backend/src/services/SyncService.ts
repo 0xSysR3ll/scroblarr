@@ -147,7 +147,7 @@ export class SyncService {
       event: "scrobble",
       source,
       userId: sourceUserId,
-      timestamp: new Date(),
+      timestamp: this.getRetryTimestamp(historyItem),
       media: {
         id: this.getRetryMediaId(historyItem),
         type: mediaType,
@@ -170,7 +170,7 @@ export class SyncService {
     });
 
     if (result.success) {
-      historyItem.success = true;
+      historyItem.success = result.errorMessage === undefined;
       historyItem.errorMessage = result.errorMessage;
       historyItem.destinations =
         result.destinations.length > 0
@@ -181,6 +181,15 @@ export class SyncService {
     }
 
     return result;
+  }
+
+  private getRetryTimestamp(historyItem: SyncHistory): Date {
+    if (!historyItem.syncedAt) {
+      return new Date();
+    }
+
+    const timestamp = new Date(historyItem.syncedAt);
+    return Number.isFinite(timestamp.getTime()) ? timestamp : new Date();
   }
 
   private parseOptionalNumber(value?: string): number | undefined {

@@ -248,6 +248,7 @@ describe("SyncService", () => {
         event: "scrobble",
         source: "plex",
         userId: "plex-user",
+        timestamp: new Date("2026-01-01T00:00:00.000Z"),
         media: expect.objectContaining({
           id: "plex-media-id",
           type: "movie",
@@ -272,6 +273,57 @@ describe("SyncService", () => {
         id: "sync-history-id",
         success: true,
         errorMessage: undefined,
+        retriedAt: expect.any(Date),
+        destinations: JSON.stringify(["TVTime"]),
+      })
+    );
+  });
+
+  it("keeps a retried history item retryable when retry only partially succeeds", async () => {
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    tvtimeTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "tvtime-valid-token"
+    );
+    traktTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "trakt-valid-token"
+    );
+    tvtimeClientMocks.scrobble.mockResolvedValue(undefined);
+    traktClientMocks.scrobble.mockRejectedValue(new Error("Trakt failed"));
+
+    const service = new SyncService();
+    const result = await service.retryHistoryItem({
+      id: "sync-history-id",
+      userId: "u1",
+      user: {
+        id: "u1",
+        enabled: true,
+        plexUsername: "plex-user",
+        tvtimeAccessToken: "tv-token",
+        tvtimeMarkMoviesAsRewatched: false,
+        tvtimeMarkEpisodesAsRewatched: false,
+        traktClientId: "trakt-client-id",
+        traktClientSecret: "trakt-secret",
+        traktAccessToken: "trakt-token",
+      },
+      mediaType: "movie",
+      mediaTitle: "Interstellar",
+      source: "plex",
+      originalMediaId: "plex-media-id",
+      tvdbMovieId: "123",
+      success: false,
+      syncedAt: new Date("2026-01-01T00:00:00.000Z"),
+    } as never);
+
+    expect(result).toEqual({
+      success: true,
+      destinations: ["TVTime"],
+      errorMessage: "Trakt: Trakt failed",
+    });
+    expect(syncHistoryRepositoryMocks.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "sync-history-id",
+        success: false,
+        errorMessage: "Trakt: Trakt failed",
         retriedAt: expect.any(Date),
         destinations: JSON.stringify(["TVTime"]),
       })

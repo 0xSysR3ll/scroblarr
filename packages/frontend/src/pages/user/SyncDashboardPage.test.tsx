@@ -1,8 +1,9 @@
 import type { SyncHistoryItem, SyncHistoryResponse } from "@services/api";
-import { getSyncHistory } from "@services/api";
+import { getSyncHistory, retrySyncHistoryItem } from "@services/api";
 import { renderWithProviders } from "@test/render";
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { showSuccess } from "@utils/toast";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SyncDashboardPage } from "./SyncDashboardPage";
@@ -12,8 +13,28 @@ const syncHistoryTableRowMock = vi.hoisted(() => ({
 }));
 
 vi.mock("@components/sync/SyncHistoryCard", () => ({
-  SyncHistoryCard: ({ item }: { item: SyncHistoryItem }) => (
-    <article>{item.mediaTitle}</article>
+  SyncHistoryCard: ({
+    item,
+    onRetry,
+    retrying,
+  }: {
+    item: SyncHistoryItem;
+    onRetry: () => void;
+    retrying: string | null;
+  }) => (
+    <article>
+      <span>{item.mediaTitle}</span>
+      {!item.success && (
+        <button
+          type="button"
+          onClick={onRetry}
+          disabled={retrying !== null}
+          aria-label={`Retry ${item.mediaTitle}`}
+        >
+          Retry
+        </button>
+      )}
+    </article>
   ),
 }));
 
@@ -34,6 +55,7 @@ vi.mock("@services/api", async (importOriginal) => {
     deleteSyncHistoryItem: vi.fn(),
     deleteSyncHistoryItems: vi.fn(),
     getSyncHistory: vi.fn(),
+    retrySyncHistoryItem: vi.fn(),
   };
 });
 
@@ -84,6 +106,11 @@ describe("SyncDashboardPage", () => {
     syncHistoryTableRowMock.renderRows = false;
     vi.mocked(getSyncHistory).mockReset();
     vi.mocked(getSyncHistory).mockResolvedValue(syncHistoryResponse());
+    vi.mocked(retrySyncHistoryItem).mockReset();
+    vi.mocked(retrySyncHistoryItem).mockResolvedValue({
+      success: true,
+      destinations: ["TVTime"],
+    });
   });
 
   it("filters loaded history with search text", async () => {
@@ -125,5 +152,37 @@ describe("SyncDashboardPage", () => {
     await waitFor(() => {
       expect(screen.getAllByTestId("sync-history-table-row")).toHaveLength(2);
     });
+  });
+
+  it("prevents overlapping retry requests while one retry is in flight", async () => {
+    let resolveRetry: (value: {
+      success: boolean;
+      destinations: string[];
+    }) => void;
+    vi.mocked(retrySyncHistoryItem).mockReturnValue(
+      new Promise((resolve) => {
+        resolveRetry = resolve;
+      })
+    );
+
+    renderWithProviders(<SyncDashboardPage />, { route: "/sync" });
+
+    const retryButton = await screen.findByRole("button", {
+      name: "Retry Broken Episode",
+    });
+    const loadCallsBeforeRetry = vi.mocked(getSyncHistory).mock.calls.length;
+
+    fireEvent.click(retryButton);
+    fireEvent.click(retryButton);
+
+    expect(retrySyncHistoryItem).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(retryButton).toBeDisabled());
+
+    resolveRetry!({ success: true, destinations: ["TVTime"] });
+
+    await waitFor(() => {
+      expect(showSuccess).toHaveBeenCalledWith("Sync retried successfully");
+    });
+    expect(getSyncHistory).toHaveBeenCalledTimes(loadCallsBeforeRetry + 1);
   });
 });
