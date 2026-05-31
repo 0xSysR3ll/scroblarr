@@ -9,6 +9,8 @@ import {
 
 import { User } from "./User";
 
+const dateColumnType = process.env.POSTGRES_HOST ? "timestamp" : "datetime";
+
 @Entity("sync_history")
 export class SyncHistory {
   @PrimaryGeneratedColumn("uuid")
@@ -78,6 +80,6 @@ export class SyncHistory {
   @CreateDateColumn()
   syncedAt!: Date;
 
-  @Column({ type: "timestamp", nullable: true })
+  @Column({ type: dateColumnType, nullable: true })
   retriedAt?: Date;
 }

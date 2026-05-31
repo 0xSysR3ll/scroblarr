@@ -2,6 +2,11 @@ import { MigrationInterface, QueryRunner, TableColumn } from "typeorm";
 
 export class AddSyncHistoryRetryFields0000000000007 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
+    const dateColumnType =
+      queryRunner.connection.options.type === "sqlite"
+        ? "datetime"
+        : "timestamp";
+
     await queryRunner.addColumn(
       "sync_history",
       new TableColumn({
@@ -16,7 +21,7 @@ export class AddSyncHistoryRetryFields0000000000007 implements MigrationInterfac
       "sync_history",
       new TableColumn({
         name: "retriedAt",
-        type: "timestamp",
+        type: dateColumnType,
         isNullable: true,
       })
     );
