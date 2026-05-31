@@ -14,6 +14,10 @@ export class SyncHistoryRepository {
     return this.repository.save(newHistory);
   }
 
+  async save(history: SyncHistory): Promise<SyncHistory> {
+    return this.repository.save(history);
+  }
+
   async findRecent(limit: number): Promise<SyncHistory[]> {
     return this.repository.find({
       relations: ["user"],

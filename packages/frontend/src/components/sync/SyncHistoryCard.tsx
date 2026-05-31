@@ -19,6 +19,7 @@ import {
   FaCheckCircle,
   FaExclamationCircle,
   FaExternalLinkAlt,
+  FaRedo,
 } from "react-icons/fa";
 
 interface SyncHistoryCardProps {
@@ -26,9 +27,11 @@ interface SyncHistoryCardProps {
   isSelected: boolean;
   confirmDeleteId: string | null;
   deleting: string | null;
+  retrying: string | null;
   onSelect: () => void;
   onDelete: () => void;
   onCancelDelete: () => void;
+  onRetry: () => void;
 }
 
 export function SyncHistoryCard({
@@ -36,13 +39,17 @@ export function SyncHistoryCard({
   isSelected,
   confirmDeleteId,
   deleting,
+  retrying,
   onSelect,
   onDelete,
   onCancelDelete,
+  onRetry,
 }: SyncHistoryCardProps) {
   const { t } = useTranslation();
   const isConfirming = confirmDeleteId === item.id;
   const isDeleting = deleting === item.id;
+  const isRetrying = retrying === item.id;
+  const isAnyRetrying = retrying !== null;
   const syncStatus = getSyncStatus(item);
 
   return (
@@ -114,15 +121,38 @@ export function SyncHistoryCard({
                   </button>
                 </div>
               ) : (
-                <button
-                  onClick={onDelete}
-                  className="p-1 text-muted-foreground transition-colors hover:text-destructive"
-                  title={t("sync.deleteItemTitle", {
-                    defaultValue: "Delete this item",
-                  })}
-                >
-                  <FaTrash className="h-3.5 w-3.5" />
-                </button>
+                <div className="flex items-center gap-1">
+                  {syncStatus === "failed" && (
+                    <button
+                      type="button"
+                      onClick={onRetry}
+                      disabled={isAnyRetrying}
+                      className="p-1 text-muted-foreground transition-colors hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                      title={t("sync.retryItemTitle", {
+                        defaultValue: "Retry this sync",
+                      })}
+                      aria-label={t("sync.retryItemTitle", {
+                        defaultValue: "Retry this sync",
+                      })}
+                    >
+                      {isRetrying ? (
+                        <Spinner size="sm" />
+                      ) : (
+                        <FaRedo className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={onDelete}
+                    className="p-1 text-muted-foreground transition-colors hover:text-destructive"
+                    title={t("sync.deleteItemTitle", {
+                      defaultValue: "Delete this item",
+                    })}
+                  >
+                    <FaTrash className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -158,7 +188,7 @@ export function SyncHistoryCard({
           {item.source && (
             <div className="mb-2">
               {item.source === "plex" ? (
-                <div className="inline-flex items-center gap-1 rounded bg-[var(--plex-chip-bg)] px-1.5 py-0.5 text-[var(--plex-chip-fg)]">
+                <div className="inline-flex items-center gap-1 rounded bg-(--plex-chip-bg) px-1.5 py-0.5 text-(--plex-chip-fg)">
                   <img
                     src="/logos/plex.svg"
                     alt="Plex"

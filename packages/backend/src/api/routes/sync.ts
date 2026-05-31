@@ -2,6 +2,7 @@ import { auth } from "@middleware/auth";
 import { SettingsRepository } from "@repositories/SettingsRepository";
 import { SyncHistoryRepository } from "@repositories/SyncHistoryRepository";
 import { isPlexServerUrl } from "@scroblarr/shared";
+import { SyncService } from "@services/SyncService";
 import { logger } from "@utils/logger";
 import { routeParam } from "@utils/routeParams";
 import { Router, Request, Response } from "express";
@@ -9,6 +10,7 @@ import { Router, Request, Response } from "express";
 const router = Router();
 const syncHistoryRepository = new SyncHistoryRepository();
 const settingsRepository = new SettingsRepository();
+const syncService = new SyncService();
 
 router.get("/history", auth, async (req: Request, res: Response) => {
   try {
@@ -78,6 +80,7 @@ router.get("/history", auth, async (req: Request, res: Response) => {
         mediaType: item.mediaType,
         mediaTitle: item.mediaTitle,
         source: item.source,
+        originalMediaId: item.originalMediaId,
         tvdbEpisodeId: item.tvdbEpisodeId,
         tvdbMovieId: item.tvdbMovieId,
         imdbMovieId: item.imdbMovieId,
@@ -93,6 +96,7 @@ router.get("/history", auth, async (req: Request, res: Response) => {
         wasRewatched: item.wasRewatched,
         destinations,
         syncedAt: item.syncedAt,
+        retriedAt: item.retriedAt,
       };
     });
 
@@ -128,6 +132,66 @@ router.delete("/history", auth, async (req: Request, res: Response) => {
     }
   } catch (error) {
     logger.api.error({ error }, "Error deleting sync history");
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/history/:id/retry", auth, async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const id = routeParam(req.params.id);
+    if (!id) {
+      return res.status(400).json({ error: "Missing id" });
+    }
+
+    const historyItem = await syncHistoryRepository.findById(id, user.id);
+    if (!historyItem) {
+      return res.status(404).json({ error: "Sync history item not found" });
+    }
+
+    if (historyItem.success) {
+      return res.status(400).json({
+        error: "Only failed sync history items can be retried",
+      });
+    }
+
+    if (historyItem.source !== "plex" && historyItem.source !== "jellyfin") {
+      return res.status(400).json({
+        error: "Sync history item source cannot be retried",
+      });
+    }
+
+    if (
+      historyItem.mediaType !== "episode" &&
+      historyItem.mediaType !== "movie"
+    ) {
+      return res.status(400).json({
+        error: "Sync history item media type cannot be retried",
+      });
+    }
+
+    if (!historyItem.user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const linkedMediaUser =
+      historyItem.source === "jellyfin"
+        ? historyItem.user.jellyfinUserId
+        : historyItem.user.plexUsername;
+    if (!linkedMediaUser) {
+      return res.status(400).json({
+        error: "User is missing the linked media server account",
+      });
+    }
+
+    const result = await syncService.retryHistoryItem(historyItem);
+    return res.json(result);
+  } catch (error) {
+    logger.api.error({ error }, "Error retrying sync history item");
     return res.status(500).json({ error: "Internal server error" });
   }
 });

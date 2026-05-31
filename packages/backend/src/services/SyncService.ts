@@ -1,3 +1,4 @@
+import { SyncHistory } from "@entities/SyncHistory";
 import { User } from "@entities/User";
 import { ISyncClient, SyncOptions } from "@integrations/common/ISyncClient";
 import { TraktClient } from "@integrations/trakt/TraktClient";
@@ -16,6 +17,16 @@ interface SyncDestination {
   hasToken: (user: User) => boolean;
   getAccessToken: (user: User) => Promise<string>;
   getSyncOptions?: (user: User, hasExistingSync: boolean) => SyncOptions;
+}
+
+export interface SyncAttemptResult {
+  success: boolean;
+  destinations: string[];
+  errorMessage?: string;
+}
+
+interface SyncEventForUserOptions {
+  saveFailedHistory?: boolean;
 }
 
 export class SyncService {
@@ -106,6 +117,112 @@ export class SyncService {
       return;
     }
 
+    await this.syncEventForUser(user, event);
+  }
+
+  async retryHistoryItem(historyItem: SyncHistory): Promise<SyncAttemptResult> {
+    const user = historyItem.user;
+    const source = historyItem.source;
+    const mediaType = historyItem.mediaType;
+
+    if (!user) {
+      throw new Error("User not found for sync history item");
+    }
+
+    if (source !== "plex" && source !== "jellyfin") {
+      throw new Error("Sync history item source cannot be retried");
+    }
+
+    if (mediaType !== "episode" && mediaType !== "movie") {
+      throw new Error("Sync history item media type cannot be retried");
+    }
+
+    const sourceUserId =
+      source === "jellyfin" ? user.jellyfinUserId : user.plexUsername;
+    if (!sourceUserId) {
+      throw new Error("User is missing the linked media server account");
+    }
+
+    const retryEvent: MediaEvent = {
+      event: "scrobble",
+      source,
+      userId: sourceUserId,
+      timestamp: this.getRetryTimestamp(historyItem),
+      media: {
+        id: this.getRetryMediaId(historyItem),
+        type: mediaType,
+        title: historyItem.mediaTitle,
+        seasonNumber: historyItem.seasonNumber,
+        episodeNumber: historyItem.episodeNumber,
+        year: historyItem.year,
+        tvdbEpisodeId: this.parseOptionalNumber(historyItem.tvdbEpisodeId),
+        tvdbMovieId: this.parseOptionalNumber(historyItem.tvdbMovieId),
+        imdbMovieId: historyItem.imdbMovieId,
+        imdbEpisodeId: historyItem.imdbEpisodeId,
+        tmdbMovieId: this.parseOptionalNumber(historyItem.tmdbMovieId),
+        tmdbSeriesId: this.parseOptionalNumber(historyItem.tmdbSeriesId),
+        posterUrl: historyItem.posterUrl,
+      },
+    };
+
+    const result = await this.syncEventForUser(user, retryEvent, {
+      saveFailedHistory: false,
+    });
+
+    if (result.success) {
+      historyItem.success = result.errorMessage === undefined;
+      historyItem.errorMessage = result.errorMessage;
+      historyItem.destinations =
+        result.destinations.length > 0
+          ? JSON.stringify(result.destinations)
+          : undefined;
+      historyItem.retriedAt = new Date();
+      await this.syncHistoryRepository.save(historyItem);
+    }
+
+    return result;
+  }
+
+  private getRetryTimestamp(historyItem: SyncHistory): Date {
+    if (!historyItem.syncedAt) {
+      return new Date();
+    }
+
+    const timestamp = new Date(historyItem.syncedAt);
+    return Number.isFinite(timestamp.getTime()) ? timestamp : new Date();
+  }
+
+  private parseOptionalNumber(value?: string): number | undefined {
+    if (!value) {
+      return undefined;
+    }
+
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  private getRetryMediaId(historyItem: SyncHistory): string {
+    const mediaId =
+      historyItem.originalMediaId ||
+      historyItem.tvdbEpisodeId ||
+      historyItem.tvdbMovieId ||
+      historyItem.imdbEpisodeId ||
+      historyItem.imdbMovieId;
+
+    if (!mediaId) {
+      throw new Error("Sync history item original media id is unavailable");
+    }
+
+    return mediaId;
+  }
+
+  private async syncEventForUser(
+    user: User,
+    event: MediaEvent,
+    options: SyncEventForUserOptions = {}
+  ): Promise<SyncAttemptResult> {
+    const saveFailedHistory = options.saveFailedHistory ?? true;
+
     if (!user.enabled) {
       logger.sync.warn(
         {
@@ -117,15 +234,21 @@ export class SyncService {
         },
         "User is disabled, skipping sync"
       );
-      await this.saveSyncHistory(
-        user.id,
-        event,
-        false,
-        "User account is disabled",
-        false,
-        []
-      );
-      return;
+      if (saveFailedHistory) {
+        await this.saveSyncHistory(
+          user.id,
+          event,
+          false,
+          "User account is disabled",
+          false,
+          []
+        );
+      }
+      return {
+        success: false,
+        destinations: [],
+        errorMessage: "User account is disabled",
+      };
     }
 
     const syncDestinations = await this.getSyncDestinations(user);
@@ -145,15 +268,21 @@ export class SyncService {
         },
         "User has no sync destinations configured, skipping sync"
       );
-      await this.saveSyncHistory(
-        user.id,
-        event,
-        false,
-        "No sync destinations configured",
-        false,
-        []
-      );
-      return;
+      if (saveFailedHistory) {
+        await this.saveSyncHistory(
+          user.id,
+          event,
+          false,
+          "No sync destinations configured",
+          false,
+          []
+        );
+      }
+      return {
+        success: false,
+        destinations: [],
+        errorMessage: "No sync destinations configured",
+      };
     }
 
     const userIdentifier =
@@ -264,14 +393,22 @@ export class SyncService {
           .map((r) => `${r.destination}: ${r.error}`)
           .join("; ");
 
-    await this.saveSyncHistory(
-      user.id,
-      event,
-      atLeastOneSuccess,
+    if (atLeastOneSuccess || saveFailedHistory) {
+      await this.saveSyncHistory(
+        user.id,
+        event,
+        atLeastOneSuccess,
+        errorMessage,
+        wasRewatched,
+        successfulDestinations
+      );
+    }
+
+    return {
+      success: atLeastOneSuccess,
+      destinations: successfulDestinations,
       errorMessage,
-      wasRewatched,
-      successfulDestinations
-    );
+    };
   }
 
   private async saveSyncHistory(
@@ -322,6 +459,7 @@ export class SyncService {
         mediaType: event.media.type,
         mediaTitle: event.media.title,
         source: event.source,
+        originalMediaId: event.media.id,
         tvdbEpisodeId: event.media.tvdbEpisodeId?.toString(),
         tvdbMovieId: event.media.tvdbMovieId?.toString(),
         imdbMovieId: event.media.imdbMovieId,

@@ -408,6 +408,7 @@
     "confirmDelete": "Confirm delete",
     "cancel": "Cancel",
     "deleteItemTitle": "Delete this item",
+    "retryItemTitle": "Retry this sync",
     "rewatched": "Rewatched",
     "sources": {
       "plex": "Plex",
@@ -421,7 +422,8 @@
       "loadFailed": "Failed to load sync history",
       "clearFailed": "Failed to clear sync history",
       "deleteItemFailed": "Failed to delete sync history item",
-      "deleteItemsFailed": "Failed to delete sync history items"
+      "deleteItemsFailed": "Failed to delete sync history items",
+      "retryFailed": "Failed to retry sync history item"
     },
     "dateGroups": {
       "today": "Today",
@@ -433,7 +435,9 @@
     "success": {
       "clearSuccess": "Sync history cleared successfully",
       "deleteItemSuccess": "Sync history item deleted successfully",
-      "deleteItemsSuccess": "Sync history items deleted successfully"
+      "deleteItemsSuccess": "Sync history items deleted successfully",
+      "retrySuccess": "Sync retried successfully",
+      "retryPartialSuccess": "Sync retry partially succeeded"
     },
     "title": "My Sync History",
     "deleteSelected": "Delete Selected",

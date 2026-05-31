@@ -7,6 +7,7 @@ export interface SyncHistoryItem {
   mediaType: string;
   mediaTitle: string;
   source?: string;
+  originalMediaId?: string;
   tvdbEpisodeId?: string;
   tvdbMovieId?: string;
   imdbMovieId?: string;
@@ -22,6 +23,7 @@ export interface SyncHistoryItem {
   wasRewatched?: boolean;
   destinations?: string[];
   syncedAt: string;
+  retriedAt?: string;
 }
 
 export interface SyncHistoryResponse {
@@ -103,6 +105,25 @@ export async function deleteSyncHistoryItems(ids: string[]): Promise<void> {
   if (!response.ok) {
     throw new Error("Failed to delete sync history items");
   }
+}
+
+export interface SyncRetryResponse {
+  success: boolean;
+  destinations: string[];
+  errorMessage?: string;
+}
+
+export async function retrySyncHistoryItem(
+  id: string
+): Promise<SyncRetryResponse> {
+  const response = await fetch(`${API_BASE_URL}/sync/history/${id}/retry`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to retry sync history item");
+  }
+  return response.json();
 }
 
 export interface SyncStatistics {

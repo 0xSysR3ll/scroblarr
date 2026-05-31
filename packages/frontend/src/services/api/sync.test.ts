@@ -6,6 +6,7 @@ import {
   deleteSyncHistoryItems,
   getSyncHistory,
   getSyncStatistics,
+  retrySyncHistoryItem,
 } from "./sync";
 
 describe("sync api", () => {
@@ -83,6 +84,31 @@ describe("sync api", () => {
         }),
         body: JSON.stringify({ ids: ["a", "b"] }),
       })
+    );
+  });
+
+  it("retries a sync-history item", async () => {
+    const response = { success: true, destinations: ["TVTime"] };
+    fetchMock.mockResolvedValueOnce(jsonResponse(response));
+
+    await expect(retrySyncHistoryItem("sync-id")).resolves.toEqual(response);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/sync/history/sync-id/retry",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          "Content-Type": "application/json",
+        }),
+      })
+    );
+  });
+
+  it("throws when retrying a sync-history item fails", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, false, 400));
+
+    await expect(retrySyncHistoryItem("sync-id")).rejects.toThrow(
+      "Failed to retry sync history item"
     );
   });
 

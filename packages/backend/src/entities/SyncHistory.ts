@@ -30,6 +30,9 @@ export class SyncHistory {
   @Column({ type: "varchar", length: 50, nullable: true })
   source?: string;
 
+  @Column({ type: "varchar", length: 255, nullable: true })
+  originalMediaId?: string;
+
   @Column({ type: "varchar", length: 100, nullable: true })
   tvdbEpisodeId?: string;
 
@@ -74,4 +77,7 @@ export class SyncHistory {
 
   @CreateDateColumn()
   syncedAt!: Date;
+
+  @Column({ type: "timestamp", nullable: true })
+  retriedAt?: Date;
 }
