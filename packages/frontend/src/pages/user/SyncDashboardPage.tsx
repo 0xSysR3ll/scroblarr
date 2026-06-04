@@ -14,6 +14,7 @@ import {
   deleteSyncHistoryItem,
   deleteSyncHistoryItems,
   retrySyncHistoryItem,
+  retrySyncHistoryItems,
   type SyncHistoryItem,
 } from "@services/api";
 import {
@@ -47,6 +48,7 @@ import {
   FaCalendar,
   FaTrash,
   FaChevronDown,
+  FaRedo,
 } from "react-icons/fa";
 import { useSearchParams } from "react-router-dom";
 
@@ -328,6 +330,16 @@ export function SyncDashboardPage() {
     ? paginatedGroups.flatMap((g) => g.items)
     : paginatedGroups.flatMap((g) => g.items);
 
+  const selectedFailedIds = useMemo(
+    () =>
+      displayHistory
+        .filter(
+          (item) => selectedIds.has(item.id) && getSyncStatus(item) === "failed"
+        )
+        .map((item) => item.id),
+    [displayHistory, selectedIds]
+  );
+
   const displayTotal = filteredHistory.length;
   const displayTotalPages = Math.ceil(displayTotal / pageSize);
 
@@ -501,6 +513,46 @@ export function SyncDashboardPage() {
     }
   }
 
+  async function handleBulkRetry() {
+    if (selectedFailedIds.length === 0 || retryInFlightRef.current) return;
+
+    try {
+      retryInFlightRef.current = true;
+      setRetrying("bulk");
+      const result = await retrySyncHistoryItems(selectedFailedIds);
+      setSelectedIds(new Set());
+      await loadHistory();
+
+      if (result.failed > 0) {
+        showError(
+          t("sync.errors.bulkRetryPartial", {
+            retried: result.retried,
+            failed: result.failed,
+            defaultValue:
+              "Retried {{retried}} item(s), but {{failed}} item(s) still failed",
+          })
+        );
+        return;
+      }
+
+      showSuccess(
+        t("sync.success.bulkRetrySuccess", {
+          count: result.retried,
+          defaultValue: "Retried {{count}} failed sync item(s)",
+        })
+      );
+    } catch {
+      showError(
+        t("sync.errors.bulkRetryFailed", {
+          defaultValue: "Failed to retry selected sync items",
+        })
+      );
+    } finally {
+      retryInFlightRef.current = false;
+      setRetrying(null);
+    }
+  }
+
   function handleSelectAll() {
     if (selectedIds.size === displayHistory.length) {
       setSelectedIds(new Set());
@@ -564,18 +616,39 @@ export function SyncDashboardPage() {
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
               {selectedIds.size > 0 && (
-                <button
-                  onClick={() => setShowBulkDeleteModal(true)}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm font-medium w-full sm:w-auto"
-                >
-                  <FaTrash className="h-4 w-4" />
-                  <span>
-                    {t("sync.deleteSelected", {
-                      defaultValue: "Delete Selected",
-                    })}{" "}
-                    ({selectedIds.size})
-                  </span>
-                </button>
+                <>
+                  {selectedFailedIds.length > 0 && (
+                    <button
+                      onClick={handleBulkRetry}
+                      disabled={retrying !== null}
+                      className="flex items-center justify-center gap-1.5 px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium w-full sm:w-auto"
+                    >
+                      {retrying === "bulk" ? (
+                        <Spinner size="sm" />
+                      ) : (
+                        <FaRedo className="h-4 w-4" />
+                      )}
+                      <span>
+                        {t("sync.retrySelectedFailed", {
+                          defaultValue: "Retry Failed",
+                        })}{" "}
+                        ({selectedFailedIds.length})
+                      </span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowBulkDeleteModal(true)}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm font-medium w-full sm:w-auto"
+                  >
+                    <FaTrash className="h-4 w-4" />
+                    <span>
+                      {t("sync.deleteSelected", {
+                        defaultValue: "Delete Selected",
+                      })}{" "}
+                      ({selectedIds.size})
+                    </span>
+                  </button>
+                </>
               )}
               <button
                 onClick={() => setShowClearModal(true)}

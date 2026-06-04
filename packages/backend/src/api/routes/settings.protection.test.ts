@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const settingsRepositoryMocks = vi.hoisted(() => ({
   get: vi.fn(),
+  getAll: vi.fn(),
 }));
 
 const userRepositoryMocks = vi.hoisted(() => ({
@@ -14,7 +15,7 @@ const userRepositoryMocks = vi.hoisted(() => ({
 vi.mock("@repositories/SettingsRepository", () => ({
   SettingsRepository: class {
     get = settingsRepositoryMocks.get;
-    getAll = vi.fn();
+    getAll = settingsRepositoryMocks.getAll;
     set = vi.fn();
     delete = vi.fn();
     deleteMany = vi.fn();

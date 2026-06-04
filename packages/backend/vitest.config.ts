@@ -17,5 +17,18 @@ export default defineConfig({
     include: ["src/**/*.test.ts"],
     globals: true,
     clearMocks: true,
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html", "lcov"],
+      reportsDirectory: "coverage",
+      include: ["src/**/*.ts"],
+      exclude: [
+        "src/**/*.test.ts",
+        "src/types/**",
+        "src/scripts/**",
+        "src/migrations/**",
+        "src/index.ts",
+      ],
+    },
   },
 });

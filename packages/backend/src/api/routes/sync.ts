@@ -12,6 +12,109 @@ const syncHistoryRepository = new SyncHistoryRepository();
 const settingsRepository = new SettingsRepository();
 const syncService = new SyncService();
 
+async function retryHistoryItemForUser(
+  id: string,
+  userId: string
+): Promise<{
+  status: number;
+  body: {
+    id: string;
+    success: boolean;
+    destinations: string[];
+    errorMessage?: string;
+    error?: string;
+  };
+}> {
+  const historyItem = await syncHistoryRepository.findById(id, userId);
+  if (!historyItem) {
+    return {
+      status: 404,
+      body: {
+        id,
+        success: false,
+        destinations: [],
+        error: "Sync history item not found",
+      },
+    };
+  }
+
+  if (historyItem.success) {
+    return {
+      status: 400,
+      body: {
+        id,
+        success: false,
+        destinations: [],
+        error: "Only failed sync history items can be retried",
+      },
+    };
+  }
+
+  if (historyItem.source !== "plex" && historyItem.source !== "jellyfin") {
+    return {
+      status: 400,
+      body: {
+        id,
+        success: false,
+        destinations: [],
+        error: "Sync history item source cannot be retried",
+      },
+    };
+  }
+
+  if (
+    historyItem.mediaType !== "episode" &&
+    historyItem.mediaType !== "movie"
+  ) {
+    return {
+      status: 400,
+      body: {
+        id,
+        success: false,
+        destinations: [],
+        error: "Sync history item media type cannot be retried",
+      },
+    };
+  }
+
+  if (!historyItem.user) {
+    return {
+      status: 404,
+      body: {
+        id,
+        success: false,
+        destinations: [],
+        error: "User not found",
+      },
+    };
+  }
+
+  const linkedMediaUser =
+    historyItem.source === "jellyfin"
+      ? historyItem.user.jellyfinUserId
+      : historyItem.user.plexUsername;
+  if (!linkedMediaUser) {
+    return {
+      status: 400,
+      body: {
+        id,
+        success: false,
+        destinations: [],
+        error: "User is missing the linked media server account",
+      },
+    };
+  }
+
+  const result = await syncService.retryHistoryItem(historyItem);
+  return {
+    status: 200,
+    body: {
+      id,
+      ...result,
+    },
+  };
+}
+
 router.get("/history", auth, async (req: Request, res: Response) => {
   try {
     const user = req.user;
@@ -148,50 +251,56 @@ router.post("/history/:id/retry", auth, async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Missing id" });
     }
 
-    const historyItem = await syncHistoryRepository.findById(id, user.id);
-    if (!historyItem) {
-      return res.status(404).json({ error: "Sync history item not found" });
+    const result = await retryHistoryItemForUser(id, user.id);
+    if (result.status !== 200) {
+      return res.status(result.status).json({ error: result.body.error });
     }
-
-    if (historyItem.success) {
-      return res.status(400).json({
-        error: "Only failed sync history items can be retried",
-      });
-    }
-
-    if (historyItem.source !== "plex" && historyItem.source !== "jellyfin") {
-      return res.status(400).json({
-        error: "Sync history item source cannot be retried",
-      });
-    }
-
-    if (
-      historyItem.mediaType !== "episode" &&
-      historyItem.mediaType !== "movie"
-    ) {
-      return res.status(400).json({
-        error: "Sync history item media type cannot be retried",
-      });
-    }
-
-    if (!historyItem.user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    const linkedMediaUser =
-      historyItem.source === "jellyfin"
-        ? historyItem.user.jellyfinUserId
-        : historyItem.user.plexUsername;
-    if (!linkedMediaUser) {
-      return res.status(400).json({
-        error: "User is missing the linked media server account",
-      });
-    }
-
-    const result = await syncService.retryHistoryItem(historyItem);
-    return res.json(result);
+    return res.json(result.body);
   } catch (error) {
     logger.api.error({ error }, "Error retrying sync history item");
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/history/retry", auth, async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const ids = req.body.ids as string[] | undefined;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: "At least one id is required" });
+    }
+    if (ids.length > 100) {
+      return res
+        .status(400)
+        .json({ error: "Cannot retry more than 100 items" });
+    }
+
+    const uniqueIds = [...new Set(ids.filter((id) => typeof id === "string"))];
+    if (uniqueIds.length === 0) {
+      return res.status(400).json({ error: "At least one id is required" });
+    }
+
+    const results = [];
+    for (const id of uniqueIds) {
+      const result = await retryHistoryItemForUser(id, user.id);
+      results.push(result.body);
+    }
+
+    const retried = results.filter((result) => result.success).length;
+    const failed = results.length - retried;
+
+    return res.json({
+      success: retried > 0,
+      retried,
+      failed,
+      results,
+    });
+  } catch (error) {
+    logger.api.error({ error }, "Error bulk retrying sync history items");
     return res.status(500).json({ error: "Internal server error" });
   }
 });
