@@ -78,8 +78,6 @@ jobs:
       - name: Run frontend coverage
         run: pnpm test:coverage
 
-<<<<<<< Updated upstream
-=======
       - name: Upload backend coverage
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
@@ -88,7 +86,6 @@ jobs:
           flags: backend
           fail_ci_if_error: true
 
->>>>>>> Stashed changes
       - name: Upload frontend coverage
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
