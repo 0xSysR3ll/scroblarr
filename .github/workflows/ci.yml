@@ -78,8 +78,16 @@ jobs:
       - name: Run frontend coverage
         run: pnpm test:coverage
 
+      - name: Upload backend coverage
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: packages/backend/coverage/lcov.info
+          flags: backend
+          fail_ci_if_error: true
+
       - name: Upload frontend coverage
-        uses: codecov/codecov-action@aa56896cf108bd10b5eb883cd1d24196da57f695
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: packages/frontend/coverage/lcov.info
