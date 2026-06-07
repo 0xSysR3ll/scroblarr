@@ -27,6 +27,7 @@ export interface SyncAttemptResult {
 
 interface SyncEventForUserOptions {
   saveFailedHistory?: boolean;
+  destinationNames?: string[];
 }
 
 export class SyncService {
@@ -167,6 +168,7 @@ export class SyncService {
 
     const result = await this.syncEventForUser(user, retryEvent, {
       saveFailedHistory: false,
+      destinationNames: this.getRetryDestinationNames(historyItem),
     });
 
     if (result.success) {
@@ -216,6 +218,42 @@ export class SyncService {
     return mediaId;
   }
 
+  private getRetryDestinationNames(
+    historyItem: SyncHistory
+  ): string[] | undefined {
+    const destinationNames = ["TVTime", "Trakt"];
+    const fromErrorMessage = destinationNames.filter((destination) =>
+      historyItem.errorMessage?.includes(`${destination}:`)
+    );
+
+    if (fromErrorMessage.length > 0) {
+      return fromErrorMessage;
+    }
+
+    if (!historyItem.destinations) {
+      return undefined;
+    }
+
+    try {
+      const parsed = JSON.parse(historyItem.destinations);
+      if (!Array.isArray(parsed)) {
+        return undefined;
+      }
+
+      const fromStoredDestinations = parsed.filter(
+        (destination): destination is string =>
+          typeof destination === "string" &&
+          destinationNames.includes(destination)
+      );
+
+      return fromStoredDestinations.length > 0
+        ? fromStoredDestinations
+        : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
   private async syncEventForUser(
     user: User,
     event: MediaEvent,
@@ -253,9 +291,17 @@ export class SyncService {
 
     const syncDestinations = await this.getSyncDestinations(user);
 
-    const availableDestinations = syncDestinations.filter((dest) =>
-      dest.hasToken(user)
-    );
+    const targetDestinationNames = options.destinationNames;
+    const availableDestinations = syncDestinations.filter((dest) => {
+      if (
+        targetDestinationNames &&
+        !targetDestinationNames.includes(dest.name)
+      ) {
+        return false;
+      }
+
+      return dest.hasToken(user);
+    });
 
     if (availableDestinations.length === 0) {
       logger.sync.warn(

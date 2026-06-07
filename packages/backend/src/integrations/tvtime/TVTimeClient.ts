@@ -76,19 +76,26 @@ export class TVTimeClient implements ISyncClient {
       throw new Error(this.buildErrorMessage(response.status, errorText));
     }
 
+    let result: { result?: string } | null = null;
     try {
-      const result = (await response.json()) as { result?: string };
-      if (result.result && result.result !== "OK") {
-        logger.tvtime.error(
-          { result: result.result, tvdbEpisodeId: event.media.tvdbEpisodeId },
-          "TVTime API returned non-OK result"
-        );
-        throw new Error(`TVTime API returned non-OK result: ${result.result}`);
-      }
+      result = (await response.json()) as { result?: string } | null;
     } catch (parseError) {
-      logger.tvtime.warn(
+      logger.tvtime.error(
         { error: parseError, tvdbEpisodeId: event.media.tvdbEpisodeId },
-        "Could not parse TVTime scrobble response"
+        "Failed to parse TVTime scrobble response"
+      );
+      throw new Error(
+        `Failed to parse TVTime scrobble response: ${parseError}`
+      );
+    }
+
+    if (result?.result !== "OK") {
+      logger.tvtime.error(
+        { result, tvdbEpisodeId: event.media.tvdbEpisodeId },
+        "TVTime API returned non-OK result"
+      );
+      throw new Error(
+        `TVTime API returned non-OK result: ${result?.result ?? "missing"}`
       );
     }
   }
@@ -150,21 +157,26 @@ export class TVTimeClient implements ISyncClient {
       throw new Error(this.buildErrorMessage(response.status, errorText));
     }
 
+    let result: { status?: string } | null = null;
     try {
-      const result = (await response.json()) as { status?: string };
-      if (result.status && result.status !== "success") {
-        logger.tvtime.error(
-          { status: result.status, movieUuid, movieTitle: event.media.title },
-          "TVTime API returned non-success status"
-        );
-        throw new Error(
-          `TVTime API returned non-success status: ${result.status}`
-        );
-      }
+      result = (await response.json()) as { status?: string } | null;
     } catch (parseError) {
-      logger.tvtime.warn(
+      logger.tvtime.error(
         { error: parseError, movieUuid, movieTitle: event.media.title },
-        "Could not parse TVTime movie scrobble response"
+        "Failed to parse TVTime movie scrobble response"
+      );
+      throw new Error(
+        `Failed to parse TVTime movie scrobble response: ${parseError}`
+      );
+    }
+
+    if (result?.status !== "success") {
+      logger.tvtime.error(
+        { result, movieUuid, movieTitle: event.media.title },
+        "TVTime API returned non-success status"
+      );
+      throw new Error(
+        `TVTime API returned non-success status: ${result?.status ?? "missing"}`
       );
     }
   }

@@ -95,6 +95,7 @@ describe("sync retry route", () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
+      id: "sync-id",
       success: true,
       destinations: ["TVTime"],
     });
@@ -136,5 +137,63 @@ describe("sync retry route", () => {
       error: "Only failed sync history items can be retried",
     });
     expect(syncServiceMocks.retryHistoryItem).not.toHaveBeenCalled();
+  });
+
+  it("bulk retries selected failed sync history items", async () => {
+    const firstHistoryItem = {
+      id: "sync-id-1",
+      userId: "user-id",
+      success: false,
+      source: "plex",
+      mediaType: "movie",
+      user: { id: "user-id", plexUsername: "plex-user" },
+    };
+    const secondHistoryItem = {
+      id: "sync-id-2",
+      userId: "user-id",
+      success: false,
+      source: "jellyfin",
+      mediaType: "episode",
+      user: { id: "user-id", jellyfinUserId: "jellyfin-user-id" },
+    };
+    syncHistoryRepositoryMocks.findById
+      .mockResolvedValueOnce(firstHistoryItem)
+      .mockResolvedValueOnce(secondHistoryItem);
+    syncServiceMocks.retryHistoryItem
+      .mockResolvedValueOnce({
+        success: true,
+        destinations: ["TVTime"],
+      })
+      .mockResolvedValueOnce({
+        success: false,
+        destinations: [],
+        errorMessage: "TVTime: Too Many Requests - Rate limit exceeded",
+      });
+
+    const response = await request(makeApp())
+      .post("/api/v1/sync/history/retry")
+      .set("authorization", "Bearer valid-user-token")
+      .send({ ids: ["sync-id-1", "sync-id-2"] });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      retried: 1,
+      failed: 1,
+      results: [
+        {
+          id: "sync-id-1",
+          success: true,
+          destinations: ["TVTime"],
+        },
+        {
+          id: "sync-id-2",
+          success: false,
+          destinations: [],
+          errorMessage: "TVTime: Too Many Requests - Rate limit exceeded",
+        },
+      ],
+    });
+    expect(syncServiceMocks.retryHistoryItem).toHaveBeenCalledTimes(2);
   });
 });

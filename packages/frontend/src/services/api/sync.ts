@@ -108,9 +108,11 @@ export async function deleteSyncHistoryItems(ids: string[]): Promise<void> {
 }
 
 export interface SyncRetryResponse {
+  id?: string;
   success: boolean;
   destinations: string[];
   errorMessage?: string;
+  error?: string;
 }
 
 export async function retrySyncHistoryItem(
@@ -122,6 +124,27 @@ export async function retrySyncHistoryItem(
   });
   if (!response.ok) {
     throw new Error("Failed to retry sync history item");
+  }
+  return response.json();
+}
+
+export interface BulkSyncRetryResponse {
+  success: boolean;
+  retried: number;
+  failed: number;
+  results: SyncRetryResponse[];
+}
+
+export async function retrySyncHistoryItems(
+  ids: string[]
+): Promise<BulkSyncRetryResponse> {
+  const response = await fetch(`${API_BASE_URL}/sync/history/retry`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ ids }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to retry sync history items");
   }
   return response.json();
 }

@@ -7,6 +7,7 @@ import {
   getSyncHistory,
   getSyncStatistics,
   retrySyncHistoryItem,
+  retrySyncHistoryItems,
 } from "./sync";
 
 describe("sync api", () => {
@@ -101,6 +102,40 @@ describe("sync api", () => {
           "Content-Type": "application/json",
         }),
       })
+    );
+  });
+
+  it("bulk retries selected sync-history items", async () => {
+    const response = {
+      success: true,
+      retried: 2,
+      failed: 0,
+      results: [
+        { id: "a", success: true, destinations: ["TVTime"] },
+        { id: "b", success: true, destinations: ["Trakt"] },
+      ],
+    };
+    fetchMock.mockResolvedValueOnce(jsonResponse(response));
+
+    await expect(retrySyncHistoryItems(["a", "b"])).resolves.toEqual(response);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/sync/history/retry",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({ ids: ["a", "b"] }),
+      })
+    );
+  });
+
+  it("throws when bulk retrying sync-history items fails", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, false, 400));
+
+    await expect(retrySyncHistoryItems(["sync-id"])).rejects.toThrow(
+      "Failed to retry sync history items"
     );
   });
 

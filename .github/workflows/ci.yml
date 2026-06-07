@@ -75,7 +75,7 @@ jobs:
       - name: Run automated tests
         run: pnpm test
 
-      - name: Run frontend coverage
+      - name: Run coverage
         run: pnpm test:coverage
 
       - name: Upload backend coverage

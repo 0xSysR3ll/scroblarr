@@ -1,5 +1,9 @@
 import type { SyncHistoryItem, SyncHistoryResponse } from "@services/api";
-import { getSyncHistory, retrySyncHistoryItem } from "@services/api";
+import {
+  getSyncHistory,
+  retrySyncHistoryItem,
+  retrySyncHistoryItems,
+} from "@services/api";
 import { renderWithProviders } from "@test/render";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -56,6 +60,7 @@ vi.mock("@services/api", async (importOriginal) => {
     deleteSyncHistoryItems: vi.fn(),
     getSyncHistory: vi.fn(),
     retrySyncHistoryItem: vi.fn(),
+    retrySyncHistoryItems: vi.fn(),
   };
 });
 
@@ -110,6 +115,13 @@ describe("SyncDashboardPage", () => {
     vi.mocked(retrySyncHistoryItem).mockResolvedValue({
       success: true,
       destinations: ["TVTime"],
+    });
+    vi.mocked(retrySyncHistoryItems).mockReset();
+    vi.mocked(retrySyncHistoryItems).mockResolvedValue({
+      success: true,
+      retried: 1,
+      failed: 0,
+      results: [{ success: true, destinations: ["TVTime"] }],
     });
   });
 

@@ -342,7 +342,7 @@ export function SettingsPage() {
 
       <div className="overflow-hidden rounded-xl border border-border/60 bg-card text-card-foreground shadow-lg">
         {/* Tabs */}
-        <div className="overflow-x-auto overflow-y-hidden border-b border-border [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="overflow-x-auto overflow-y-hidden border-b border-border [-ms-overflow-style:none] scrollbar-none [&::-webkit-scrollbar]:hidden">
           <nav className="-mb-px flex flex-nowrap" aria-label="Tabs">
             <button
               type="button"

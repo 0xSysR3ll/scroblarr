@@ -279,6 +279,59 @@ describe("SyncService", () => {
     );
   });
 
+  it("retries only the destination that failed on the history item", async () => {
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    tvtimeTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "tvtime-valid-token"
+    );
+    traktTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "trakt-valid-token"
+    );
+    tvtimeClientMocks.scrobble.mockResolvedValue(undefined);
+    traktClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    const result = await service.retryHistoryItem({
+      id: "sync-history-id",
+      userId: "u1",
+      user: {
+        id: "u1",
+        enabled: true,
+        plexUsername: "plex-user",
+        tvtimeAccessToken: "tv-token",
+        tvtimeMarkMoviesAsRewatched: false,
+        tvtimeMarkEpisodesAsRewatched: false,
+        traktClientId: "trakt-client-id",
+        traktClientSecret: "trakt-secret",
+        traktAccessToken: "trakt-token",
+      },
+      mediaType: "movie",
+      mediaTitle: "Interstellar",
+      source: "plex",
+      originalMediaId: "plex-media-id",
+      tvdbMovieId: "123",
+      success: false,
+      errorMessage: "TVTime: TVTime failed",
+      syncedAt: new Date("2026-01-01T00:00:00.000Z"),
+    } as never);
+
+    expect(result).toEqual({
+      success: true,
+      destinations: ["TVTime"],
+      errorMessage: undefined,
+    });
+    expect(tvtimeClientMocks.scrobble).toHaveBeenCalledTimes(1);
+    expect(traktClientMocks.scrobble).not.toHaveBeenCalled();
+    expect(syncHistoryRepositoryMocks.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "sync-history-id",
+        success: true,
+        errorMessage: undefined,
+        destinations: JSON.stringify(["TVTime"]),
+      })
+    );
+  });
+
   it("keeps a retried history item retryable when retry only partially succeeds", async () => {
     syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
     tvtimeTokenManagerMocks.getValidAccessToken.mockResolvedValue(
