@@ -64,6 +64,30 @@ describe("TVTimeClient", () => {
     ).rejects.toThrow("TVTime API returned non-OK result: ERROR");
   });
 
+  it("rejects malformed episode responses from TVTime", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockRejectedValue(new SyntaxError("bad json")),
+    });
+    const client = new TVTimeClient();
+
+    await expect(
+      client.scrobble(makeEpisodeEvent(), "access-token")
+    ).rejects.toThrow("Failed to parse TVTime scrobble response");
+  });
+
+  it("rejects episode responses missing the result field", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({}),
+    });
+    const client = new TVTimeClient();
+
+    await expect(
+      client.scrobble(makeEpisodeEvent(), "access-token")
+    ).rejects.toThrow("TVTime API returned non-OK result: missing");
+  });
+
   it("searches and scrobbles movies by UUID", async () => {
     fetchMock
       .mockResolvedValueOnce({
@@ -104,6 +128,71 @@ describe("TVTimeClient", () => {
     expect(decodeSidecarUrl(new URL(watchUrl))).toBe(
       "https://msapi.tvtime.com/prod/v1/tracking/movie-uuid/rewatch"
     );
+  });
+
+  it("uses the regular movie watch endpoint when rewatch is disabled", async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          status: "success",
+          data: [{ id: 111, uuid: "movie-uuid", imdb_id: "tt1234567" }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ status: "success" }),
+      });
+    const client = new TVTimeClient();
+
+    await client.scrobble(makeMovieEvent(), "access-token", {
+      markMoviesAsRewatched: false,
+    });
+
+    const [watchUrl] = fetchMock.mock.calls[1] as [string];
+    expect(decodeSidecarUrl(new URL(watchUrl))).toBe(
+      "https://msapi.tvtime.com/prod/v1/tracking/movie-uuid/watch"
+    );
+  });
+
+  it("rejects malformed movie scrobble responses from TVTime", async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          status: "success",
+          data: [{ id: 111, uuid: "movie-uuid", imdb_id: "tt1234567" }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockRejectedValue(new SyntaxError("bad json")),
+      });
+    const client = new TVTimeClient();
+
+    await expect(
+      client.scrobble(makeMovieEvent(), "access-token")
+    ).rejects.toThrow("Failed to parse TVTime movie scrobble response");
+  });
+
+  it("rejects movie scrobble responses missing success status", async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          status: "success",
+          data: [{ id: 111, uuid: "movie-uuid", imdb_id: "tt1234567" }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({}),
+      });
+    const client = new TVTimeClient();
+
+    await expect(
+      client.scrobble(makeMovieEvent(), "access-token")
+    ).rejects.toThrow("TVTime API returned non-success status: missing");
   });
 
   function makeEpisodeEvent(): MediaEvent {

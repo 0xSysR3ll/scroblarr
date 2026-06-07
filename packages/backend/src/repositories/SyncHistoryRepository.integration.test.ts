@@ -24,6 +24,7 @@ type SyncHistoryRepositoryClass = typeof SyncHistoryRepository;
 describe("SyncHistoryRepository integration", () => {
   let tempDir: string;
   let originalDatabasePath: string | undefined;
+  let originalPostgresHost: string | undefined;
   let dataSource: DataSourceInstance;
   let UserEntity: UserEntity;
   let SyncHistoryEntity: SyncHistoryEntity;
@@ -34,6 +35,7 @@ describe("SyncHistoryRepository integration", () => {
   beforeAll(async () => {
     tempDir = await mkdtemp(path.join(tmpdir(), "scroblarr-sync-history-"));
     originalDatabasePath = process.env.DATABASE_PATH;
+    originalPostgresHost = process.env.POSTGRES_HOST;
     process.env.DATABASE_PATH = path.join(tempDir, "test.sqlite");
     delete process.env.POSTGRES_HOST;
 
@@ -76,6 +78,11 @@ describe("SyncHistoryRepository integration", () => {
       delete process.env.DATABASE_PATH;
     } else {
       process.env.DATABASE_PATH = originalDatabasePath;
+    }
+    if (originalPostgresHost === undefined) {
+      delete process.env.POSTGRES_HOST;
+    } else {
+      process.env.POSTGRES_HOST = originalPostgresHost;
     }
     await rm(tempDir, { recursive: true, force: true });
   });
@@ -236,8 +243,6 @@ describe("SyncHistoryRepository integration", () => {
   }
 
   function daysAgo(days: number): Date {
-    const date = new Date();
-    date.setUTCDate(date.getUTCDate() - days);
-    return date;
+    return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   }
 });
