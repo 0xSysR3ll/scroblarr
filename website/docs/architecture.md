@@ -13,7 +13,7 @@ Scroblarr is built as a monorepo using pnpm workspaces. This keeps everything or
 The backend is an Express.js API server that handles:
 
 - **Webhook endpoints**: Receives events from Plex and Jellyfin
-- **Sync service**: Processes watch events and syncs to Trakt/TVTime
+- **Sync service**: Processes watch events and syncs to Trakt, TVTime, and Simkl
 - **User management**: Handles authentication and user operations
 - **Settings management**: Stores and retrieves configuration
 - **Database**: TypeORM with SQLite or PostgreSQL; migrations run automatically on startup
@@ -57,7 +57,7 @@ This ensures type safety between frontend and backend.
 1. **Media server** (Plex/Jellyfin) sends webhook to **Backend webhook endpoint**
 2. **Webhook parser** extracts watch event data
 3. **Sync service** matches event to user and destination accounts
-4. **Integration clients** (Trakt/TVTime) sync the watch data
+4. **Integration clients** (Trakt/TVTime/Simkl) sync the watch data
 5. **Database** stores sync history
 6. **Frontend** displays sync history and statistics
 
@@ -73,6 +73,7 @@ The backend exposes a REST API at `/api/v1/`:
 - `/api/v1/sync/*` - Sync history (authenticated users)
 - `/api/v1/trakt/*` - Trakt linking and tokens
 - `/api/v1/tvtime/*` - TVTime linking and profile helpers
+- `/api/v1/simkl/*` - Simkl PIN linking and profile helpers
 - `/api/v1/logs/*` - Structured application logs (**admin**)
 - `/api/v1/avatars/*` - User avatar proxy/fetch helpers
 - `/api/v1/meta/*` - Build/version metadata (e.g. `/version` for health and diagnostics)

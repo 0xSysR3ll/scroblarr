@@ -1,6 +1,8 @@
 import { SyncHistory } from "@entities/SyncHistory";
 import { User } from "@entities/User";
 import { ISyncClient, SyncOptions } from "@integrations/common/ISyncClient";
+import { SimklClient } from "@integrations/simkl/SimklClient";
+import { SimklTokenManager } from "@integrations/simkl/SimklTokenManager";
 import { TraktClient } from "@integrations/trakt/TraktClient";
 import { TraktTokenManager } from "@integrations/trakt/TraktTokenManager";
 import { TVTimeClient } from "@integrations/tvtime/TVTimeClient";
@@ -37,6 +39,7 @@ export class SyncService {
   private tvtimeClient: TVTimeClient;
   private tvtimeTokenManager: TVTimeTokenManager;
   private traktTokenManager: TraktTokenManager;
+  private simklTokenManager: SimklTokenManager;
   constructor() {
     this.userRepository = new UserRepository();
     this.syncHistoryRepository = new SyncHistoryRepository();
@@ -44,6 +47,7 @@ export class SyncService {
     this.tvtimeClient = new TVTimeClient();
     this.tvtimeTokenManager = new TVTimeTokenManager();
     this.traktTokenManager = new TraktTokenManager();
+    this.simklTokenManager = new SimklTokenManager();
   }
 
   private async getSyncDestinations(user: User): Promise<SyncDestination[]> {
@@ -79,6 +83,25 @@ export class SyncService {
         logger.sync.warn(
           { error, userId: user.id },
           "Failed to add Trakt sync destination for user"
+        );
+      }
+    }
+
+    if (user.simklClientId && user.simklAccessToken) {
+      try {
+        const simklClient = new SimklClient(user.simklClientId);
+        destinations.push({
+          name: "Simkl",
+          client: simklClient,
+          hasToken: (u) => !!u.simklAccessToken,
+          getAccessToken: async (u) => {
+            return await this.simklTokenManager.getValidAccessToken(u.id);
+          },
+        });
+      } catch (error) {
+        logger.sync.warn(
+          { error, userId: user.id },
+          "Failed to add Simkl sync destination for user"
         );
       }
     }
@@ -221,7 +244,7 @@ export class SyncService {
   private getRetryDestinationNames(
     historyItem: SyncHistory
   ): string[] | undefined {
-    const destinationNames = ["TVTime", "Trakt"];
+    const destinationNames = ["TVTime", "Trakt", "Simkl"];
     const fromErrorMessage = destinationNames.filter((destination) =>
       historyItem.errorMessage?.includes(`${destination}:`)
     );

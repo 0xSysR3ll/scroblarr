@@ -3,7 +3,7 @@ import type { SyncHistoryItem } from "@services/api";
 import { API_BASE_URL } from "@services/api/common";
 import { TFunction } from "i18next";
 
-const SYNC_DESTINATIONS = ["TVTime", "Trakt"] as const;
+const SYNC_DESTINATIONS = ["TVTime", "Trakt", "Simkl"] as const;
 
 export type SyncDestinationName = (typeof SYNC_DESTINATIONS)[number];
 export type SyncItemStatus = "success" | "partial" | "failed";

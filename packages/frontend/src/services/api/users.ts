@@ -8,6 +8,7 @@ export interface User {
   email?: string;
   tvtimeUsername?: string;
   traktUsername?: string;
+  simklUsername?: string;
   isAdmin: boolean;
   enabled: boolean;
   createdAt: string;

@@ -106,7 +106,7 @@ const config = {
       footer: {
         style: "light",
         links: [],
-        copyright: `© ${new Date().getFullYear()} Scroblarr · Plex, Jellyfin, Trakt, TVTime, and related marks are trademarks of their respective owners. This project is independent and is not sponsored, endorsed, or affiliated with those services.`,
+        copyright: `© ${new Date().getFullYear()} Scroblarr · Plex, Jellyfin, Trakt, TVTime, Simkl, and related marks are trademarks of their respective owners. This project is independent and is not sponsored, endorsed, or affiliated with those services.`,
         logo: {
           alt: "Scroblarr",
           src: "img/logo-icon.svg",

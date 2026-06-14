@@ -213,6 +213,7 @@ export type LogLabel =
   | "database"
   | "tvtime"
   | "trakt"
+  | "simkl"
   | "plex"
   | "jellyfin"
   | "system"
@@ -245,6 +246,7 @@ const logger = {
   database: labeled("database"),
   tvtime: labeled("tvtime"),
   trakt: labeled("trakt"),
+  simkl: labeled("simkl"),
   plex: labeled("plex"),
   jellyfin: labeled("jellyfin"),
   system: labeled("system"),

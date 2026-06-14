@@ -14,6 +14,7 @@ import { logoutRoutes } from "./routes/logout";
 import { logsRoutes } from "./routes/logs";
 import { metaRoutes } from "./routes/meta";
 import { settingsRoutes } from "./routes/settings";
+import { simklRoutes } from "./routes/simkl";
 import { syncRoutes } from "./routes/sync";
 import { traktRoutes } from "./routes/trakt";
 import { tvtimeRoutes } from "./routes/tvtime";
@@ -114,6 +115,7 @@ export function createApp(): Express {
   app.use("/api/v1/settings", settingsRoutes);
   app.use("/api/v1/tvtime", integrationLimiter, tvtimeRoutes);
   app.use("/api/v1/trakt", integrationLimiter, traktRoutes);
+  app.use("/api/v1/simkl", integrationLimiter, simklRoutes);
   app.use("/api/v1/sync", syncRoutes);
   app.use("/api/v1/logs", logsRoutes);
   app.use("/api/v1/logout", logoutRoutes);

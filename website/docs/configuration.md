@@ -17,6 +17,7 @@ Scroblarr needs two types of configuration:
 2. **Destination services** - Where your watch history syncs to
    - [Trakt](/docs/configuration/trakt) - Link your Trakt account
    - [TVTime](/docs/configuration/tvtime) - Link your TVTime account
+   - [Simkl](/docs/configuration/simkl) - Link your Simkl account
 
 ## General settings
 
@@ -45,7 +46,7 @@ After configuring everything, test it:
 
 1. Watch something on Plex or Jellyfin
 2. Check the **Dashboard** in Scroblarr - you should see the sync appear
-3. Check your Trakt/TVTime account - the watch should be synced there too
+3. Check your linked destination accounts - the watch should be synced there too
 
 If something's not working, check the **Logs** page in Settings for error messages.
 

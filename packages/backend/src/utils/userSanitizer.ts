@@ -8,6 +8,8 @@ export interface SanitizedUser {
   displayName?: string;
   email?: string;
   tvtimeUsername?: string;
+  traktUsername?: string;
+  simklUsername?: string;
   isAdmin: boolean;
   enabled: boolean;
   tvtimeMarkMoviesAsRewatched?: boolean;
@@ -24,6 +26,8 @@ export function getProxiedThumbUrl(user: User): string | undefined {
     return `/api/v1/avatars/plex/${user.id}`;
   } else if (user.traktThumb) {
     return `/api/v1/avatars/trakt/${user.id}`;
+  } else if (user.simklThumb) {
+    return `/api/v1/avatars/simkl/${user.id}`;
   } else if (user.tvtimeThumb) {
     return `/api/v1/avatars/tvtime/${user.id}`;
   }
@@ -41,6 +45,8 @@ export function sanitizeUser(user: User): SanitizedUser {
     displayName: user.displayName,
     email: user.email,
     tvtimeUsername: user.tvtimeUsername,
+    traktUsername: user.traktUsername,
+    simklUsername: user.simklUsername,
     isAdmin: user.isAdmin,
     enabled: user.enabled,
     tvtimeMarkMoviesAsRewatched: user.tvtimeMarkMoviesAsRewatched,

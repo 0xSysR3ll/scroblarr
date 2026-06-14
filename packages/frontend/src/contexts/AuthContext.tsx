@@ -22,6 +22,7 @@ export interface AuthUser {
   hasJellyfin?: boolean;
   hasTrakt?: boolean;
   hasTVTime?: boolean;
+  hasSimkl?: boolean;
 }
 
 interface AuthContextType {

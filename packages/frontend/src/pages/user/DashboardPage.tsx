@@ -281,7 +281,7 @@ export function DashboardPage() {
                   <p className="text-muted-foreground mb-6">
                     {t("dashboard.empty.description", {
                       defaultValue:
-                        "Watch something on Plex or Jellyfin and it will appear here. Make sure webhooks are configured and your Trakt or TVTime account is linked in your profile.",
+                        "Watch something on Plex or Jellyfin and it will appear here. Make sure webhooks are configured and your Trakt, TVTime, or Simkl account is linked in your profile.",
                     })}
                   </p>
                   <button
@@ -718,6 +718,12 @@ export function DashboardPage() {
                         <span className="text-foreground/90">TVTime</span>
                         <span className="text-2xl font-bold text-foreground">
                           {statistics.byDestination.tvtime.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-foreground/90">Simkl</span>
+                        <span className="text-2xl font-bold text-foreground">
+                          {statistics.byDestination.simkl.toLocaleString()}
                         </span>
                       </div>
                     </div>

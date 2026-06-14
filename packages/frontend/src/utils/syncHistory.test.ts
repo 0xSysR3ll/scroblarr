@@ -57,6 +57,25 @@ describe("sync history utils", () => {
     ]);
   });
 
+  it("maps Simkl destination failures", () => {
+    expect(
+      getDestinationResults(
+        syncItem({
+          destinations: ["Trakt", "TVTime"],
+          errorMessage: "Simkl: rate limited",
+        })
+      )
+    ).toEqual([
+      { name: "TVTime", status: "success" },
+      { name: "Trakt", status: "success" },
+      {
+        name: "Simkl",
+        status: "failed",
+        errorMessage: "rate limited",
+      },
+    ]);
+  });
+
   it("only shows rewatched badges for successful TVTime syncs", () => {
     expect(shouldShowRewatchedBadge(syncItem({ wasRewatched: true }))).toBe(
       true

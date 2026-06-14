@@ -86,6 +86,18 @@ export class User {
   @Column({ type: "varchar", length: 500, nullable: true })
   traktThumb?: string;
 
+  @Column({ type: "varchar", length: 255, nullable: true })
+  simklUsername?: string;
+
+  @Column({ type: "varchar", length: 500, nullable: true })
+  simklAccessToken?: string;
+
+  @Column({ type: "varchar", length: 500, nullable: true })
+  simklClientId?: string;
+
+  @Column({ type: "varchar", length: 500, nullable: true })
+  simklThumb?: string;
+
   @CreateDateColumn()
   createdAt!: Date;
 

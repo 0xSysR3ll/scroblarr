@@ -251,4 +251,51 @@ router.get("/tvtime/:userId", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/simkl/:userId", async (req: Request, res: Response) => {
+  try {
+    const userId = routeParam(req.params.userId);
+    if (!userId) {
+      return res.status(400).json({ error: "Missing user id" });
+    }
+    if (!canAccessUserAvatar(req, userId)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const user = await userRepository.findById(userId);
+
+    if (!user || !user.simklThumb) {
+      return res.status(404).json({ error: "User or Simkl avatar not found" });
+    }
+
+    try {
+      const response = await fetch(user.simklThumb, {
+        headers: {
+          Accept: "image/*",
+        },
+      });
+
+      if (!response.ok) {
+        return res.status(response.status).json({
+          error: "Failed to fetch Simkl avatar",
+        });
+      }
+
+      const contentType = response.headers.get("content-type") || "image/jpeg";
+      const imageBuffer = await response.arrayBuffer();
+
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      return res.send(Buffer.from(imageBuffer));
+    } catch (error) {
+      logger.api.error(
+        { error, thumbUrl: user.simklThumb },
+        "Error proxying Simkl avatar"
+      );
+      return res.status(500).json({ error: "Failed to fetch Simkl avatar" });
+    }
+  } catch (error) {
+    logger.api.error({ error }, "Error fetching Simkl avatar");
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export { router as avatarRoutes };
