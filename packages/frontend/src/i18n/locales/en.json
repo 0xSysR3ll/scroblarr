@@ -363,6 +363,8 @@
     "oauthInstructions": "Click 'Authorize' to open Trakt in a new window. After authorizing, you'll receive an authorization code. Paste it below to complete the linking process.",
     "authorize": "Authorize",
     "authorizationCode": "Authorization Code",
+    "authorizationCodeHelp": "Paste the code Trakt shows after authorization.",
+    "openAuthPage": "Open Trakt auth page",
     "codePlaceholder": "Paste the authorization code here",
     "link": "Link Account",
     "unlinkTitle": "Unlink Trakt Account",

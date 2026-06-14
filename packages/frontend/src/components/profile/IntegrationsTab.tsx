@@ -1270,12 +1270,32 @@ export function IntegrationsTab({
               </div>
 
               {traktAuthUrl && (
-                <div>
-                  <label className="block text-sm font-medium text-foreground/90 mb-1.5">
-                    {t("trakt.authorizationCode", {
-                      defaultValue: "Authorization Code",
-                    })}
-                  </label>
+                <div className="rounded-lg border border-purple-200 bg-purple-50/70 p-3 dark:border-purple-900 dark:bg-purple-950/30">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-purple-800 dark:text-purple-200">
+                        {t("trakt.authorizationCode", {
+                          defaultValue: "Authorization Code",
+                        })}
+                      </p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {t("trakt.authorizationCodeHelp", {
+                          defaultValue:
+                            "Paste the code Trakt shows after authorization.",
+                        })}
+                      </p>
+                    </div>
+                    <a
+                      href={traktAuthUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex w-fit items-center rounded-md border border-purple-300 bg-background px-2.5 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:text-purple-300 dark:hover:bg-purple-950"
+                    >
+                      {t("trakt.openAuthPage", {
+                        defaultValue: "Open Trakt auth page",
+                      })}
+                    </a>
+                  </div>
                   <input
                     type="text"
                     value={traktCode}
@@ -1283,7 +1303,7 @@ export function IntegrationsTab({
                     placeholder={t("trakt.codePlaceholder", {
                       defaultValue: "Paste the authorization code here",
                     })}
-                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
+                    className="mt-3 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
                   />
                   <button
                     onClick={handleLinkTrakt}
@@ -1293,7 +1313,7 @@ export function IntegrationsTab({
                       (!traktStatus?.hasCredentials &&
                         (!traktClientId.trim() || !traktClientSecret.trim()))
                     }
-                    className="mt-2 w-full sm:w-auto px-3 py-2 text-sm font-medium bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="mt-3 w-full sm:w-auto px-3 py-2 text-sm font-medium bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {traktSaving
                       ? t("common.loading", { defaultValue: "Linking..." })
