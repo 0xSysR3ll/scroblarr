@@ -27,7 +27,7 @@ import {
 } from "@services/api";
 import { OAuthPopup } from "@utils/OAuthPopup";
 import { showSuccess, showError } from "@utils/toast";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useId } from "react";
 import { useTranslation } from "react-i18next";
 import {
   FaCheckCircle,
@@ -110,6 +110,8 @@ export function IntegrationsTab({
   const [showSimklUnlinkModal, setShowSimklUnlinkModal] = useState(false);
   const [simklOAuthPopup] = useState(() => new OAuthPopup());
   const simklPinPollIdRef = useRef(0);
+  const traktAuthorizationCodeLabelId = useId();
+  const traktAuthorizationCodeDescriptionId = useId();
 
   const loadTVTimeProfile = useCallback(
     async (status: TVTimeStatus) => {
@@ -1273,12 +1275,18 @@ export function IntegrationsTab({
                 <div className="rounded-lg border border-purple-200 bg-purple-50/70 p-3 dark:border-purple-900 dark:bg-purple-950/30">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-purple-800 dark:text-purple-200">
+                      <p
+                        id={traktAuthorizationCodeLabelId}
+                        className="text-xs font-medium uppercase tracking-wide text-purple-800 dark:text-purple-200"
+                      >
                         {t("trakt.authorizationCode", {
                           defaultValue: "Authorization Code",
                         })}
                       </p>
-                      <p className="mt-1 text-sm text-muted-foreground">
+                      <p
+                        id={traktAuthorizationCodeDescriptionId}
+                        className="mt-1 text-sm text-muted-foreground"
+                      >
                         {t("trakt.authorizationCodeHelp", {
                           defaultValue:
                             "Paste the code Trakt shows after authorization.",
@@ -1298,6 +1306,8 @@ export function IntegrationsTab({
                   </div>
                   <input
                     type="text"
+                    aria-labelledby={traktAuthorizationCodeLabelId}
+                    aria-describedby={traktAuthorizationCodeDescriptionId}
                     value={traktCode}
                     onChange={(e) => setTraktCode(e.target.value)}
                     placeholder={t("trakt.codePlaceholder", {
