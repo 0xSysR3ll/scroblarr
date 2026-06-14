@@ -538,7 +538,8 @@ export function SyncDashboardPage() {
       showSuccess(
         t("sync.success.bulkRetrySuccess", {
           count: result.retried,
-          defaultValue: "Retried {{count}} failed sync item(s)",
+          defaultValue_one: "Retried {{count}} failed sync item",
+          defaultValue_other: "Retried {{count}} failed sync items",
         })
       );
     } catch {

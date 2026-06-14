@@ -443,8 +443,8 @@
       "deleteItemsSuccess": "Sync history items deleted successfully",
       "retrySuccess": "Sync retried successfully",
       "retryPartialSuccess": "Sync retry partially succeeded",
-      "bulkRetrySuccess_one": "Retried {{count}} failed sync item(s)",
-      "bulkRetrySuccess_other": "Retried {{count}} failed sync item(s)"
+      "bulkRetrySuccess_one": "Retried {{count}} failed sync item",
+      "bulkRetrySuccess_other": "Retried {{count}} failed sync items"
     },
     "title": "My Sync History",
     "deleteSelected": "Delete Selected",
