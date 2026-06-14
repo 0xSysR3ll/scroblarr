@@ -1499,10 +1499,10 @@ export function IntegrationsTab({
                     </a>
                   </div>
                   {simklPinMessage && (
-                    <p className="mt-3 flex items-center gap-2 text-xs text-emerald-800 dark:text-emerald-200">
+                    <div className="mt-3 flex items-center gap-2 text-xs text-emerald-800 dark:text-emerald-200">
                       {simklPinPolling && <Spinner size="sm" />}
                       <span>{simklPinMessage}</span>
-                    </p>
+                    </div>
                   )}
                   <button
                     onClick={handleLinkSimkl}

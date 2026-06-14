@@ -73,6 +73,15 @@ describe("SimklOAuth", () => {
     });
   });
 
+  it("requires a client secret for authorization code exchange", async () => {
+    const oauth = new SimklOAuth("client-id");
+
+    await expect(
+      oauth.exchangeCodeForToken("code", "urn:ietf:wg:oauth:2.0:oob")
+    ).rejects.toThrow("Simkl client secret is required");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("surfaces token exchange failures", async () => {
     fetchMock.mockResolvedValue({
       ok: false,
@@ -84,5 +93,93 @@ describe("SimklOAuth", () => {
     await expect(
       oauth.exchangeCodeForToken("bad-code", "urn:ietf:wg:oauth:2.0:oob")
     ).rejects.toThrow("Failed to exchange Simkl authorization code: 401");
+  });
+
+  it("requests PIN codes", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        result: "OK",
+        device_code: "device-code",
+        user_code: "ABCDE",
+        verification_url: "https://simkl.com/pin/",
+        expires_in: 900,
+        interval: 5,
+      }),
+    });
+    const oauth = new SimklOAuth("client-id");
+
+    await expect(oauth.requestPinCode()).resolves.toEqual({
+      result: "OK",
+      device_code: "device-code",
+      user_code: "ABCDE",
+      verification_url: "https://simkl.com/pin/",
+      expires_in: 900,
+      interval: 5,
+      message: "",
+    });
+
+    const [url, request] = fetchMock.mock.calls[0] as [
+      string,
+      { method: string; headers: Record<string, string> },
+    ];
+    const actualUrl = new URL(url);
+    expect(actualUrl.pathname).toBe("/oauth/pin");
+    expect(actualUrl.searchParams.get("client_id")).toBe("client-id");
+    expect(request.method).toBe("GET");
+    expect(request.headers).toEqual(
+      expect.objectContaining({ "simkl-api-key": "client-id" })
+    );
+  });
+
+  it("rejects invalid PIN code responses", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        result: "KO",
+        message: "invalid client",
+      }),
+    });
+    const oauth = new SimklOAuth("client-id");
+
+    await expect(oauth.requestPinCode()).rejects.toThrow("invalid client");
+  });
+
+  it("exchanges approved PIN codes for access tokens", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        result: "OK",
+        access_token: "access-token",
+      }),
+    });
+    const oauth = new SimklOAuth("client-id");
+
+    await expect(oauth.exchangePinForToken("AB CD")).resolves.toEqual({
+      accessToken: "access-token",
+    });
+
+    const [url, request] = fetchMock.mock.calls[0] as [
+      string,
+      { method: string },
+    ];
+    const actualUrl = new URL(url);
+    expect(actualUrl.pathname).toBe("/oauth/pin/AB%20CD");
+    expect(request.method).toBe("GET");
+  });
+
+  it("surfaces pending PIN authorization responses", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        result: "KO",
+        message: "Authorization pending",
+      }),
+    });
+    const oauth = new SimklOAuth("client-id");
+
+    await expect(oauth.exchangePinForToken("ABCDE")).rejects.toThrow(
+      "Authorization pending"
+    );
   });
 });

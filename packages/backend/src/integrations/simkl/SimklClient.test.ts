@@ -75,6 +75,42 @@ describe("SimklClient", () => {
     });
   });
 
+  it("sends movie history with title fallback when no IDs are available", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ added: { movies: 1 } }),
+    });
+    const client = new SimklClient("client-id");
+
+    await client.scrobble(
+      {
+        event: "scrobble",
+        source: "plex",
+        userId: "plex-user",
+        timestamp: new Date("2026-06-04T17:00:00.000Z"),
+        media: {
+          id: "movie-1",
+          type: "movie",
+          title: "Example Movie",
+          year: 2024,
+        },
+      },
+      "access-token"
+    );
+
+    const [, request] = fetchMock.mock.calls[0] as [string, { body: string }];
+    expect(JSON.parse(request.body)).toEqual({
+      movies: [
+        {
+          title: "Example Movie",
+          year: 2024,
+          watched_at: "2026-06-04T17:00:00Z",
+          ids: {},
+        },
+      ],
+    });
+  });
+
   it("sends episode history with season and TVDB episode IDs", async () => {
     fetchMock.mockResolvedValue({
       ok: true,
@@ -107,6 +143,76 @@ describe("SimklClient", () => {
         },
       ],
     });
+  });
+
+  it("sends top-level episode history when only a TVDB episode ID is available", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ added: { episodes: 1 } }),
+    });
+    const client = new SimklClient("client-id");
+    const event = makeEpisodeEvent();
+    event.media.seasonNumber = undefined;
+    event.media.episodeNumber = undefined;
+
+    await client.scrobble(event, "access-token");
+
+    const [, request] = fetchMock.mock.calls[0] as [string, { body: string }];
+    expect(JSON.parse(request.body)).toEqual({
+      episodes: [
+        {
+          watched_at: "2026-06-04T17:00:00Z",
+          ids: {
+            tvdb: 98765,
+          },
+        },
+      ],
+    });
+  });
+
+  it("loads user profiles", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        user: {
+          name: "alice",
+          avatar: "https://img.example/alice.png",
+        },
+        account: {
+          id: 51,
+        },
+      }),
+    });
+    const client = new SimklClient("client-id");
+
+    await expect(client.getUserProfile("access-token")).resolves.toEqual({
+      id: 51,
+      username: "alice",
+      image: "https://img.example/alice.png",
+    });
+
+    const [url, request] = fetchMock.mock.calls[0] as [
+      string,
+      { method: string; body?: string },
+    ];
+    expect(new URL(url).pathname).toBe("/users/settings");
+    expect(request.method).toBe("POST");
+    expect(request.body).toBeUndefined();
+  });
+
+  it("surfaces Simkl API errors", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 401,
+      text: vi
+        .fn()
+        .mockResolvedValue(JSON.stringify({ error: "invalid_token" })),
+    });
+    const client = new SimklClient("client-id");
+
+    await expect(
+      client.scrobble(makeEpisodeEvent(), "bad-token")
+    ).rejects.toThrow("Simkl API error: 401 - invalid_token");
   });
 
   it("rejects unmatched Simkl history responses", async () => {

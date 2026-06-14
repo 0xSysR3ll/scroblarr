@@ -16,6 +16,10 @@ const simklClientMocks = vi.hoisted(() => ({
   getUserProfile: vi.fn(),
 }));
 
+const simklTokenManagerMocks = vi.hoisted(() => ({
+  getValidAccessToken: vi.fn(),
+}));
+
 vi.mock("../middleware/auth", () => ({
   auth: (
     req: express.Request,
@@ -49,7 +53,7 @@ vi.mock("@integrations/simkl/SimklClient", () => ({
 
 vi.mock("@integrations/simkl/SimklTokenManager", () => ({
   SimklTokenManager: class {
-    getValidAccessToken = vi.fn().mockResolvedValue("access-token");
+    getValidAccessToken = simklTokenManagerMocks.getValidAccessToken;
   },
 }));
 
@@ -72,6 +76,9 @@ describe("simkl routes", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    simklTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "access-token"
+    );
     userRepositoryMocks.findById.mockResolvedValue({
       id: "user-id",
       plexUsername: "plex-user",
@@ -101,6 +108,19 @@ describe("simkl routes", () => {
     expect(simklOAuthMocks.requestPinCode).toHaveBeenCalledOnce();
   });
 
+  it("requires a client ID when requesting authorization", async () => {
+    userRepositoryMocks.findById.mockResolvedValueOnce({
+      id: "user-id",
+      plexUsername: "plex-user",
+      simklClientId: null,
+    });
+
+    const response = await request(app).get("/simkl/authorize").expect(400);
+
+    expect(response.body.error).toContain("Simkl client ID is required");
+    expect(simklOAuthMocks.requestPinCode).not.toHaveBeenCalled();
+  });
+
   it("links a Simkl account", async () => {
     simklOAuthMocks.exchangePinForToken.mockResolvedValue({
       accessToken: "new-access-token",
@@ -127,6 +147,51 @@ describe("simkl routes", () => {
     );
   });
 
+  it("stores a provided client ID when linking", async () => {
+    simklOAuthMocks.exchangePinForToken.mockResolvedValue({
+      accessToken: "new-access-token",
+    });
+    simklClientMocks.getUserProfile.mockRejectedValue(
+      new Error("profile down")
+    );
+
+    await request(app)
+      .post("/simkl/link")
+      .send({ userCode: "ABCDE", clientId: "provided-client-id" })
+      .expect(200);
+
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith(
+      "user-id",
+      expect.objectContaining({
+        simklAccessToken: "new-access-token",
+        simklClientId: "provided-client-id",
+      })
+    );
+  });
+
+  it("returns validation errors for invalid link payloads", async () => {
+    const response = await request(app)
+      .post("/simkl/link")
+      .send({})
+      .expect(400);
+
+    expect(response.body.error).toBe("Validation error");
+    expect(simklOAuthMocks.exchangePinForToken).not.toHaveBeenCalled();
+  });
+
+  it("returns pending PIN errors as bad requests", async () => {
+    simklOAuthMocks.exchangePinForToken.mockRejectedValue(
+      new Error("Authorization pending")
+    );
+
+    const response = await request(app)
+      .post("/simkl/link")
+      .send({ userCode: "ABCDE" })
+      .expect(400);
+
+    expect(response.body).toEqual({ error: "Authorization pending" });
+  });
+
   it("unlinks a Simkl account", async () => {
     const response = await request(app).post("/simkl/unlink").expect(200);
 
@@ -149,5 +214,42 @@ describe("simkl routes", () => {
       image: "https://img.example/stored.png",
       hasCredentials: true,
     });
+  });
+
+  it("returns and refreshes Simkl profile details", async () => {
+    simklClientMocks.getUserProfile.mockResolvedValue({
+      id: 51,
+      username: "fresh-user",
+      image: "https://img.example/fresh.png",
+    });
+
+    const response = await request(app).get("/simkl/profile").expect(200);
+
+    expect(simklTokenManagerMocks.getValidAccessToken).toHaveBeenCalledWith(
+      "user-id"
+    );
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith("user-id", {
+      simklUsername: "fresh-user",
+      simklThumb: "https://img.example/fresh.png",
+    });
+    expect(response.body).toEqual({
+      id: 51,
+      username: "fresh-user",
+      image: "https://img.example/fresh.png",
+    });
+  });
+
+  it("rejects profile requests when Simkl is not linked", async () => {
+    userRepositoryMocks.findById.mockResolvedValueOnce({
+      id: "user-id",
+      plexUsername: "plex-user",
+      simklAccessToken: null,
+      simklClientId: "stored-client-id",
+    });
+
+    const response = await request(app).get("/simkl/profile").expect(400);
+
+    expect(response.body).toEqual({ error: "Simkl account not linked" });
+    expect(simklTokenManagerMocks.getValidAccessToken).not.toHaveBeenCalled();
   });
 });

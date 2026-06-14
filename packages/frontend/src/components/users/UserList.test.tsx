@@ -138,4 +138,20 @@ describe("UserList", () => {
       expect(onToggleEnabled).toHaveBeenCalledWith("regular-user", false);
     });
   });
+
+  it("shows a Simkl badge for linked users", () => {
+    renderWithProviders(
+      <UserList
+        users={[
+          {
+            ...users[1],
+            simklUsername: "bob-simkl",
+          },
+        ]}
+      />
+    );
+
+    const bobRow = getUserTableRow("Bob");
+    expect(within(bobRow).getByText("Simkl")).toBeInTheDocument();
+  });
 });

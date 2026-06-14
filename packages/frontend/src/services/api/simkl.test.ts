@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   getSimklAuthorizeUrl,
+  getSimklProfile,
   getSimklStatus,
   invalidateSimklCache,
   linkSimkl,
@@ -118,5 +119,72 @@ describe("simkl api", () => {
       headers: expectedHeaders,
     });
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("loads and caches Simkl profiles", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        id: 51,
+        username: "alice",
+        image: "https://img.example/alice.png",
+      })
+    );
+
+    await expect(getSimklProfile()).resolves.toEqual({
+      id: 51,
+      username: "alice",
+      image: "https://img.example/alice.png",
+    });
+    await expect(getSimklProfile()).resolves.toMatchObject({
+      username: "alice",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/simkl/profile", {
+      headers: expectedHeaders,
+    });
+  });
+
+  it("surfaces authorization errors from the backend", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "Simkl client ID is required" }, false, 400)
+    );
+
+    await expect(getSimklAuthorizeUrl()).rejects.toThrow(
+      "Simkl client ID is required"
+    );
+  });
+
+  it("surfaces link errors from the backend", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "Authorization pending" }, false, 400)
+    );
+
+    await expect(linkSimkl("ABCDE")).rejects.toThrow("Authorization pending");
+  });
+
+  it("surfaces unlink errors from the backend", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "Failed to unlink Simkl account" }, false, 500)
+    );
+
+    await expect(unlinkSimkl()).rejects.toThrow(
+      "Failed to unlink Simkl account"
+    );
+  });
+
+  it("surfaces status and profile fetch failures", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ error: "nope" }, false, 500))
+      .mockResolvedValueOnce({
+        ok: false,
+        statusText: "Service Unavailable",
+        json: vi.fn().mockRejectedValue(new Error("invalid json")),
+      });
+
+    await expect(getSimklStatus()).rejects.toThrow(
+      "Failed to fetch Simkl status"
+    );
+    await expect(getSimklProfile()).rejects.toThrow("Service Unavailable");
   });
 });
