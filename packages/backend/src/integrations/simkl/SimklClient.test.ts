@@ -154,6 +154,7 @@ describe("SimklClient", () => {
     const event = makeEpisodeEvent();
     event.media.seasonNumber = undefined;
     event.media.episodeNumber = undefined;
+    event.media.title = undefined as never;
 
     await client.scrobble(event, "access-token");
 
@@ -213,6 +214,17 @@ describe("SimklClient", () => {
     await expect(
       client.scrobble(makeEpisodeEvent(), "bad-token")
     ).rejects.toThrow("Simkl API error: 401 - invalid_token");
+  });
+
+  it("surfaces Simkl API timeouts", async () => {
+    fetchMock.mockRejectedValue(
+      Object.assign(new Error("aborted"), { name: "AbortError" })
+    );
+    const client = new SimklClient("client-id");
+
+    await expect(
+      client.scrobble(makeEpisodeEvent(), "access-token")
+    ).rejects.toThrow("Simkl API request timed out");
   });
 
   it("rejects unmatched Simkl history responses", async () => {

@@ -53,6 +53,7 @@ describe("IntegrationsTab Simkl integration", () => {
   const onProfileUpdated = vi.fn();
 
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(getTVTimeStatus).mockResolvedValue({
       linked: false,
       username: null,

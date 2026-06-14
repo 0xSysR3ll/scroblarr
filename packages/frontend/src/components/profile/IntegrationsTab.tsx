@@ -267,6 +267,11 @@ export function IntegrationsTab({
         return false;
       }
       setSimklError(errorMessage);
+      if (!showPendingError) {
+        setSimklPinPolling(false);
+        setSimklPinMessage(null);
+        return true;
+      }
       return false;
     } finally {
       if (showPendingError) {

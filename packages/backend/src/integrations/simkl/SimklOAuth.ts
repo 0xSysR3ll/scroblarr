@@ -33,6 +33,31 @@ export interface SimklPinStatusResponse {
   message?: string;
 }
 
+const SIMKL_OAUTH_TIMEOUT_MS = 30_000;
+
+async function fetchWithTimeout(
+  url: Parameters<typeof fetch>[0],
+  init: Parameters<typeof fetch>[1],
+  errorContext: string
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SIMKL_OAUTH_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`${errorContext} timed out`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export class SimklOAuth {
   constructor(
     private readonly clientId: string,
@@ -63,7 +88,7 @@ export class SimklOAuth {
       );
     }
 
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       withSimklQueryParams(`${SIMKL_API_BASE_URL}/oauth/token`, this.clientId),
       {
         method: "POST",
@@ -75,7 +100,8 @@ export class SimklOAuth {
           redirect_uri: redirectUri,
           grant_type: "authorization_code",
         }),
-      }
+      },
+      "Simkl authorization code exchange"
     );
 
     if (!response.ok) {
@@ -100,12 +126,13 @@ export class SimklOAuth {
   }
 
   async requestPinCode(): Promise<Required<SimklPinCodeResponse>> {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       withSimklQueryParams(`${SIMKL_API_BASE_URL}/oauth/pin`, this.clientId),
       {
         method: "GET",
         headers: getSimklHeaders(this.clientId),
-      }
+      },
+      "Simkl PIN code request"
     );
 
     if (!response.ok) {
@@ -144,7 +171,7 @@ export class SimklOAuth {
   }
 
   async exchangePinForToken(userCode: string): Promise<SimklTokens> {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       withSimklQueryParams(
         `${SIMKL_API_BASE_URL}/oauth/pin/${encodeURIComponent(userCode)}`,
         this.clientId
@@ -152,7 +179,8 @@ export class SimklOAuth {
       {
         method: "GET",
         headers: getSimklHeaders(this.clientId),
-      }
+      },
+      "Simkl PIN status check"
     );
 
     if (!response.ok) {

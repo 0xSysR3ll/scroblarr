@@ -28,6 +28,36 @@ export function invalidateSimklCache(): void {
   invalidateCachedPrefix("simkl-");
 }
 
+async function getErrorMessage(
+  response: Response,
+  fallback: string
+): Promise<string> {
+  try {
+    const jsonSource =
+      typeof response.clone === "function" ? response.clone() : response;
+    const error = (await jsonSource.json()) as { error?: unknown };
+    if (typeof error.error === "string" && error.error) {
+      return error.error;
+    }
+  } catch {
+    // Fall through to text/status fallback.
+  }
+
+  try {
+    const text = await response.text();
+    if (text.trim()) {
+      return text.trim();
+    }
+  } catch {
+    // Fall through to status fallback.
+  }
+
+  const status = [response.status, response.statusText]
+    .filter(Boolean)
+    .join(" ");
+  return status ? `${fallback} (${status})` : fallback;
+}
+
 export async function getSimklAuthorizeUrl(
   clientId?: string
 ): Promise<SimklPinAuthorization> {
@@ -42,8 +72,9 @@ export async function getSimklAuthorizeUrl(
     headers: getAuthHeaders(),
   });
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to get Simkl PIN code");
+    throw new Error(
+      await getErrorMessage(response, "Failed to get Simkl PIN code")
+    );
   }
   return response.json();
 }
@@ -58,8 +89,9 @@ export async function linkSimkl(
     body: JSON.stringify({ userCode, clientId }),
   });
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to link Simkl account");
+    throw new Error(
+      await getErrorMessage(response, "Failed to link Simkl account")
+    );
   }
   invalidateSimklCache();
   return response.json();
@@ -71,8 +103,9 @@ export async function unlinkSimkl(): Promise<{ success: boolean }> {
     headers: getAuthHeaders(),
   });
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to unlink Simkl account");
+    throw new Error(
+      await getErrorMessage(response, "Failed to unlink Simkl account")
+    );
   }
   invalidateSimklCache();
   return response.json();
@@ -101,14 +134,9 @@ export async function getSimklProfile(): Promise<SimklProfile> {
     headers: getAuthHeaders(),
   });
   if (!response.ok) {
-    let errorMessage = "Failed to fetch Simkl profile";
-    try {
-      const error = await response.json();
-      errorMessage = error.error || errorMessage;
-    } catch {
-      errorMessage = response.statusText || errorMessage;
-    }
-    throw new Error(errorMessage);
+    throw new Error(
+      await getErrorMessage(response, "Failed to fetch Simkl profile")
+    );
   }
   const data = (await response.json()) as SimklProfile;
   setCached(CACHE_KEY_PROFILE, data);

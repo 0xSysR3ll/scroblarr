@@ -76,6 +76,34 @@ describe("sync history utils", () => {
     ]);
   });
 
+  it("maps mixed-order destination failures to the right destination", () => {
+    expect(
+      getDestinationResults(
+        syncItem({
+          success: false,
+          destinations: [],
+          errorMessage: "Simkl: error1; Trakt: error2; TVTime: error3",
+        })
+      )
+    ).toEqual([
+      {
+        name: "TVTime",
+        status: "failed",
+        errorMessage: "error3",
+      },
+      {
+        name: "Trakt",
+        status: "failed",
+        errorMessage: "error2",
+      },
+      {
+        name: "Simkl",
+        status: "failed",
+        errorMessage: "error1",
+      },
+    ]);
+  });
+
   it("only shows rewatched badges for successful TVTime syncs", () => {
     expect(shouldShowRewatchedBadge(syncItem({ wasRewatched: true }))).toBe(
       true

@@ -132,6 +132,17 @@ describe("SimklOAuth", () => {
     );
   });
 
+  it("surfaces PIN request timeouts", async () => {
+    fetchMock.mockRejectedValue(
+      Object.assign(new Error("aborted"), { name: "AbortError" })
+    );
+    const oauth = new SimklOAuth("client-id");
+
+    await expect(oauth.requestPinCode()).rejects.toThrow(
+      "Simkl PIN code request timed out"
+    );
+  });
+
   it("rejects invalid PIN code responses", async () => {
     fetchMock.mockResolvedValue({
       ok: true,

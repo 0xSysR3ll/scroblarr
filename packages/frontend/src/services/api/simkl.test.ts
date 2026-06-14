@@ -185,6 +185,34 @@ describe("simkl api", () => {
     await expect(getSimklStatus()).rejects.toThrow(
       "Failed to fetch Simkl status"
     );
-    await expect(getSimklProfile()).rejects.toThrow("Service Unavailable");
+    await expect(getSimklProfile()).rejects.toThrow(
+      "Failed to fetch Simkl profile (Service Unavailable)"
+    );
+  });
+
+  it("surfaces non-JSON authorize, link, and unlink errors", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response("proxy failed", {
+          status: 502,
+          statusText: "Bad Gateway",
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response("link proxy failed", {
+          status: 503,
+          statusText: "Service Unavailable",
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response("unlink proxy failed", {
+          status: 504,
+          statusText: "Gateway Timeout",
+        })
+      );
+
+    await expect(getSimklAuthorizeUrl()).rejects.toThrow("proxy failed");
+    await expect(linkSimkl("ABCDE")).rejects.toThrow("link proxy failed");
+    await expect(unlinkSimkl()).rejects.toThrow("unlink proxy failed");
   });
 });

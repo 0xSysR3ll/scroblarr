@@ -57,6 +57,7 @@ interface SimklHistoryResponse {
 }
 
 export class SimklClient implements ISyncClient {
+  private static readonly FETCH_TIMEOUT_MS = 30_000;
   private static readonly MIN_POST_INTERVAL_MS = 1000;
   private static postQueue: Promise<void> = Promise.resolve();
   private static lastPostAt = 0;
@@ -145,10 +146,6 @@ export class SimklClient implements ISyncClient {
     event: MediaEvent,
     accessToken: string
   ): Promise<void> {
-    if (!event.media.title) {
-      throw new Error("Show title is required for Simkl episode scrobble");
-    }
-
     const showIds: SimklIds = {};
     if (event.media.tmdbSeriesId) {
       showIds.tmdb = event.media.tmdbSeriesId;
@@ -174,9 +171,15 @@ export class SimklClient implements ISyncClient {
       ids: Object.keys(episodeIds).length > 0 ? episodeIds : undefined,
     };
 
-    if (event.media.seasonNumber === undefined && event.media.tvdbEpisodeId) {
+    const canSubmitDirectEpisode =
+      event.media.seasonNumber === undefined && !!event.media.tvdbEpisodeId;
+    if (canSubmitDirectEpisode) {
       await this.addToHistory({ episodes: [episode] }, accessToken, event);
       return;
+    }
+
+    if (!event.media.title) {
+      throw new Error("Show title is required for Simkl episode scrobble");
     }
 
     const show: SimklShow = {
@@ -232,14 +235,34 @@ export class SimklClient implements ISyncClient {
         await SimklClient.waitForPostSlot();
       }
 
-      const response = await fetch(
-        withSimklQueryParams(`${SIMKL_API_BASE_URL}${endpoint}`, this.clientId),
-        {
-          method: "POST",
-          headers: getSimklHeaders(this.clientId, accessToken),
-          body: payload === undefined ? undefined : JSON.stringify(payload),
-        }
+      const controller = new AbortController();
+      const timeout = setTimeout(
+        () => controller.abort(),
+        SimklClient.FETCH_TIMEOUT_MS
       );
+      let response: Response;
+
+      try {
+        response = await fetch(
+          withSimklQueryParams(
+            `${SIMKL_API_BASE_URL}${endpoint}`,
+            this.clientId
+          ),
+          {
+            method: "POST",
+            headers: getSimklHeaders(this.clientId, accessToken),
+            body: payload === undefined ? undefined : JSON.stringify(payload),
+            signal: controller.signal,
+          }
+        );
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          throw new Error("Simkl API request timed out");
+        }
+        throw error;
+      } finally {
+        clearTimeout(timeout);
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
