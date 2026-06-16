@@ -7,7 +7,7 @@ import {
   unlinkSimkl,
 } from "@services/api";
 import { renderWithProviders } from "@test/render";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { showSuccess } from "@utils/toast";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -48,6 +48,21 @@ vi.mock("@services/api", () => ({
   unlinkSimkl: vi.fn(),
   updateProfile: vi.fn(),
 }));
+
+function getSimklSection(): HTMLElement {
+  const heading = screen.getByRole("heading", { name: "Simkl" });
+  const section = heading.closest(".rounded-lg.border");
+  expect(section).not.toBeNull();
+  return section as HTMLElement;
+}
+
+async function clickSimklAuthorize(
+  user: ReturnType<typeof userEvent.setup>
+): Promise<void> {
+  await user.click(
+    within(getSimklSection()).getByRole("button", { name: "Authorize" })
+  );
+}
 
 describe("IntegrationsTab Simkl integration", () => {
   const onProfileUpdated = vi.fn();
@@ -106,10 +121,7 @@ describe("IntegrationsTab Simkl integration", () => {
       await screen.findByPlaceholderText("Enter your Simkl Client ID"),
       "client-id"
     );
-    const authorizeButtons = screen.getAllByRole("button", {
-      name: "Authorize",
-    });
-    await user.click(authorizeButtons[authorizeButtons.length - 1]);
+    await clickSimklAuthorize(user);
 
     expect(
       await screen.findByText("ABCDE", {}, { timeout: 2500 })
@@ -179,10 +191,7 @@ describe("IntegrationsTab Simkl integration", () => {
       await screen.findByPlaceholderText("Enter your Simkl Client ID"),
       "client-id"
     );
-    const authorizeButtons = screen.getAllByRole("button", {
-      name: "Authorize",
-    });
-    await user.click(authorizeButtons[authorizeButtons.length - 1]);
+    await clickSimklAuthorize(user);
 
     expect(await screen.findByText("Popup blocked")).toBeVisible();
     expect(getSimklAuthorizeUrl).not.toHaveBeenCalled();
@@ -202,10 +211,7 @@ describe("IntegrationsTab Simkl integration", () => {
       await screen.findByPlaceholderText("Enter your Simkl Client ID"),
       "client-id"
     );
-    const authorizeButtons = screen.getAllByRole("button", {
-      name: "Authorize",
-    });
-    await user.click(authorizeButtons[authorizeButtons.length - 1]);
+    await clickSimklAuthorize(user);
 
     expect(
       await screen.findByText("PIN service down", {}, { timeout: 3000 })
@@ -230,10 +236,7 @@ describe("IntegrationsTab Simkl integration", () => {
       await screen.findByPlaceholderText("Enter your Simkl Client ID"),
       "client-id"
     );
-    const authorizeButtons = screen.getAllByRole("button", {
-      name: "Authorize",
-    });
-    await user.click(authorizeButtons[authorizeButtons.length - 1]);
+    await clickSimklAuthorize(user);
 
     await waitFor(
       () => {
@@ -242,6 +245,7 @@ describe("IntegrationsTab Simkl integration", () => {
       },
       { timeout: 10000 }
     );
+    expect(linkSimkl).toHaveBeenCalledTimes(1);
     expect(
       screen.queryByText("Waiting for approval on Simkl...")
     ).not.toBeInTheDocument();
@@ -265,10 +269,7 @@ describe("IntegrationsTab Simkl integration", () => {
       await screen.findByPlaceholderText("Enter your Simkl Client ID"),
       "client-id"
     );
-    const authorizeButtons = screen.getAllByRole("button", {
-      name: "Authorize",
-    });
-    await user.click(authorizeButtons[authorizeButtons.length - 1]);
+    await clickSimklAuthorize(user);
 
     expect(
       await screen.findByText("ABCDE", {}, { timeout: 3000 })

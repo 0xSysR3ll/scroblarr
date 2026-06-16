@@ -167,8 +167,15 @@ describe("UserList", () => {
       />
     );
 
-    const mobileCards = document.querySelectorAll(".md\\:hidden .rounded-lg");
-    expect(mobileCards.length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Simkl").length).toBeGreaterThanOrEqual(1);
+    const mobileView = document.querySelector(".md\\:hidden");
+    expect(mobileView).not.toBeNull();
+
+    const bobMobileCard = within(mobileView as HTMLElement)
+      .getByText("Bob")
+      .closest(".rounded-lg");
+    expect(bobMobileCard).not.toBeNull();
+    expect(
+      within(bobMobileCard as HTMLElement).getByText("Simkl")
+    ).toBeInTheDocument();
   });
 });
