@@ -252,4 +252,84 @@ describe("simkl routes", () => {
     expect(response.body).toEqual({ error: "Simkl account not linked" });
     expect(simklTokenManagerMocks.getValidAccessToken).not.toHaveBeenCalled();
   });
+
+  it("returns 500 when PIN authorization fails", async () => {
+    simklOAuthMocks.requestPinCode.mockRejectedValue(new Error("Simkl down"));
+
+    const response = await request(app).get("/simkl/authorize").expect(500);
+
+    expect(response.body).toEqual({ error: "Simkl down" });
+  });
+
+  it("requires a client ID when linking without stored credentials", async () => {
+    userRepositoryMocks.findById.mockResolvedValueOnce({
+      id: "user-id",
+      plexUsername: "plex-user",
+      simklClientId: null,
+    });
+
+    const response = await request(app)
+      .post("/simkl/link")
+      .send({ userCode: "ABCDE" })
+      .expect(400);
+
+    expect(response.body.error).toContain("Simkl client ID is required");
+    expect(simklOAuthMocks.exchangePinForToken).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 for unexpected link failures", async () => {
+    simklOAuthMocks.exchangePinForToken.mockRejectedValue(
+      new Error("Server error")
+    );
+
+    const response = await request(app)
+      .post("/simkl/link")
+      .send({ userCode: "ABCDE" })
+      .expect(500);
+
+    expect(response.body).toEqual({ error: "Server error" });
+  });
+
+  it("returns 500 when unlink fails", async () => {
+    userRepositoryMocks.update.mockRejectedValueOnce(new Error("db down"));
+
+    const response = await request(app).post("/simkl/unlink").expect(500);
+
+    expect(response.body).toEqual({ error: "db down" });
+  });
+
+  it("returns 500 when status lookup fails", async () => {
+    userRepositoryMocks.findById.mockRejectedValueOnce(new Error("db down"));
+
+    const response = await request(app).get("/simkl/status").expect(500);
+
+    expect(response.body).toEqual({ error: "db down" });
+  });
+
+  it("returns profile details without updating unchanged stored values", async () => {
+    simklClientMocks.getUserProfile.mockResolvedValue({
+      id: 51,
+      username: "stored-user",
+      image: "https://img.example/stored.png",
+    });
+
+    const response = await request(app).get("/simkl/profile").expect(200);
+
+    expect(userRepositoryMocks.update).not.toHaveBeenCalled();
+    expect(response.body).toEqual({
+      id: 51,
+      username: "stored-user",
+      image: "https://img.example/stored.png",
+    });
+  });
+
+  it("returns 500 when profile refresh fails", async () => {
+    simklClientMocks.getUserProfile.mockRejectedValue(
+      new Error("profile down")
+    );
+
+    const response = await request(app).get("/simkl/profile").expect(500);
+
+    expect(response.body).toEqual({ error: "profile down" });
+  });
 });

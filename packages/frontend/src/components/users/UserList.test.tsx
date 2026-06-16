@@ -154,4 +154,21 @@ describe("UserList", () => {
     const bobRow = getUserTableRow("Bob");
     expect(within(bobRow).getByText("Simkl")).toBeInTheDocument();
   });
+
+  it("shows a Simkl badge in the mobile card layout", () => {
+    renderWithProviders(
+      <UserList
+        users={[
+          {
+            ...users[1],
+            simklUsername: "bob-simkl",
+          },
+        ]}
+      />
+    );
+
+    const mobileCards = document.querySelectorAll(".md\\:hidden .rounded-lg");
+    expect(mobileCards.length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Simkl").length).toBeGreaterThanOrEqual(1);
+  });
 });

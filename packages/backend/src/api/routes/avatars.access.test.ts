@@ -145,4 +145,29 @@ describe("avatar sensitive access", () => {
 
     expect(response.body).toEqual({ error: "Failed to fetch Simkl avatar" });
   });
+
+  it("returns 500 when Simkl avatar proxying throws", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("network down"))
+    );
+    userRepositoryMocks.findBySessionToken.mockResolvedValue({
+      id: "owner-id",
+      isAdmin: false,
+    });
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "owner-id",
+      simklThumb: "https://simkl.example/avatar.png",
+    });
+
+    const app = express();
+    app.use("/api/v1/avatars", avatarRoutes);
+
+    const response = await request(app)
+      .get("/api/v1/avatars/simkl/owner-id")
+      .set("authorization", "Bearer owner-token")
+      .expect(500);
+
+    expect(response.body).toEqual({ error: "Failed to fetch Simkl avatar" });
+  });
 });

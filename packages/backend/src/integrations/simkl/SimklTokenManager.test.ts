@@ -40,4 +40,13 @@ describe("SimklTokenManager", () => {
       "Simkl not linked for this user"
     );
   });
+
+  it("rejects missing users", async () => {
+    userRepositoryMocks.findById.mockResolvedValue(null);
+    const manager = new SimklTokenManager();
+
+    await expect(manager.getValidAccessToken("missing-user")).rejects.toThrow(
+      "User missing-user not found"
+    );
+  });
 });

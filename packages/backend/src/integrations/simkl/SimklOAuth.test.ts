@@ -193,4 +193,53 @@ describe("SimklOAuth", () => {
       "Authorization pending"
     );
   });
+
+  it("surfaces PIN request HTTP failures", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 503,
+      text: vi.fn().mockResolvedValue("down"),
+    });
+    const oauth = new SimklOAuth("client-id");
+
+    await expect(oauth.requestPinCode()).rejects.toThrow(
+      "Failed to request Simkl PIN code: 503"
+    );
+  });
+
+  it("surfaces PIN status HTTP failures", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: vi.fn().mockResolvedValue("err"),
+    });
+    const oauth = new SimklOAuth("client-id");
+
+    await expect(oauth.exchangePinForToken("ABCDE")).rejects.toThrow(
+      "Failed to check Simkl PIN status: 500"
+    );
+  });
+
+  it("rejects token responses without access tokens", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ token_type: "bearer" }),
+    });
+    const oauth = new SimklOAuth("client-id", "client-secret");
+
+    await expect(
+      oauth.exchangeCodeForToken("code", "urn:ietf:wg:oauth:2.0:oob")
+    ).rejects.toThrow("Simkl token response did not include an access token");
+  });
+
+  it("surfaces authorization code exchange timeouts", async () => {
+    fetchMock.mockRejectedValue(
+      Object.assign(new Error("aborted"), { name: "AbortError" })
+    );
+    const oauth = new SimklOAuth("client-id", "client-secret");
+
+    await expect(
+      oauth.exchangeCodeForToken("code", "urn:ietf:wg:oauth:2.0:oob")
+    ).rejects.toThrow("Simkl authorization code exchange timed out");
+  });
 });

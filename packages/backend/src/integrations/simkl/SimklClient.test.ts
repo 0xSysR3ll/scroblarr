@@ -268,6 +268,86 @@ describe("SimklClient", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("rejects unsupported media types", async () => {
+    const client = new SimklClient("client-id");
+
+    await expect(
+      client.scrobble(
+        {
+          event: "scrobble",
+          source: "plex",
+          userId: "plex-user",
+          timestamp: new Date("2026-06-04T17:00:00.000Z"),
+          media: {
+            id: "track-1",
+            type: "track",
+            title: "Example Track",
+          },
+        } as never,
+        "access-token"
+      )
+    ).rejects.toThrow("Unsupported media type: track");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects movies without identifiers or title", async () => {
+    const client = new SimklClient("client-id");
+
+    await expect(
+      client.scrobble(
+        {
+          event: "scrobble",
+          source: "plex",
+          userId: "plex-user",
+          timestamp: new Date("2026-06-04T17:00:00.000Z"),
+          media: {
+            id: "movie-1",
+            type: "movie",
+            title: "",
+          },
+        },
+        "access-token"
+      )
+    ).rejects.toThrow(
+      "Movie requires at least IMDB ID, TMDB ID, TVDB ID, or title"
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("requires a show title for season-based episode payloads", async () => {
+    const client = new SimklClient("client-id");
+    const event = makeEpisodeEvent();
+    event.media.title = undefined as never;
+
+    await expect(client.scrobble(event, "access-token")).rejects.toThrow(
+      "Show title is required for Simkl episode scrobble"
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("parses message-based and plain-text API errors", async () => {
+    const client = new SimklClient("client-id");
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      text: vi.fn().mockResolvedValue(JSON.stringify({ message: "busy" })),
+    });
+
+    await expect(
+      client.scrobble(makeEpisodeEvent(), "access-token")
+    ).rejects.toThrow("Simkl API error: 503 - busy");
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      text: vi.fn().mockResolvedValue("plain error"),
+    });
+
+    await expect(
+      client.scrobble(makeEpisodeEvent(), "access-token")
+    ).rejects.toThrow("Simkl API error: 500 - plain error");
+  });
+
   function makeEpisodeEvent(): MediaEvent {
     return {
       event: "scrobble",

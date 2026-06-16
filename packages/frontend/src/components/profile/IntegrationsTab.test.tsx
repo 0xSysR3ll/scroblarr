@@ -164,4 +164,119 @@ describe("IntegrationsTab Simkl integration", () => {
       expect(onProfileUpdated).toHaveBeenCalled();
     });
   });
+
+  it("shows an error when Simkl popup setup fails", async () => {
+    const user = userEvent.setup();
+    oauthPopupMocks.preparePopup.mockImplementation(() => {
+      throw new Error("Popup blocked");
+    });
+
+    renderWithProviders(
+      <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+    );
+
+    await user.type(
+      await screen.findByPlaceholderText("Enter your Simkl Client ID"),
+      "client-id"
+    );
+    const authorizeButtons = screen.getAllByRole("button", {
+      name: "Authorize",
+    });
+    await user.click(authorizeButtons[authorizeButtons.length - 1]);
+
+    expect(await screen.findByText("Popup blocked")).toBeVisible();
+    expect(getSimklAuthorizeUrl).not.toHaveBeenCalled();
+  });
+
+  it("shows an error when PIN authorization fails", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getSimklAuthorizeUrl).mockRejectedValue(
+      new Error("PIN service down")
+    );
+
+    renderWithProviders(
+      <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+    );
+
+    await user.type(
+      await screen.findByPlaceholderText("Enter your Simkl Client ID"),
+      "client-id"
+    );
+    const authorizeButtons = screen.getAllByRole("button", {
+      name: "Authorize",
+    });
+    await user.click(authorizeButtons[authorizeButtons.length - 1]);
+
+    expect(
+      await screen.findByText("PIN service down", {}, { timeout: 3000 })
+    ).toBeVisible();
+  });
+
+  it("stops PIN polling after a fatal authorization error", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getSimklAuthorizeUrl).mockResolvedValue({
+      userCode: "ABCDE",
+      verificationUrl: "https://simkl.com/pin/",
+      expiresIn: 30,
+      interval: 5,
+    });
+    vi.mocked(linkSimkl).mockRejectedValue(new Error("Invalid PIN"));
+
+    renderWithProviders(
+      <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+    );
+
+    await user.type(
+      await screen.findByPlaceholderText("Enter your Simkl Client ID"),
+      "client-id"
+    );
+    const authorizeButtons = screen.getAllByRole("button", {
+      name: "Authorize",
+    });
+    await user.click(authorizeButtons[authorizeButtons.length - 1]);
+
+    await waitFor(
+      () => {
+        expect(linkSimkl).toHaveBeenCalledWith("ABCDE", "client-id");
+        expect(screen.getByText("Invalid PIN")).toBeVisible();
+      },
+      { timeout: 10000 }
+    );
+    expect(
+      screen.queryByText("Waiting for approval on Simkl...")
+    ).not.toBeInTheDocument();
+  }, 15000);
+
+  it("surfaces manual link failures", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getSimklAuthorizeUrl).mockResolvedValue({
+      userCode: "ABCDE",
+      verificationUrl: "https://simkl.com/pin/",
+      expiresIn: 900,
+      interval: 5,
+    });
+    vi.mocked(linkSimkl).mockRejectedValue(new Error("Invalid PIN"));
+
+    renderWithProviders(
+      <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+    );
+
+    await user.type(
+      await screen.findByPlaceholderText("Enter your Simkl Client ID"),
+      "client-id"
+    );
+    const authorizeButtons = screen.getAllByRole("button", {
+      name: "Authorize",
+    });
+    await user.click(authorizeButtons[authorizeButtons.length - 1]);
+
+    expect(
+      await screen.findByText("ABCDE", {}, { timeout: 3000 })
+    ).toBeVisible();
+    await user.click(
+      screen.getByRole("button", { name: "Check approval now" })
+    );
+
+    expect(await screen.findByText("Invalid PIN")).toBeVisible();
+  });
 });

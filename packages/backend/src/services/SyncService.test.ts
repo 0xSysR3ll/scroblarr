@@ -260,6 +260,40 @@ describe("SyncService", () => {
     );
   });
 
+  it("records partial failure when Simkl fails alongside another destination", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      tvtimeAccessToken: null,
+      traktClientId: "trakt-client-id",
+      traktClientSecret: "trakt-secret",
+      traktAccessToken: "trakt-token",
+      simklClientId: "simkl-client-id",
+      simklAccessToken: "simkl-token",
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    traktTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "trakt-valid-token"
+    );
+    simklTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "simkl-valid-token"
+    );
+    traktClientMocks.scrobble.mockResolvedValue(undefined);
+    simklClientMocks.scrobble.mockRejectedValue(new Error("Simkl failed"));
+
+    const service = new SyncService();
+    await service.syncEvent(makeEvent());
+
+    expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        errorMessage: expect.stringContaining("Simkl: Simkl failed"),
+        destinations: JSON.stringify(["Trakt"]),
+      })
+    );
+  });
+
   it("retries a failed history item using the linked media server account", async () => {
     syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
     tvtimeTokenManagerMocks.getValidAccessToken.mockResolvedValue(
