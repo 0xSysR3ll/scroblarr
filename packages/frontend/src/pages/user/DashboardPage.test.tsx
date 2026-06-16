@@ -1,4 +1,5 @@
 import { useAuth } from "@contexts/AuthContext";
+import type { SyncHistoryResponse } from "@services/api";
 import { getSyncHistory, getSyncStatistics } from "@services/api/sync";
 import { renderWithProviders } from "@test/render";
 import { screen, waitFor } from "@testing-library/react";
@@ -50,11 +51,13 @@ describe("DashboardPage", () => {
     vi.mocked(getSyncStatistics).mockResolvedValue(statisticsFixture());
     vi.mocked(getSyncHistory).mockResolvedValue({
       data: [],
-      total: 0,
-      page: 1,
-      limit: 5,
-      totalPages: 0,
-    });
+      pagination: {
+        page: 1,
+        pageSize: 5,
+        total: 0,
+        totalPages: 0,
+      },
+    } satisfies SyncHistoryResponse);
   });
 
   it("renders destination statistics including Simkl", async () => {
