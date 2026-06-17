@@ -181,7 +181,8 @@
       "bulkDeleteMessage_other": "Are you sure you want to delete {{count}} user{{plural}}? This action cannot be undone.",
       "delete": "Delete"
     },
-    "deleteSelected": "Delete Selected"
+    "deleteSelected": "Delete Selected",
+    "simkl": "Simkl"
   },
   "settings": {
     "title": "Settings",
@@ -423,7 +424,9 @@
       "clearFailed": "Failed to clear sync history",
       "deleteItemFailed": "Failed to delete sync history item",
       "deleteItemsFailed": "Failed to delete sync history items",
-      "retryFailed": "Failed to retry sync history item"
+      "retryFailed": "Failed to retry sync history item",
+      "bulkRetryPartial": "Retried {{retried}} item(s), but {{failed}} item(s) still failed",
+      "bulkRetryFailed": "Failed to retry selected sync items"
     },
     "dateGroups": {
       "today": "Today",
@@ -437,7 +440,9 @@
       "deleteItemSuccess": "Sync history item deleted successfully",
       "deleteItemsSuccess": "Sync history items deleted successfully",
       "retrySuccess": "Sync retried successfully",
-      "retryPartialSuccess": "Sync retry partially succeeded"
+      "retryPartialSuccess": "Sync retry partially succeeded",
+      "bulkRetrySuccess_one": "Retried {{count}} failed sync item(s)",
+      "bulkRetrySuccess_other": "Retried {{count}} failed sync item(s)"
     },
     "title": "My Sync History",
     "deleteSelected": "Delete Selected",
@@ -497,7 +502,8 @@
       "yesterday": "Yesterday",
       "daysAgo_one": "{{count}}d ago",
       "daysAgo_other": "{{count}}d ago"
-    }
+    },
+    "retrySelectedFailed": "Retry Failed"
   },
   "errors": {
     "routeLoadTitle": "Could not load this screen",
@@ -530,5 +536,35 @@
     "importUsers_one": "Import {{count}} User{{plural}}",
     "importUsers_other": "Import {{count}} User{{plural}}",
     "importUsersButton": "Import Users"
+  },
+  "simkl": {
+    "getAuthUrlFailed": "Failed to get Simkl PIN code",
+    "codeRequired": "Simkl PIN code is required",
+    "linked": "Simkl account linked successfully",
+    "linkFailed": "Failed to link Simkl account",
+    "unlinked": "Simkl account unlinked successfully",
+    "unlinkFailed": "Failed to unlink Simkl account",
+    "description": "Sync your watched movies and episodes to Simkl. Uses Simkl PIN authorization for secure authentication.",
+    "unlink": "Unlink",
+    "profile": {
+      "username": "Username"
+    },
+    "docsHint": "Create a Simkl app and enter its Client ID below. Simkl PIN authorization does not require a client secret.",
+    "clientId": "Client ID",
+    "clientIdPlaceholder": "Enter your Simkl Client ID",
+    "oauthInstructions": "Click 'Authorize' to get a Simkl PIN code, then enter that code on Simkl's PIN page.",
+    "authorize": "Authorize",
+    "authorizationCode": "PIN Code",
+    "codePlaceholder": "Simkl PIN code",
+    "openPinPage": "Open Simkl PIN page",
+    "pinWaiting": "Waiting for approval on Simkl...",
+    "pinExpired": "The Simkl PIN expired. Generate a new one to try again.",
+    "checkPin": "Check approval now",
+    "checkingPin": "Checking...",
+    "link": "Link Account",
+    "unlinkTitle": "Unlink Simkl Account",
+    "unlinkMessage": "Are you sure you want to unlink your Simkl account? This will stop syncing to Simkl.",
+    "cancel": "Cancel",
+    "confirm": "Confirm"
   }
 }

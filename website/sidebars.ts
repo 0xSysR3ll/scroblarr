@@ -21,6 +21,7 @@ const sidebars: SidebarsConfig = {
             "configuration/jellyfin",
             "configuration/trakt",
             "configuration/tvtime",
+            "configuration/simkl",
           ],
         },
       ],

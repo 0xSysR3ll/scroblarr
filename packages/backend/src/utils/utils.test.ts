@@ -46,4 +46,17 @@ describe("sanitizeUser", () => {
 
     expect(getProxiedThumbUrl(user as never)).toBeUndefined();
   });
+
+  it("prefers Simkl proxied avatar when Simkl thumb exists", () => {
+    const user = {
+      id: "u3",
+      simklThumb: "https://simkl.in/avatars/1/1.jpg",
+      isAdmin: false,
+      enabled: true,
+      createdAt: new Date("2024-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2024-01-02T00:00:00.000Z"),
+    };
+
+    expect(getProxiedThumbUrl(user as never)).toBe("/api/v1/avatars/simkl/u3");
+  });
 });

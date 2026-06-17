@@ -138,4 +138,44 @@ describe("UserList", () => {
       expect(onToggleEnabled).toHaveBeenCalledWith("regular-user", false);
     });
   });
+
+  it("shows a Simkl badge for linked users", () => {
+    renderWithProviders(
+      <UserList
+        users={[
+          {
+            ...users[1],
+            simklUsername: "bob-simkl",
+          },
+        ]}
+      />
+    );
+
+    const bobRow = getUserTableRow("Bob");
+    expect(within(bobRow).getByText("Simkl")).toBeInTheDocument();
+  });
+
+  it("shows a Simkl badge in the mobile card layout", () => {
+    renderWithProviders(
+      <UserList
+        users={[
+          {
+            ...users[1],
+            simklUsername: "bob-simkl",
+          },
+        ]}
+      />
+    );
+
+    const mobileView = document.querySelector(".md\\:hidden");
+    expect(mobileView).not.toBeNull();
+
+    const bobMobileCard = within(mobileView as HTMLElement)
+      .getByText("Bob")
+      .closest(".rounded-lg");
+    expect(bobMobileCard).not.toBeNull();
+    expect(
+      within(bobMobileCard as HTMLElement).getByText("Simkl")
+    ).toBeInTheDocument();
+  });
 });

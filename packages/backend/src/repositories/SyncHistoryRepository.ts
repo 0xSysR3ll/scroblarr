@@ -213,6 +213,7 @@ export class SyncHistoryRepository {
     byDestination: {
       trakt: number;
       tvtime: number;
+      simkl: number;
     };
     byPeriod: {
       today: number;
@@ -276,6 +277,7 @@ export class SyncHistoryRepository {
       jellyfinCount,
       traktCount,
       tvtimeCount,
+      simklCount,
       today,
       thisWeek,
       thisMonth,
@@ -316,14 +318,21 @@ export class SyncHistoryRepository {
         .createQueryBuilder("sync_history")
         .where("sync_history.userId = :userId", { userId })
         .andWhere("sync_history.destinations LIKE :traktPat", {
-          traktPat: '%"trakt"%',
+          traktPat: '%"Trakt"%',
         })
         .getCount(),
       this.repository
         .createQueryBuilder("sync_history")
         .where("sync_history.userId = :userId", { userId })
         .andWhere("sync_history.destinations LIKE :tvtimePat", {
-          tvtimePat: '%"tvtime"%',
+          tvtimePat: '%"TVTime"%',
+        })
+        .getCount(),
+      this.repository
+        .createQueryBuilder("sync_history")
+        .where("sync_history.userId = :userId", { userId })
+        .andWhere("sync_history.destinations LIKE :simklPat", {
+          simklPat: '%"Simkl"%',
         })
         .getCount(),
       this.repository
@@ -462,6 +471,7 @@ export class SyncHistoryRepository {
       byDestination: {
         trakt: traktCount,
         tvtime: tvtimeCount,
+        simkl: simklCount,
       },
       byPeriod: {
         today,

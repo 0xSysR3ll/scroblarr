@@ -1,4 +1,9 @@
-import { getCurrentUser } from "@services/api";
+import {
+  getCurrentUser,
+  invalidateSimklCache,
+  invalidateTraktCache,
+  invalidateTVTimeCache,
+} from "@services/api";
 import {
   createContext,
   useContext,
@@ -22,6 +27,7 @@ export interface AuthUser {
   hasJellyfin?: boolean;
   hasTrakt?: boolean;
   hasTVTime?: boolean;
+  hasSimkl?: boolean;
 }
 
 interface AuthContextType {
@@ -35,6 +41,12 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function invalidateIntegrationCaches() {
+  invalidateSimklCache();
+  invalidateTraktCache();
+  invalidateTVTimeCache();
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -70,6 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function setUserFromLogin(userData: AuthUser) {
+    invalidateIntegrationCaches();
     setUser(userData);
     setLoading(false);
   }
@@ -78,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetch("/api/v1/logout", { method: "POST", credentials: "include" }).finally(
       () => {
         localStorage.removeItem("authSource");
+        invalidateIntegrationCaches();
         setUser(null);
       }
     );

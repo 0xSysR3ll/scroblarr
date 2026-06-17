@@ -3,7 +3,8 @@ import type { SyncHistoryItem } from "@services/api";
 import { API_BASE_URL } from "@services/api/common";
 import { TFunction } from "i18next";
 
-const SYNC_DESTINATIONS = ["TVTime", "Trakt"] as const;
+const SYNC_DESTINATIONS = ["TVTime", "Trakt", "Simkl"] as const;
+const DESTINATION_ERROR_PATTERN = /(?:^|;\s*)(TVTime|Trakt|Simkl):\s*/g;
 
 export type SyncDestinationName = (typeof SYNC_DESTINATIONS)[number];
 export type SyncItemStatus = "success" | "partial" | "failed";
@@ -22,23 +23,22 @@ function getDestinationError(
     return undefined;
   }
 
-  const marker = `${destination}:`;
-  const start = errorMessage.indexOf(marker);
+  const errors = new Map<SyncDestinationName, string>();
+  const matches = [...errorMessage.matchAll(DESTINATION_ERROR_PATTERN)];
 
-  if (start === -1) {
-    return undefined;
+  for (let i = 0; i < matches.length; i++) {
+    const match = matches[i];
+    const name = match[1] as SyncDestinationName;
+    const errorStart = match.index! + match[0].length;
+    const errorEnd = matches[i + 1]?.index ?? errorMessage.length;
+    const destinationError = errorMessage.slice(errorStart, errorEnd).trim();
+
+    if (destinationError) {
+      errors.set(name, destinationError);
+    }
   }
 
-  const errorStart = start + marker.length;
-  const nextDestinationStart = SYNC_DESTINATIONS.filter(
-    (name) => name !== destination
-  )
-    .map((name) => errorMessage.indexOf(`; ${name}:`, errorStart))
-    .find((index) => index !== -1);
-
-  return (
-    errorMessage.slice(errorStart, nextDestinationStart).trim() || undefined
-  );
+  return errors.get(destination);
 }
 
 export function getSyncStatus(item: SyncHistoryItem): SyncItemStatus {

@@ -1,4 +1,9 @@
-import { getCurrentUser } from "@services/api";
+import {
+  getCurrentUser,
+  invalidateSimklCache,
+  invalidateTraktCache,
+  invalidateTVTimeCache,
+} from "@services/api";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,6 +12,9 @@ import { AuthProvider, useAuth, type AuthUser } from "./AuthContext";
 
 vi.mock("@services/api", () => ({
   getCurrentUser: vi.fn(),
+  invalidateSimklCache: vi.fn(),
+  invalidateTraktCache: vi.fn(),
+  invalidateTVTimeCache: vi.fn(),
 }));
 
 const authUser: AuthUser = {
@@ -44,6 +52,7 @@ function renderAuthProvider() {
 describe("AuthContext", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.clearAllMocks();
     vi.unstubAllGlobals();
     localStorage.clear();
     vi.mocked(getCurrentUser).mockReset();
@@ -97,5 +106,8 @@ describe("AuthContext", () => {
       method: "POST",
       credentials: "include",
     });
+    expect(invalidateSimklCache).toHaveBeenCalled();
+    expect(invalidateTraktCache).toHaveBeenCalled();
+    expect(invalidateTVTimeCache).toHaveBeenCalled();
   });
 });

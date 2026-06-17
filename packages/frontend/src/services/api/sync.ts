@@ -166,6 +166,7 @@ export interface SyncStatistics {
   byDestination: {
     trakt: number;
     tvtime: number;
+    simkl: number;
   };
   byPeriod: {
     today: number;

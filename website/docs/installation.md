@@ -15,7 +15,7 @@ You'll need:
 - **Docker** only if you want the container image (no local Node toolchain)
 - **SQLite** by default (nothing to install) or **PostgreSQL** if you prefer it
 - At least one of **Plex** or **Jellyfin** so webhooks exist
-- **Trakt** and/or **TVTime** accounts when you're ready to sync out (you can link those after install)
+- **Trakt**, **TVTime**, and/or **Simkl** accounts when you're ready to sync out (you can link those after install)
 
 ## Choose your installation method
 
@@ -129,7 +129,7 @@ With plain `docker run`, same idea: stop, remove, pull, run again — your **`sc
 2. Create the first admin user
 3. Set an **API key** under **Settings → General** (webhooks won't work until this exists)
 4. Add Plex/Jellyfin under **Settings → Media Server** — [Configuration](/docs/configuration) walks through it
-5. Paste webhook URLs into Plex/Jellyfin and link Trakt/TVTime when you're ready
+5. Paste webhook URLs into Plex/Jellyfin and link Trakt, TVTime, or Simkl when you're ready
 
 </TabItem>
 <TabItem value="source" label="Build from source">
@@ -237,7 +237,7 @@ CORS only bites when the **address in the browser's address bar** doesn't match 
 2. Create the first admin user
 3. Set an **API key** under **Settings → General** (webhooks won't work until this exists)
 4. Add Plex/Jellyfin under **Settings → Media Server** — [Configuration](/docs/configuration) walks through it
-5. Paste webhook URLs into Plex/Jellyfin and link Trakt/TVTime when you're ready
+5. Paste webhook URLs into Plex/Jellyfin and link Trakt, TVTime, or Simkl when you're ready
 
 ### Updates, logs, backups
 

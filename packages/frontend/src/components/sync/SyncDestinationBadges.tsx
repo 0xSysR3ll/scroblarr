@@ -17,16 +17,19 @@ interface SyncDestinationBadgesProps {
 const destinationLabels: Record<SyncDestinationName, string> = {
   TVTime: "TVTime",
   Trakt: "Trakt",
+  Simkl: "Simkl",
 };
 
 const destinationLogoPaths: Record<SyncDestinationName, string> = {
-  TVTime: "/logos/tvtime.png",
+  TVTime: "/logos/tvtime.svg",
   Trakt: "/logos/trakt.svg",
+  Simkl: "/logos/simkl.svg",
 };
 
 const destinationTranslationKeys: Record<SyncDestinationName, string> = {
   TVTime: "sync.destinations.tvtime",
   Trakt: "sync.destinations.trakt",
+  Simkl: "sync.destinations.simkl",
 };
 
 function getBadgeClasses(destination: SyncDestinationResult): string {
@@ -36,6 +39,10 @@ function getBadgeClasses(destination: SyncDestinationResult): string {
 
   if (destination.name === "TVTime") {
     return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300";
+  }
+
+  if (destination.name === "Simkl") {
+    return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300";
   }
 
   return "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300";

@@ -27,11 +27,19 @@ const traktClientMocks = vi.hoisted(() => ({
   scrobble: vi.fn(),
 }));
 
+const simklClientMocks = vi.hoisted(() => ({
+  scrobble: vi.fn(),
+}));
+
 const tvtimeTokenManagerMocks = vi.hoisted(() => ({
   getValidAccessToken: vi.fn(),
 }));
 
 const traktTokenManagerMocks = vi.hoisted(() => ({
+  getValidAccessToken: vi.fn(),
+}));
+
+const simklTokenManagerMocks = vi.hoisted(() => ({
   getValidAccessToken: vi.fn(),
 }));
 
@@ -71,6 +79,12 @@ vi.mock("@integrations/trakt/TraktClient", () => ({
   },
 }));
 
+vi.mock("@integrations/simkl/SimklClient", () => ({
+  SimklClient: class {
+    scrobble = simklClientMocks.scrobble;
+  },
+}));
+
 vi.mock("@integrations/tvtime/TVTimeTokenManager", () => ({
   TVTimeTokenManager: class {
     getValidAccessToken = tvtimeTokenManagerMocks.getValidAccessToken;
@@ -80,6 +94,12 @@ vi.mock("@integrations/tvtime/TVTimeTokenManager", () => ({
 vi.mock("@integrations/trakt/TraktTokenManager", () => ({
   TraktTokenManager: class {
     getValidAccessToken = traktTokenManagerMocks.getValidAccessToken;
+  },
+}));
+
+vi.mock("@integrations/simkl/SimklTokenManager", () => ({
+  SimklTokenManager: class {
+    getValidAccessToken = simklTokenManagerMocks.getValidAccessToken;
   },
 }));
 
@@ -202,6 +222,74 @@ describe("SyncService", () => {
         success: true,
         wasRewatched: true,
         destinations: JSON.stringify(["TVTime"]),
+      })
+    );
+  });
+
+  it("syncs to Simkl when linked and records the destination", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      tvtimeAccessToken: null,
+      traktAccessToken: null,
+      simklClientId: "simkl-client-id",
+      simklAccessToken: "simkl-token",
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    simklTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "simkl-valid-token"
+    );
+    simklClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    await service.syncEvent(makeEvent());
+
+    expect(simklClientMocks.scrobble).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "scrobble" }),
+      "simkl-valid-token",
+      expect.any(Object)
+    );
+    expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "u1",
+        originalMediaId: "m1",
+        success: true,
+        destinations: JSON.stringify(["Simkl"]),
+      })
+    );
+  });
+
+  it("records partial failure when Simkl fails alongside another destination", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      tvtimeAccessToken: null,
+      traktClientId: "trakt-client-id",
+      traktClientSecret: "trakt-secret",
+      traktAccessToken: "trakt-token",
+      simklClientId: "simkl-client-id",
+      simklAccessToken: "simkl-token",
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    traktTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "trakt-valid-token"
+    );
+    simklTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "simkl-valid-token"
+    );
+    traktClientMocks.scrobble.mockResolvedValue(undefined);
+    simklClientMocks.scrobble.mockRejectedValue(new Error("Simkl failed"));
+
+    const service = new SyncService();
+    await service.syncEvent(makeEvent());
+
+    expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        errorMessage: expect.stringContaining("Simkl: Simkl failed"),
+        destinations: JSON.stringify(["Trakt"]),
       })
     );
   });

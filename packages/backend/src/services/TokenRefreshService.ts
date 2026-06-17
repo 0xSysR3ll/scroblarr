@@ -24,6 +24,7 @@ export class TokenRefreshService {
       let traktFailed = 0;
       let tvtimeSuccess = 0;
       let tvtimeFailed = 0;
+      let simklLinked = 0;
 
       for (const user of users) {
         if (user.traktAccessToken && user.traktRefreshToken) {
@@ -59,6 +60,14 @@ export class TokenRefreshService {
             );
           }
         }
+
+        if (user.simklAccessToken) {
+          simklLinked++;
+          logger.simkl.debug(
+            { userId: user.id },
+            "Simkl token does not expire; skipping refresh"
+          );
+        }
       }
 
       logger.system.info(
@@ -68,6 +77,7 @@ export class TokenRefreshService {
           traktFailed,
           tvtimeSuccess,
           tvtimeFailed,
+          simklLinked,
         },
         "Completed scheduled token refresh"
       );

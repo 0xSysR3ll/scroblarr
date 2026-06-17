@@ -43,6 +43,7 @@ import { avatarRoutes } from "./avatars";
 describe("avatar sensitive access", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("returns 403 when non-admin requests another user's avatar", async () => {
@@ -81,5 +82,92 @@ describe("avatar sensitive access", () => {
 
     expect(response.status).toBe(404);
     expect(response.body).toEqual({ error: "User or Plex avatar not found" });
+  });
+
+  it("proxies Simkl avatars for the owning user", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: {
+        get: vi.fn().mockReturnValue("image/png"),
+      },
+      arrayBuffer: vi.fn().mockResolvedValue(Buffer.from("image-bytes").buffer),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    userRepositoryMocks.findBySessionToken.mockResolvedValue({
+      id: "owner-id",
+      isAdmin: false,
+    });
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "owner-id",
+      simklThumb: "https://simkl.example/avatar.png",
+    });
+
+    const app = express();
+    app.use("/api/v1/avatars", avatarRoutes);
+
+    const response = await request(app)
+      .get("/api/v1/avatars/simkl/owner-id")
+      .set("authorization", "Bearer owner-token")
+      .expect(200);
+
+    expect(fetchMock).toHaveBeenCalledWith("https://simkl.example/avatar.png", {
+      headers: {
+        Accept: "image/*",
+      },
+    });
+    expect(response.headers["content-type"]).toContain("image/png");
+  });
+
+  it("returns upstream failures for Simkl avatars", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+      })
+    );
+    userRepositoryMocks.findBySessionToken.mockResolvedValue({
+      id: "owner-id",
+      isAdmin: false,
+    });
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "owner-id",
+      simklThumb: "https://simkl.example/missing.png",
+    });
+
+    const app = express();
+    app.use("/api/v1/avatars", avatarRoutes);
+
+    const response = await request(app)
+      .get("/api/v1/avatars/simkl/owner-id")
+      .set("authorization", "Bearer owner-token")
+      .expect(404);
+
+    expect(response.body).toEqual({ error: "Failed to fetch Simkl avatar" });
+  });
+
+  it("returns 500 when Simkl avatar proxying throws", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("network down"))
+    );
+    userRepositoryMocks.findBySessionToken.mockResolvedValue({
+      id: "owner-id",
+      isAdmin: false,
+    });
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "owner-id",
+      simklThumb: "https://simkl.example/avatar.png",
+    });
+
+    const app = express();
+    app.use("/api/v1/avatars", avatarRoutes);
+
+    const response = await request(app)
+      .get("/api/v1/avatars/simkl/owner-id")
+      .set("authorization", "Bearer owner-token")
+      .expect(500);
+
+    expect(response.body).toEqual({ error: "Failed to fetch Simkl avatar" });
   });
 });
