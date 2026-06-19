@@ -125,7 +125,10 @@ export function createApp(): Express {
   const publicDir = env.PUBLIC_DIR ? path.resolve(env.PUBLIC_DIR) : undefined;
   if (env.NODE_ENV === "production" && publicDir && existsSync(publicDir)) {
     app.use(express.static(publicDir));
-    app.get("/{*path}", spaFallbackLimiter, (_req, res) => {
+    app.get("/{*path}", spaFallbackLimiter, (req, res, next) => {
+      if (req.path.startsWith("/api-docs")) {
+        return next();
+      }
       res.sendFile(path.join(publicDir, "index.html"));
     });
   }

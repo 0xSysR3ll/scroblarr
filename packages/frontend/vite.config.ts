@@ -58,6 +58,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        // Let /api-docs reach the backend Swagger UI instead of the SPA shell.
+        navigateFallbackDenylist: [/^\/api-docs/, /^\/swagger-ui/],
         navigationPreload: true,
         skipWaiting: true,
         clientsClaim: true,
@@ -74,7 +76,10 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: ({ request }) => request.mode === "navigate",
+            urlPattern: ({ request, url }) =>
+              request.mode === "navigate" &&
+              !url.pathname.startsWith("/api-docs") &&
+              !url.pathname.startsWith("/swagger-ui"),
             handler: "NetworkFirst",
             options: {
               cacheName: "pages-cache",
@@ -115,6 +120,10 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/api": {
+        target: "http://localhost:3000",
+        changeOrigin: true,
+      },
+      "/api-docs": {
         target: "http://localhost:3000",
         changeOrigin: true,
       },

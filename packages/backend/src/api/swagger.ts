@@ -27,6 +27,12 @@ try {
 }
 
 export function setupSwagger(app: Express): void {
+  // Relative asset URLs from /api-docs (no trailing slash) resolve to /swagger-ui.*;
+  // send those to the real files under /api-docs/ instead of the SPA fallback.
+  app.get(/^\/swagger-ui[^/]*\.(css|js)$/, (req, res) => {
+    res.redirect(301, `/api-docs${req.path}`);
+  });
+
   app.use(
     "/api-docs",
     swaggerUi.serve,
