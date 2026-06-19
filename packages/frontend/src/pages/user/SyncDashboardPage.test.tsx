@@ -19,14 +19,24 @@ const syncHistoryTableRowMock = vi.hoisted(() => ({
 vi.mock("@components/sync/SyncHistoryCard", () => ({
   SyncHistoryCard: ({
     item,
+    isSelected,
+    onSelect,
     onRetry,
     retrying,
   }: {
     item: SyncHistoryItem;
+    isSelected: boolean;
+    onSelect: () => void;
     onRetry: () => void;
     retrying: string | null;
   }) => (
     <article>
+      <input
+        type="checkbox"
+        aria-label={`Select ${item.mediaTitle}`}
+        checked={isSelected}
+        onChange={onSelect}
+      />
       <span>{item.mediaTitle}</span>
       {!item.success && (
         <button
@@ -196,5 +206,22 @@ describe("SyncDashboardPage", () => {
       expect(showSuccess).toHaveBeenCalledWith("Sync retried successfully");
     });
     expect(getSyncHistory).toHaveBeenCalledTimes(loadCallsBeforeRetry + 1);
+  });
+
+  it("shows the singular bulk retry success message after retrying one selected failure", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<SyncDashboardPage />, { route: "/sync" });
+
+    await screen.findByText("Broken Episode");
+
+    await user.click(
+      screen.getByRole("checkbox", { name: "Select Broken Episode" })
+    );
+    await user.click(screen.getByRole("button", { name: "Retry Failed (1)" }));
+
+    await waitFor(() => {
+      expect(retrySyncHistoryItems).toHaveBeenCalledWith(["2"]);
+      expect(showSuccess).toHaveBeenCalledWith("Retried 1 failed sync item");
+    });
   });
 });

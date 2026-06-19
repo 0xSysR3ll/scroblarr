@@ -135,32 +135,25 @@ describe("IntegrationsTab", () => {
       await Promise.resolve();
     });
 
-    const panel = screen.getByText("Authorization Code");
-    const authorizationPanel =
-      panel.closest("div")?.parentElement?.parentElement;
+    const authorizationPanel = screen.getByTestId("trakt-auth-panel");
 
-    expect(authorizationPanel).toBeInstanceOf(HTMLElement);
     expect(
-      within(authorizationPanel as HTMLElement).getByText(
+      within(authorizationPanel).getByText(
         "Paste the code Trakt shows after authorization."
       )
     ).toBeVisible();
     expect(
-      within(authorizationPanel as HTMLElement).getByRole("link", {
+      within(authorizationPanel).getByRole("link", {
         name: "Open Trakt auth page",
       })
     ).toHaveAttribute("href", "https://trakt.tv/oauth/authorize");
-    const codeInput = within(authorizationPanel as HTMLElement).getByRole(
-      "textbox",
-      {
-        name: "Authorization Code",
-        description: "Paste the code Trakt shows after authorization.",
-      }
-    );
+    const codeInput = within(authorizationPanel).getByRole("textbox", {
+      name: "Authorization Code",
+      description: "Paste the code Trakt shows after authorization.",
+    });
 
     expect(codeInput).toBeVisible();
-    expect(codeInput).toHaveAttribute("aria-labelledby");
-    expect(codeInput).toHaveAttribute("aria-describedby");
+    expect(oauthPopupMocks.preparePopup).toHaveBeenCalledWith("Trakt Auth");
     expect(oauthPopupMocks.navigateToUrl).toHaveBeenCalledWith(
       "https://trakt.tv/oauth/authorize"
     );

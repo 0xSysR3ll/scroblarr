@@ -1272,7 +1272,10 @@ export function IntegrationsTab({
               </div>
 
               {traktAuthUrl && (
-                <div className="rounded-lg border border-purple-200 bg-purple-50/70 p-3 dark:border-purple-900 dark:bg-purple-950/30">
+                <div
+                  data-testid="trakt-auth-panel"
+                  className="rounded-lg border border-purple-200 bg-purple-50/70 p-3 dark:border-purple-900 dark:bg-purple-950/30"
+                >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p
