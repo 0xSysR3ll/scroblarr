@@ -2,15 +2,22 @@ import {
   getSimklAuthorizeUrl,
   getSimklStatus,
   getTVTimeStatus,
+  getTraktAuthorizeUrl,
   getTraktStatus,
   linkSimkl,
   unlinkSimkl,
 } from "@services/api";
 import { renderWithProviders } from "@test/render";
-import { screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { showSuccess } from "@utils/toast";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { IntegrationsTab } from "./IntegrationsTab";
 
@@ -49,6 +56,13 @@ vi.mock("@services/api", () => ({
   updateProfile: vi.fn(),
 }));
 
+function getTraktSection(): HTMLElement {
+  const heading = screen.getByRole("heading", { name: "Trakt" });
+  const section = heading.closest(".rounded-lg.border");
+  expect(section).not.toBeNull();
+  return section as HTMLElement;
+}
+
 function getSimklSection(): HTMLElement {
   const heading = screen.getByRole("heading", { name: "Simkl" });
   const section = heading.closest(".rounded-lg.border");
@@ -63,6 +77,88 @@ async function clickSimklAuthorize(
     within(getSimklSection()).getByRole("button", { name: "Authorize" })
   );
 }
+
+describe("IntegrationsTab", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    oauthPopupMocks.preparePopup.mockReset();
+    oauthPopupMocks.navigateToUrl.mockReset();
+    oauthPopupMocks.closePopup.mockReset();
+
+    vi.mocked(getTVTimeStatus).mockResolvedValue({
+      linked: false,
+      email: null,
+      username: null,
+    });
+    vi.mocked(getTraktStatus).mockResolvedValue({
+      linked: false,
+      username: null,
+      image: null,
+      hasCredentials: false,
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("shows the polished Trakt authorization panel after generating an auth URL", async () => {
+    vi.mocked(getTraktAuthorizeUrl).mockResolvedValue({
+      authUrl: "https://trakt.tv/oauth/authorize",
+    });
+
+    renderWithProviders(<IntegrationsTab />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(getTraktStatus).toHaveBeenCalled();
+
+    fireEvent.change(
+      screen.getByPlaceholderText("Enter your Trakt Client ID"),
+      {
+        target: { value: "client-id" },
+      }
+    );
+    fireEvent.change(
+      screen.getByPlaceholderText("Enter your Trakt Client Secret"),
+      {
+        target: { value: "client-secret" },
+      }
+    );
+    fireEvent.click(
+      within(getTraktSection()).getByRole("button", { name: "Authorize" })
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(1500);
+      await Promise.resolve();
+    });
+
+    const authorizationPanel = screen.getByTestId("trakt-auth-panel");
+
+    expect(
+      within(authorizationPanel).getByText(
+        "Paste the code Trakt shows after authorization."
+      )
+    ).toBeVisible();
+    expect(
+      within(authorizationPanel).getByRole("link", {
+        name: "Open Trakt auth page",
+      })
+    ).toHaveAttribute("href", "https://trakt.tv/oauth/authorize");
+    const codeInput = within(authorizationPanel).getByRole("textbox", {
+      name: "Authorization Code",
+      description: "Paste the code Trakt shows after authorization.",
+    });
+
+    expect(codeInput).toBeVisible();
+    expect(oauthPopupMocks.preparePopup).toHaveBeenCalledWith("Trakt Auth");
+    expect(oauthPopupMocks.navigateToUrl).toHaveBeenCalledWith(
+      "https://trakt.tv/oauth/authorize"
+    );
+  });
+});
 
 describe("IntegrationsTab Simkl integration", () => {
   const onProfileUpdated = vi.fn();

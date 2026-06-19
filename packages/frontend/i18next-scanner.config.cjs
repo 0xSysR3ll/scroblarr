@@ -30,6 +30,20 @@ module.exports = {
       suffix: "}}",
     },
     defaultValue: (lng, ns, key, options) => {
+      if (
+        key.endsWith("_one") &&
+        options &&
+        typeof options.defaultValue_one === "string"
+      ) {
+        return options.defaultValue_one;
+      }
+      if (
+        key.endsWith("_other") &&
+        options &&
+        typeof options.defaultValue_other === "string"
+      ) {
+        return options.defaultValue_other;
+      }
       if (options && typeof options.defaultValue === "string") {
         return options.defaultValue;
       }
@@ -37,5 +51,3 @@ module.exports = {
     },
   },
 };
-
-
