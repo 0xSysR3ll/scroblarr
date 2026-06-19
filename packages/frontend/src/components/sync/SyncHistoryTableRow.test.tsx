@@ -52,17 +52,18 @@ describe("SyncHistoryTableRow", () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
-  it("hides the retry action for partial sync history items", () => {
-    renderRow({
+  it("shows the retry action for partial sync history items", async () => {
+    const user = userEvent.setup();
+    const { onRetry } = renderRow({
       ...baseItem,
       success: true,
       destinations: ["Trakt"],
       errorMessage: "TVTime: temporary failure",
     });
 
-    expect(
-      screen.queryByRole("button", { name: "Retry this sync" })
-    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Retry this sync" }));
+
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
   it("disables retry while any retry is already in flight", () => {

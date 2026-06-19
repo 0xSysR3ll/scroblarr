@@ -1447,9 +1447,10 @@ paths:
 
   /api/v1/sync/history/{id}/retry:
     post:
-      summary: Retry failed sync history item
+      summary: Retry failed or partially failed sync history item
       description: |
-        Retries a failed sync history item for the authenticated user.
+        Retries a failed or partially failed sync history item for the authenticated user.
+        For partial items, only destinations that failed are retried.
 
         A successful or partially successful retry marks the original row as retried and creates a new sync history row.
         A completely failed retry returns the failure result without creating another history row.

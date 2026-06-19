@@ -8,6 +8,7 @@ import {
   getDestinationResults,
   getPosterUrl,
   getSyncStatus,
+  isRetryableSyncItem,
   shouldShowRewatchedBadge,
 } from "./syncHistory";
 
@@ -37,6 +38,14 @@ describe("sync history utils", () => {
       "partial"
     );
     expect(getSyncStatus(syncItem({ success: false }))).toBe("failed");
+  });
+
+  it("marks failed and partial items as retryable", () => {
+    expect(isRetryableSyncItem(syncItem())).toBe(false);
+    expect(
+      isRetryableSyncItem(syncItem({ errorMessage: "TVTime: duplicate" }))
+    ).toBe(true);
+    expect(isRetryableSyncItem(syncItem({ success: false }))).toBe(true);
   });
 
   it("maps destination-specific partial failures", () => {

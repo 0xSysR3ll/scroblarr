@@ -228,7 +228,7 @@ export function SyncHistoryTableRow({
           </div>
         ) : (
           <div className="flex items-center justify-end gap-1.5">
-            {syncStatus === "failed" && (
+            {(syncStatus === "failed" || syncStatus === "partial") && (
               <button
                 type="button"
                 onClick={onRetry}
