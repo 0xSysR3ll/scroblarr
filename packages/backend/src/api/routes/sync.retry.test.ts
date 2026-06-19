@@ -162,6 +162,11 @@ describe("sync retry route", () => {
       .set("authorization", "Bearer valid-user-token");
 
     expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      id: "sync-id",
+      success: true,
+      destinations: ["Trakt", "TVTime"],
+    });
     expect(syncServiceMocks.retryHistoryItem).toHaveBeenCalledWith(historyItem);
   });
 
