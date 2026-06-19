@@ -122,7 +122,7 @@ export function SyncHistoryCard({
                 </div>
               ) : (
                 <div className="flex items-center gap-1">
-                  {syncStatus === "failed" && (
+                  {(syncStatus === "failed" || syncStatus === "partial") && (
                     <button
                       type="button"
                       onClick={onRetry}

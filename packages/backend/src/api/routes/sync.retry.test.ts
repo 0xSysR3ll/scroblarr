@@ -118,7 +118,7 @@ describe("sync retry route", () => {
     expect(syncServiceMocks.retryHistoryItem).not.toHaveBeenCalled();
   });
 
-  it("rejects retrying successful sync history items", async () => {
+  it("rejects retrying fully successful sync history items", async () => {
     syncHistoryRepositoryMocks.findById.mockResolvedValue({
       id: "sync-id",
       userId: "user-id",
@@ -134,9 +134,40 @@ describe("sync retry route", () => {
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({
-      error: "Only failed sync history items can be retried",
+      error:
+        "Only failed or partially failed sync history items can be retried",
     });
     expect(syncServiceMocks.retryHistoryItem).not.toHaveBeenCalled();
+  });
+
+  it("retries partially failed sync history items", async () => {
+    const historyItem = {
+      id: "sync-id",
+      userId: "user-id",
+      success: true,
+      errorMessage: "TVTime: temporary failure",
+      destinations: JSON.stringify(["Trakt"]),
+      source: "plex",
+      mediaType: "movie",
+      user: { id: "user-id", plexUsername: "plex-user" },
+    };
+    syncHistoryRepositoryMocks.findById.mockResolvedValue(historyItem);
+    syncServiceMocks.retryHistoryItem.mockResolvedValue({
+      success: true,
+      destinations: ["Trakt", "TVTime"],
+    });
+
+    const response = await request(makeApp())
+      .post("/api/v1/sync/history/sync-id/retry")
+      .set("authorization", "Bearer valid-user-token");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      id: "sync-id",
+      success: true,
+      destinations: ["Trakt", "TVTime"],
+    });
+    expect(syncServiceMocks.retryHistoryItem).toHaveBeenCalledWith(historyItem);
   });
 
   it("bulk retries selected failed sync history items", async () => {

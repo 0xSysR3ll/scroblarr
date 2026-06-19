@@ -23,6 +23,7 @@ import {
   exportToCSV,
   exportToJSON,
   getSyncStatus,
+  isRetryableSyncItem,
 } from "@utils/syncHistory";
 import { showError, showSuccess } from "@utils/toast";
 import React, {
@@ -333,9 +334,7 @@ export function SyncDashboardPage() {
   const selectedFailedIds = useMemo(
     () =>
       displayHistory
-        .filter(
-          (item) => selectedIds.has(item.id) && getSyncStatus(item) === "failed"
-        )
+        .filter((item) => selectedIds.has(item.id) && isRetryableSyncItem(item))
         .map((item) => item.id),
     [displayHistory, selectedIds]
   );

@@ -38,14 +38,15 @@ async function retryHistoryItemForUser(
     };
   }
 
-  if (historyItem.success) {
+  if (historyItem.success && !historyItem.errorMessage) {
     return {
       status: 400,
       body: {
         id,
         success: false,
         destinations: [],
-        error: "Only failed sync history items can be retried",
+        error:
+          "Only failed or partially failed sync history items can be retried",
       },
     };
   }

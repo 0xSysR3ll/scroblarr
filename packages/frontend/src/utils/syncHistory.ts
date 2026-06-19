@@ -49,6 +49,10 @@ export function getSyncStatus(item: SyncHistoryItem): SyncItemStatus {
   return item.errorMessage ? "partial" : "success";
 }
 
+export function isRetryableSyncItem(item: SyncHistoryItem): boolean {
+  return getSyncStatus(item) !== "success";
+}
+
 export function getDestinationResults(
   item: SyncHistoryItem
 ): SyncDestinationResult[] {
