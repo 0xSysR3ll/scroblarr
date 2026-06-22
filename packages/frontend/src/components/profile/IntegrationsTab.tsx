@@ -31,6 +31,7 @@ import { useState, useEffect, useCallback, useRef, useId } from "react";
 import { useTranslation } from "react-i18next";
 import {
   FaCheckCircle,
+  FaExclamationTriangle,
   FaTimesCircle,
   FaUnlink,
   FaEye,
@@ -190,7 +191,7 @@ export function IntegrationsTab({
     async function loadTraktStatus() {
       try {
         setTraktLoading(true);
-        const status = await getTraktStatus();
+        const status = await getTraktStatus({ force: true });
         setTraktStatus(status);
       } catch {
         // Error handled by UI state
@@ -1072,14 +1073,25 @@ export function IntegrationsTab({
           </div>
           {traktStatus?.linked && (
             <div className="hidden sm:flex items-center gap-3 shrink-0">
-              <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                <FaCheckCircle className="w-5 h-5" />
-                <span className="text-sm font-medium">
-                  {t("profile.linkedAccounts.linked", {
-                    defaultValue: "Linked",
-                  })}
-                </span>
-              </div>
+              {traktStatus.needsReauthorization ? (
+                <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                  <FaExclamationTriangle className="w-5 h-5" />
+                  <span className="text-sm font-medium">
+                    {t("profile.linkedAccounts.reauthRequired", {
+                      defaultValue: "Re-authorization required",
+                    })}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                  <FaCheckCircle className="w-5 h-5" />
+                  <span className="text-sm font-medium">
+                    {t("profile.linkedAccounts.linked", {
+                      defaultValue: "Linked",
+                    })}
+                  </span>
+                </div>
+              )}
               <button
                 onClick={handleUnlinkTrakt}
                 disabled={traktSaving}
@@ -1101,6 +1113,17 @@ export function IntegrationsTab({
 
         {traktStatus?.linked ? (
           <div className="pt-3 border-t border-border">
+            {traktStatus.needsReauthorization && (
+              <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-amber-700 dark:text-amber-300">
+                <FaExclamationTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <p className="text-sm">
+                  {t("trakt.needsReauthorization", {
+                    defaultValue:
+                      "Trakt authorization expired or was revoked. Unlink and link your account again to resume syncing.",
+                  })}
+                </p>
+              </div>
+            )}
             <div className="flex items-start gap-4">
               {traktStatus.image && (
                 <img
@@ -1126,14 +1149,25 @@ export function IntegrationsTab({
             </div>
             {traktStatus?.linked && (
               <div className="flex sm:hidden items-center gap-3 pt-3 mt-3 border-t border-border">
-                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                  <FaCheckCircle className="w-5 h-5" />
-                  <span className="text-sm font-medium">
-                    {t("profile.linkedAccounts.linked", {
-                      defaultValue: "Linked",
-                    })}
-                  </span>
-                </div>
+                {traktStatus.needsReauthorization ? (
+                  <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                    <FaExclamationTriangle className="w-5 h-5" />
+                    <span className="text-sm font-medium">
+                      {t("profile.linkedAccounts.reauthRequired", {
+                        defaultValue: "Re-authorization required",
+                      })}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                    <FaCheckCircle className="w-5 h-5" />
+                    <span className="text-sm font-medium">
+                      {t("profile.linkedAccounts.linked", {
+                        defaultValue: "Linked",
+                      })}
+                    </span>
+                  </div>
+                )}
                 <button
                   onClick={handleUnlinkTrakt}
                   disabled={traktSaving}

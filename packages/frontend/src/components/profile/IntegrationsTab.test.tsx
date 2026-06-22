@@ -158,6 +158,59 @@ describe("IntegrationsTab", () => {
       "https://trakt.tv/oauth/authorize"
     );
   });
+
+  it("shows a re-authorization warning for linked Trakt accounts", async () => {
+    vi.mocked(getTraktStatus).mockResolvedValue({
+      linked: true,
+      needsReauthorization: true,
+      username: "trakt-user",
+      image: "https://img.example/trakt.png",
+      hasCredentials: true,
+    });
+
+    renderWithProviders(<IntegrationsTab />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(getTraktStatus).toHaveBeenCalledWith({ force: true });
+    expect(screen.getByText("trakt-user")).toBeVisible();
+    expect(
+      screen.getAllByText("Re-authorization required").length
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getByText(
+        "Trakt authorization expired or was revoked. Unlink and link your account again to resume syncing."
+      )
+    ).toBeVisible();
+    expect(
+      within(getTraktSection()).queryByText("Linked")
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows a linked state for linked Trakt accounts with valid tokens", async () => {
+    vi.mocked(getTraktStatus).mockResolvedValue({
+      linked: true,
+      needsReauthorization: false,
+      username: "trakt-user",
+      image: "https://img.example/trakt.png",
+      hasCredentials: true,
+    });
+
+    renderWithProviders(<IntegrationsTab />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(
+      within(getTraktSection()).getAllByText("Linked").length
+    ).toBeGreaterThan(0);
+    expect(
+      within(getTraktSection()).queryByText("Re-authorization required")
+    ).not.toBeInTheDocument();
+  });
 });
 
 describe("IntegrationsTab Simkl integration", () => {

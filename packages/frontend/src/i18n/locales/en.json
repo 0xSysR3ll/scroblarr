@@ -294,7 +294,8 @@
       "notConfigured": "No media servers are configured. Please ask an admin to configure Plex or Jellyfin in the settings.",
       "unlinkConfirmTitle": "Unlink Plex Account",
       "unlinkConfirmMessage": "This will remove your Plex account connection. You will need to link your account again to sync watched media.",
-      "adminWarning": "As an admin, you must have at least one linked account. If you unlink Plex and only Plex is configured, you may lose access. Please ensure Jellyfin is configured and linked first."
+      "adminWarning": "As an admin, you must have at least one linked account. If you unlink Plex and only Plex is configured, you may lose access. Please ensure Jellyfin is configured and linked first.",
+      "reauthRequired": "Re-authorization required"
     },
     "tabs": {
       "general": "General",
@@ -370,7 +371,8 @@
     "unlinkTitle": "Unlink Trakt Account",
     "unlinkMessage": "Are you sure you want to unlink your Trakt account? This will stop syncing to Trakt.",
     "cancel": "Cancel",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "needsReauthorization": "Trakt authorization expired or was revoked. Unlink and link your account again to resume syncing."
   },
   "logs": {
     "errors": {

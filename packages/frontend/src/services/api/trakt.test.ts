@@ -108,6 +108,38 @@ describe("trakt api", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("bypasses cache when force is true", async () => {
+    const status = {
+      linked: true,
+      needsReauthorization: false,
+      username: "alice",
+      image: null,
+      hasCredentials: true,
+    };
+    fetchMock.mockResolvedValue(jsonResponse(status));
+
+    await expect(getTraktStatus()).resolves.toEqual(status);
+    await expect(getTraktStatus({ force: true })).resolves.toEqual(status);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not cache status that requires re-authorization", async () => {
+    const status = {
+      linked: true,
+      needsReauthorization: true,
+      username: "alice",
+      image: null,
+      hasCredentials: true,
+    };
+    fetchMock.mockResolvedValue(jsonResponse(status));
+
+    await expect(getTraktStatus()).resolves.toEqual(status);
+    await expect(getTraktStatus()).resolves.toEqual(status);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("unlinks accounts and clears cached status", async () => {
     fetchMock
       .mockResolvedValueOnce(

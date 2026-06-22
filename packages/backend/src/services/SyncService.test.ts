@@ -37,6 +37,7 @@ const tvtimeTokenManagerMocks = vi.hoisted(() => ({
 
 const traktTokenManagerMocks = vi.hoisted(() => ({
   getValidAccessToken: vi.fn(),
+  refreshAccessToken: vi.fn(),
 }));
 
 const simklTokenManagerMocks = vi.hoisted(() => ({
@@ -94,6 +95,7 @@ vi.mock("@integrations/tvtime/TVTimeTokenManager", () => ({
 vi.mock("@integrations/trakt/TraktTokenManager", () => ({
   TraktTokenManager: class {
     getValidAccessToken = traktTokenManagerMocks.getValidAccessToken;
+    refreshAccessToken = traktTokenManagerMocks.refreshAccessToken;
   },
 }));
 
@@ -113,6 +115,8 @@ vi.mock("@utils/logger", () => ({
     },
   },
 }));
+
+import { TraktApiError } from "@integrations/trakt/TraktApiError";
 
 import { SyncService } from "./SyncService";
 
@@ -540,6 +544,49 @@ describe("SyncService", () => {
         success: true,
         errorMessage: expect.stringContaining("TVTime: TVTime failed"),
         wasRewatched: false,
+        destinations: JSON.stringify(["Trakt"]),
+      })
+    );
+  });
+
+  it("retries Trakt sync once after an auth error", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      tvtimeAccessToken: null,
+      traktClientId: "trakt-client-id",
+      traktClientSecret: "trakt-secret",
+      traktAccessToken: "trakt-token",
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    traktTokenManagerMocks.getValidAccessToken.mockResolvedValue("stale-token");
+    traktTokenManagerMocks.refreshAccessToken.mockResolvedValue(
+      "refreshed-token"
+    );
+    traktClientMocks.scrobble
+      .mockRejectedValueOnce(new TraktApiError("auth failed", 401, true))
+      .mockResolvedValueOnce(undefined);
+
+    const service = new SyncService();
+    await service.syncEvent(makeEvent());
+
+    expect(traktClientMocks.scrobble).toHaveBeenCalledTimes(2);
+    expect(traktClientMocks.scrobble).toHaveBeenNthCalledWith(
+      1,
+      expect.anything(),
+      "stale-token",
+      expect.anything()
+    );
+    expect(traktClientMocks.scrobble).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      "refreshed-token",
+      expect.anything()
+    );
+    expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
         destinations: JSON.stringify(["Trakt"]),
       })
     );
