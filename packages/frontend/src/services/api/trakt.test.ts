@@ -111,7 +111,7 @@ describe("trakt api", () => {
   it("bypasses cache when force is true", async () => {
     const status = {
       linked: true,
-      needsReauthorization: true,
+      needsReauthorization: false,
       username: "alice",
       image: null,
       hasCredentials: true,
