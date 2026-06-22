@@ -165,18 +165,26 @@ export class SimklClient implements ISyncClient {
       );
     }
 
+    if (event.media.tvdbEpisodeId) {
+      await this.addToHistory(
+        {
+          episodes: [
+            {
+              watched_at: this.formatWatchedAt(event.timestamp),
+              ids: episodeIds,
+            },
+          ],
+        },
+        accessToken,
+        event
+      );
+      return;
+    }
+
     const episode: SimklEpisode = {
       number: event.media.episodeNumber,
       watched_at: this.formatWatchedAt(event.timestamp),
-      ids: Object.keys(episodeIds).length > 0 ? episodeIds : undefined,
     };
-
-    const canSubmitDirectEpisode =
-      event.media.seasonNumber === undefined && !!event.media.tvdbEpisodeId;
-    if (canSubmitDirectEpisode) {
-      await this.addToHistory({ episodes: [episode] }, accessToken, event);
-      return;
-    }
 
     if (!event.media.title) {
       throw new Error("Show title is required for Simkl episode scrobble");

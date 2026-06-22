@@ -111,7 +111,7 @@ describe("SimklClient", () => {
     });
   });
 
-  it("sends episode history with season and TVDB episode IDs", async () => {
+  it("sends top-level episode history when a TVDB episode ID is available", async () => {
     fetchMock.mockResolvedValue({
       ok: true,
       json: vi.fn().mockResolvedValue({ added: { episodes: 1 } }),
@@ -119,6 +119,30 @@ describe("SimklClient", () => {
     const client = new SimklClient("client-id");
 
     await client.scrobble(makeEpisodeEvent(), "access-token");
+
+    const [, request] = fetchMock.mock.calls[0] as [string, { body: string }];
+    expect(JSON.parse(request.body)).toEqual({
+      episodes: [
+        {
+          watched_at: "2026-06-04T17:00:00Z",
+          ids: {
+            tvdb: 98765,
+          },
+        },
+      ],
+    });
+  });
+
+  it("sends show history with season and episode numbers when no TVDB episode ID is available", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ added: { episodes: 1 } }),
+    });
+    const client = new SimklClient("client-id");
+    const event = makeEpisodeEvent();
+    event.media.tvdbEpisodeId = undefined;
+
+    await client.scrobble(event, "access-token");
 
     const [, request] = fetchMock.mock.calls[0] as [string, { body: string }];
     expect(JSON.parse(request.body)).toEqual({
@@ -133,9 +157,6 @@ describe("SimklClient", () => {
                 {
                   number: 3,
                   watched_at: "2026-06-04T17:00:00Z",
-                  ids: {
-                    tvdb: 98765,
-                  },
                 },
               ],
             },
@@ -317,6 +338,7 @@ describe("SimklClient", () => {
   it("requires a show title for season-based episode payloads", async () => {
     const client = new SimklClient("client-id");
     const event = makeEpisodeEvent();
+    event.media.tvdbEpisodeId = undefined;
     event.media.title = undefined as never;
 
     await expect(client.scrobble(event, "access-token")).rejects.toThrow(
