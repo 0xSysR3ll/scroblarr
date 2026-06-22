@@ -87,17 +87,75 @@ describe("TraktClient", () => {
     });
   });
 
-  it("surfaces JSON error messages from Trakt", async () => {
+  it("surfaces auth errors from WWW-Authenticate headers", async () => {
     fetchMock.mockResolvedValue({
       ok: false,
       status: 401,
-      text: vi.fn().mockResolvedValue(JSON.stringify({ message: "expired" })),
+      headers: new Headers({
+        "www-authenticate":
+          'Bearer realm="Trakt", error="invalid_token", error_description="The access token is invalid"',
+      }),
+      text: vi.fn().mockResolvedValue(""),
     });
     const client = new TraktClient("client-id");
 
     await expect(
       client.scrobble(makeEpisodeEvent(), "access-token")
-    ).rejects.toThrow("Trakt API error: 401 - expired");
+    ).rejects.toThrow(
+      "Trakt token expired or revoked; re-link your account in Profile > Integrations"
+    );
+  });
+
+  it("surfaces JSON error messages from Trakt for non-auth failures", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 409,
+      headers: new Headers(),
+      text: vi
+        .fn()
+        .mockResolvedValue(
+          JSON.stringify({ message: "already scrobbled recently" })
+        ),
+    });
+    const client = new TraktClient("client-id");
+
+    await expect(
+      client.scrobble(makeEpisodeEvent(), "access-token")
+    ).rejects.toThrow("Trakt API error: 409 - already scrobbled recently");
+  });
+
+  it("surfaces auth errors for movie scrobbles", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 401,
+      headers: new Headers({
+        "www-authenticate":
+          'Bearer realm="Trakt", error="invalid_token", error_description="The access token is invalid"',
+      }),
+      text: vi.fn().mockResolvedValue(""),
+    });
+    const client = new TraktClient("client-id");
+
+    await expect(
+      client.scrobble(
+        {
+          event: "scrobble",
+          source: "plex",
+          userId: "plex-user",
+          timestamp: new Date("2026-06-04T17:00:00.000Z"),
+          media: {
+            id: "movie-1",
+            type: "movie",
+            title: "Example Movie",
+            imdbMovieId: "tt1234567",
+            year: 2024,
+          },
+        },
+        "access-token"
+      )
+    ).rejects.toThrow(
+      "Trakt token expired or revoked; re-link your account in Profile > Integrations"
+    );
   });
 
   it("rejects episodes without an ID or season and episode numbers", async () => {

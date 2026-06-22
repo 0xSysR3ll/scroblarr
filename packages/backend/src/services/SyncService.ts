@@ -3,6 +3,7 @@ import { User } from "@entities/User";
 import { ISyncClient, SyncOptions } from "@integrations/common/ISyncClient";
 import { SimklClient } from "@integrations/simkl/SimklClient";
 import { SimklTokenManager } from "@integrations/simkl/SimklTokenManager";
+import { isTraktAuthError } from "@integrations/trakt/TraktApiError";
 import { TraktClient } from "@integrations/trakt/TraktClient";
 import { TraktTokenManager } from "@integrations/trakt/TraktTokenManager";
 import { TVTimeClient } from "@integrations/tvtime/TVTimeClient";
@@ -18,6 +19,7 @@ interface SyncDestination {
   client: ISyncClient;
   hasToken: (user: User) => boolean;
   getAccessToken: (user: User) => Promise<string>;
+  refreshAccessToken?: (user: User) => Promise<string>;
   getSyncOptions?: (user: User, hasExistingSync: boolean) => SyncOptions;
 }
 
@@ -77,6 +79,9 @@ export class SyncService {
           hasToken: (u) => !!u.traktAccessToken,
           getAccessToken: async (u) => {
             return await this.traktTokenManager.getValidAccessToken(u.id);
+          },
+          refreshAccessToken: async (u) => {
+            return await this.traktTokenManager.refreshAccessToken(u.id);
           },
         });
       } catch (error) {
@@ -391,7 +396,13 @@ export class SyncService {
           ? destination.getSyncOptions(user, hasExistingSync)
           : {};
 
-        await destination.client.scrobble(event, accessToken, options);
+        await this.scrobbleWithOptionalAuthRetry(
+          destination,
+          user,
+          event,
+          accessToken,
+          options
+        );
 
         const mediaInfo =
           event.media.type === "episode"
@@ -558,6 +569,25 @@ export class SyncService {
         { error, userId, mediaTitle: event.media.title },
         "Failed to save sync history - data loss risk"
       );
+    }
+  }
+
+  private async scrobbleWithOptionalAuthRetry(
+    destination: SyncDestination,
+    user: User,
+    event: MediaEvent,
+    accessToken: string,
+    options: SyncOptions
+  ): Promise<void> {
+    try {
+      await destination.client.scrobble(event, accessToken, options);
+    } catch (error) {
+      if (!destination.refreshAccessToken || !isTraktAuthError(error)) {
+        throw error;
+      }
+
+      const refreshedToken = await destination.refreshAccessToken(user);
+      await destination.client.scrobble(event, refreshedToken, options);
     }
   }
 }

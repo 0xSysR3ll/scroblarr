@@ -5,6 +5,7 @@ const CACHE_KEY_STATUS = "trakt-status";
 
 export interface TraktStatus {
   linked: boolean;
+  needsReauthorization?: boolean;
   username: string | null;
   image: string | null;
   hasCredentials: boolean;
@@ -67,9 +68,13 @@ export async function unlinkTrakt(): Promise<{ success: boolean }> {
   return response.json();
 }
 
-export async function getTraktStatus(): Promise<TraktStatus> {
-  const cached = getCached<TraktStatus>(CACHE_KEY_STATUS);
-  if (cached) return cached;
+export async function getTraktStatus(
+  options: { force?: boolean } = {}
+): Promise<TraktStatus> {
+  if (!options.force) {
+    const cached = getCached<TraktStatus>(CACHE_KEY_STATUS);
+    if (cached) return cached;
+  }
 
   const response = await fetch(`${API_BASE_URL}/trakt/status`, {
     headers: getAuthHeaders(),
@@ -78,6 +83,8 @@ export async function getTraktStatus(): Promise<TraktStatus> {
     throw new Error("Failed to fetch Trakt status");
   }
   const data = (await response.json()) as TraktStatus;
-  setCached(CACHE_KEY_STATUS, data);
+  if (!data.needsReauthorization) {
+    setCached(CACHE_KEY_STATUS, data);
+  }
   return data;
 }

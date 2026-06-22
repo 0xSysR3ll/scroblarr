@@ -1,6 +1,7 @@
 import { UserRepository } from "@repositories/UserRepository";
 import { logger } from "@utils/logger";
 
+import { TraktApiError } from "./TraktApiError";
 import { TraktOAuth, TraktTokens } from "./TraktOAuth";
 
 export class TraktTokenManager {
@@ -46,6 +47,19 @@ export class TraktTokenManager {
       return user.traktAccessToken;
     }
 
+    return this.refreshAccessToken(userId);
+  }
+
+  async refreshAccessToken(userId: string): Promise<string> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      throw new Error(`User ${userId} not found`);
+    }
+
+    if (!user.traktAccessToken || !user.traktRefreshToken) {
+      throw new Error("Trakt not linked for this user");
+    }
+
     try {
       const traktOAuth = await this.getTraktOAuth(user.id);
       const tokens = await traktOAuth.refreshToken(user.traktRefreshToken);
@@ -56,12 +70,31 @@ export class TraktTokenManager {
         { userId, error: refreshError },
         "Failed to refresh Trakt token"
       );
+      if (refreshError instanceof TraktApiError) {
+        throw refreshError;
+      }
       throw new Error(
         `Failed to refresh Trakt token: ${
           refreshError instanceof Error ? refreshError.message : "Unknown error"
         }`
       );
     }
+  }
+
+  async validateAccessToken(
+    accessToken: string,
+    clientId: string
+  ): Promise<boolean> {
+    const response = await fetch("https://api.trakt.tv/users/me", {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "trakt-api-version": "2",
+        "trakt-api-key": clientId,
+        "User-Agent": "Scroblarr/1.0.0",
+      },
+    });
+
+    return response.ok;
   }
 
   private async updateUserTokens(

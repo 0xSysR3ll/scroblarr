@@ -2,6 +2,8 @@ import { ISyncClient, SyncOptions } from "@integrations/common/ISyncClient";
 import { MediaEvent } from "@scroblarr/shared";
 import { logger } from "@utils/logger";
 
+import { TraktApiError } from "./TraktApiError";
+
 export class TraktClient implements ISyncClient {
   private static readonly BASE_URL = "https://api.trakt.tv";
   private clientId: string;
@@ -89,10 +91,16 @@ export class TraktClient implements ISyncClient {
 
     if (!response.ok) {
       const errorText = await response.text();
+      const apiError = TraktApiError.fromResponse(
+        response.status,
+        errorText,
+        response.headers.get("www-authenticate")
+      );
       logger.trakt.error(
         {
           status: response.status,
           errorText,
+          wwwAuthenticate: response.headers.get("www-authenticate"),
           payload,
           episodeId: event.media.tvdbEpisodeId,
           episodeSeason: event.media.seasonNumber,
@@ -103,9 +111,7 @@ export class TraktClient implements ISyncClient {
         },
         "Trakt episode scrobble API error"
       );
-      throw new Error(
-        `Trakt API error: ${response.status} - ${this.extractErrorMessage(errorText)}`
-      );
+      throw apiError;
     }
 
     // Response parsing is optional - scrobble succeeded if status is OK
@@ -153,10 +159,16 @@ export class TraktClient implements ISyncClient {
 
     if (!response.ok) {
       const errorText = await response.text();
+      const apiError = TraktApiError.fromResponse(
+        response.status,
+        errorText,
+        response.headers.get("www-authenticate")
+      );
       logger.trakt.error(
         {
           status: response.status,
           errorText,
+          wwwAuthenticate: response.headers.get("www-authenticate"),
           payload,
           movieTitle: event.media.title,
           movieYear: event.media.year,
@@ -166,26 +178,9 @@ export class TraktClient implements ISyncClient {
         },
         "Trakt movie scrobble API error"
       );
-      throw new Error(
-        `Trakt API error: ${response.status} - ${this.extractErrorMessage(errorText)}`
-      );
+      throw apiError;
     }
 
     // Response parsing is optional - scrobble succeeded if status is OK
-  }
-
-  private extractErrorMessage(errorText: string): string {
-    try {
-      const errorJson = JSON.parse(errorText);
-      if (errorJson.error) {
-        return errorJson.error;
-      }
-      if (errorJson.message) {
-        return errorJson.message;
-      }
-    } catch {
-      // Not JSON
-    }
-    return errorText.substring(0, 200);
   }
 }

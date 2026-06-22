@@ -1,5 +1,6 @@
 import { User } from "@entities/User";
 import { TraktOAuth } from "@integrations/trakt/TraktOAuth";
+import { TraktTokenManager } from "@integrations/trakt/TraktTokenManager";
 import { UserRepository } from "@repositories/UserRepository";
 import { logger } from "@utils/logger";
 import { Router, Request, Response } from "express";
@@ -9,6 +10,7 @@ import { auth } from "../middleware/auth";
 
 const router = Router();
 const userRepository = new UserRepository();
+const traktTokenManager = new TraktTokenManager();
 
 const linkTraktSchema = z.object({
   code: z.string().min(1),
@@ -234,8 +236,40 @@ router.get("/status", async (req: Request, res: Response) => {
       return res.status(401).json({ error: "User not found" });
     }
 
+    const linked = !!freshUser.traktAccessToken;
+    let needsReauthorization = false;
+
+    if (
+      freshUser.traktAccessToken &&
+      freshUser.traktClientId &&
+      freshUser.traktClientSecret &&
+      freshUser.traktRefreshToken
+    ) {
+      const storedTokenValid = await traktTokenManager.validateAccessToken(
+        freshUser.traktAccessToken,
+        freshUser.traktClientId
+      );
+
+      if (storedTokenValid) {
+        needsReauthorization = false;
+      } else {
+        try {
+          const refreshedToken = await traktTokenManager.refreshAccessToken(
+            freshUser.id
+          );
+          needsReauthorization = !(await traktTokenManager.validateAccessToken(
+            refreshedToken,
+            freshUser.traktClientId
+          ));
+        } catch {
+          needsReauthorization = true;
+        }
+      }
+    }
+
     return res.json({
-      linked: !!freshUser.traktAccessToken,
+      linked,
+      needsReauthorization,
       username: freshUser.traktUsername || null,
       image: freshUser.traktThumb || null,
       hasCredentials: !!(

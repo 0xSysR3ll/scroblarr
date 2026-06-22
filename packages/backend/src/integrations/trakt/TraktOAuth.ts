@@ -1,5 +1,7 @@
 import { logger } from "@utils/logger";
 
+import { TraktApiError } from "./TraktApiError";
+
 export interface TraktTokenResponse {
   access_token: string;
   token_type: string;
@@ -105,13 +107,20 @@ export class TraktOAuth {
 
     if (!response.ok) {
       const errorText = await response.text();
+      const apiError = TraktApiError.fromResponse(
+        response.status,
+        errorText,
+        response.headers.get("www-authenticate")
+      );
       logger.trakt.error(
-        { status: response.status, errorText },
+        {
+          status: response.status,
+          errorText,
+          wwwAuthenticate: response.headers.get("www-authenticate"),
+        },
         "Failed to refresh Trakt token"
       );
-      throw new Error(
-        `Failed to refresh Trakt token: ${response.status} - ${errorText}`
-      );
+      throw apiError;
     }
 
     const tokenData = (await response.json()) as TraktTokenResponse;
