@@ -14,7 +14,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "../shared/src/**/*.test.ts"],
     globals: true,
     clearMocks: true,
     coverage: {

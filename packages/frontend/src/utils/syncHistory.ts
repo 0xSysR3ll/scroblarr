@@ -1,18 +1,40 @@
-import { isPlexServerUrl } from "@scroblarr/shared";
+import type {
+  SyncDestinationName,
+  SyncDestinationResults,
+} from "@scroblarr/shared";
+import { isPlexServerUrl, SYNC_DESTINATION_NAMES } from "@scroblarr/shared";
 import type { SyncHistoryItem } from "@services/api";
 import { API_BASE_URL } from "@services/api/common";
 import { TFunction } from "i18next";
 
-const SYNC_DESTINATIONS = ["TVTime", "Trakt", "Simkl"] as const;
-const DESTINATION_ERROR_PATTERN = /(?:^|;\s*)(TVTime|Trakt|Simkl):\s*/g;
-
-export type SyncDestinationName = (typeof SYNC_DESTINATIONS)[number];
+export type { SyncDestinationName };
 export type SyncItemStatus = "success" | "partial" | "failed";
 
 export interface SyncDestinationResult {
   name: SyncDestinationName;
   status: "success" | "failed";
   errorMessage?: string;
+}
+
+const DESTINATION_ERROR_PATTERN = /(?:^|;\s*)(TVTime|Trakt|Simkl):\s*/g;
+
+function getDestinationResultsFromStructured(
+  destinationResults: SyncDestinationResults
+): SyncDestinationResult[] {
+  return SYNC_DESTINATION_NAMES.flatMap((destination) => {
+    const result = destinationResults[destination];
+    if (!result) {
+      return [];
+    }
+
+    return [
+      {
+        name: destination,
+        status: result.status,
+        errorMessage: result.error,
+      },
+    ];
+  });
 }
 
 function getDestinationError(
@@ -42,6 +64,24 @@ function getDestinationError(
 }
 
 export function getSyncStatus(item: SyncHistoryItem): SyncItemStatus {
+  const structuredResults = getDestinationResultsFromStructured(
+    item.destinationResults ?? {}
+  );
+  if (structuredResults.length > 0) {
+    const hasSuccess = structuredResults.some(
+      (result) => result.status === "success"
+    );
+    const hasFailure = structuredResults.some(
+      (result) => result.status === "failed"
+    );
+
+    if (!hasSuccess) {
+      return "failed";
+    }
+
+    return hasFailure ? "partial" : "success";
+  }
+
   if (!item.success) {
     return "failed";
   }
@@ -56,11 +96,18 @@ export function isRetryableSyncItem(item: SyncHistoryItem): boolean {
 export function getDestinationResults(
   item: SyncHistoryItem
 ): SyncDestinationResult[] {
+  const structuredResults = getDestinationResultsFromStructured(
+    item.destinationResults ?? {}
+  );
+  if (structuredResults.length > 0) {
+    return structuredResults;
+  }
+
   const successfulDestinations = new Set(
     item.success ? (item.destinations ?? []) : []
   );
 
-  return SYNC_DESTINATIONS.filter((destination) => {
+  return SYNC_DESTINATION_NAMES.filter((destination) => {
     const errorMessage = getDestinationError(item.errorMessage, destination);
 
     return successfulDestinations.has(destination) || errorMessage;
