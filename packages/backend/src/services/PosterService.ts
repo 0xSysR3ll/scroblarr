@@ -7,6 +7,12 @@ import { getTmdbAccessToken } from "@integrations/tmdb/tmdbConfig";
 import { isPlexServerUrl } from "@scroblarr/shared";
 import { logger } from "@utils/logger";
 
+const POSTER_FETCH_TIMEOUT_MS = 10_000;
+
+function posterFetchSignal(): AbortSignal {
+  return AbortSignal.timeout(POSTER_FETCH_TIMEOUT_MS);
+}
+
 export interface PosterFetchSuccess {
   buffer: Buffer;
   contentType: string;
@@ -143,6 +149,7 @@ export class PosterService {
         headers: {
           "X-Plex-Token": user.plexAccessToken,
         },
+        signal: posterFetchSignal(),
       });
 
       if (!response.ok) {
@@ -190,7 +197,8 @@ export class PosterService {
       const jellyfinClient = new JellyfinClient(settings.jellyfinHost);
       const { buffer, contentType } = await jellyfinClient.fetchImage(
         user.jellyfinAccessToken,
-        posterUrl
+        posterUrl,
+        posterFetchSignal()
       );
 
       return {
@@ -210,6 +218,7 @@ export class PosterService {
     try {
       const response = await fetch(posterUrl, {
         headers: { Accept: "image/*" },
+        signal: posterFetchSignal(),
       });
 
       if (!response.ok) {

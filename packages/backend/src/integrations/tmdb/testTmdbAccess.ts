@@ -1,6 +1,7 @@
 import { TmdbRateLimitError } from "./TmdbApiError";
 
 const TMDB_API_BASE = "https://api.themoviedb.org/3";
+const TMDB_TEST_TIMEOUT_MS = 10_000;
 
 export interface TmdbConnectionTestSuccess {
   success: true;
@@ -24,6 +25,7 @@ export async function testTmdbAccessToken(
       Authorization: `Bearer ${accessToken}`,
       Accept: "application/json",
     },
+    signal: AbortSignal.timeout(TMDB_TEST_TIMEOUT_MS),
   });
 
   if (response.ok) {

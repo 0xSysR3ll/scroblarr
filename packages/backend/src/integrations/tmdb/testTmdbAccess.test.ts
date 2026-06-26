@@ -12,17 +12,21 @@ describe("testTmdbAccessToken", () => {
   });
 
   it("returns success when TMDB accepts the token", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-      })
-    );
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+    });
+    vi.stubGlobal("fetch", fetchMock);
 
     await expect(testTmdbAccessToken("valid-token")).resolves.toEqual({
       success: true,
     });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.themoviedb.org/3/configuration",
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+      })
+    );
   });
 
   it("returns a clear error for invalid tokens", async () => {
@@ -80,6 +84,17 @@ describe("testTmdbAccessToken", () => {
       message: "TMDB rate limit exceeded. Try again shortly.",
     });
     expect(toTmdbConnectionTestError(new Error("network"))).toEqual({
+      success: false,
+      status: 500,
+      message: "Failed to reach TMDB API",
+    });
+    expect(
+      toTmdbConnectionTestError(
+        Object.assign(new Error("The operation was aborted"), {
+          name: "AbortError",
+        })
+      )
+    ).toEqual({
       success: false,
       status: 500,
       message: "Failed to reach TMDB API",

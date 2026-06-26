@@ -75,6 +75,34 @@ describe("JellyfinWebhookParser", () => {
     });
   });
 
+  it("uses the series TMDB id from SeriesProvider_tmdb for episodes", () => {
+    const event = JellyfinWebhookParser.parse({
+      notificationType: "PlaybackStop",
+      username: "jellyfin-user",
+      userId: "jellyfin-user-id",
+      itemType: "Episode",
+      itemId: "episode-id",
+      name: "Pilot",
+      seriesName: "Example Show",
+      seasonNumber: "1",
+      episodeNumber: "2",
+      provider_tmdb: "3485701",
+      SeriesProvider_tmdb: "1396",
+      provider_tvdb: "12345",
+      provider_imdb: "tt7654321",
+      runtimeTicks: "1000000000",
+      playbackPositionTicks: "900000000",
+      timestamp: "2026-06-04T17:00:00.000Z",
+    });
+
+    expect(event).toMatchObject({
+      media: {
+        type: "episode",
+        tmdbSeriesId: 1396,
+      },
+    });
+  });
+
   it("ignores unsupported item types and missing users", () => {
     expect(
       JellyfinWebhookParser.parse({

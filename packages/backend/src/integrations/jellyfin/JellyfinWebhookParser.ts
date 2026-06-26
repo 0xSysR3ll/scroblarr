@@ -14,6 +14,8 @@ export interface JellyfinWebhookPayload {
   provider_tvdb?: string;
   provider_imdb?: string;
   provider_tmdb?: string;
+  series_provider_tmdb?: string;
+  SeriesProvider_tmdb?: string;
   thumbnail?: {
     url?: string;
   };
@@ -97,6 +99,7 @@ export class JellyfinWebhookParser {
       provider_tvdb,
       provider_imdb,
       provider_tmdb,
+      payload.series_provider_tmdb ?? payload.SeriesProvider_tmdb,
       thumbnail,
       runtimeTicks,
       playbackPositionTicks
@@ -141,6 +144,7 @@ export class JellyfinWebhookParser {
     providerTvdb: string | undefined,
     providerImdb: string | undefined,
     providerTmdb: string | undefined,
+    seriesProviderTmdb: string | undefined,
     thumbnail: { url?: string } | undefined,
     runtimeTicks: string | undefined,
     playbackPositionTicks: string | undefined
@@ -201,7 +205,7 @@ export class JellyfinWebhookParser {
 
     if (itemType === "Episode") {
       const tvdbEpisodeId = extractTvdbId(providerTvdb);
-      const tmdbSeriesId = extractTmdbId(providerTmdb);
+      const tmdbSeriesId = extractTmdbId(seriesProviderTmdb);
       const imdbEpisodeId =
         providerImdb && providerImdb.trim() !== "" ? providerImdb : undefined;
       const seasonNum = seasonNumber ? parseInt(seasonNumber, 10) : undefined;

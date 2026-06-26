@@ -117,7 +117,10 @@ export class TmdbClient {
     }
 
     if (input.imdbEpisodeId) {
-      const showId = await this.findEpisodeShowId(input.imdbEpisodeId);
+      const showId = await this.findEpisodeShowId(
+        input.imdbEpisodeId,
+        "imdb_id"
+      );
       if (showId) {
         const details = await this.getTvDetails(showId.toString());
         if (details?.poster_path) {
@@ -127,13 +130,15 @@ export class TmdbClient {
     }
 
     if (input.tvdbEpisodeId) {
-      const posterPath = await this.findPosterPath(
+      const showId = await this.findEpisodeShowId(
         input.tvdbEpisodeId,
-        "tvdb_id",
-        "tv"
+        "tvdb_id"
       );
-      if (posterPath) {
-        return posterPath;
+      if (showId) {
+        const details = await this.getTvDetails(showId.toString());
+        if (details?.poster_path) {
+          return details.poster_path;
+        }
       }
     }
 
@@ -153,10 +158,11 @@ export class TmdbClient {
   }
 
   private async findEpisodeShowId(
-    imdbEpisodeId: string
+    externalId: string,
+    externalSource: "imdb_id" | "tvdb_id"
   ): Promise<number | null> {
     const result = await this.apiGet<TmdbFindResult>(
-      `/find/${encodeURIComponent(imdbEpisodeId)}?external_source=imdb_id`
+      `/find/${encodeURIComponent(externalId)}?external_source=${externalSource}`
     );
     const episode = result?.tv_episode_results?.[0];
     return episode?.show_id ?? null;

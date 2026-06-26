@@ -170,7 +170,8 @@ router.post(
       }
 
       logger.api.error({ error }, "Error testing TMDB access token");
-      res.status(500).json(toTmdbConnectionTestError(error));
+      const failure = toTmdbConnectionTestError(error);
+      res.status(failure.status).json(failure);
     }
   }
 );

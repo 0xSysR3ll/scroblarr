@@ -245,6 +245,10 @@ describe("PosterService", () => {
       buffer: Buffer.from(new Uint8Array([1, 1])),
       contentType: "image/jpeg",
     });
-    expect(jellyfinClientMocks.fetchImage).toHaveBeenCalledOnce();
+    expect(jellyfinClientMocks.fetchImage).toHaveBeenCalledWith(
+      "jf-token",
+      "https://jellyfin.local/Items/1/Images/Primary",
+      expect.any(AbortSignal)
+    );
   });
 });

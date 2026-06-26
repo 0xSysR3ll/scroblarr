@@ -395,7 +395,8 @@ export class JellyfinClient {
 
   async fetchImage(
     accessToken: string,
-    imageUrl: string
+    imageUrl: string,
+    signal?: AbortSignal
   ): Promise<{ buffer: ArrayBuffer; contentType: string }> {
     const authHeader = this.getAuthHeader(accessToken);
     const response = await fetch(imageUrl, {
@@ -403,6 +404,7 @@ export class JellyfinClient {
         Authorization: authHeader,
         Accept: "image/*",
       },
+      signal,
     });
 
     if (!response.ok) {

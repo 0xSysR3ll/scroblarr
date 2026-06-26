@@ -252,7 +252,9 @@ export function SettingsPage() {
         if (apiKey) {
           updated.apiKey = apiKey;
         }
-        updated.tmdbAccessToken = tmdbAccessToken;
+        if (tmdbAccessToken) {
+          updated.tmdbAccessToken = tmdbAccessToken;
+        }
       }
 
       if (activeTab === "mediaServer") {

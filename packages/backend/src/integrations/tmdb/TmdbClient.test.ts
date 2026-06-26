@@ -145,6 +145,37 @@ describe("TmdbClient", () => {
     expect(posterPath).toBe("/episode-series.jpg");
   });
 
+  it("resolves episode posters via TVDB episode lookup", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          tv_episode_results: [{ show_id: 321 }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ poster_path: "/tvdb-series.jpg" }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new TmdbClient("test-token");
+    const posterPath = await client.resolvePosterPath({
+      mediaType: "episode",
+      tvdbEpisodeId: "9230216",
+    });
+
+    expect(posterPath).toBe("/tvdb-series.jpg");
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "https://api.themoviedb.org/3/find/9230216?external_source=tvdb_id",
+      expect.any(Object)
+    );
+  });
+
   it("throws when TMDB rate limits API requests", async () => {
     vi.stubGlobal(
       "fetch",

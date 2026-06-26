@@ -28,10 +28,15 @@ vi.mock("@repositories/UserRepository", () => ({
   },
 }));
 
-vi.mock("@integrations/tmdb/testTmdbAccess", () => ({
-  testTmdbAccessToken: testTmdbAccessMocks.testTmdbAccessToken,
-  toTmdbConnectionTestError: vi.fn(),
-}));
+vi.mock("@integrations/tmdb/testTmdbAccess", async () => {
+  const actual = await vi.importActual<
+    typeof import("@integrations/tmdb/testTmdbAccess")
+  >("@integrations/tmdb/testTmdbAccess");
+  return {
+    ...actual,
+    testTmdbAccessToken: testTmdbAccessMocks.testTmdbAccessToken,
+  };
+});
 
 vi.mock("@utils/logger", () => ({
   logger: {
@@ -42,6 +47,8 @@ vi.mock("@utils/logger", () => ({
     },
   },
 }));
+
+import { TmdbRateLimitError } from "@integrations/tmdb/TmdbApiError";
 
 import { settingsRoutes } from "./settings";
 
@@ -137,6 +144,28 @@ describe("settings TMDB test route", () => {
       success: false,
       status: 401,
       message: "Invalid TMDB access token",
+    });
+  });
+
+  it("aligns HTTP status with mapped connection failures", async () => {
+    testTmdbAccessMocks.testTmdbAccessToken.mockRejectedValue(
+      new TmdbRateLimitError()
+    );
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/settings", settingsRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/settings/tmdb/test")
+      .set("authorization", "Bearer admin-token")
+      .send({ tmdbAccessToken: "token" });
+
+    expect(response.status).toBe(429);
+    expect(response.body).toEqual({
+      success: false,
+      status: 429,
+      message: "TMDB rate limit exceeded. Try again shortly.",
     });
   });
 });
