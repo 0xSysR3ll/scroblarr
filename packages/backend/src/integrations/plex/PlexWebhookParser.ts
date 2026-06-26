@@ -29,7 +29,7 @@ export interface PlexWebhookPayload {
     parentIndex?: number;
     duration?: number;
     viewOffset?: number;
-    Guid?: Array<{ id: string }> | string;
+    Guid?: Array<{ id: string } | string> | string;
     guid?: string;
     primaryGuid?: string;
     subtype?: string;
