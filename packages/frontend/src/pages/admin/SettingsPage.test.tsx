@@ -113,4 +113,57 @@ describe("SettingsPage", () => {
       );
     });
   });
+
+  it("saves an edited TMDB token from the general settings tab", async () => {
+    vi.mocked(updateSettings).mockResolvedValue({
+      syncHistoryLimit: "100",
+      tmdbAccessToken: "updated-token",
+    });
+
+    const user = userEvent.setup();
+    renderWithProviders(<SettingsPage />, { route: "/settings?tab=general" });
+
+    const tokenInput = await screen.findByLabelText(
+      "TMDB API Read Access Token"
+    );
+    await user.clear(tokenInput);
+    await user.type(tokenInput, "updated-token");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(updateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          syncHistoryLimit: 100,
+          tmdbAccessToken: "updated-token",
+        })
+      );
+    });
+  });
+
+  it("includes the API key in general settings saves when present", async () => {
+    vi.mocked(getSettings).mockResolvedValue({
+      syncHistoryLimit: "100",
+      apiKey: "sk_saved",
+    });
+    vi.mocked(updateSettings).mockResolvedValue({
+      syncHistoryLimit: "100",
+      apiKey: "sk_saved",
+    });
+
+    const user = userEvent.setup();
+    renderWithProviders(<SettingsPage />, { route: "/settings?tab=general" });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("API Key")).toHaveValue("sk_saved");
+    });
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(updateSettings).toHaveBeenCalledWith({
+        syncHistoryLimit: 100,
+        apiKey: "sk_saved",
+      });
+    });
+  });
 });

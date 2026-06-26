@@ -271,6 +271,188 @@ describe("TmdbClient", () => {
     ).resolves.toBeNull();
   });
 
+  it("returns null when episode lookup results omit a show id", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          tv_episode_results: [{}],
+        }),
+      })
+    );
+
+    const client = new TmdbClient("test-token");
+    await expect(
+      client.resolvePosterPath({
+        mediaType: "episode",
+        imdbEpisodeId: "tt7654321",
+      })
+    ).resolves.toBeNull();
+  });
+
+  it("returns null when episode lookup finds no TMDB match", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+      })
+    );
+
+    const client = new TmdbClient("test-token");
+    await expect(
+      client.resolvePosterPath({
+        mediaType: "episode",
+        imdbEpisodeId: "tt7654321",
+      })
+    ).resolves.toBeNull();
+  });
+
+  it("returns null when IMDb episode lookup finds a show without a poster", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          tv_episode_results: [{ show_id: 789 }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ poster_path: null }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new TmdbClient("test-token");
+    await expect(
+      client.resolvePosterPath({
+        mediaType: "episode",
+        imdbEpisodeId: "tt7654321",
+      })
+    ).resolves.toBeNull();
+  });
+
+  it("returns null when movie fallbacks exhaust all lookup sources", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ poster_path: null }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          movie_results: [{ poster_path: null }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          movie_results: [{ poster_path: null }],
+        }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new TmdbClient("test-token");
+    await expect(
+      client.resolvePosterPath({
+        mediaType: "movie",
+        tmdbMovieId: "123",
+        imdbMovieId: "tt1234567",
+        tvdbMovieId: "218",
+      })
+    ).resolves.toBeNull();
+  });
+
+  it("supports TV find results when resolving TV poster paths", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          tv_results: [{ poster_path: "/tv-show.jpg" }],
+        }),
+      })
+    );
+
+    const client = new TmdbClient("test-token");
+    const findPosterPath = (
+      client as unknown as {
+        findPosterPath: (
+          externalId: string,
+          externalSource: "imdb_id" | "tvdb_id",
+          mediaKind: "movie" | "tv"
+        ) => Promise<string | null>;
+      }
+    ).findPosterPath.bind(client);
+
+    await expect(findPosterPath("tt9999999", "imdb_id", "tv")).resolves.toBe(
+      "/tv-show.jpg"
+    );
+  });
+
+  it("returns null for TV find results without a poster path", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          tv_results: [{ poster_path: null }],
+        }),
+      })
+    );
+
+    const client = new TmdbClient("test-token");
+    const findPosterPath = (
+      client as unknown as {
+        findPosterPath: (
+          externalId: string,
+          externalSource: "imdb_id" | "tvdb_id",
+          mediaKind: "movie" | "tv"
+        ) => Promise<string | null>;
+      }
+    ).findPosterPath.bind(client);
+
+    await expect(
+      findPosterPath("tt9999999", "imdb_id", "tv")
+    ).resolves.toBeNull();
+  });
+
+  it("returns null when TV find results are missing", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({}),
+      })
+    );
+
+    const client = new TmdbClient("test-token");
+    const findPosterPath = (
+      client as unknown as {
+        findPosterPath: (
+          externalId: string,
+          externalSource: "imdb_id" | "tvdb_id",
+          mediaKind: "movie" | "tv"
+        ) => Promise<string | null>;
+      }
+    ).findPosterPath.bind(client);
+
+    await expect(
+      findPosterPath("tt9999999", "imdb_id", "tv")
+    ).resolves.toBeNull();
+  });
+
   it("throws for unexpected TMDB API failures", async () => {
     vi.stubGlobal(
       "fetch",

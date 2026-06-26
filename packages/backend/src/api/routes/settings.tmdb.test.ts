@@ -49,6 +49,7 @@ vi.mock("@utils/logger", () => ({
 }));
 
 import { TmdbRateLimitError } from "@integrations/tmdb/TmdbApiError";
+import { logger } from "@utils/logger";
 
 import { settingsRoutes } from "./settings";
 
@@ -80,6 +81,49 @@ describe("settings TMDB test route", () => {
     expect(response.body).toEqual({ success: true });
     expect(testTmdbAccessMocks.testTmdbAccessToken).toHaveBeenCalledWith(
       "draft-token"
+    );
+  });
+
+  it("trims TMDB tokens from the test request body", async () => {
+    testTmdbAccessMocks.testTmdbAccessToken.mockResolvedValue({
+      success: true,
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/settings", settingsRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/settings/tmdb/test")
+      .set("authorization", "Bearer admin-token")
+      .send({ tmdbAccessToken: "  draft-token  " });
+
+    expect(response.status).toBe(200);
+    expect(testTmdbAccessMocks.testTmdbAccessToken).toHaveBeenCalledWith(
+      "draft-token"
+    );
+  });
+
+  it("falls back to the saved token when the request body is whitespace", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      tmdbAccessToken: "saved-token",
+    });
+    testTmdbAccessMocks.testTmdbAccessToken.mockResolvedValue({
+      success: true,
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/settings", settingsRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/settings/tmdb/test")
+      .set("authorization", "Bearer admin-token")
+      .send({ tmdbAccessToken: "   " });
+
+    expect(response.status).toBe(200);
+    expect(testTmdbAccessMocks.testTmdbAccessToken).toHaveBeenCalledWith(
+      "saved-token"
     );
   });
 
@@ -231,5 +275,9 @@ describe("settings TMDB test route", () => {
       status: 500,
       message: "Failed to reach TMDB API",
     });
+    expect(logger.api.error).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.any(Error) }),
+      "Error testing TMDB access token"
+    );
   });
 });
