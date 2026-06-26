@@ -173,30 +173,34 @@ describe("GeneralSettingsTab", () => {
       clipboard: { writeText },
     });
 
-    renderWithProviders(
-      <GeneralSettingsTab
-        syncHistoryLimit={100}
-        onSyncHistoryLimitChange={onSyncHistoryLimitChange}
-        apiKey="sk_test"
-        onApiKeyChange={onApiKeyChange}
-        tmdbAccessToken=""
-        onTmdbAccessTokenChange={onTmdbAccessTokenChange}
-      />
-    );
+    try {
+      renderWithProviders(
+        <GeneralSettingsTab
+          syncHistoryLimit={100}
+          onSyncHistoryLimitChange={onSyncHistoryLimitChange}
+          apiKey="sk_test"
+          onApiKeyChange={onApiKeyChange}
+          tmdbAccessToken=""
+          onTmdbAccessTokenChange={onTmdbAccessTokenChange}
+        />
+      );
 
-    const apiKeyInput = screen.getByLabelText("API Key");
-    expect(apiKeyInput).toHaveAttribute("type", "password");
+      const apiKeyInput = screen.getByLabelText("API Key");
+      expect(apiKeyInput).toHaveAttribute("type", "password");
 
-    await user.click(screen.getByRole("button", { name: "Show API key" }));
-    expect(apiKeyInput).toHaveAttribute("type", "text");
+      await user.click(screen.getByRole("button", { name: "Show API key" }));
+      expect(apiKeyInput).toHaveAttribute("type", "text");
 
-    await user.click(screen.getByRole("button", { name: "Copy" }));
-    expect(writeText).toHaveBeenCalledWith("sk_test");
-    expect(showSuccess).toHaveBeenCalledWith("API key copied to clipboard");
+      await user.click(screen.getByRole("button", { name: "Copy" }));
+      expect(writeText).toHaveBeenCalledWith("sk_test");
+      expect(showSuccess).toHaveBeenCalledWith("API key copied to clipboard");
 
-    await user.click(screen.getByRole("button", { name: "Generate" }));
-    expect(onApiKeyChange).toHaveBeenCalledWith(expect.stringMatching(/^sk_/));
-
-    vi.unstubAllGlobals();
+      await user.click(screen.getByRole("button", { name: "Generate" }));
+      expect(onApiKeyChange).toHaveBeenCalledWith(
+        expect.stringMatching(/^sk_/)
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

@@ -238,21 +238,23 @@ describe("settings TMDB test route", () => {
     app.use(express.json());
     app.use("/api/v1/settings", settingsRoutes);
 
-    const response = await request(app)
-      .post("/api/v1/settings/tmdb/test")
-      .set("authorization", "Bearer admin-token")
-      .send({});
+    try {
+      const response = await request(app)
+        .post("/api/v1/settings/tmdb/test")
+        .set("authorization", "Bearer admin-token")
+        .send({});
 
-    if (originalToken === undefined) {
-      delete process.env.TMDB_ACCESS_TOKEN;
-    } else {
-      process.env.TMDB_ACCESS_TOKEN = originalToken;
+      expect(response.status).toBe(200);
+      expect(testTmdbAccessMocks.testTmdbAccessToken).toHaveBeenCalledWith(
+        "env-token"
+      );
+    } finally {
+      if (originalToken === undefined) {
+        delete process.env.TMDB_ACCESS_TOKEN;
+      } else {
+        process.env.TMDB_ACCESS_TOKEN = originalToken;
+      }
     }
-
-    expect(response.status).toBe(200);
-    expect(testTmdbAccessMocks.testTmdbAccessToken).toHaveBeenCalledWith(
-      "env-token"
-    );
   });
 
   it("maps unexpected TMDB test failures to a 500 response", async () => {
