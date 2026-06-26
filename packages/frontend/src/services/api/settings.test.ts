@@ -30,6 +30,12 @@ describe("settings api", () => {
     });
   });
 
+  it("throws when settings cannot be loaded", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, false));
+
+    await expect(getSettings()).rejects.toThrow("Failed to fetch settings");
+  });
+
   it("updates settings with a PATCH body", async () => {
     const settings = { syncHistoryLimit: "1000" };
     fetchMock.mockResolvedValueOnce(jsonResponse(settings));
@@ -59,6 +65,20 @@ describe("settings api", () => {
       method: "DELETE",
       headers: expectedHeaders,
     });
+  });
+
+  it("throws when media server removal fails", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, false));
+
+    await expect(removePlexServer()).rejects.toThrow(
+      "Failed to remove Plex server"
+    );
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, false));
+
+    await expect(removeJellyfinServer()).rejects.toThrow(
+      "Failed to remove Jellyfin server"
+    );
   });
 
   it("throws on failed settings updates", async () => {

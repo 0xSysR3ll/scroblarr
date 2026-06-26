@@ -73,6 +73,28 @@ describe("PlexWebhookParser", () => {
     });
   });
 
+  it("uses grandparentGuid when grandparentPrimaryGuid is absent", () => {
+    const event = PlexWebhookParser.parse(
+      {
+        event: "media.scrobble",
+        user: { username: "plex-user" },
+        Metadata: {
+          type: "episode",
+          grandparentTitle: "Example Show",
+          parentIndex: 1,
+          index: 1,
+          grandparentGuid: "tmdb://2468",
+        },
+      },
+      "https://plex.local:32400/"
+    );
+
+    expect(event?.media).toMatchObject({
+      type: "episode",
+      tmdbSeriesId: 2468,
+    });
+  });
+
   it("ignores unsupported payloads", () => {
     expect(
       PlexWebhookParser.parse({

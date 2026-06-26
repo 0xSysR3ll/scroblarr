@@ -16,6 +16,10 @@ const syncHistoryRepositoryMocks = vi.hoisted(() => ({
   findById: vi.fn(),
 }));
 
+const posterServiceMocks = vi.hoisted(() => ({
+  fetchPoster: vi.fn(),
+}));
+
 vi.mock("@repositories/SettingsRepository", () => ({
   SettingsRepository: class {
     get = settingsRepositoryMocks.get;
@@ -45,6 +49,18 @@ vi.mock("@utils/logger", () => ({
     },
   },
 }));
+
+vi.mock("@services/PosterService", async () => {
+  const actual = await vi.importActual<
+    typeof import("@services/PosterService")
+  >("@services/PosterService");
+  return {
+    ...actual,
+    PosterService: class {
+      fetchPoster = posterServiceMocks.fetchPoster;
+    },
+  };
+});
 
 import { syncRoutes } from "./sync";
 
@@ -99,5 +115,36 @@ describe("sync poster sensitive access", () => {
 
     expect(response.status).toBe(404);
     expect(response.body).toEqual({ error: "No poster available" });
+  });
+
+  it("returns proxied poster bytes for authorized owners", async () => {
+    userRepositoryMocks.findBySessionToken.mockResolvedValue({
+      id: "owner-id",
+      isAdmin: false,
+    });
+    syncHistoryRepositoryMocks.findById.mockResolvedValue({
+      id: "sync-id",
+      userId: "owner-id",
+      posterUrl: "https://example.com/poster.jpg",
+      tmdbMovieId: "123",
+      user: { id: "owner-id" },
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+    posterServiceMocks.fetchPoster.mockResolvedValue({
+      buffer: Buffer.from([1, 2, 3]),
+      contentType: "image/png",
+    });
+
+    const app = express();
+    app.use("/api/v1/sync", syncRoutes);
+
+    const response = await request(app)
+      .get("/api/v1/sync/poster/sync-id")
+      .set("authorization", "Bearer owner-token");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toContain("image/png");
+    expect(response.headers["cache-control"]).toBe("public, max-age=86400");
+    expect(Buffer.from(response.body)).toEqual(Buffer.from([1, 2, 3]));
   });
 });

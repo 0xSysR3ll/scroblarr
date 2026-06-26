@@ -176,6 +176,61 @@ describe("TmdbClient", () => {
     );
   });
 
+  it("falls back to TVDB find results for movies", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        movie_results: [{ poster_path: "/tvdb-movie.jpg" }],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new TmdbClient("test-token");
+    const posterPath = await client.resolvePosterPath({
+      mediaType: "movie",
+      tvdbMovieId: "218",
+    });
+
+    expect(posterPath).toBe("/tvdb-movie.jpg");
+  });
+
+  it("returns null when TMDB has no match", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+      })
+    );
+
+    const client = new TmdbClient("test-token");
+    await expect(
+      client.resolvePosterPath({
+        mediaType: "movie",
+        tmdbMovieId: "999",
+      })
+    ).resolves.toBeNull();
+  });
+
+  it("throws for unexpected TMDB API failures", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+      })
+    );
+
+    const client = new TmdbClient("test-token");
+    await expect(
+      client.resolvePosterPath({
+        mediaType: "movie",
+        tmdbMovieId: "123",
+      })
+    ).rejects.toThrow("TMDB API error: 500");
+  });
+
   it("throws when TMDB rate limits API requests", async () => {
     vi.stubGlobal(
       "fetch",

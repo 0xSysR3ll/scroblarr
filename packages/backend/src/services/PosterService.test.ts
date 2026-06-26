@@ -24,6 +24,7 @@ vi.mock("@integrations/jellyfin/JellyfinClient", () => ({
 
 import type { SyncHistory } from "@entities/SyncHistory";
 import type { User } from "@entities/User";
+import { TmdbRateLimitError } from "@integrations/tmdb/TmdbApiError";
 
 import { hasPosterLookupData, PosterService } from "./PosterService";
 
@@ -250,5 +251,201 @@ describe("PosterService", () => {
       "https://jellyfin.local/Items/1/Images/Primary",
       expect.any(AbortSignal)
     );
+  });
+
+  it("returns 404 when no poster source can be resolved", async () => {
+    const service = new PosterService();
+    const result = await service.fetchPoster(
+      createSyncHistory({ posterUrl: undefined, tmdbMovieId: undefined }),
+      createUser(),
+      {}
+    );
+
+    expect(result).toEqual({
+      status: 404,
+      message: "No poster available",
+    });
+  });
+
+  it("returns Plex auth errors without calling TMDB", async () => {
+    const service = new PosterService();
+    const result = await service.fetchPoster(
+      createSyncHistory(),
+      createUser({ plexAccessToken: undefined }),
+      { plexServerUrl: "https://plex.local" }
+    );
+
+    expect(result).toEqual({
+      status: 403,
+      message: "Plex authentication required",
+    });
+    expect(tmdbClientMocks.resolvePosterPath).not.toHaveBeenCalled();
+  });
+
+  it("returns an error when Plex is not configured", async () => {
+    const service = new PosterService();
+    const result = await service.fetchPoster(
+      createSyncHistory(),
+      createUser(),
+      { tmdbAccessToken: "token" }
+    );
+
+    expect(result).toEqual({
+      status: 500,
+      message: "Plex server not configured",
+    });
+  });
+
+  it("handles Plex fetch failures", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network")));
+
+    const service = new PosterService();
+    const result = await service.fetchPoster(
+      createSyncHistory(),
+      createUser(),
+      { plexServerUrl: "https://plex.local" }
+    );
+
+    expect(result).toEqual({
+      status: 500,
+      message: "Failed to fetch poster image",
+    });
+  });
+
+  it("returns Jellyfin auth and configuration errors", async () => {
+    const service = new PosterService();
+
+    expect(
+      await service.fetchPoster(
+        createSyncHistory({
+          posterUrl: "https://jellyfin.local/image.jpg",
+          source: "jellyfin",
+        }),
+        createUser({ jellyfinAccessToken: undefined }),
+        { jellyfinHost: "https://jellyfin.local" }
+      )
+    ).toEqual({
+      status: 403,
+      message: "Jellyfin authentication required",
+    });
+
+    expect(
+      await service.fetchPoster(
+        createSyncHistory({
+          posterUrl: "https://jellyfin.local/image.jpg",
+          source: "jellyfin",
+        }),
+        createUser({ jellyfinAccessToken: "jf-token" }),
+        {}
+      )
+    ).toEqual({
+      status: 500,
+      message: "Jellyfin server not configured",
+    });
+  });
+
+  it("handles Jellyfin and generic fetch failures", async () => {
+    jellyfinClientMocks.fetchImage.mockRejectedValue(new Error("network"));
+    const service = new PosterService();
+
+    expect(
+      await service.fetchPoster(
+        createSyncHistory({
+          posterUrl: "https://jellyfin.local/image.jpg",
+          source: "jellyfin",
+        }),
+        createUser({ jellyfinAccessToken: "jf-token" }),
+        { jellyfinHost: "https://jellyfin.local" }
+      )
+    ).toEqual({
+      status: 500,
+      message: "Failed to fetch poster image",
+    });
+
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network")));
+    expect(
+      await service.fetchPoster(
+        createSyncHistory({
+          posterUrl: "https://cdn.example.test/poster.png",
+          source: undefined,
+        }),
+        createUser(),
+        {}
+      )
+    ).toEqual({
+      status: 500,
+      message: "Failed to fetch poster image",
+    });
+  });
+
+  it("returns generic URL failures without throwing", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+      })
+    );
+
+    const service = new PosterService();
+    const result = await service.fetchPoster(
+      createSyncHistory({
+        posterUrl: "https://cdn.example.test/poster.png",
+        source: undefined,
+      }),
+      createUser(),
+      {}
+    );
+
+    expect(result).toEqual({
+      status: 502,
+      message: "Failed to fetch poster image",
+    });
+  });
+
+  it("logs non-rate-limit TMDB lookup failures", async () => {
+    tmdbClientMocks.resolvePosterPath.mockRejectedValue(
+      new Error("lookup failed")
+    );
+
+    const service = new PosterService();
+    const result = await service.fetchPoster(
+      createSyncHistory({ posterUrl: undefined, tmdbMovieId: "123" }),
+      createUser(),
+      { tmdbAccessToken: "token" }
+    );
+
+    expect(result).toEqual({
+      status: 404,
+      message: "No poster available",
+    });
+  });
+
+  it("ignores TMDB rate limits and falls back to media server errors", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+      })
+    );
+    tmdbClientMocks.resolvePosterPath.mockRejectedValue(
+      new TmdbRateLimitError()
+    );
+
+    const service = new PosterService();
+    const result = await service.fetchPoster(
+      createSyncHistory(),
+      createUser(),
+      {
+        plexServerUrl: "https://plex.local",
+        tmdbAccessToken: "token",
+      }
+    );
+
+    expect(result).toEqual({
+      status: 404,
+      message: "Failed to fetch poster image",
+    });
   });
 });
