@@ -16,7 +16,10 @@ export interface SyncDestinationResult {
   errorMessage?: string;
 }
 
-const DESTINATION_ERROR_PATTERN = /(?:^|;\s*)(TVTime|Trakt|Simkl):\s*/g;
+const DESTINATION_ERROR_PATTERN = new RegExp(
+  `(?:^|;\\s*)(${SYNC_DESTINATION_NAMES.join("|")}):\\s*`,
+  "g"
+);
 
 function getDestinationResultsFromStructured(
   destinationResults: SyncDestinationResults
@@ -79,7 +82,12 @@ export function getSyncStatus(item: SyncHistoryItem): SyncItemStatus {
       return "failed";
     }
 
-    return hasFailure ? "partial" : "success";
+    const status = hasFailure ? "partial" : "success";
+    if (status === "success" && !item.success) {
+      return "failed";
+    }
+
+    return status;
   }
 
   if (!item.success) {

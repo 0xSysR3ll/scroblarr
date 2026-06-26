@@ -183,7 +183,7 @@ router.get("/history", auth, async (req: Request, res: Response) => {
       }
       const destinationResults =
         parseDestinationResultsJson(item.destinationResults) ??
-        parseDestinationResultsFromHistory(item);
+        (item.success ? parseDestinationResultsFromHistory(item) : undefined);
       return {
         id: item.id,
         userId: item.userId,

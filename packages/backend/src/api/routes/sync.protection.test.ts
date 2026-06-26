@@ -208,9 +208,7 @@ describe("sync route protection", () => {
       TVTime: { status: "success" },
       Trakt: { status: "success" },
     });
-    expect(response.body.data[1].destinationResults).toEqual({
-      TVTime: { status: "success" },
-    });
+    expect(response.body.data[1].destinationResults).toBeUndefined();
   });
 
   it("falls back when destination fields contain invalid JSON", async () => {

@@ -90,6 +90,18 @@ describe("sync history utils", () => {
         })
       )
     ).toBe("failed");
+
+    expect(
+      getSyncStatus(
+        syncItem({
+          success: false,
+          destinationResults: {
+            TVTime: { status: "success" },
+            Trakt: { status: "success" },
+          },
+        })
+      )
+    ).toBe("failed");
   });
 
   it("returns only destinations present in structured results", () => {
