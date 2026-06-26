@@ -213,6 +213,64 @@ describe("TmdbClient", () => {
     ).resolves.toBeNull();
   });
 
+  it("falls back from series TMDB id to IMDb episode lookup", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ poster_path: null }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          tv_episode_results: [{ show_id: 999 }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ poster_path: "/fallback-series.jpg" }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new TmdbClient("test-token");
+    const posterPath = await client.resolvePosterPath({
+      mediaType: "episode",
+      tmdbSeriesId: "123",
+      imdbEpisodeId: "tt7654321",
+    });
+
+    expect(posterPath).toBe("/fallback-series.jpg");
+  });
+
+  it("returns null when TVDB episode lookup finds a show without a poster", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          tv_episode_results: [{ show_id: 321 }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ poster_path: null }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new TmdbClient("test-token");
+    await expect(
+      client.resolvePosterPath({
+        mediaType: "episode",
+        tvdbEpisodeId: "9230216",
+      })
+    ).resolves.toBeNull();
+  });
+
   it("throws for unexpected TMDB API failures", async () => {
     vi.stubGlobal(
       "fetch",
@@ -271,5 +329,26 @@ describe("TmdbClient", () => {
     await expect(client.fetchPosterImage("/missing.jpg")).rejects.toThrow(
       "TMDB image fetch failed: 404"
     );
+  });
+
+  it("defaults poster image content type when TMDB omits the header", async () => {
+    const imageBytes = new Uint8Array([1, 2, 3]).buffer;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: {
+          get: () => null,
+        },
+        arrayBuffer: async () => imageBytes,
+      })
+    );
+
+    const client = new TmdbClient("test-token");
+    await expect(client.fetchPosterImage("/poster.jpg")).resolves.toEqual({
+      buffer: imageBytes,
+      contentType: "image/jpeg",
+    });
   });
 });

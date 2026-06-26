@@ -85,4 +85,32 @@ describe("SettingsPage", () => {
       );
     });
   });
+
+  it("omits the TMDB token from saves when the field is empty", async () => {
+    vi.mocked(getSettings).mockResolvedValue({
+      syncHistoryLimit: "100",
+    });
+
+    const user = userEvent.setup();
+    renderWithProviders(<SettingsPage />, { route: "/settings?tab=general" });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("TMDB API Read Access Token")).toHaveValue(
+        ""
+      );
+    });
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(updateSettings).toHaveBeenCalledWith({
+        syncHistoryLimit: 100,
+      });
+      expect(updateSettings).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          tmdbAccessToken: expect.anything(),
+        })
+      );
+    });
+  });
 });

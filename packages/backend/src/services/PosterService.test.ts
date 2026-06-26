@@ -92,8 +92,7 @@ describe("PosterService", () => {
         ok: true,
         status: 200,
         headers: {
-          get: (name: string) =>
-            name.toLowerCase() === "content-type" ? "image/jpeg" : null,
+          get: () => null,
         },
         arrayBuffer: async () => imageBytes,
       })
@@ -203,8 +202,7 @@ describe("PosterService", () => {
         ok: true,
         status: 200,
         headers: {
-          get: (name: string) =>
-            name.toLowerCase() === "content-type" ? "image/png" : null,
+          get: () => null,
         },
         arrayBuffer: async () => imageBytes,
       })
@@ -222,7 +220,7 @@ describe("PosterService", () => {
 
     expect(result).toEqual({
       buffer: Buffer.from(imageBytes),
-      contentType: "image/png",
+      contentType: "image/jpeg",
     });
   });
 

@@ -168,4 +168,68 @@ describe("settings TMDB test route", () => {
       message: "TMDB rate limit exceeded. Try again shortly.",
     });
   });
+
+  it("returns validation errors for invalid TMDB test payloads", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/settings", settingsRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/settings/tmdb/test")
+      .set("authorization", "Bearer admin-token")
+      .send({ tmdbAccessToken: 123 });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe("Validation error");
+  });
+
+  it("uses TMDB_ACCESS_TOKEN from the environment when settings are empty", async () => {
+    const originalToken = process.env.TMDB_ACCESS_TOKEN;
+    process.env.TMDB_ACCESS_TOKEN = "env-token";
+    testTmdbAccessMocks.testTmdbAccessToken.mockResolvedValue({
+      success: true,
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/settings", settingsRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/settings/tmdb/test")
+      .set("authorization", "Bearer admin-token")
+      .send({});
+
+    if (originalToken === undefined) {
+      delete process.env.TMDB_ACCESS_TOKEN;
+    } else {
+      process.env.TMDB_ACCESS_TOKEN = originalToken;
+    }
+
+    expect(response.status).toBe(200);
+    expect(testTmdbAccessMocks.testTmdbAccessToken).toHaveBeenCalledWith(
+      "env-token"
+    );
+  });
+
+  it("maps unexpected TMDB test failures to a 500 response", async () => {
+    testTmdbAccessMocks.testTmdbAccessToken.mockRejectedValue(
+      new Error("network")
+    );
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/settings", settingsRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/settings/tmdb/test")
+      .set("authorization", "Bearer admin-token")
+      .send({ tmdbAccessToken: "token" });
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({
+      success: false,
+      status: 500,
+      message: "Failed to reach TMDB API",
+    });
+  });
 });

@@ -84,4 +84,21 @@ describe("settings PATCH", () => {
       "tmdbAccessToken"
     );
   });
+
+  it("trims TMDB access tokens before saving", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/settings", settingsRoutes);
+
+    const response = await request(app)
+      .patch("/api/v1/settings")
+      .set("authorization", "Bearer admin-token")
+      .send({ tmdbAccessToken: "  trimmed-token  " });
+
+    expect(response.status).toBe(200);
+    expect(settingsRepositoryMocks.set).toHaveBeenCalledWith(
+      "tmdbAccessToken",
+      "trimmed-token"
+    );
+  });
 });

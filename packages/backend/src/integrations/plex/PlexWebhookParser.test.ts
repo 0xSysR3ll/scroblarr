@@ -95,6 +95,52 @@ describe("PlexWebhookParser", () => {
     });
   });
 
+  it("parses string Guid entries and omits series TMDB id when unavailable", () => {
+    const event = PlexWebhookParser.parse(
+      {
+        event: "media.scrobble",
+        user: { username: "plex-user" },
+        Metadata: {
+          type: "episode",
+          grandparentTitle: "Example Show",
+          parentIndex: 1,
+          index: 1,
+          Guid: ["tvdb://999", "imdb://tt1111111"],
+          grandparentGuid: "plex://show-guid",
+        },
+      },
+      "https://plex.local:32400/"
+    );
+
+    expect(event?.media).toMatchObject({
+      tvdbEpisodeId: 999,
+      imdbEpisodeId: "tt1111111",
+      tmdbSeriesId: undefined,
+    });
+  });
+
+  it("parses a single Guid string and ignores invalid server URLs", () => {
+    const event = PlexWebhookParser.parse(
+      {
+        event: "media.scrobble",
+        user: { username: "plex-user" },
+        Metadata: {
+          type: "movie",
+          title: "Example Movie",
+          Guid: "imdb://tt2222222",
+          thumb: "/library/metadata/1/thumb",
+        },
+      },
+      "not-a-valid-url"
+    );
+
+    expect(event?.media).toMatchObject({
+      type: "movie",
+      imdbMovieId: "tt2222222",
+      posterUrl: undefined,
+    });
+  });
+
   it("ignores unsupported payloads", () => {
     expect(
       PlexWebhookParser.parse({

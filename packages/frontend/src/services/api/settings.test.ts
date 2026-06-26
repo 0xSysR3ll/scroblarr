@@ -119,4 +119,26 @@ describe("settings api", () => {
       "Invalid TMDB access token"
     );
   });
+
+  it("tests TMDB connection without a draft token in the request body", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ success: true }));
+
+    await expect(testTmdbConnection()).resolves.toEqual({ success: true });
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/settings/tmdb/test", {
+      method: "POST",
+      headers: expectedHeaders,
+      body: JSON.stringify({}),
+    });
+  });
+
+  it("uses a fallback message when TMDB test failures omit details", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ success: false }, false, 500)
+    );
+
+    await expect(testTmdbConnection("token")).rejects.toThrow(
+      "Failed to test TMDB connection"
+    );
+  });
 });

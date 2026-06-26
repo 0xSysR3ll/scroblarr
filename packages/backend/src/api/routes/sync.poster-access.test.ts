@@ -147,4 +147,98 @@ describe("sync poster sensitive access", () => {
     expect(response.headers["cache-control"]).toBe("public, max-age=86400");
     expect(Buffer.from(response.body)).toEqual(Buffer.from([1, 2, 3]));
   });
+
+  it("returns 404 when the sync history item does not exist", async () => {
+    userRepositoryMocks.findBySessionToken.mockResolvedValue({
+      id: "owner-id",
+      isAdmin: false,
+    });
+    syncHistoryRepositoryMocks.findById.mockResolvedValue(null);
+
+    const app = express();
+    app.use("/api/v1/sync", syncRoutes);
+
+    const response = await request(app)
+      .get("/api/v1/sync/poster/missing-id")
+      .set("authorization", "Bearer owner-token");
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: "Sync history item not found" });
+  });
+
+  it("returns 404 when the sync history user relation is missing", async () => {
+    userRepositoryMocks.findBySessionToken.mockResolvedValue({
+      id: "owner-id",
+      isAdmin: false,
+    });
+    syncHistoryRepositoryMocks.findById.mockResolvedValue({
+      id: "sync-id",
+      userId: "owner-id",
+      tmdbMovieId: "123",
+      user: null,
+    });
+
+    const app = express();
+    app.use("/api/v1/sync", syncRoutes);
+
+    const response = await request(app)
+      .get("/api/v1/sync/poster/sync-id")
+      .set("authorization", "Bearer owner-token");
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: "User not found" });
+  });
+
+  it("returns poster fetch errors from the poster service", async () => {
+    userRepositoryMocks.findBySessionToken.mockResolvedValue({
+      id: "owner-id",
+      isAdmin: false,
+    });
+    syncHistoryRepositoryMocks.findById.mockResolvedValue({
+      id: "sync-id",
+      userId: "owner-id",
+      tmdbMovieId: "123",
+      user: { id: "owner-id" },
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+    posterServiceMocks.fetchPoster.mockResolvedValue({
+      status: 502,
+      message: "Failed to fetch poster image",
+    });
+
+    const app = express();
+    app.use("/api/v1/sync", syncRoutes);
+
+    const response = await request(app)
+      .get("/api/v1/sync/poster/sync-id")
+      .set("authorization", "Bearer owner-token");
+
+    expect(response.status).toBe(502);
+    expect(response.body).toEqual({ error: "Failed to fetch poster image" });
+  });
+
+  it("returns 500 when poster fetching throws", async () => {
+    userRepositoryMocks.findBySessionToken.mockResolvedValue({
+      id: "owner-id",
+      isAdmin: false,
+    });
+    syncHistoryRepositoryMocks.findById.mockResolvedValue({
+      id: "sync-id",
+      userId: "owner-id",
+      tmdbMovieId: "123",
+      user: { id: "owner-id" },
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+    posterServiceMocks.fetchPoster.mockRejectedValue(new Error("boom"));
+
+    const app = express();
+    app.use("/api/v1/sync", syncRoutes);
+
+    const response = await request(app)
+      .get("/api/v1/sync/poster/sync-id")
+      .set("authorization", "Bearer owner-token");
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: "Internal server error" });
+  });
 });

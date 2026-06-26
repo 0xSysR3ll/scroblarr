@@ -1,6 +1,6 @@
 import { testTmdbConnection } from "@services/api/settings";
 import { renderWithProviders } from "@test/render";
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { showError, showSuccess } from "@utils/toast";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -98,5 +98,105 @@ describe("GeneralSettingsTab", () => {
       screen.getByRole("button", { name: "Show TMDB access token" })
     );
     expect(tokenInput).toHaveAttribute("type", "text");
+
+    await user.click(
+      screen.getByRole("button", { name: "Hide TMDB access token" })
+    );
+    expect(tokenInput).toHaveAttribute("type", "password");
+  });
+
+  it("tests TMDB connection without a draft token", async () => {
+    const user = userEvent.setup();
+    vi.mocked(testTmdbConnection).mockResolvedValue({ success: true });
+    renderTab();
+
+    await user.click(screen.getByRole("button", { name: "Test connection" }));
+
+    await waitFor(() => {
+      expect(testTmdbConnection).toHaveBeenCalledWith(undefined);
+    });
+  });
+
+  it("shows a generic error when TMDB test rejects with a non-Error value", async () => {
+    const user = userEvent.setup();
+    vi.mocked(testTmdbConnection).mockRejectedValue("broken");
+    renderTab({ tmdbAccessToken: "bad-token" });
+
+    await user.click(screen.getByRole("button", { name: "Test connection" }));
+
+    await waitFor(() => {
+      expect(showError).toHaveBeenCalledWith("TMDB connection failed");
+    });
+  });
+
+  it("shows a loading state while testing the TMDB connection", async () => {
+    const user = userEvent.setup();
+    let resolveTest: ((value: { success: boolean }) => void) | undefined;
+    vi.mocked(testTmdbConnection).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveTest = resolve;
+        })
+    );
+    renderTab({ tmdbAccessToken: "draft-token" });
+
+    await user.click(screen.getByRole("button", { name: "Test connection" }));
+
+    expect(
+      screen.getByRole("button", { name: "Loading Testing..." })
+    ).toBeDisabled();
+
+    resolveTest?.({ success: true });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Test connection" })
+      ).not.toBeDisabled();
+    });
+  });
+
+  it("updates the sync history limit", async () => {
+    renderTab();
+
+    fireEvent.change(screen.getByLabelText("Sync History Limit"), {
+      target: { value: "250" },
+    });
+
+    expect(onSyncHistoryLimitChange).toHaveBeenCalledWith(250);
+  });
+
+  it("copies, generates, and toggles the API key", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      clipboard: { writeText },
+    });
+
+    renderWithProviders(
+      <GeneralSettingsTab
+        syncHistoryLimit={100}
+        onSyncHistoryLimitChange={onSyncHistoryLimitChange}
+        apiKey="sk_test"
+        onApiKeyChange={onApiKeyChange}
+        tmdbAccessToken=""
+        onTmdbAccessTokenChange={onTmdbAccessTokenChange}
+      />
+    );
+
+    const apiKeyInput = screen.getByLabelText("API Key");
+    expect(apiKeyInput).toHaveAttribute("type", "password");
+
+    await user.click(screen.getByRole("button", { name: "Show API key" }));
+    expect(apiKeyInput).toHaveAttribute("type", "text");
+
+    await user.click(screen.getByRole("button", { name: "Copy" }));
+    expect(writeText).toHaveBeenCalledWith("sk_test");
+    expect(showSuccess).toHaveBeenCalledWith("API key copied to clipboard");
+
+    await user.click(screen.getByRole("button", { name: "Generate" }));
+    expect(onApiKeyChange).toHaveBeenCalledWith(expect.stringMatching(/^sk_/));
+
+    vi.unstubAllGlobals();
   });
 });
