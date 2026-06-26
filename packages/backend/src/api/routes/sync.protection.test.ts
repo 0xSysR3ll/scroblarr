@@ -155,4 +155,117 @@ describe("sync route protection", () => {
       "ASC"
     );
   });
+
+  it("includes parsed destination results in history responses", async () => {
+    userRepositoryMocks.findBySessionToken.mockResolvedValue({
+      id: "user-id",
+      isAdmin: false,
+      displayName: "User",
+      plexUsername: "plex-user",
+    });
+    syncHistoryRepositoryMocks.findByUserPaginated.mockResolvedValue({
+      data: [
+        {
+          id: "sync-1",
+          userId: "user-id",
+          user: { displayName: "User", plexUsername: "plex-user" },
+          mediaType: "movie",
+          mediaTitle: "Test Movie",
+          source: "plex",
+          success: true,
+          errorMessage: "Simkl: rate limited",
+          destinations: JSON.stringify(["Trakt", "TVTime"]),
+          destinationResults: JSON.stringify({
+            TVTime: { status: "success" },
+            Trakt: { status: "success" },
+          }),
+          syncedAt: new Date("2026-01-01T00:00:00.000Z"),
+        },
+        {
+          id: "sync-2",
+          userId: "user-id",
+          user: { displayName: "User", plexUsername: "plex-user" },
+          mediaType: "episode",
+          mediaTitle: "Test Show",
+          source: "jellyfin",
+          success: false,
+          destinations: JSON.stringify(["TVTime"]),
+          syncedAt: new Date("2026-01-02T00:00:00.000Z"),
+        },
+      ],
+      total: 2,
+    });
+
+    const app = express();
+    app.use("/api/v1/sync", syncRoutes);
+
+    const response = await request(app)
+      .get("/api/v1/sync/history")
+      .set("authorization", "Bearer valid-user-token");
+
+    expect(response.status).toBe(200);
+    expect(response.body.data[0].destinationResults).toEqual({
+      TVTime: { status: "success" },
+      Trakt: { status: "success" },
+    });
+    expect(response.body.data[1].destinationResults).toBeUndefined();
+  });
+
+  it("falls back when destination fields contain invalid JSON", async () => {
+    userRepositoryMocks.findBySessionToken.mockResolvedValue({
+      id: "user-id",
+      isAdmin: false,
+      displayName: "User",
+      plexUsername: "plex-user",
+    });
+    syncHistoryRepositoryMocks.findByUserPaginated.mockResolvedValue({
+      data: [
+        {
+          id: "sync-3",
+          userId: "user-id",
+          user: { displayName: "User", plexUsername: "plex-user" },
+          mediaType: "movie",
+          mediaTitle: "Broken Destinations",
+          source: "plex",
+          success: true,
+          destinations: "not-json",
+          destinationResults: JSON.stringify({
+            Trakt: { status: "success" },
+          }),
+          syncedAt: new Date("2026-01-03T00:00:00.000Z"),
+        },
+        {
+          id: "sync-4",
+          userId: "user-id",
+          user: { displayName: "User", plexUsername: "plex-user" },
+          mediaType: "movie",
+          mediaTitle: "Broken Results",
+          source: "plex",
+          success: true,
+          destinations: JSON.stringify(["TVTime"]),
+          destinationResults: "not-json",
+          errorMessage: "Simkl: rate limited",
+          syncedAt: new Date("2026-01-04T00:00:00.000Z"),
+        },
+      ],
+      total: 2,
+    });
+
+    const app = express();
+    app.use("/api/v1/sync", syncRoutes);
+
+    const response = await request(app)
+      .get("/api/v1/sync/history")
+      .set("authorization", "Bearer valid-user-token");
+
+    expect(response.status).toBe(200);
+    expect(response.body.data[0].destinations).toBeUndefined();
+    expect(response.body.data[0].destinationResults).toEqual({
+      Trakt: { status: "success" },
+    });
+    expect(response.body.data[1].destinationResults).toEqual({
+      TVTime: { status: "success" },
+      Simkl: { status: "failed", error: "rate limited" },
+    });
+  });
 });

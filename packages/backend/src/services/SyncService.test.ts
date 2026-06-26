@@ -294,6 +294,9 @@ describe("SyncService", () => {
         success: true,
         errorMessage: expect.stringContaining("Simkl: Simkl failed"),
         destinations: JSON.stringify(["Trakt"]),
+        destinationResults: expect.stringContaining(
+          '"Simkl":{"status":"failed"'
+        ),
       })
     );
   });
@@ -330,11 +333,13 @@ describe("SyncService", () => {
       syncedAt: new Date("2026-01-01T00:00:00.000Z"),
     } as never);
 
-    expect(result).toEqual({
-      success: true,
-      destinations: ["TVTime"],
-      errorMessage: undefined,
-    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        destinations: ["TVTime"],
+        errorMessage: undefined,
+      })
+    );
     expect(tvtimeClientMocks.scrobble).toHaveBeenCalledWith(
       expect.objectContaining({
         event: "scrobble",
@@ -352,14 +357,7 @@ describe("SyncService", () => {
       "tvtime-valid-token",
       expect.any(Object)
     );
-    expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId: "u1",
-        originalMediaId: "plex-media-id",
-        success: true,
-        destinations: JSON.stringify(["TVTime"]),
-      })
-    );
+    expect(syncHistoryRepositoryMocks.create).not.toHaveBeenCalled();
     expect(syncHistoryRepositoryMocks.save).toHaveBeenCalledWith(
       expect.objectContaining({
         id: "sync-history-id",
@@ -402,24 +400,30 @@ describe("SyncService", () => {
       source: "plex",
       originalMediaId: "plex-media-id",
       tvdbMovieId: "123",
-      success: false,
+      destinations: JSON.stringify(["Trakt"]),
+      success: true,
       errorMessage: "TVTime: TVTime failed",
       syncedAt: new Date("2026-01-01T00:00:00.000Z"),
     } as never);
 
-    expect(result).toEqual({
-      success: true,
-      destinations: ["TVTime"],
-      errorMessage: undefined,
-    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        destinations: ["TVTime"],
+        errorMessage: undefined,
+      })
+    );
     expect(tvtimeClientMocks.scrobble).toHaveBeenCalledTimes(1);
     expect(traktClientMocks.scrobble).not.toHaveBeenCalled();
+    expect(syncHistoryRepositoryMocks.create).not.toHaveBeenCalled();
     expect(syncHistoryRepositoryMocks.save).toHaveBeenCalledWith(
       expect.objectContaining({
         id: "sync-history-id",
         success: true,
         errorMessage: undefined,
-        destinations: JSON.stringify(["TVTime"]),
+        destinationResults: expect.stringContaining(
+          '"TVTime":{"status":"success"}'
+        ),
       })
     );
   });
@@ -459,15 +463,18 @@ describe("SyncService", () => {
       syncedAt: new Date("2026-01-01T00:00:00.000Z"),
     } as never);
 
-    expect(result).toEqual({
-      success: true,
-      destinations: ["TVTime"],
-      errorMessage: "Trakt: Trakt failed",
-    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        destinations: ["TVTime"],
+        errorMessage: "Trakt: Trakt failed",
+      })
+    );
+    expect(syncHistoryRepositoryMocks.create).not.toHaveBeenCalled();
     expect(syncHistoryRepositoryMocks.save).toHaveBeenCalledWith(
       expect.objectContaining({
         id: "sync-history-id",
-        success: false,
+        success: true,
         errorMessage: "Trakt: Trakt failed",
         retriedAt: expect.any(Date),
         destinations: JSON.stringify(["TVTime"]),
@@ -503,11 +510,13 @@ describe("SyncService", () => {
       syncedAt: new Date("2026-01-01T00:00:00.000Z"),
     } as never);
 
-    expect(result).toEqual({
-      success: false,
-      destinations: [],
-      errorMessage: "TVTime: TVTime failed",
-    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: false,
+        destinations: [],
+        errorMessage: "TVTime: TVTime failed",
+      })
+    );
     expect(syncHistoryRepositoryMocks.create).not.toHaveBeenCalled();
     expect(syncHistoryRepositoryMocks.save).not.toHaveBeenCalled();
   });
@@ -545,6 +554,61 @@ describe("SyncService", () => {
         errorMessage: expect.stringContaining("TVTime: TVTime failed"),
         wasRewatched: false,
         destinations: JSON.stringify(["Trakt"]),
+        destinationResults: expect.stringContaining(
+          '"TVTime":{"status":"failed"'
+        ),
+      })
+    );
+  });
+
+  it("merges destinations when retrying a partially failed history item", async () => {
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    traktTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "trakt-valid-token"
+    );
+    traktClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    const result = await service.retryHistoryItem({
+      id: "sync-history-id",
+      userId: "u1",
+      user: {
+        id: "u1",
+        enabled: true,
+        plexUsername: "plex-user",
+        tvtimeAccessToken: "tv-token",
+        tvtimeMarkMoviesAsRewatched: false,
+        tvtimeMarkEpisodesAsRewatched: false,
+        traktClientId: "trakt-client-id",
+        traktClientSecret: "trakt-secret",
+        traktAccessToken: "trakt-token",
+      },
+      mediaType: "movie",
+      mediaTitle: "Interstellar",
+      source: "plex",
+      originalMediaId: "plex-media-id",
+      tvdbMovieId: "123",
+      destinations: JSON.stringify(["TVTime"]),
+      success: true,
+      errorMessage: "Trakt: Trakt token expired or revoked",
+      syncedAt: new Date("2026-01-01T00:00:00.000Z"),
+    } as never);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        destinations: ["Trakt"],
+        errorMessage: undefined,
+      })
+    );
+    expect(traktClientMocks.scrobble).toHaveBeenCalledTimes(1);
+    expect(syncHistoryRepositoryMocks.create).not.toHaveBeenCalled();
+    expect(syncHistoryRepositoryMocks.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "sync-history-id",
+        success: true,
+        errorMessage: undefined,
+        destinations: JSON.stringify(["TVTime", "Trakt"]),
       })
     );
   });

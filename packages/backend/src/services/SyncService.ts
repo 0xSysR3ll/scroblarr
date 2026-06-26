@@ -11,8 +11,18 @@ import { TVTimeTokenManager } from "@integrations/tvtime/TVTimeTokenManager";
 import { SettingsRepository } from "@repositories/SettingsRepository";
 import { SyncHistoryRepository } from "@repositories/SyncHistoryRepository";
 import { UserRepository } from "@repositories/UserRepository";
-import { MediaEvent } from "@scroblarr/shared";
+import { MediaEvent, serializeDestinationResults } from "@scroblarr/shared";
 import { logger } from "@utils/logger";
+
+import {
+  buildAttemptResult,
+  buildGlobalFailureResult,
+  getRetryDestinationNamesFromHistory,
+  mergeRetryAttemptIntoHistory,
+  type SyncAttemptResult,
+} from "./syncHistoryDestinationResults";
+
+export type { SyncAttemptResult };
 
 interface SyncDestination {
   name: string;
@@ -21,12 +31,6 @@ interface SyncDestination {
   getAccessToken: (user: User) => Promise<string>;
   refreshAccessToken?: (user: User) => Promise<string>;
   getSyncOptions?: (user: User, hasExistingSync: boolean) => SyncOptions;
-}
-
-export interface SyncAttemptResult {
-  success: boolean;
-  destinations: string[];
-  errorMessage?: string;
 }
 
 interface SyncEventForUserOptions {
@@ -196,16 +200,11 @@ export class SyncService {
 
     const result = await this.syncEventForUser(user, retryEvent, {
       saveFailedHistory: false,
-      destinationNames: this.getRetryDestinationNames(historyItem),
+      destinationNames: getRetryDestinationNamesFromHistory(historyItem),
     });
 
     if (result.success) {
-      historyItem.success = result.errorMessage === undefined;
-      historyItem.errorMessage = result.errorMessage;
-      historyItem.destinations =
-        result.destinations.length > 0
-          ? JSON.stringify(result.destinations)
-          : undefined;
+      mergeRetryAttemptIntoHistory(historyItem, result.destinationResults);
       historyItem.retriedAt = new Date();
       await this.syncHistoryRepository.save(historyItem);
     }
@@ -246,42 +245,6 @@ export class SyncService {
     return mediaId;
   }
 
-  private getRetryDestinationNames(
-    historyItem: SyncHistory
-  ): string[] | undefined {
-    const destinationNames = ["TVTime", "Trakt", "Simkl"];
-    const fromErrorMessage = destinationNames.filter((destination) =>
-      historyItem.errorMessage?.includes(`${destination}:`)
-    );
-
-    if (fromErrorMessage.length > 0) {
-      return fromErrorMessage;
-    }
-
-    if (!historyItem.destinations) {
-      return undefined;
-    }
-
-    try {
-      const parsed = JSON.parse(historyItem.destinations);
-      if (!Array.isArray(parsed)) {
-        return undefined;
-      }
-
-      const fromStoredDestinations = parsed.filter(
-        (destination): destination is string =>
-          typeof destination === "string" &&
-          destinationNames.includes(destination)
-      );
-
-      return fromStoredDestinations.length > 0
-        ? fromStoredDestinations
-        : undefined;
-    } catch {
-      return undefined;
-    }
-  }
-
   private async syncEventForUser(
     user: User,
     event: MediaEvent,
@@ -301,20 +264,12 @@ export class SyncService {
         "User is disabled, skipping sync"
       );
       if (saveFailedHistory) {
-        await this.saveSyncHistory(
-          user.id,
-          event,
-          false,
-          "User account is disabled",
-          false,
-          []
+        const failureResult = buildGlobalFailureResult(
+          "User account is disabled"
         );
+        await this.saveSyncHistory(user.id, event, failureResult, false);
       }
-      return {
-        success: false,
-        destinations: [],
-        errorMessage: "User account is disabled",
-      };
+      return buildGlobalFailureResult("User account is disabled");
     }
 
     const syncDestinations = await this.getSyncDestinations(user);
@@ -343,20 +298,12 @@ export class SyncService {
         "User has no sync destinations configured, skipping sync"
       );
       if (saveFailedHistory) {
-        await this.saveSyncHistory(
-          user.id,
-          event,
-          false,
-          "No sync destinations configured",
-          false,
-          []
+        const failureResult = buildGlobalFailureResult(
+          "No sync destinations configured"
         );
+        await this.saveSyncHistory(user.id, event, failureResult, false);
       }
-      return {
-        success: false,
-        destinations: [],
-        errorMessage: "No sync destinations configured",
-      };
+      return buildGlobalFailureResult("No sync destinations configured");
     }
 
     const userIdentifier =
@@ -454,50 +401,26 @@ export class SyncService {
       }
     }
 
-    const allSuccessful = syncResults.every((r) => r.success);
-    const atLeastOneSuccess = syncResults.some((r) => r.success);
-    const successfulDestinations = syncResults
-      .filter((r) => r.success)
-      .map((r) => r.destination);
-    const tvtimeSucceeded = successfulDestinations.includes("TVTime");
+    const attemptResult = buildAttemptResult(syncResults);
+    const tvtimeSucceeded = attemptResult.destinations.includes("TVTime");
     const wasRewatched =
       tvtimeSucceeded &&
       (event.media.type === "movie"
         ? user.tvtimeMarkMoviesAsRewatched && hasExistingSync
         : user.tvtimeMarkEpisodesAsRewatched && hasExistingSync);
 
-    const errorMessage = allSuccessful
-      ? undefined
-      : syncResults
-          .filter((r) => !r.success)
-          .map((r) => `${r.destination}: ${r.error}`)
-          .join("; ");
-
-    if (atLeastOneSuccess || saveFailedHistory) {
-      await this.saveSyncHistory(
-        user.id,
-        event,
-        atLeastOneSuccess,
-        errorMessage,
-        wasRewatched,
-        successfulDestinations
-      );
+    if (saveFailedHistory) {
+      await this.saveSyncHistory(user.id, event, attemptResult, wasRewatched);
     }
 
-    return {
-      success: atLeastOneSuccess,
-      destinations: successfulDestinations,
-      errorMessage,
-    };
+    return attemptResult;
   }
 
   private async saveSyncHistory(
     userId: string,
     event: MediaEvent,
-    success: boolean,
-    errorMessage?: string,
-    wasRewatched?: boolean,
-    destinations?: string[]
+    attemptResult: SyncAttemptResult,
+    wasRewatched?: boolean
   ): Promise<void> {
     try {
       let posterUrl = event.media.posterUrl;
@@ -550,13 +473,16 @@ export class SyncService {
         seasonNumber: event.media.seasonNumber,
         episodeNumber: event.media.episodeNumber,
         year: event.media.year,
-        success,
-        errorMessage,
+        success: attemptResult.success,
+        errorMessage: attemptResult.errorMessage,
         wasRewatched: wasRewatched ?? false,
         destinations:
-          destinations && destinations.length > 0
-            ? JSON.stringify(destinations)
+          attemptResult.destinations.length > 0
+            ? JSON.stringify(attemptResult.destinations)
             : undefined,
+        destinationResults: serializeDestinationResults(
+          attemptResult.destinationResults
+        ),
       });
 
       const limitSetting =

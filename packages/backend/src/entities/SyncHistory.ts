@@ -77,6 +77,9 @@ export class SyncHistory {
   @Column({ type: "text", nullable: true })
   destinations?: string;
 
+  @Column({ type: "text", nullable: true })
+  destinationResults?: string;
+
   @CreateDateColumn()
   syncedAt!: Date;
 

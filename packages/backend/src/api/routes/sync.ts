@@ -1,7 +1,11 @@
 import { auth } from "@middleware/auth";
 import { SettingsRepository } from "@repositories/SettingsRepository";
 import { SyncHistoryRepository } from "@repositories/SyncHistoryRepository";
-import { isPlexServerUrl } from "@scroblarr/shared";
+import {
+  isPlexServerUrl,
+  parseDestinationResultsFromHistory,
+  parseDestinationResultsJson,
+} from "@scroblarr/shared";
 import { SyncService } from "@services/SyncService";
 import { logger } from "@utils/logger";
 import { routeParam } from "@utils/routeParams";
@@ -177,6 +181,9 @@ router.get("/history", auth, async (req: Request, res: Response) => {
           destinations = undefined;
         }
       }
+      const destinationResults =
+        parseDestinationResultsJson(item.destinationResults) ??
+        (item.success ? parseDestinationResultsFromHistory(item) : undefined);
       return {
         id: item.id,
         userId: item.userId,
@@ -199,6 +206,7 @@ router.get("/history", auth, async (req: Request, res: Response) => {
         errorMessage: item.errorMessage,
         wasRewatched: item.wasRewatched,
         destinations,
+        destinationResults,
         syncedAt: item.syncedAt,
         retriedAt: item.retriedAt,
       };

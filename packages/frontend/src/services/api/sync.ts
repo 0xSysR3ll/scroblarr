@@ -1,3 +1,5 @@
+import type { SyncDestinationResults } from "@scroblarr/shared";
+
 import { API_BASE_URL, getAuthHeaders } from "./common";
 
 export interface SyncHistoryItem {
@@ -22,6 +24,7 @@ export interface SyncHistoryItem {
   errorMessage?: string;
   wasRewatched?: boolean;
   destinations?: string[];
+  destinationResults?: SyncDestinationResults;
   syncedAt: string;
   retriedAt?: string;
 }

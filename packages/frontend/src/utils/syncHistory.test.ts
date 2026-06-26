@@ -32,6 +32,103 @@ describe("sync history utils", () => {
     vi.useRealTimers();
   });
 
+  it("uses structured destination results when present", () => {
+    expect(
+      getDestinationResults(
+        syncItem({
+          destinations: ["Simkl"],
+          destinationResults: {
+            TVTime: { status: "success" },
+            Trakt: { status: "success" },
+            Simkl: { status: "failed", error: "could not match" },
+          },
+        })
+      )
+    ).toEqual([
+      { name: "TVTime", status: "success" },
+      { name: "Trakt", status: "success" },
+      {
+        name: "Simkl",
+        status: "failed",
+        errorMessage: "could not match",
+      },
+    ]);
+    expect(
+      getSyncStatus(
+        syncItem({
+          destinations: ["Simkl"],
+          destinationResults: {
+            TVTime: { status: "success" },
+            Trakt: { status: "success" },
+            Simkl: { status: "failed", error: "could not match" },
+          },
+        })
+      )
+    ).toBe("partial");
+  });
+
+  it("classifies structured sync status for full success and full failure", () => {
+    expect(
+      getSyncStatus(
+        syncItem({
+          destinationResults: {
+            TVTime: { status: "success" },
+            Trakt: { status: "success" },
+          },
+        })
+      )
+    ).toBe("success");
+
+    expect(
+      getSyncStatus(
+        syncItem({
+          success: true,
+          destinationResults: {
+            TVTime: { status: "failed", error: "down" },
+            Trakt: { status: "failed", error: "401" },
+          },
+        })
+      )
+    ).toBe("failed");
+
+    expect(
+      getSyncStatus(
+        syncItem({
+          success: false,
+          destinationResults: {
+            TVTime: { status: "success" },
+            Trakt: { status: "success" },
+          },
+        })
+      )
+    ).toBe("failed");
+  });
+
+  it("returns only destinations present in structured results", () => {
+    expect(
+      getDestinationResults(
+        syncItem({
+          destinationResults: {
+            TVTime: { status: "success" },
+          },
+        })
+      )
+    ).toEqual([{ name: "TVTime", status: "success" }]);
+  });
+
+  it("marks all-failed structured items as retryable", () => {
+    expect(
+      isRetryableSyncItem(
+        syncItem({
+          success: true,
+          destinationResults: {
+            TVTime: { status: "failed", error: "down" },
+          },
+        })
+      )
+    ).toBe(true);
+  });
+
   it("classifies sync status from success and error state", () => {
     expect(getSyncStatus(syncItem())).toBe("success");
     expect(getSyncStatus(syncItem({ errorMessage: "TVTime: duplicate" }))).toBe(
@@ -46,6 +143,13 @@ describe("sync history utils", () => {
       isRetryableSyncItem(syncItem({ errorMessage: "TVTime: duplicate" }))
     ).toBe(true);
     expect(isRetryableSyncItem(syncItem({ success: false }))).toBe(true);
+  });
+
+  it("returns successful destinations from legacy fields without errors", () => {
+    expect(getDestinationResults(syncItem())).toEqual([
+      { name: "TVTime", status: "success" },
+      { name: "Trakt", status: "success" },
+    ]);
   });
 
   it("maps destination-specific partial failures", () => {
