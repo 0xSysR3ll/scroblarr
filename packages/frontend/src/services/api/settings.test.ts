@@ -82,4 +82,21 @@ describe("settings api", () => {
       body: JSON.stringify({ tmdbAccessToken: "draft-token" }),
     });
   });
+
+  it("throws when TMDB connection test fails", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          success: false,
+          message: "Invalid TMDB access token",
+        },
+        false,
+        401
+      )
+    );
+
+    await expect(testTmdbConnection("bad-token")).rejects.toThrow(
+      "Invalid TMDB access token"
+    );
+  });
 });

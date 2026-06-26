@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { testTmdbAccessToken } from "./testTmdbAccess";
+import {
+  testTmdbAccessToken,
+  toTmdbConnectionTestError,
+} from "./testTmdbAccess";
+import { TmdbRateLimitError } from "./TmdbApiError";
 
 describe("testTmdbAccessToken", () => {
   afterEach(() => {
@@ -50,6 +54,35 @@ describe("testTmdbAccessToken", () => {
       success: false,
       status: 429,
       message: "TMDB rate limit exceeded. Try again shortly.",
+    });
+  });
+
+  it("returns a generic API error for other failures", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+      })
+    );
+
+    await expect(testTmdbAccessToken("valid-token")).resolves.toEqual({
+      success: false,
+      status: 503,
+      message: "TMDB API returned 503",
+    });
+  });
+
+  it("maps unexpected errors to a connection failure", () => {
+    expect(toTmdbConnectionTestError(new TmdbRateLimitError())).toEqual({
+      success: false,
+      status: 429,
+      message: "TMDB rate limit exceeded. Try again shortly.",
+    });
+    expect(toTmdbConnectionTestError(new Error("network"))).toEqual({
+      success: false,
+      status: 500,
+      message: "Failed to reach TMDB API",
     });
   });
 });

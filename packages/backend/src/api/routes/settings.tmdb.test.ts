@@ -92,4 +92,51 @@ describe("settings TMDB test route", () => {
       message: "No TMDB access token configured",
     });
   });
+
+  it("uses the saved settings token when the request body is empty", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      tmdbAccessToken: "saved-token",
+    });
+    testTmdbAccessMocks.testTmdbAccessToken.mockResolvedValue({
+      success: true,
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/settings", settingsRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/settings/tmdb/test")
+      .set("authorization", "Bearer admin-token")
+      .send({});
+
+    expect(response.status).toBe(200);
+    expect(testTmdbAccessMocks.testTmdbAccessToken).toHaveBeenCalledWith(
+      "saved-token"
+    );
+  });
+
+  it("returns TMDB validation failures from the test endpoint", async () => {
+    testTmdbAccessMocks.testTmdbAccessToken.mockResolvedValue({
+      success: false,
+      status: 401,
+      message: "Invalid TMDB access token",
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/settings", settingsRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/settings/tmdb/test")
+      .set("authorization", "Bearer admin-token")
+      .send({ tmdbAccessToken: "bad-token" });
+
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({
+      success: false,
+      status: 401,
+      message: "Invalid TMDB access token",
+    });
+  });
 });
