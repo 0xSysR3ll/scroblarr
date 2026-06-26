@@ -211,6 +211,10 @@ describe("settings TMDB test route", () => {
       status: 429,
       message: "TMDB rate limit exceeded. Try again shortly.",
     });
+    expect(logger.api.error).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.any(TmdbRateLimitError) }),
+      "Error testing TMDB access token"
+    );
   });
 
   it("returns validation errors for invalid TMDB test payloads", async () => {
