@@ -18,6 +18,7 @@ describe("PlexWebhookParser", () => {
         parentIndex: 1,
         index: 2,
         Guid: [{ id: "tvdb://12345" }, { id: "imdb://tt7654321" }],
+        grandparentPrimaryGuid: "tmdb://54321",
         grandparentThumb: "/library/metadata/42/thumb",
       },
     };
@@ -37,6 +38,7 @@ describe("PlexWebhookParser", () => {
         episodeNumber: 2,
         tvdbEpisodeId: 12345,
         imdbEpisodeId: "tt7654321",
+        tmdbSeriesId: 54321,
         posterUrl: "https://plex.local:32400/library/metadata/42/thumb",
       },
     });

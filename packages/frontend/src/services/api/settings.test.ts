@@ -5,6 +5,7 @@ import {
   getSettings,
   removeJellyfinServer,
   removePlexServer,
+  testTmdbConnection,
   updateSettings,
 } from "./settings";
 
@@ -66,5 +67,19 @@ describe("settings api", () => {
     await expect(updateSettings({ apiKey: "secret" })).rejects.toThrow(
       "Failed to update settings"
     );
+  });
+
+  it("tests TMDB connection through the dedicated endpoint", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ success: true }));
+
+    await expect(testTmdbConnection("draft-token")).resolves.toEqual({
+      success: true,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/settings/tmdb/test", {
+      method: "POST",
+      headers: expectedHeaders,
+      body: JSON.stringify({ tmdbAccessToken: "draft-token" }),
+    });
   });
 });

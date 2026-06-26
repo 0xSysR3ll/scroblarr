@@ -98,6 +98,6 @@ describe("sync poster sensitive access", () => {
       .set("authorization", "Bearer owner-token");
 
     expect(response.status).toBe(404);
-    expect(response.body).toEqual({ error: "No poster URL available" });
+    expect(response.body).toEqual({ error: "No poster available" });
   });
 });

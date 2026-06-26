@@ -2,10 +2,10 @@ import { auth } from "@middleware/auth";
 import { SettingsRepository } from "@repositories/SettingsRepository";
 import { SyncHistoryRepository } from "@repositories/SyncHistoryRepository";
 import {
-  isPlexServerUrl,
   parseDestinationResultsFromHistory,
   parseDestinationResultsJson,
 } from "@scroblarr/shared";
+import { hasPosterLookupData, PosterService } from "@services/PosterService";
 import { SyncService } from "@services/SyncService";
 import { logger } from "@utils/logger";
 import { routeParam } from "@utils/routeParams";
@@ -15,6 +15,7 @@ const router = Router();
 const syncHistoryRepository = new SyncHistoryRepository();
 const settingsRepository = new SettingsRepository();
 const syncService = new SyncService();
+const posterService = new PosterService();
 
 async function retryHistoryItemForUser(
   id: string,
@@ -375,8 +376,8 @@ router.get("/poster/:id", auth, async (req: Request, res: Response) => {
       return res.status(403).json({ error: "Forbidden" });
     }
 
-    if (!syncHistory.posterUrl) {
-      return res.status(404).json({ error: "No poster URL available" });
+    if (!hasPosterLookupData(syncHistory)) {
+      return res.status(404).json({ error: "No poster available" });
     }
 
     const user = syncHistory.user;
@@ -384,110 +385,16 @@ router.get("/poster/:id", auth, async (req: Request, res: Response) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    const posterUrl = syncHistory.posterUrl;
+    const settings = await settingsRepository.getAll();
+    const result = await posterService.fetchPoster(syncHistory, user, settings);
 
-    if (isPlexServerUrl(posterUrl)) {
-      if (!user.plexAccessToken) {
-        return res.status(403).json({
-          error: "Plex authentication required",
-        });
-      }
-
-      try {
-        const settings = await settingsRepository.getAll();
-        if (!settings.plexServerUrl) {
-          return res.status(500).json({
-            error: "Plex server not configured",
-          });
-        }
-
-        const url = new URL(posterUrl);
-        const thumbPath = url.pathname;
-
-        const serverUrl = settings.plexServerUrl.replace(/\/$/, "");
-        const imageUrl = `${serverUrl}${thumbPath}`;
-
-        const response = await fetch(imageUrl, {
-          headers: {
-            "X-Plex-Token": user.plexAccessToken,
-          },
-        });
-
-        if (!response.ok) {
-          return res.status(response.status).json({
-            error: "Failed to fetch poster image",
-          });
-        }
-
-        const contentType =
-          response.headers.get("content-type") || "image/jpeg";
-        const imageBuffer = await response.arrayBuffer();
-
-        res.setHeader("Content-Type", contentType);
-        res.setHeader("Cache-Control", "public, max-age=86400");
-        return res.send(Buffer.from(imageBuffer));
-      } catch (error) {
-        logger.api.error({ error, posterUrl }, "Error proxying Plex poster");
-        return res.status(500).json({ error: "Failed to fetch poster image" });
-      }
+    if ("message" in result) {
+      return res.status(result.status).json({ error: result.message });
     }
 
-    if (syncHistory.source === "jellyfin") {
-      if (!user.jellyfinAccessToken) {
-        return res.status(403).json({
-          error: "Jellyfin authentication required",
-        });
-      }
-
-      try {
-        const settings = await settingsRepository.getAll();
-        if (!settings.jellyfinHost) {
-          return res.status(500).json({
-            error: "Jellyfin server not configured",
-          });
-        }
-
-        const { JellyfinClient } =
-          await import("@integrations/jellyfin/JellyfinClient");
-        const jellyfinClient = new JellyfinClient(settings.jellyfinHost);
-
-        const { buffer, contentType } = await jellyfinClient.fetchImage(
-          user.jellyfinAccessToken,
-          posterUrl
-        );
-
-        res.setHeader("Content-Type", contentType);
-        res.setHeader("Cache-Control", "public, max-age=86400");
-        return res.send(Buffer.from(buffer));
-      } catch (error) {
-        logger.api.error(
-          { error, posterUrl },
-          "Error proxying Jellyfin poster"
-        );
-        return res.status(500).json({ error: "Failed to fetch poster image" });
-      }
-    }
-
-    try {
-      const response = await fetch(posterUrl, {
-        headers: { Accept: "image/*" },
-      });
-      if (!response.ok) {
-        return res.status(response.status).json({
-          error: "Failed to fetch poster image",
-        });
-      }
-
-      const contentType = response.headers.get("content-type") || "image/jpeg";
-      const imageBuffer = await response.arrayBuffer();
-
-      res.setHeader("Content-Type", contentType);
-      res.setHeader("Cache-Control", "public, max-age=86400");
-      return res.send(Buffer.from(imageBuffer));
-    } catch (error) {
-      logger.api.error({ error, posterUrl }, "Error proxying generic poster");
-      return res.status(500).json({ error: "Failed to fetch poster image" });
-    }
+    res.setHeader("Content-Type", result.contentType);
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    return res.send(result.buffer);
   } catch (error) {
     logger.api.error({ error }, "Error fetching poster");
     return res.status(500).json({ error: "Internal server error" });

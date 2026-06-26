@@ -201,6 +201,7 @@ export class JellyfinWebhookParser {
 
     if (itemType === "Episode") {
       const tvdbEpisodeId = extractTvdbId(providerTvdb);
+      const tmdbSeriesId = extractTmdbId(providerTmdb);
       const imdbEpisodeId =
         providerImdb && providerImdb.trim() !== "" ? providerImdb : undefined;
       const seasonNum = seasonNumber ? parseInt(seasonNumber, 10) : undefined;
@@ -219,6 +220,7 @@ export class JellyfinWebhookParser {
         watchedDuration: ticksToMs(playbackPositionTicks),
         tvdbEpisodeId,
         imdbEpisodeId,
+        tmdbSeriesId,
         posterUrl,
       };
     }

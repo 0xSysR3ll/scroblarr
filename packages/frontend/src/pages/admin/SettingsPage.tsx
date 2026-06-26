@@ -45,6 +45,7 @@ export function SettingsPage() {
   const [editingServer, setEditingServer] = useState<string | null>(null);
   const [syncHistoryLimit, setSyncHistoryLimit] = useState<number>(100);
   const [apiKey, setApiKey] = useState<string>("");
+  const [tmdbAccessToken, setTmdbAccessToken] = useState<string>("");
   const [jellyfinSettings, setJellyfinSettings] = useState<{
     hostname: string;
     port: number;
@@ -173,6 +174,10 @@ export function SettingsPage() {
           setApiKey(settingsData.apiKey);
         }
 
+        if (settingsData.tmdbAccessToken) {
+          setTmdbAccessToken(settingsData.tmdbAccessToken);
+        }
+
         if (settingsData.jellyfinHost) {
           const hostname = settingsData.jellyfinHost
             .replace(/^https?:\/\//, "")
@@ -243,8 +248,11 @@ export function SettingsPage() {
         syncHistoryLimit: syncHistoryLimit,
       };
 
-      if (activeTab === "general" && apiKey) {
-        updated.apiKey = apiKey;
+      if (activeTab === "general") {
+        if (apiKey) {
+          updated.apiKey = apiKey;
+        }
+        updated.tmdbAccessToken = tmdbAccessToken;
       }
 
       if (activeTab === "mediaServer") {
@@ -423,6 +431,8 @@ export function SettingsPage() {
               onSyncHistoryLimitChange={setSyncHistoryLimit}
               apiKey={apiKey}
               onApiKeyChange={setApiKey}
+              tmdbAccessToken={tmdbAccessToken}
+              onTmdbAccessTokenChange={setTmdbAccessToken}
             />
           )}
 

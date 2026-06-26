@@ -228,7 +228,7 @@ describe("sync history utils", () => {
     ).toBe(false);
   });
 
-  it("proxies Jellyfin poster URLs through the backend", () => {
+  it("proxies poster URLs through the backend", () => {
     expect(
       getPosterUrl(
         syncItem({
@@ -238,6 +238,18 @@ describe("sync history utils", () => {
         })
       )
     ).toBe("/api/v1/sync/poster/poster-1");
+  });
+
+  it("proxies posters when only external IDs are available", () => {
+    expect(
+      getPosterUrl(
+        syncItem({
+          id: "poster-2",
+          posterUrl: undefined,
+          tmdbMovieId: "123",
+        })
+      )
+    ).toBe("/api/v1/sync/poster/poster-2");
   });
 
   it("formats episode and movie titles with complete metadata", () => {

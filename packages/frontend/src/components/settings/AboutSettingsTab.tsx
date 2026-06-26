@@ -245,6 +245,13 @@ export function AboutSettingsTab({ versionInfo }: AboutSettingsTabProps) {
         </div>
 
         <p className="mt-4 border-t border-border/50 pt-3 text-[10px] leading-relaxed text-muted-foreground sm:text-xs">
+          {t("settings.about.tmdbAttribution", {
+            defaultValue:
+              "This product uses the TMDB API but is not endorsed or certified by TMDB.",
+          })}
+        </p>
+
+        <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground sm:text-xs">
           {t("settings.about.trademarkDisclaimer", {
             defaultValue:
               "Plex, Jellyfin, Trakt, TVTime, and related marks are trademarks of their respective owners. Scroblarr is an independent project and is not sponsored, endorsed, or affiliated with those services.",
