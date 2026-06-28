@@ -254,6 +254,8 @@ export function SettingsPage() {
         }
         if (tmdbAccessToken) {
           updated.tmdbAccessToken = tmdbAccessToken;
+        } else if (settings.tmdbAccessToken) {
+          updated.tmdbAccessToken = "";
         }
       }
 

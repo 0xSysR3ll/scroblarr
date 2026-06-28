@@ -140,6 +140,31 @@ describe("SettingsPage", () => {
     });
   });
 
+  it("clears a saved TMDB token when the field is emptied", async () => {
+    vi.mocked(updateSettings).mockResolvedValue({
+      syncHistoryLimit: "100",
+    });
+
+    const user = userEvent.setup();
+    renderWithProviders(<SettingsPage />, { route: "/settings?tab=general" });
+
+    const tokenInput = await screen.findByLabelText(
+      "TMDB API Read Access Token"
+    );
+    await waitFor(() => {
+      expect(tokenInput).toHaveValue("saved-token");
+    });
+    await user.clear(tokenInput);
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(updateSettings).toHaveBeenCalledWith({
+        syncHistoryLimit: 100,
+        tmdbAccessToken: "",
+      });
+    });
+  });
+
   it("includes the API key in general settings saves when present", async () => {
     vi.mocked(getSettings).mockResolvedValue({
       syncHistoryLimit: "100",

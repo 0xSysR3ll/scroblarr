@@ -334,6 +334,17 @@ describe("TmdbClient", () => {
         imdbEpisodeId: "tt7654321",
       })
     ).resolves.toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "https://api.themoviedb.org/3/find/tt7654321?external_source=imdb_id",
+      expect.any(Object)
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "https://api.themoviedb.org/3/tv/789",
+      expect.any(Object)
+    );
   });
 
   it("returns null when movie fallbacks exhaust all lookup sources", async () => {
@@ -369,6 +380,22 @@ describe("TmdbClient", () => {
         tvdbMovieId: "218",
       })
     ).resolves.toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "https://api.themoviedb.org/3/movie/123",
+      expect.any(Object)
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "https://api.themoviedb.org/3/find/tt1234567?external_source=imdb_id",
+      expect.any(Object)
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      "https://api.themoviedb.org/3/find/218?external_source=tvdb_id",
+      expect.any(Object)
+    );
   });
 
   it("supports TV find results when resolving TV poster paths", async () => {
