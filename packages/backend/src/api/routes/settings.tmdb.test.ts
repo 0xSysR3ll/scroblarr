@@ -167,6 +167,27 @@ describe("settings TMDB test route", () => {
     );
   });
 
+  it("handles a missing parsed body when no JSON middleware is mounted", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      tmdbAccessToken: "saved-token",
+    });
+    testTmdbAccessMocks.testTmdbAccessToken.mockResolvedValue({
+      success: true,
+    });
+
+    const app = express();
+    app.use("/api/v1/settings", settingsRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/settings/tmdb/test")
+      .set("authorization", "Bearer admin-token");
+
+    expect(response.status).toBe(200);
+    expect(testTmdbAccessMocks.testTmdbAccessToken).toHaveBeenCalledWith(
+      "saved-token"
+    );
+  });
+
   it("returns TMDB validation failures from the test endpoint", async () => {
     testTmdbAccessMocks.testTmdbAccessToken.mockResolvedValue({
       success: false,
