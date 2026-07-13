@@ -5,6 +5,7 @@ import {
   getSettings,
   removeJellyfinServer,
   removePlexServer,
+  testTmdbConnection,
   updateSettings,
 } from "./settings";
 
@@ -27,6 +28,12 @@ describe("settings api", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/v1/settings", {
       headers: expectedHeaders,
     });
+  });
+
+  it("throws when settings cannot be loaded", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, false));
+
+    await expect(getSettings()).rejects.toThrow("Failed to fetch settings");
   });
 
   it("updates settings with a PATCH body", async () => {
@@ -60,11 +67,78 @@ describe("settings api", () => {
     });
   });
 
+  it("throws when media server removal fails", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, false));
+
+    await expect(removePlexServer()).rejects.toThrow(
+      "Failed to remove Plex server"
+    );
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, false));
+
+    await expect(removeJellyfinServer()).rejects.toThrow(
+      "Failed to remove Jellyfin server"
+    );
+  });
+
   it("throws on failed settings updates", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({}, false));
 
     await expect(updateSettings({ apiKey: "secret" })).rejects.toThrow(
       "Failed to update settings"
+    );
+  });
+
+  it("tests TMDB connection through the dedicated endpoint", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ success: true }));
+
+    await expect(testTmdbConnection("draft-token")).resolves.toEqual({
+      success: true,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/settings/tmdb/test", {
+      method: "POST",
+      headers: expectedHeaders,
+      body: JSON.stringify({ tmdbAccessToken: "draft-token" }),
+    });
+  });
+
+  it("throws when TMDB connection test fails", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          success: false,
+          message: "Invalid TMDB access token",
+        },
+        false,
+        401
+      )
+    );
+
+    await expect(testTmdbConnection("bad-token")).rejects.toThrow(
+      "Invalid TMDB access token"
+    );
+  });
+
+  it("tests TMDB connection without a draft token in the request body", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ success: true }));
+
+    await expect(testTmdbConnection()).resolves.toEqual({ success: true });
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/settings/tmdb/test", {
+      method: "POST",
+      headers: expectedHeaders,
+      body: JSON.stringify({}),
+    });
+  });
+
+  it("uses a fallback message when TMDB test failures omit details", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ success: false }, false, 500)
+    );
+
+    await expect(testTmdbConnection("token")).rejects.toThrow(
+      "Failed to test TMDB connection"
     );
   });
 });

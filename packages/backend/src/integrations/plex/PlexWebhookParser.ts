@@ -29,7 +29,7 @@ export interface PlexWebhookPayload {
     parentIndex?: number;
     duration?: number;
     viewOffset?: number;
-    Guid?: Array<{ id: string }> | string;
+    Guid?: Array<{ id: string } | string> | string;
     guid?: string;
     primaryGuid?: string;
     subtype?: string;
@@ -38,6 +38,8 @@ export interface PlexWebhookPayload {
     art?: string;
     grandparentThumb?: string;
     parentThumb?: string;
+    grandparentGuid?: string;
+    grandparentPrimaryGuid?: string;
   };
 }
 
@@ -198,6 +200,23 @@ export class PlexWebhookParser {
 
     if (metadata.type === "episode") {
       const { tvdbId, imdbId } = extractIds();
+      const extractSeriesTmdbId = (): number | undefined => {
+        const sources = [
+          metadata.grandparentPrimaryGuid,
+          metadata.grandparentGuid,
+        ].filter((guid): guid is string => typeof guid === "string");
+
+        for (const guid of sources) {
+          if (guid.startsWith("tmdb://")) {
+            const match = guid.match(/tmdb:\/\/(\d+)/);
+            if (match) {
+              return parseInt(match[1], 10);
+            }
+          }
+        }
+
+        return undefined;
+      };
 
       return {
         id: `${metadata.type}-${metadata.grandparentTitle}-${metadata.parentIndex}-${metadata.index}`,
@@ -210,6 +229,7 @@ export class PlexWebhookParser {
         watchedDuration: metadata.viewOffset,
         tvdbEpisodeId: tvdbId,
         imdbEpisodeId: imdbId,
+        tmdbSeriesId: extractSeriesTmdbId(),
         posterUrl,
       };
     }

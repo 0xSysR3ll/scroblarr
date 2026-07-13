@@ -1,3 +1,8 @@
+import {
+  testTmdbAccessToken,
+  toTmdbConnectionTestError,
+} from "@integrations/tmdb/testTmdbAccess";
+import { getTmdbAccessToken } from "@integrations/tmdb/tmdbConfig";
 import { SettingsRepository } from "@repositories/SettingsRepository";
 import { logger } from "@utils/logger";
 import { Router, Request, Response } from "express";
@@ -21,6 +26,11 @@ const updateSettingsSchema = z.object({
   jellyfinUrlBase: z.string().optional(),
   jellyfinApiKey: z.string().optional(),
   apiKey: z.string().min(1).optional(),
+  tmdbAccessToken: z.union([z.string().min(1), z.literal("")]).optional(),
+});
+
+const testTmdbSchema = z.object({
+  tmdbAccessToken: z.string().min(1).optional(),
 });
 
 router.use(adminAuth);
@@ -95,6 +105,15 @@ router.patch("/", async (req: Request, res: Response): Promise<void> => {
       await settingsRepository.set("apiKey", validated.apiKey.trim());
     }
 
+    if (validated.tmdbAccessToken !== undefined) {
+      const token = validated.tmdbAccessToken.trim();
+      if (token === "") {
+        await settingsRepository.delete("tmdbAccessToken");
+      } else {
+        await settingsRepository.set("tmdbAccessToken", token);
+      }
+    }
+
     const changedKeys = Object.keys(validated);
     logger.api.info(
       {
@@ -117,6 +136,45 @@ router.patch("/", async (req: Request, res: Response): Promise<void> => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+router.post(
+  "/tmdb/test",
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const validated = testTmdbSchema.parse(req.body ?? {});
+      const settings = await settingsRepository.getAll();
+      const accessToken =
+        validated.tmdbAccessToken?.trim() || getTmdbAccessToken(settings);
+
+      if (!accessToken) {
+        res.status(400).json({
+          success: false,
+          message: "No TMDB access token configured",
+        });
+        return;
+      }
+
+      const result = await testTmdbAccessToken(accessToken);
+      if (!result.success) {
+        res.status(result.status).json(result);
+        return;
+      }
+
+      res.json(result);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res
+          .status(400)
+          .json({ error: "Validation error", details: error.issues });
+        return;
+      }
+
+      logger.api.error({ error }, "Error testing TMDB access token");
+      const failure = toTmdbConnectionTestError(error);
+      res.status(failure.status).json(failure);
+    }
+  }
+);
 
 router.delete("/plex", async (req: Request, res: Response): Promise<void> => {
   try {

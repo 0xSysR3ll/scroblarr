@@ -203,7 +203,8 @@
       "issues": "Issues & feedback",
       "releases": "All releases",
       "license": "License (MIT)",
-      "trademarkDisclaimer": "Plex, Jellyfin, Trakt, TVTime, and related marks are trademarks of their respective owners. Scroblarr is an independent project and is not sponsored, endorsed, or affiliated with those services."
+      "trademarkDisclaimer": "Plex, Jellyfin, Trakt, TVTime, and related marks are trademarks of their respective owners. Scroblarr is an independent project and is not sponsored, endorsed, or affiliated with those services.",
+      "tmdbAttribution": "This product uses the TMDB API but is not endorsed or certified by TMDB."
     },
     "general": {
       "title": "General Settings",
@@ -217,7 +218,15 @@
       "generateApiKey": "Generate new API key",
       "generate": "Generate",
       "syncHistoryLimit": "Sync History Limit",
-      "syncHistoryLimitDescription": "Maximum number of sync history items to keep. Older items will be automatically removed. (10-10000)"
+      "syncHistoryLimitDescription": "Maximum number of sync history items to keep. Older items will be automatically removed. (10-10000)",
+      "tmdbAccessToken": "TMDB API Read Access Token",
+      "tmdbAccessTokenDescription": "Used to load posters from The Movie Database when media is no longer available on your server. You can also set TMDB_ACCESS_TOKEN in the environment.",
+      "tmdbAccessTokenLink": "Get a token from TMDB",
+      "tmdbAccessTokenPlaceholder": "eyJhbGciOiJIUzI1NiJ9...",
+      "tmdbTestSuccess": "TMDB connection successful",
+      "tmdbTestFailed": "TMDB connection failed",
+      "tmdbTesting": "Testing...",
+      "tmdbTest": "Test connection"
     },
     "jellyfinServerRemoved": "Jellyfin server removed successfully",
     "removeJellyfinServerFailed": "Failed to remove Jellyfin server",

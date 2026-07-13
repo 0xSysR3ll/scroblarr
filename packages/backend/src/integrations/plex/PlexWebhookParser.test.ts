@@ -18,6 +18,7 @@ describe("PlexWebhookParser", () => {
         parentIndex: 1,
         index: 2,
         Guid: [{ id: "tvdb://12345" }, { id: "imdb://tt7654321" }],
+        grandparentPrimaryGuid: "tmdb://54321",
         grandparentThumb: "/library/metadata/42/thumb",
       },
     };
@@ -37,6 +38,7 @@ describe("PlexWebhookParser", () => {
         episodeNumber: 2,
         tvdbEpisodeId: 12345,
         imdbEpisodeId: "tt7654321",
+        tmdbSeriesId: 54321,
         posterUrl: "https://plex.local:32400/library/metadata/42/thumb",
       },
     });
@@ -68,6 +70,74 @@ describe("PlexWebhookParser", () => {
         tmdbMovieId: 9876,
         posterUrl: "https://plex.local/base/library/metadata/99/thumb",
       },
+    });
+  });
+
+  it("uses grandparentGuid when grandparentPrimaryGuid is absent", () => {
+    const event = PlexWebhookParser.parse(
+      {
+        event: "media.scrobble",
+        user: { username: "plex-user" },
+        Metadata: {
+          type: "episode",
+          grandparentTitle: "Example Show",
+          parentIndex: 1,
+          index: 1,
+          grandparentGuid: "tmdb://2468",
+        },
+      },
+      "https://plex.local:32400/"
+    );
+
+    expect(event?.media).toMatchObject({
+      type: "episode",
+      tmdbSeriesId: 2468,
+    });
+  });
+
+  it("parses string Guid entries and omits series TMDB id when unavailable", () => {
+    const event = PlexWebhookParser.parse(
+      {
+        event: "media.scrobble",
+        user: { username: "plex-user" },
+        Metadata: {
+          type: "episode",
+          grandparentTitle: "Example Show",
+          parentIndex: 1,
+          index: 1,
+          Guid: ["tvdb://999", "imdb://tt1111111"],
+          grandparentGuid: "plex://show-guid",
+        },
+      },
+      "https://plex.local:32400/"
+    );
+
+    expect(event?.media).toMatchObject({
+      tvdbEpisodeId: 999,
+      imdbEpisodeId: "tt1111111",
+      tmdbSeriesId: undefined,
+    });
+  });
+
+  it("parses a single Guid string and ignores invalid server URLs", () => {
+    const event = PlexWebhookParser.parse(
+      {
+        event: "media.scrobble",
+        user: { username: "plex-user" },
+        Metadata: {
+          type: "movie",
+          title: "Example Movie",
+          Guid: "imdb://tt2222222",
+          thumb: "/library/metadata/1/thumb",
+        },
+      },
+      "not-a-valid-url"
+    );
+
+    expect(event?.media).toMatchObject({
+      type: "movie",
+      imdbMovieId: "tt2222222",
+      posterUrl: undefined,
     });
   });
 

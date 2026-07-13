@@ -2,7 +2,7 @@ import type {
   SyncDestinationName,
   SyncDestinationResults,
 } from "@scroblarr/shared";
-import { isPlexServerUrl, SYNC_DESTINATION_NAMES } from "@scroblarr/shared";
+import { SYNC_DESTINATION_NAMES } from "@scroblarr/shared";
 import type { SyncHistoryItem } from "@services/api";
 import { API_BASE_URL } from "@services/api/common";
 import { TFunction } from "i18next";
@@ -141,19 +141,29 @@ export function shouldShowRewatchedBadge(item: SyncHistoryItem): boolean {
 }
 
 /**
- * Generates a proxy URL for poster images if they're from Plex or Jellyfin
- * Otherwise returns the original URL
+ * Whether the backend can resolve a poster for this sync history item.
+ */
+export function hasPosterLookupData(item: SyncHistoryItem): boolean {
+  return Boolean(
+    item.posterUrl ||
+    item.tmdbMovieId ||
+    item.tmdbSeriesId ||
+    item.imdbMovieId ||
+    item.imdbEpisodeId ||
+    item.tvdbMovieId ||
+    item.tvdbEpisodeId
+  );
+}
+
+/**
+ * Generates a proxy URL for poster images served by the backend.
  */
 export function getPosterUrl(item: SyncHistoryItem): string | undefined {
-  if (!item.posterUrl) {
+  if (!hasPosterLookupData(item)) {
     return undefined;
   }
 
-  if (isPlexServerUrl(item.posterUrl) || item.source === "jellyfin") {
-    return `${API_BASE_URL}/sync/poster/${item.id}`;
-  }
-
-  return item.posterUrl;
+  return `${API_BASE_URL}/sync/poster/${item.id}`;
 }
 
 export function formatMediaTitle(item: SyncHistoryItem): string {

@@ -1,13 +1,24 @@
-import { showSuccess } from "@utils/toast";
+import { Spinner } from "@components/ui/spinner";
+import { testTmdbConnection } from "@services/api/settings";
+import { showSuccess, showError } from "@utils/toast";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FaHistory, FaEye, FaEyeSlash, FaSync, FaCopy } from "react-icons/fa";
+import {
+  FaHistory,
+  FaEye,
+  FaEyeSlash,
+  FaSync,
+  FaCopy,
+  FaPlug,
+} from "react-icons/fa";
 
 interface GeneralSettingsTabProps {
   syncHistoryLimit: number;
   onSyncHistoryLimitChange: (value: number) => void;
   apiKey: string;
   onApiKeyChange: (value: string) => void;
+  tmdbAccessToken: string;
+  onTmdbAccessTokenChange: (value: string) => void;
 }
 
 export function GeneralSettingsTab({
@@ -15,9 +26,13 @@ export function GeneralSettingsTab({
   onSyncHistoryLimitChange,
   apiKey,
   onApiKeyChange,
+  tmdbAccessToken,
+  onTmdbAccessTokenChange,
 }: GeneralSettingsTabProps) {
   const { t } = useTranslation();
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showTmdbAccessToken, setShowTmdbAccessToken] = useState(false);
+  const [testingTmdb, setTestingTmdb] = useState(false);
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -127,6 +142,106 @@ export function GeneralSettingsTab({
                 {t("settings.general.generate", {
                   defaultValue: "Generate",
                 })}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label
+            htmlFor="tmdbAccessToken"
+            className="mb-1 block text-sm font-medium text-foreground"
+          >
+            {t("settings.general.tmdbAccessToken", {
+              defaultValue: "TMDB API Read Access Token",
+            })}
+          </label>
+          <p className="mb-2 text-xs text-muted-foreground">
+            {t("settings.general.tmdbAccessTokenDescription", {
+              defaultValue:
+                "Used to load posters from The Movie Database when media is no longer available on your server. You can also set TMDB_ACCESS_TOKEN in the environment.",
+            })}{" "}
+            <a
+              href="https://www.themoviedb.org/settings/api"
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary underline underline-offset-2"
+            >
+              {t("settings.general.tmdbAccessTokenLink", {
+                defaultValue: "Get a token from TMDB",
+              })}
+            </a>
+          </p>
+          <div className="flex max-w-md flex-col gap-2 sm:flex-row sm:items-start">
+            <div className="relative flex-1">
+              <input
+                id="tmdbAccessToken"
+                type={showTmdbAccessToken ? "text" : "password"}
+                value={tmdbAccessToken}
+                onChange={(e) => onTmdbAccessTokenChange(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 pr-10 font-mono text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
+                placeholder={t("settings.general.tmdbAccessTokenPlaceholder", {
+                  defaultValue: "eyJhbGciOiJIUzI1NiJ9...",
+                })}
+              />
+              <button
+                type="button"
+                onClick={() => setShowTmdbAccessToken(!showTmdbAccessToken)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-muted-foreground transition-colors hover:text-foreground"
+                aria-label={
+                  showTmdbAccessToken
+                    ? "Hide TMDB access token"
+                    : "Show TMDB access token"
+                }
+              >
+                {showTmdbAccessToken ? (
+                  <FaEyeSlash className="w-4 h-4" />
+                ) : (
+                  <FaEye className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                setTestingTmdb(true);
+                try {
+                  await testTmdbConnection(
+                    tmdbAccessToken.trim() ? tmdbAccessToken.trim() : undefined
+                  );
+                  showSuccess(
+                    t("settings.general.tmdbTestSuccess", {
+                      defaultValue: "TMDB connection successful",
+                    })
+                  );
+                } catch (error) {
+                  showError(
+                    error instanceof Error
+                      ? error.message
+                      : t("settings.general.tmdbTestFailed", {
+                          defaultValue: "TMDB connection failed",
+                        })
+                  );
+                } finally {
+                  setTestingTmdb(false);
+                }
+              }}
+              disabled={testingTmdb}
+              className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-input bg-muted px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {testingTmdb ? (
+                <Spinner size="sm" />
+              ) : (
+                <FaPlug className="w-4 h-4" />
+              )}
+              <span>
+                {testingTmdb
+                  ? t("settings.general.tmdbTesting", {
+                      defaultValue: "Testing...",
+                    })
+                  : t("settings.general.tmdbTest", {
+                      defaultValue: "Test connection",
+                    })}
               </span>
             </button>
           </div>

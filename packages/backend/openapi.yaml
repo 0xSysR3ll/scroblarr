@@ -191,6 +191,10 @@ components:
           type: string
           nullable: true
           description: Global API key for API authentication
+        tmdbAccessToken:
+          type: string
+          nullable: true
+          description: TMDB API Read Access Token for poster lookups
 
     SettingsUpdate:
       type: object
@@ -222,6 +226,9 @@ components:
           type: string
           minLength: 1
           description: Global API key for API authentication
+        tmdbAccessToken:
+          type: string
+          description: TMDB API Read Access Token for poster lookups; empty string clears it
 
     SyncHistoryItem:
       type: object
@@ -1355,6 +1362,66 @@ paths:
           description: Unauthorized
         '403':
           description: Forbidden (not admin)
+        '500':
+          description: Internal server error
+
+  /api/v1/settings/tmdb/test:
+    post:
+      summary: Test TMDB API access token
+      tags: [Settings]
+      security:
+        - sessionAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tmdbAccessToken:
+                  type: string
+                  description: Optional token to test before saving; falls back to saved settings or TMDB_ACCESS_TOKEN
+      responses:
+        '200':
+          description: TMDB connection successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    enum: [true]
+        '400':
+          description: Missing token or validation error
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required: [success, message]
+                    properties:
+                      success:
+                        type: boolean
+                        enum: [false]
+                      message:
+                        type: string
+                        example: No TMDB access token configured
+                  - type: object
+                    required: [error]
+                    properties:
+                      error:
+                        type: string
+                        example: Validation error
+                      details:
+                        type: array
+                        items:
+                          type: object
+        '401':
+          description: Invalid TMDB access token
+        '429':
+          description: TMDB rate limit exceeded
         '500':
           description: Internal server error
 

@@ -7,6 +7,7 @@ import {
   formatRelativeTime,
   getDestinationResults,
   getPosterUrl,
+  hasPosterLookupData,
   getSyncStatus,
   isRetryableSyncItem,
   shouldShowRewatchedBadge,
@@ -228,7 +229,7 @@ describe("sync history utils", () => {
     ).toBe(false);
   });
 
-  it("proxies Jellyfin poster URLs through the backend", () => {
+  it("proxies poster URLs through the backend", () => {
     expect(
       getPosterUrl(
         syncItem({
@@ -238,6 +239,42 @@ describe("sync history utils", () => {
         })
       )
     ).toBe("/api/v1/sync/poster/poster-1");
+  });
+
+  it("detects when poster lookup data is available", () => {
+    expect(
+      hasPosterLookupData(
+        syncItem({
+          posterUrl: undefined,
+          tmdbSeriesId: "456",
+        })
+      )
+    ).toBe(true);
+    expect(
+      hasPosterLookupData(
+        syncItem({
+          posterUrl: undefined,
+          tmdbMovieId: undefined,
+          tmdbSeriesId: undefined,
+          imdbMovieId: undefined,
+          imdbEpisodeId: undefined,
+          tvdbMovieId: undefined,
+          tvdbEpisodeId: undefined,
+        })
+      )
+    ).toBe(false);
+  });
+
+  it("proxies posters when only external IDs are available", () => {
+    expect(
+      getPosterUrl(
+        syncItem({
+          id: "poster-2",
+          posterUrl: undefined,
+          tmdbMovieId: "123",
+        })
+      )
+    ).toBe("/api/v1/sync/poster/poster-2");
   });
 
   it("formats episode and movie titles with complete metadata", () => {
