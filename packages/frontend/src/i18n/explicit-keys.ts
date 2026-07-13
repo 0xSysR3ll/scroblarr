@@ -5,7 +5,7 @@
  *
  * This module is not imported by the application.
  */
-function _explicitI18nKeys(
+export function explicitI18nKeys(
   t: (key: string, options?: { defaultValue?: string }) => string
 ): void {
   t("sync.destinations.tvtime", { defaultValue: "TVTime" });

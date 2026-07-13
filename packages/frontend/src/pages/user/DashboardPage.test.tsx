@@ -71,4 +71,19 @@ describe("DashboardPage", () => {
     expect(simklRow).not.toBeNull();
     expect(simklRow).toHaveTextContent("3");
   });
+
+  it("renders the empty-state description without TVTime", async () => {
+    vi.mocked(getSyncStatistics).mockResolvedValue({
+      ...statisticsFixture(),
+      total: 0,
+    });
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(
+      await screen.findByText(
+        /make sure webhooks are configured and your trakt or simkl account is linked/i
+      )
+    ).toBeInTheDocument();
+  });
 });
