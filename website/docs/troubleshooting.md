@@ -35,7 +35,7 @@ Scroblarr compares the webhook JSON `Server.uuid` to the machine identifier save
 
 ## Syncs not appearing
 
-### Watch history not syncing to Trakt, TVTime, or Simkl
+### Watch history not syncing to Trakt or Simkl
 
 - **Check account linking**: Go to Profile → Integrations and verify your accounts are linked
 - **Check user matching**: Make sure the Plex/Jellyfin username matches the user in Scroblarr
@@ -46,7 +46,6 @@ Scroblarr compares the webhook JSON `Server.uuid` to the machine identifier save
 ### Syncs failing with authentication errors
 
 - **Trakt**: Your OAuth token might have expired. Try unlinking and re-linking your Trakt account
-- **TVTime**: Your credentials might be wrong. Try unlinking and re-linking with correct email/password
 - **Simkl**: Your access token or Client ID might be invalid. Try unlinking and re-linking your Simkl account with the Client ID from your Simkl developer app.
 - **Trakt OAuth app**: Confirm your **Trakt Client ID** and **Client Secret** (from [trakt.tv/oauth/applications](https://trakt.tv/oauth/applications)) match what you entered in Scroblarr—these are not the same as the Scroblarr **Settings → General** API key used for webhooks.
 
@@ -59,19 +58,6 @@ Simkl matches items using external IDs and titles from Plex or Jellyfin. If sync
 - **Movies**: Confirm the item has IMDb, TMDB, TVDB, or accurate title/year metadata.
 
 See [Simkl configuration](/docs/configuration/simkl#metadata-requirements) for details.
-
-### TVTime sync fails with "TVDB episode ID" or missing metadata
-
-TVTime episode scrobbling requires a **TVDB episode ID** in the watch event. If logs or sync history mention TVDB:
-
-- **Refresh metadata** for the show in Plex or Jellyfin and ensure your library uses a metadata agent that supplies **TheTVDB** (or equivalent) GUIDs.
-- **Movies**: If movies fail to match, confirm the item has correct external IDs (TVDB or IMDb) in the media server.
-
-See [TVTime configuration](/docs/configuration/tvtime#metadata-requirements-tvdb) for a short overview.
-
-### TVTime shows "502" or "profile temporarily unavailable"
-
-If the Profile → Integrations page shows a message like "Profile details could not be loaded (TVTime service temporarily unavailable)" but your TVTime account is linked and shows your email, **you are still connected**. Syncing to TVTime will work. The 502 comes from TVTime's API when loading profile/avatar; you can ignore the message or refresh the page later.
 
 ## User import issues
 
@@ -105,7 +91,7 @@ This usually happens if multiple instances are running or if the database file h
 ### Slow syncs
 
 - **Check network**: Slow internet can cause delays
-- **Check API rate limits**: Trakt, TVTime, and Simkl have rate limits. If you're syncing a lot at once, it might be slow
+- **Check API rate limits**: Trakt and Simkl have rate limits. If you're syncing a lot at once, it might be slow
 - **Check server resources**: Make sure your server has enough CPU and memory
 
 ### High memory usage

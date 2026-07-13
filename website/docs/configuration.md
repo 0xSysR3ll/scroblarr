@@ -16,7 +16,6 @@ Scroblarr needs two types of configuration:
 
 2. **Destination services** - Where your watch history syncs to
    - [Trakt](/docs/configuration/trakt) - Link your Trakt account
-   - [TVTime](/docs/configuration/tvtime) - Link your TVTime account
    - [Simkl](/docs/configuration/simkl) - Link your Simkl account
 
 ## General settings

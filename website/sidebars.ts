@@ -20,7 +20,6 @@ const sidebars: SidebarsConfig = {
             "configuration/plex",
             "configuration/jellyfin",
             "configuration/trakt",
-            "configuration/tvtime",
             "configuration/simkl",
           ],
         },

@@ -2,7 +2,6 @@ import {
   getCurrentUser,
   invalidateSimklCache,
   invalidateTraktCache,
-  invalidateTVTimeCache,
 } from "@services/api";
 import {
   createContext,
@@ -21,12 +20,7 @@ export interface AuthUser {
   thumb?: string;
   plexUsername?: string;
   jellyfinUsername?: string;
-  tvtimeMarkMoviesAsRewatched?: boolean;
-  tvtimeMarkEpisodesAsRewatched?: boolean;
-  hasPlex?: boolean;
-  hasJellyfin?: boolean;
   hasTrakt?: boolean;
-  hasTVTime?: boolean;
   hasSimkl?: boolean;
 }
 
@@ -45,7 +39,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 function invalidateIntegrationCaches() {
   invalidateSimklCache();
   invalidateTraktCache();
-  invalidateTVTimeCache();
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

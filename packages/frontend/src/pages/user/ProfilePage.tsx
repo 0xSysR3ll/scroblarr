@@ -94,13 +94,7 @@ export function ProfilePage() {
           />
         );
       case "integrations":
-        return (
-          <IntegrationsTab
-            tvtimeMarkMoviesAsRewatched={user?.tvtimeMarkMoviesAsRewatched}
-            tvtimeMarkEpisodesAsRewatched={user?.tvtimeMarkEpisodesAsRewatched}
-            onProfileUpdated={checkAuth}
-          />
-        );
+        return <IntegrationsTab onProfileUpdated={checkAuth} />;
     }
   }, [activeTab, user, authProviders, checkAuth]);
 

@@ -17,7 +17,6 @@ import { settingsRoutes } from "./routes/settings";
 import { simklRoutes } from "./routes/simkl";
 import { syncRoutes } from "./routes/sync";
 import { traktRoutes } from "./routes/trakt";
-import { tvtimeRoutes } from "./routes/tvtime";
 import { userRoutes } from "./routes/users";
 import { webhookRoutes } from "./routes/webhooks";
 import { setupSwagger } from "./swagger";
@@ -113,7 +112,6 @@ export function createApp(): Express {
   app.use("/api/v1/auth", authLimiter, authRoutes);
   app.use("/api/v1/users", userRoutes);
   app.use("/api/v1/settings", settingsRoutes);
-  app.use("/api/v1/tvtime", integrationLimiter, tvtimeRoutes);
   app.use("/api/v1/trakt", integrationLimiter, traktRoutes);
   app.use("/api/v1/simkl", integrationLimiter, simklRoutes);
   app.use("/api/v1/sync", syncRoutes);

@@ -1,6 +1,71 @@
+const fs = require("node:fs");
 const path = require("node:path");
 
+const { get, includes, set: setPath } = require("lodash");
+
 const configDir = __dirname;
+
+function resolveDefaultValue(options, key, callOptions) {
+  if (
+    key.endsWith("_one") &&
+    typeof callOptions.defaultValue_one === "string"
+  ) {
+    return callOptions.defaultValue_one;
+  }
+  if (
+    key.endsWith("_other") &&
+    typeof callOptions.defaultValue_other === "string"
+  ) {
+    return callOptions.defaultValue_other;
+  }
+  if (typeof callOptions.defaultValue === "string") {
+    return callOptions.defaultValue;
+  }
+  if (typeof options.defaultValue === "function") {
+    return options.defaultValue(
+      options.defaultLng,
+      callOptions.ns || options.defaultNs,
+      key,
+      callOptions
+    );
+  }
+  return undefined;
+}
+
+function applyDefaultLngValue(parser, key, callOptions) {
+  const options = parser.options;
+  const lng = options.defaultLng;
+  const ns = callOptions.ns || options.defaultNs;
+  const scanRoot = parser.resScan[lng]?.[ns];
+  if (!scanRoot) {
+    return;
+  }
+
+  const keySeparator = options.keySeparator;
+  const keyParts = keySeparator ? key.split(keySeparator) : [key];
+
+  const assign = (leafSuffix, value) => {
+    if (typeof value !== "string" || value.length === 0) {
+      return;
+    }
+
+    const pathParts = [...keyParts];
+    pathParts[pathParts.length - 1] += leafSuffix;
+    setPath(scanRoot, pathParts, value);
+  };
+
+  if (typeof callOptions.defaultValue_one === "string") {
+    assign("_one", callOptions.defaultValue_one);
+  }
+  if (typeof callOptions.defaultValue_other === "string") {
+    assign("_other", callOptions.defaultValue_other);
+  }
+
+  const defaultValue = resolveDefaultValue(options, key, callOptions);
+  if (typeof defaultValue === "string" && defaultValue.length > 0) {
+    assign("", defaultValue);
+  }
+}
 
 /** @type {import('i18next-scanner').Config} */
 module.exports = {
@@ -8,7 +73,7 @@ module.exports = {
   output: path.resolve(configDir, "src/i18n/locales"),
   options: {
     debug: false,
-    removeUnusedKeys: false,
+    removeUnusedKeys: true,
     sort: false,
     func: {
       list: ["t"],
@@ -49,5 +114,20 @@ module.exports = {
       }
       return "";
     },
+  },
+  transform(file, enc, done) {
+    const parser = this.parser;
+    const options = parser.options;
+    const content = fs.readFileSync(file.path, enc);
+    const extname = path.extname(file.path);
+
+    if (includes(get(options, "func.extensions"), extname)) {
+      parser.parseFuncFromString(content, (key, callOptions = {}) => {
+        parser.set(key, callOptions);
+        applyDefaultLngValue(parser, key, callOptions);
+      });
+    }
+
+    done();
   },
 };

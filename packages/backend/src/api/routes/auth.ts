@@ -557,8 +557,6 @@ router.patch(
       const updateSchema = z.object({
         displayName: z.string().optional(),
         email: z.string().email().optional(),
-        tvtimeMarkMoviesAsRewatched: z.boolean().optional(),
-        tvtimeMarkEpisodesAsRewatched: z.boolean().optional(),
       });
 
       const validated = updateSchema.parse(req.body);
@@ -580,9 +578,6 @@ router.patch(
         displayName: updatedUser.displayName,
         email: updatedUser.email,
         isAdmin: updatedUser.isAdmin,
-        tvtimeMarkMoviesAsRewatched: updatedUser.tvtimeMarkMoviesAsRewatched,
-        tvtimeMarkEpisodesAsRewatched:
-          updatedUser.tvtimeMarkEpisodesAsRewatched,
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -608,8 +603,7 @@ router.get("/me", auth, async (req: Request, res: Response): Promise<void> => {
     let thumb =
       userWithToken.plexThumb ||
       userWithToken.jellyfinThumb ||
-      userWithToken.traktThumb ||
-      userWithToken.tvtimeThumb;
+      userWithToken.traktThumb;
 
     if (!thumb && userWithToken.plexAccessToken) {
       try {
@@ -654,29 +648,6 @@ router.get("/me", auth, async (req: Request, res: Response): Promise<void> => {
       }
     }
 
-    if (!thumb && userWithToken.tvtimeAccessToken) {
-      try {
-        const { TVTimeClient } =
-          await import("@integrations/tvtime/TVTimeClient");
-        const { TVTimeTokenManager } =
-          await import("@integrations/tvtime/TVTimeTokenManager");
-        const tokenManager = new TVTimeTokenManager();
-        const tvTimeClient = new TVTimeClient();
-        const accessToken = await tokenManager.getValidAccessToken(
-          userWithToken.id
-        );
-        const profile = await tvTimeClient.getUserProfile(accessToken);
-        if (profile.image) {
-          await userRepository.update(userWithToken.id, {
-            tvtimeThumb: profile.image,
-          });
-          thumb = profile.image;
-        }
-      } catch {
-        // Ignore avatar fetch failures
-      }
-    }
-
     const primaryUsername = userRepository.getPrimaryUsername(userWithToken);
     const { getProxiedThumbUrl } = await import("@utils/userSanitizer");
 
@@ -689,13 +660,9 @@ router.get("/me", auth, async (req: Request, res: Response): Promise<void> => {
       thumb: getProxiedThumbUrl(userWithToken),
       plexUsername: userWithToken.plexUsername || undefined,
       jellyfinUsername: userWithToken.jellyfinUsername || undefined,
-      tvtimeMarkMoviesAsRewatched: userWithToken.tvtimeMarkMoviesAsRewatched,
-      tvtimeMarkEpisodesAsRewatched:
-        userWithToken.tvtimeMarkEpisodesAsRewatched,
       hasPlex: !!userWithToken.plexUsername,
       hasJellyfin: !!userWithToken.jellyfinUsername,
       hasTrakt: !!userWithToken.traktAccessToken,
-      hasTVTime: !!userWithToken.tvtimeAccessToken,
       hasSimkl: !!userWithToken.simklAccessToken,
     });
   } catch (error) {

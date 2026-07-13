@@ -7,13 +7,10 @@ export interface SanitizedUser {
   jellyfinUsername?: string;
   displayName?: string;
   email?: string;
-  tvtimeUsername?: string;
   traktUsername?: string;
   simklUsername?: string;
   isAdmin: boolean;
   enabled: boolean;
-  tvtimeMarkMoviesAsRewatched?: boolean;
-  tvtimeMarkEpisodesAsRewatched?: boolean;
   thumb?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -28,8 +25,6 @@ export function getProxiedThumbUrl(user: User): string | undefined {
     return `/api/v1/avatars/trakt/${user.id}`;
   } else if (user.simklThumb) {
     return `/api/v1/avatars/simkl/${user.id}`;
-  } else if (user.tvtimeThumb) {
-    return `/api/v1/avatars/tvtime/${user.id}`;
   }
   return undefined;
 }
@@ -44,13 +39,10 @@ export function sanitizeUser(user: User): SanitizedUser {
     jellyfinUsername: user.jellyfinUsername,
     displayName: user.displayName,
     email: user.email,
-    tvtimeUsername: user.tvtimeUsername,
     traktUsername: user.traktUsername,
     simklUsername: user.simklUsername,
     isAdmin: user.isAdmin,
     enabled: user.enabled,
-    tvtimeMarkMoviesAsRewatched: user.tvtimeMarkMoviesAsRewatched,
-    tvtimeMarkEpisodesAsRewatched: user.tvtimeMarkEpisodesAsRewatched,
     thumb: getProxiedThumbUrl(user),
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
