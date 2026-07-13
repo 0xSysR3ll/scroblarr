@@ -104,16 +104,10 @@ components:
         jellyfinUsername:
           type: string
           nullable: true
-          type: string
-          nullable: true
         thumb:
           type: string
           nullable: true
           description: User avatar URL (proxied through /api/v1/avatars)
-          type: boolean
-          nullable: true
-          type: boolean
-          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -129,8 +123,6 @@ components:
         email:
           type: string
           format: email
-          type: boolean
-          type: boolean
 
     UserCreate:
       type: object
@@ -144,7 +136,6 @@ components:
         email:
           type: string
           format: email
-          type: string
         enabled:
           type: boolean
           default: true
