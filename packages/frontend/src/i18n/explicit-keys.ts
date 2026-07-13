@@ -8,7 +8,6 @@
 export function explicitI18nKeys(
   t: (key: string, options?: { defaultValue?: string }) => string
 ): void {
-  t("sync.destinations.tvtime", { defaultValue: "TVTime" });
   t("sync.destinations.trakt", { defaultValue: "Trakt" });
   t("sync.destinations.simkl", { defaultValue: "Simkl" });
 }

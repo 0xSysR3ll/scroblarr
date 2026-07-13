@@ -44,5 +44,8 @@ describe("ProfilePage", () => {
     // IntegrationsTab renders sections headed by destination names.
     expect(await screen.findByRole("heading", { name: "Trakt" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Simkl" })).toBeVisible();
+    expect(
+      screen.queryByRole("heading", { name: "TVTime" })
+    ).not.toBeInTheDocument();
   });
 });
