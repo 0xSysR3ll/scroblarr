@@ -174,9 +174,7 @@ export function SettingsPage() {
           setApiKey(settingsData.apiKey);
         }
 
-        if (settingsData.tmdbAccessToken) {
-          setTmdbAccessToken(settingsData.tmdbAccessToken);
-        }
+        setTmdbAccessToken(settingsData.tmdbAccessToken || "");
 
         if (settingsData.jellyfinHost) {
           const hostname = settingsData.jellyfinHost
