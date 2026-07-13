@@ -21,17 +21,13 @@ const createUserSchema = z.object({
   plexUsername: z.string().min(1),
   displayName: z.string().optional(),
   email: z.string().email().optional(),
-  tvtimeUsername: z.string().optional(),
   enabled: z.boolean().default(true),
 });
 
 const updateUserSchema = z.object({
   displayName: z.string().optional(),
   email: z.string().email().optional(),
-  tvtimeUsername: z.string().optional(),
   enabled: z.boolean().optional(),
-  tvtimeMarkMoviesAsRewatched: z.boolean().optional(),
-  tvtimeMarkEpisodesAsRewatched: z.boolean().optional(),
 });
 
 router.use(adminAuth);

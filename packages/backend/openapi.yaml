@@ -325,7 +325,7 @@ components:
           description: Destinations that were successfully synced
           items:
             type: string
-            enum: [TVTime, Trakt, Simkl]
+            enum: [Trakt, Simkl]
         errorMessage:
           type: string
           nullable: true
@@ -1183,11 +1183,8 @@ paths:
                 email:
                   type: string
                   format: email
-                          type: string
                 enabled:
                   type: boolean
-                          type: boolean
-                          type: boolean
       responses:
         '200':
           description: User updated

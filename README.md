@@ -16,7 +16,7 @@ No manual logging — just watch and sync.
 ## Features
 
 - **Automatic syncing** — Real-time webhook-based sync; no manual steps
-- **Multi-user** — Each user links their own Trakt and Simkl accounts
+- **Multi-user** — Each user links their own Trakt and/or Simkl accounts
 - **Self-hosted** — Your data stays on your server
 - **Web UI** — Configure media servers, link accounts, and view sync history
 - **Sync history & stats** — Dashboard with activity, failures, and trends

@@ -5,7 +5,11 @@ const { get, includes, set: setPath } = require("lodash");
 
 const configDir = __dirname;
 
-function resolveDefaultValue(options, key, callOptions) {
+function resolveDefaultValueFromCall(
+  fallback,
+  key,
+  callOptions
+) {
   if (
     key.endsWith("_one") &&
     typeof callOptions.defaultValue_one === "string"
@@ -21,10 +25,10 @@ function resolveDefaultValue(options, key, callOptions) {
   if (typeof callOptions.defaultValue === "string") {
     return callOptions.defaultValue;
   }
-  if (typeof options.defaultValue === "function") {
-    return options.defaultValue(
-      options.defaultLng,
-      callOptions.ns || options.defaultNs,
+  if (typeof fallback.defaultValue === "function") {
+    return fallback.defaultValue(
+      fallback.defaultLng,
+      callOptions.ns || fallback.defaultNs,
       key,
       callOptions
     );
@@ -61,7 +65,15 @@ function applyDefaultLngValue(parser, key, callOptions) {
     assign("_other", callOptions.defaultValue_other);
   }
 
-  const defaultValue = resolveDefaultValue(options, key, callOptions);
+  const defaultValue = resolveDefaultValueFromCall(
+    {
+      defaultLng: options.defaultLng,
+      defaultNs: options.defaultNs,
+      defaultValue: options.defaultValue,
+    },
+    key,
+    callOptions
+  );
   if (typeof defaultValue === "string" && defaultValue.length > 0) {
     assign("", defaultValue);
   }
@@ -95,24 +107,13 @@ module.exports = {
       suffix: "}}",
     },
     defaultValue: (lng, ns, key, options) => {
-      if (
-        key.endsWith("_one") &&
-        options &&
-        typeof options.defaultValue_one === "string"
-      ) {
-        return options.defaultValue_one;
-      }
-      if (
-        key.endsWith("_other") &&
-        options &&
-        typeof options.defaultValue_other === "string"
-      ) {
-        return options.defaultValue_other;
-      }
-      if (options && typeof options.defaultValue === "string") {
-        return options.defaultValue;
-      }
-      return "";
+      return (
+        resolveDefaultValueFromCall(
+          { defaultLng: lng, defaultNs: ns, defaultValue: undefined },
+          key,
+          options ?? {}
+        ) ?? ""
+      );
     },
   },
   transform(file, enc, done) {

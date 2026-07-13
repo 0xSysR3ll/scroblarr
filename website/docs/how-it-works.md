@@ -48,7 +48,7 @@ Scroblarr uses Simkl's history sync API to mark movies and TV episodes as watche
 
 One of Scroblarr's key features is multi-user support. Here's how it works:
 
-- **Each user on your media server** can link their own Trakt and Simkl accounts
+- **Each user on your media server** can link their own Trakt and/or Simkl accounts
 - **Watch history syncs independently** - your Plex user syncs to your Trakt, someone else's Plex user syncs to their Trakt
 - **Admins can manage everything** from the web interface
 - **Users can manage their own accounts** from their profile page
