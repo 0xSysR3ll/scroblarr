@@ -48,15 +48,16 @@ function emptyStatisticsFixture(): SyncStatistics {
     successRate: 0,
     byMediaType: { episode: 0, movie: 0, series: 0 },
     bySource: { plex: 0, jellyfin: 0 },
-    byDestination: { trakt: 0, simkl: 0 },
+    byDestination: { trakt: 0, simkl: 0, tvtime: 0 },
     byPeriod: { today: 0, thisWeek: 0, thisMonth: 0, lastMonth: 0 },
     topThisMonth: [],
+    last30Days: { total: 0, successful: 0, failed: 0 },
     averages: { perDay: 0, perWeek: 0, perMonth: 0 },
     lastSyncedAt: null,
     last7Days: [0, 0, 0, 0, 0, 0, 0],
     peakDay: null,
     lastFailure: null,
-  } as SyncStatistics;
+  };
 }
 
 describe("DashboardPage", () => {
