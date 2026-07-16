@@ -303,18 +303,6 @@ export function UserList({
                       </span>
                     </div>
                   )}
-                  {user.tvtimeUsername && (
-                    <div className="flex items-center gap-1 px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900 rounded-full">
-                      <img
-                        src="/logos/tvtime.svg"
-                        alt="TVTime"
-                        className="w-3 h-3"
-                      />
-                      <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300">
-                        {t("users.tvtime", { defaultValue: "TVTime" })}
-                      </span>
-                    </div>
-                  )}
                   {user.simklUsername && (
                     <div className="flex items-center gap-1 px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900 rounded-full">
                       <img
@@ -512,20 +500,6 @@ export function UserList({
                             </span>
                           </div>
                         )}
-                        {user.tvtimeUsername && (
-                          <div className="flex items-center gap-1 px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900 rounded-full">
-                            <img
-                              src="/logos/tvtime.svg"
-                              alt="TVTime"
-                              className="w-3 h-3"
-                            />
-                            <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300">
-                              {t("users.tvtime", {
-                                defaultValue: "TVTime",
-                              })}
-                            </span>
-                          </div>
-                        )}
                         {user.simklUsername && (
                           <div className="flex items-center gap-1 px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900 rounded-full">
                             <img
@@ -544,7 +518,6 @@ export function UserList({
                           !user.plexUsername &&
                           !user.jellyfinUsername &&
                           !user.traktUsername &&
-                          !user.tvtimeUsername &&
                           !user.simklUsername && (
                             <span className="text-xs text-muted-foreground/60">
                               -

@@ -1,17 +1,14 @@
 import { TraktTokenManager } from "@integrations/trakt/TraktTokenManager";
-import { TVTimeTokenManager } from "@integrations/tvtime/TVTimeTokenManager";
 import { UserRepository } from "@repositories/UserRepository";
 import { logger } from "@utils/logger";
 
 export class TokenRefreshService {
   private userRepository: UserRepository;
   private traktTokenManager: TraktTokenManager;
-  private tvtimeTokenManager: TVTimeTokenManager;
 
   constructor() {
     this.userRepository = new UserRepository();
     this.traktTokenManager = new TraktTokenManager();
-    this.tvtimeTokenManager = new TVTimeTokenManager();
   }
 
   async refreshAllTokens(): Promise<void> {
@@ -22,8 +19,6 @@ export class TokenRefreshService {
 
       let traktSuccess = 0;
       let traktFailed = 0;
-      let tvtimeSuccess = 0;
-      let tvtimeFailed = 0;
       let simklLinked = 0;
 
       for (const user of users) {
@@ -44,23 +39,6 @@ export class TokenRefreshService {
           }
         }
 
-        if (user.tvtimeAccessToken && user.tvtimeRefreshToken) {
-          try {
-            await this.tvtimeTokenManager.getValidAccessToken(user.id);
-            tvtimeSuccess++;
-            logger.tvtime.debug(
-              { userId: user.id },
-              "Successfully refreshed TVTime token"
-            );
-          } catch (error) {
-            tvtimeFailed++;
-            logger.tvtime.warn(
-              { userId: user.id, error },
-              "Failed to refresh TVTime token during scheduled refresh"
-            );
-          }
-        }
-
         if (user.simklAccessToken) {
           simklLinked++;
           logger.simkl.debug(
@@ -75,8 +53,6 @@ export class TokenRefreshService {
           totalUsers: users.length,
           traktSuccess,
           traktFailed,
-          tvtimeSuccess,
-          tvtimeFailed,
           simklLinked,
         },
         "Completed scheduled token refresh"

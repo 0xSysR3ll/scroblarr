@@ -254,7 +254,7 @@ export function AboutSettingsTab({ versionInfo }: AboutSettingsTabProps) {
         <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground sm:text-xs">
           {t("settings.about.trademarkDisclaimer", {
             defaultValue:
-              "Plex, Jellyfin, Trakt, TVTime, and related marks are trademarks of their respective owners. Scroblarr is an independent project and is not sponsored, endorsed, or affiliated with those services.",
+              "Plex, Jellyfin, Trakt, Simkl, and related marks are trademarks of their respective owners. Scroblarr is an independent project and is not sponsored, endorsed, or affiliated with those services.",
           })}
         </p>
       </div>

@@ -6,7 +6,6 @@ export interface User {
   jellyfinUsername?: string;
   displayName?: string;
   email?: string;
-  tvtimeUsername?: string;
   traktUsername?: string;
   simklUsername?: string;
   isAdmin: boolean;

@@ -2,8 +2,8 @@
   "auth": {
     "oauthError": "Authentication error: {{error}}",
     "logout": "Logout",
-    "hidePassword": "Hide",
-    "showPassword": "Show",
+    "hidePassword": "Hide password",
+    "showPassword": "Show password",
     "loginFailed": "Failed to login",
     "plexAuth": "Authenticate with Plex",
     "password": "Password",
@@ -43,8 +43,7 @@
     "jellyfinConnectPrompt": "Enter your Jellyfin server details"
   },
   "common": {
-    "loading": "Loading",
-    "saving": "Saving...",
+    "loading": "Loading...",
     "save": "Save",
     "cancel": "Cancel",
     "confirm": "Confirm",
@@ -78,7 +77,7 @@
     "refresh": "Refresh",
     "empty": {
       "title": "No sync data yet",
-      "description": "Watch something on Plex or Jellyfin and it will appear here. Make sure webhooks are configured and your Trakt or TVTime account is linked in your profile.",
+      "description": "Watch something on Plex or Jellyfin and it will appear here. Make sure webhooks are configured and your Trakt or Simkl account is linked in your profile.",
       "checkProfile": "Check profile & links",
       "topThisMonth": "No syncs this month yet",
       "recentSyncs": "No recent syncs to show"
@@ -94,7 +93,7 @@
       "synced": "synced",
       "ok": "ok",
       "failedShort": "failed",
-      "thisMonth": "This month",
+      "thisMonth": "This Month",
       "syncs": "syncs",
       "vsLastMonth": "vs last month",
       "sameAsLastMonth": "same as last month",
@@ -137,7 +136,12 @@
     "topThisMonthMovies_other": "{{count}} watch",
     "recentSyncs": "Recent syncs",
     "viewAll": "View all",
-    "profile": "Profile"
+    "profile": "Profile",
+    "sparklineToday": "Today: {{count}} syncs",
+    "sparklineYesterday": "Yesterday: {{count}} syncs",
+    "sparklineDaysAgo": "{{days}} days ago: {{count}} syncs",
+    "topThisMonthEpisodes": "{{count}} episodes",
+    "topThisMonthMovies": "{{count}} watch"
   },
   "nav": {
     "sync": "Sync",
@@ -149,7 +153,7 @@
     "displayName": "Display Name",
     "admin": "Admin",
     "email": "Email",
-    "jellyfinCredentialsRequired": "Jellyfin username and password are required",
+    "jellyfinCredentialsRequired": "Username and password are required",
     "jellyfinUsername": "Jellyfin username",
     "deleteSuccess": "User deleted successfully",
     "deleteFailed": "Failed to delete user",
@@ -158,13 +162,12 @@
     "selectAll": "Select All",
     "deselectAll": "Deselect All",
     "selectUser": "Select {{name}}",
-    "deleteUser": "Delete?",
+    "deleteUser": "Delete this user?",
     "confirmDelete": "Confirm delete",
     "deleteUserTitle": "Delete user",
     "plex": "Plex",
     "jellyfin": "Jellyfin",
     "trakt": "Trakt",
-    "tvtime": "TVTime",
     "disableUser": "Disable user",
     "enableUser": "Enable user",
     "enabled": "Enabled",
@@ -179,7 +182,8 @@
       "bulkDeleteTitle": "Delete Selected Users",
       "bulkDeleteMessage_one": "Are you sure you want to delete {{count}} user{{plural}}? This action cannot be undone.",
       "bulkDeleteMessage_other": "Are you sure you want to delete {{count}} user{{plural}}? This action cannot be undone.",
-      "delete": "Delete"
+      "delete": "Delete",
+      "bulkDeleteMessage": "Are you sure you want to delete {{count}} user{{plural}}? This action cannot be undone."
     },
     "deleteSelected": "Delete Selected",
     "simkl": "Simkl"
@@ -203,7 +207,7 @@
       "issues": "Issues & feedback",
       "releases": "All releases",
       "license": "License (MIT)",
-      "trademarkDisclaimer": "Plex, Jellyfin, Trakt, TVTime, and related marks are trademarks of their respective owners. Scroblarr is an independent project and is not sponsored, endorsed, or affiliated with those services.",
+      "trademarkDisclaimer": "Plex, Jellyfin, Trakt, Simkl, and related marks are trademarks of their respective owners. Scroblarr is an independent project and is not sponsored, endorsed, or affiliated with those services.",
       "tmdbAttribution": "This product uses the TMDB API but is not endorsed or certified by TMDB."
     },
     "general": {
@@ -234,7 +238,7 @@
     "jellyfinServerDescription": "Configure your Jellyfin server connection settings.",
     "jellyfinNotConfigured": "No Jellyfin server has been configured yet.",
     "addJellyfinServer": "Add Jellyfin Server",
-    "cannotRemoveOnlyServer": "Cannot remove the only configured server. Configure Plex first.",
+    "cannotRemoveOnlyServer": "Cannot remove the only configured server. Configure Jellyfin first.",
     "removeJellyfinServer": "Remove Server",
     "jellyfinLoginRequired": "Login with your Jellyfin credentials to automatically generate an API key.",
     "jellyfinHostnameRequired": "Server hostname is required",
@@ -247,13 +251,13 @@
     "currentConnection": "Current Connection",
     "removeJellyfinServerTitle": "Remove Jellyfin Server",
     "removeJellyfinServerMessage": "Are you sure you want to remove the Jellyfin server configuration? This will:\n\n• Clear all Jellyfin server settings\n• Prevent importing new users from Jellyfin\n• Prevent syncing for existing Jellyfin users\n• Keep existing users and their sync history\n\nThis action cannot be undone.",
-    "removeServerAdminWarning": "As an admin, you must have at least one server configured. If you remove Jellyfin and only Jellyfin is configured, you may lose access. Please ensure Plex is configured first.",
+    "removeServerAdminWarning": "As an admin, you must have at least one server configured. If you remove Plex and only Plex is configured, you may lose access. Please ensure Jellyfin is configured first.",
     "plexServerSaved": "Plex server saved successfully",
     "savePlexServerFailed": "Failed to save Plex server",
     "plexServerRemoved": "Plex server removed successfully",
     "removePlexServerFailed": "Failed to remove Plex server",
     "plexServer": "Plex Server",
-    "plexServerDescription": "Select the Plex server connection to use for importing users. This setting will be saved and used automatically.",
+    "plexServerDescription": "Select the Plex server connection to use for importing users. Click 'Save' to apply your selection.",
     "plexAuthRequired": "To configure a Plex server, first authenticate with your Plex account as the admin. This will link your account and let Scroblarr discover your servers.",
     "unsavedChanges": "Unsaved",
     "refreshServers": "Refresh servers",
@@ -288,22 +292,21 @@
     "general": {
       "title": "General Information"
     },
-    "saved": "Settings saved successfully!",
     "integrations": {
       "title": "Integrations",
       "description": "Connect your syncing service accounts to automatically sync your watched episodes."
     },
     "linkedAccounts": {
       "linked": "Linked",
-      "unlinkSuccess": "Plex account unlinked successfully!",
-      "unlinkFailed": "Failed to unlink Plex account",
+      "unlinkSuccess": "Jellyfin account unlinked successfully!",
+      "unlinkFailed": "Failed to unlink Jellyfin account",
       "title": "Linked Accounts",
       "description": "Link your media server accounts to enable syncing.",
-      "unlink": "Unlink Plex Account",
+      "unlink": "Unlink",
       "notConfigured": "No media servers are configured. Please ask an admin to configure Plex or Jellyfin in the settings.",
-      "unlinkConfirmTitle": "Unlink Plex Account",
-      "unlinkConfirmMessage": "This will remove your Plex account connection. You will need to link your account again to sync watched media.",
-      "adminWarning": "As an admin, you must have at least one linked account. If you unlink Plex and only Plex is configured, you may lose access. Please ensure Jellyfin is configured and linked first.",
+      "unlinkConfirmTitle": "Unlink Jellyfin Account",
+      "unlinkConfirmMessage": "This will remove your Jellyfin account connection. You will need to link your account again to sync watched media.",
+      "adminWarning": "As an admin, you must have at least one linked account. If you unlink Jellyfin and only Jellyfin is configured, you may lose access. Please ensure Plex is configured and linked first.",
       "reauthRequired": "Re-authorization required"
     },
     "tabs": {
@@ -311,45 +314,6 @@
       "linkedAccounts": "Linked Accounts",
       "integrations": "Integrations"
     }
-  },
-  "tvtime": {
-    "profileFailed": "Failed to load TVTime profile",
-    "profileUnavailable": "Your account is linked. Profile details could not be loaded (TVTime service temporarily unavailable). Syncing should still work.",
-    "progress": {
-      "launchingBrowser": "Launching browser (Puppeteer)...",
-      "loadingAuthPage": "Loading TVTime authentication page...",
-      "extractingJwt": "Extracting JWT token from browser...",
-      "authenticating": "Authenticating with your credentials...",
-      "saving": "Saving account information...",
-      "loadingProfile": "Loading profile information...",
-      "title": "Linking your account..."
-    },
-    "emailPasswordRequired": "Email and password are required",
-    "linkFailed": "Failed to link TVTime account",
-    "unlinkFailed": "Failed to unlink TVTime account",
-    "description": "Sync your watched episodes automatically. Your credentials are stored securely.",
-    "unlink": "Unlink",
-    "profile": {
-      "username": "Username",
-      "email": "Email"
-    },
-    "settings": {
-      "title": "Sync Settings",
-      "description": "Mark media as rewatched only if it has been synced before.",
-      "markMoviesAsRewatched": "Mark movies as rewatched",
-      "markMoviesAsRewatchedDescription": "When enabled, movies that have been synced before will be marked as rewatches in TVTime.",
-      "markEpisodesAsRewatched": "Mark episodes as rewatched",
-      "markEpisodesAsRewatchedDescription": "When enabled, episodes that have been synced before will be marked as rewatches in TVTime."
-    },
-    "email": "Email",
-    "emailPlaceholder": "Enter your TVTime email",
-    "password": "Password",
-    "passwordPlaceholder": "Enter your TVTime password",
-    "link": "Link TVTime Account",
-    "unlinkConfirmTitle": "Unlink TVTime Account",
-    "unlinkConfirmMessage": "Are you sure you want to unlink your TVTime account? This will stop syncing to TVTime.",
-    "cancel": "Cancel",
-    "confirm": "Confirm"
   },
   "trakt": {
     "getAuthUrlFailed": "Failed to get authorization URL",
@@ -409,7 +373,8 @@
     "modified": "Modified",
     "actions": "Actions",
     "download": "Download",
-    "title": "Logs"
+    "title": "Logs",
+    "additionalFieldsSummary": "{{count}} additional field{{plural}}"
   },
   "sync": {
     "pagination": {
@@ -459,7 +424,7 @@
     },
     "title": "My Sync History",
     "deleteSelected": "Delete Selected",
-    "clearHistory": "Clear My History",
+    "clearHistory": "Clear",
     "export": "Export",
     "exportCSV": "Export as CSV",
     "exportJSON": "Export as JSON",
@@ -504,7 +469,8 @@
       "bulkDeleteMessage_one": "Are you sure you want to delete {{count}} sync history item{{plural}}? This action cannot be undone.",
       "bulkDeleteMessage_other": "Are you sure you want to delete {{count}} sync history item{{plural}}? This action cannot be undone.",
       "deleting": "Deleting...",
-      "delete": "Delete"
+      "delete": "Delete",
+      "bulkDeleteMessage": "Are you sure you want to delete {{count}} sync history item{{plural}}? This action cannot be undone."
     },
     "time": {
       "justNow": "Just now",
@@ -514,9 +480,17 @@
       "hoursAgo_other": "{{count}}h ago",
       "yesterday": "Yesterday",
       "daysAgo_one": "{{count}}d ago",
-      "daysAgo_other": "{{count}}d ago"
+      "daysAgo_other": "{{count}}d ago",
+      "minutesAgo": "{{count}}m ago",
+      "hoursAgo": "{{count}}h ago",
+      "daysAgo": "{{count}}d ago"
     },
-    "retrySelectedFailed": "Retry Failed"
+    "retrySelectedFailed": "Retry Failed",
+    "destinations": {
+      "tvtime": "TVTime",
+      "trakt": "Trakt",
+      "simkl": "Simkl"
+    }
   },
   "errors": {
     "routeLoadTitle": "Could not load this screen",
@@ -548,7 +522,9 @@
     "allUsersImported": "All users from this server have already been imported.",
     "importUsers_one": "Import {{count}} User{{plural}}",
     "importUsers_other": "Import {{count}} User{{plural}}",
-    "importUsersButton": "Import Users"
+    "importUsersButton": "Import Users",
+    "usersSelected": "{{count}} user{{plural}} selected",
+    "importUsers": "Import {{count}} User{{plural}}"
   },
   "simkl": {
     "getAuthUrlFailed": "Failed to get Simkl PIN code",
@@ -568,16 +544,21 @@
     "oauthInstructions": "Click 'Authorize' to get a Simkl PIN code, then enter that code on Simkl's PIN page.",
     "authorize": "Authorize",
     "authorizationCode": "PIN Code",
-    "codePlaceholder": "Simkl PIN code",
     "openPinPage": "Open Simkl PIN page",
     "pinWaiting": "Waiting for approval on Simkl...",
     "pinExpired": "The Simkl PIN expired. Generate a new one to try again.",
     "checkPin": "Check approval now",
     "checkingPin": "Checking...",
-    "link": "Link Account",
     "unlinkTitle": "Unlink Simkl Account",
     "unlinkMessage": "Are you sure you want to unlink your Simkl account? This will stop syncing to Simkl.",
     "cancel": "Cancel",
     "confirm": "Confirm"
+  },
+  "": {
+    "": {
+      "": {
+        "": ""
+      }
+    }
   }
 }

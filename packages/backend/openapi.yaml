@@ -5,7 +5,7 @@ info:
   description: |
     API documentation for Scroblarr - Media scrobbling service for Plex, Jellyfin, and Emby.
 
-    This API allows you to manage users, sync media watching history across services, and configure integrations with TVTime and Trakt.
+    This API allows you to manage users, sync media watching history across services, and configure integrations with Trakt and Simkl.
 
 servers:
   - url: http://localhost:3000
@@ -24,8 +24,6 @@ tags:
     description: Application settings (Admin only)
   - name: Sync
     description: Sync history and operations
-  - name: TVTime
-    description: TVTime integration endpoints
   - name: Trakt
     description: Trakt integration endpoints
   - name: Webhooks
@@ -106,19 +104,10 @@ components:
         jellyfinUsername:
           type: string
           nullable: true
-        tvtimeUsername:
-          type: string
-          nullable: true
         thumb:
           type: string
           nullable: true
           description: User avatar URL (proxied through /api/v1/avatars)
-        tvtimeMarkMoviesAsRewatched:
-          type: boolean
-          nullable: true
-        tvtimeMarkEpisodesAsRewatched:
-          type: boolean
-          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -134,10 +123,6 @@ components:
         email:
           type: string
           format: email
-        tvtimeMarkMoviesAsRewatched:
-          type: boolean
-        tvtimeMarkEpisodesAsRewatched:
-          type: boolean
 
     UserCreate:
       type: object
@@ -151,8 +136,6 @@ components:
         email:
           type: string
           format: email
-        tvtimeUsername:
-          type: string
         enabled:
           type: boolean
           default: true
@@ -333,7 +316,7 @@ components:
           description: Destinations that were successfully synced
           items:
             type: string
-            enum: [TVTime, Trakt]
+            enum: [Trakt, Simkl]
         errorMessage:
           type: string
           nullable: true
@@ -362,34 +345,6 @@ components:
               type: integer
             jellyfin:
               type: integer
-
-    TVTimeStatus:
-      type: object
-      properties:
-        linked:
-          type: boolean
-        email:
-          type: string
-          nullable: true
-        username:
-          type: string
-          nullable: true
-
-    TVTimeProfile:
-      type: object
-      properties:
-        id:
-          type: string
-          nullable: true
-        username:
-          type: string
-          nullable: true
-        email:
-          type: string
-          nullable: true
-        image:
-          type: string
-          nullable: true
 
     TraktStatus:
       type: object
@@ -1219,13 +1174,7 @@ paths:
                 email:
                   type: string
                   format: email
-                tvtimeUsername:
-                  type: string
                 enabled:
-                  type: boolean
-                tvtimeMarkMoviesAsRewatched:
-                  type: boolean
-                tvtimeMarkEpisodesAsRewatched:
                   type: boolean
       responses:
         '200':
@@ -1616,97 +1565,6 @@ paths:
         '500':
           description: Internal server error
 
-  /api/v1/tvtime/link:
-    post:
-      summary: Link TVTime account
-      tags: [TVTime]
-      security:
-        - sessionAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - email
-                - password
-              properties:
-                email:
-                  type: string
-                  format: email
-                password:
-                  type: string
-      responses:
-        '200':
-          description: Account linked
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Success'
-        '400':
-          description: Validation error
-        '401':
-          description: Unauthorized
-        '500':
-          description: Internal server error
-
-  /api/v1/tvtime/unlink:
-    post:
-      summary: Unlink TVTime account
-      tags: [TVTime]
-      security:
-        - sessionAuth: []
-      responses:
-        '200':
-          description: Account unlinked
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Success'
-        '401':
-          description: Unauthorized
-        '500':
-          description: Internal server error
-
-  /api/v1/tvtime/status:
-    get:
-      summary: Get TVTime account status
-      tags: [TVTime]
-      security:
-        - sessionAuth: []
-      responses:
-        '200':
-          description: Account status
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TVTimeStatus'
-        '401':
-          description: Unauthorized
-        '500':
-          description: Internal server error
-
-  /api/v1/tvtime/profile:
-    get:
-      summary: Get TVTime profile
-      tags: [TVTime]
-      security:
-        - sessionAuth: []
-      responses:
-        '200':
-          description: Profile data
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TVTimeProfile'
-        '400':
-          description: Account not linked
-        '401':
-          description: Unauthorized
-        '500':
-          description: Internal server error
-
   /api/v1/trakt/authorize:
     get:
       summary: Get Trakt authorization URL
@@ -2031,28 +1889,6 @@ paths:
   /api/v1/avatars/trakt/{userId}:
     get:
       summary: Get Trakt user avatar
-      tags: [Avatars]
-      parameters:
-        - name: userId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: Avatar image
-          content:
-            image/jpeg: {}
-            image/png: {}
-        '404':
-          description: User or avatar not found
-        '500':
-          description: Internal server error
-
-  /api/v1/avatars/tvtime/{userId}:
-    get:
-      summary: Get TVTime user avatar
       tags: [Avatars]
       parameters:
         - name: userId

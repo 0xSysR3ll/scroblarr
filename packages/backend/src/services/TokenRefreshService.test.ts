@@ -8,17 +8,11 @@ const traktTokenManagerMocks = vi.hoisted(() => ({
   getValidAccessToken: vi.fn(),
 }));
 
-const tvtimeTokenManagerMocks = vi.hoisted(() => ({
-  getValidAccessToken: vi.fn(),
-}));
-
 const loggerMocks = vi.hoisted(() => ({
   systemInfo: vi.fn(),
   systemError: vi.fn(),
   traktDebug: vi.fn(),
   traktWarn: vi.fn(),
-  tvtimeDebug: vi.fn(),
-  tvtimeWarn: vi.fn(),
   simklDebug: vi.fn(),
 }));
 
@@ -34,12 +28,6 @@ vi.mock("@integrations/trakt/TraktTokenManager", () => ({
   },
 }));
 
-vi.mock("@integrations/tvtime/TVTimeTokenManager", () => ({
-  TVTimeTokenManager: class {
-    getValidAccessToken = tvtimeTokenManagerMocks.getValidAccessToken;
-  },
-}));
-
 vi.mock("@utils/logger", () => ({
   logger: {
     system: {
@@ -49,10 +37,6 @@ vi.mock("@utils/logger", () => ({
     trakt: {
       debug: loggerMocks.traktDebug,
       warn: loggerMocks.traktWarn,
-    },
-    tvtime: {
-      debug: loggerMocks.tvtimeDebug,
-      warn: loggerMocks.tvtimeWarn,
     },
     simkl: {
       debug: loggerMocks.simklDebug,
@@ -79,7 +63,6 @@ describe("TokenRefreshService", () => {
     await service.refreshAllTokens();
 
     expect(traktTokenManagerMocks.getValidAccessToken).not.toHaveBeenCalled();
-    expect(tvtimeTokenManagerMocks.getValidAccessToken).not.toHaveBeenCalled();
     expect(loggerMocks.simklDebug).toHaveBeenCalledWith(
       { userId: "simkl-user" },
       "Simkl token does not expire; skipping refresh"

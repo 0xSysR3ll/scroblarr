@@ -6,8 +6,6 @@ import { SimklTokenManager } from "@integrations/simkl/SimklTokenManager";
 import { isTraktAuthError } from "@integrations/trakt/TraktApiError";
 import { TraktClient } from "@integrations/trakt/TraktClient";
 import { TraktTokenManager } from "@integrations/trakt/TraktTokenManager";
-import { TVTimeClient } from "@integrations/tvtime/TVTimeClient";
-import { TVTimeTokenManager } from "@integrations/tvtime/TVTimeTokenManager";
 import { SettingsRepository } from "@repositories/SettingsRepository";
 import { SyncHistoryRepository } from "@repositories/SyncHistoryRepository";
 import { UserRepository } from "@repositories/UserRepository";
@@ -42,37 +40,18 @@ export class SyncService {
   private userRepository: UserRepository;
   private syncHistoryRepository: SyncHistoryRepository;
   private settingsRepository: SettingsRepository;
-  private tvtimeClient: TVTimeClient;
-  private tvtimeTokenManager: TVTimeTokenManager;
   private traktTokenManager: TraktTokenManager;
   private simklTokenManager: SimklTokenManager;
   constructor() {
     this.userRepository = new UserRepository();
     this.syncHistoryRepository = new SyncHistoryRepository();
     this.settingsRepository = new SettingsRepository();
-    this.tvtimeClient = new TVTimeClient();
-    this.tvtimeTokenManager = new TVTimeTokenManager();
     this.traktTokenManager = new TraktTokenManager();
     this.simklTokenManager = new SimklTokenManager();
   }
 
   private async getSyncDestinations(user: User): Promise<SyncDestination[]> {
-    const destinations: SyncDestination[] = [
-      {
-        name: "TVTime",
-        client: this.tvtimeClient,
-        hasToken: (u) => !!u.tvtimeAccessToken,
-        getAccessToken: async (u) => {
-          return await this.tvtimeTokenManager.getValidAccessToken(u.id);
-        },
-        getSyncOptions: (u, hasExistingSync) => ({
-          markMoviesAsRewatched:
-            u.tvtimeMarkMoviesAsRewatched && hasExistingSync,
-          markEpisodesAsRewatched:
-            u.tvtimeMarkEpisodesAsRewatched && hasExistingSync,
-        }),
-      },
-    ];
+    const destinations: SyncDestination[] = [];
 
     if (user.traktClientId && user.traktClientSecret && user.traktAccessToken) {
       try {
@@ -402,15 +381,9 @@ export class SyncService {
     }
 
     const attemptResult = buildAttemptResult(syncResults);
-    const tvtimeSucceeded = attemptResult.destinations.includes("TVTime");
-    const wasRewatched =
-      tvtimeSucceeded &&
-      (event.media.type === "movie"
-        ? user.tvtimeMarkMoviesAsRewatched && hasExistingSync
-        : user.tvtimeMarkEpisodesAsRewatched && hasExistingSync);
 
     if (saveFailedHistory) {
-      await this.saveSyncHistory(user.id, event, attemptResult, wasRewatched);
+      await this.saveSyncHistory(user.id, event, attemptResult);
     }
 
     return attemptResult;

@@ -1,6 +1,10 @@
 import { useAuth } from "@contexts/AuthContext";
 import type { SyncHistoryResponse } from "@services/api";
-import { getSyncHistory, getSyncStatistics } from "@services/api/sync";
+import {
+  getSyncHistory,
+  getSyncStatistics,
+  type SyncStatistics,
+} from "@services/api/sync";
 import { renderWithProviders } from "@test/render";
 import { screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -32,6 +36,26 @@ function statisticsFixture() {
     lastSyncedAt: "2026-06-01T12:00:00.000Z",
     last7Days: [1, 2, 0, 1, 3, 2, 3],
     peakDay: 3,
+    lastFailure: null,
+  };
+}
+
+function emptyStatisticsFixture(): SyncStatistics {
+  return {
+    total: 0,
+    successful: 0,
+    failed: 0,
+    successRate: 0,
+    byMediaType: { episode: 0, movie: 0, series: 0 },
+    bySource: { plex: 0, jellyfin: 0 },
+    byDestination: { trakt: 0, simkl: 0, tvtime: 0 },
+    byPeriod: { today: 0, thisWeek: 0, thisMonth: 0, lastMonth: 0 },
+    topThisMonth: [],
+    last30Days: { total: 0, successful: 0, failed: 0 },
+    averages: { perDay: 0, perWeek: 0, perMonth: 0 },
+    lastSyncedAt: null,
+    last7Days: [0, 0, 0, 0, 0, 0, 0],
+    peakDay: null,
     lastFailure: null,
   };
 }
@@ -70,5 +94,18 @@ describe("DashboardPage", () => {
     const simklRow = screen.getByText("Simkl").closest("div");
     expect(simklRow).not.toBeNull();
     expect(simklRow).toHaveTextContent("3");
+  });
+
+  it("renders the empty-state description without TVTime", async () => {
+    vi.mocked(getSyncStatistics).mockResolvedValue(emptyStatisticsFixture());
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(
+      await screen.findByText(
+        /make sure webhooks are configured and your trakt or simkl account is linked/i
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByText("By Destination")).not.toBeInTheDocument();
   });
 });

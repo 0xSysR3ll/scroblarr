@@ -1,7 +1,6 @@
 import {
   getSimklAuthorizeUrl,
   getSimklStatus,
-  getTVTimeStatus,
   getTraktAuthorizeUrl,
   getTraktStatus,
   linkSimkl,
@@ -41,10 +40,6 @@ vi.mock("@utils/toast", () => ({
 }));
 
 vi.mock("@services/api", () => ({
-  getTVTimeStatus: vi.fn(),
-  linkTVTime: vi.fn(),
-  unlinkTVTime: vi.fn(),
-  getTVTimeProfile: vi.fn(),
   getTraktStatus: vi.fn(),
   getTraktAuthorizeUrl: vi.fn(),
   linkTrakt: vi.fn(),
@@ -53,7 +48,6 @@ vi.mock("@services/api", () => ({
   getSimklAuthorizeUrl: vi.fn(),
   linkSimkl: vi.fn(),
   unlinkSimkl: vi.fn(),
-  updateProfile: vi.fn(),
 }));
 
 function getTraktSection(): HTMLElement {
@@ -85,12 +79,13 @@ describe("IntegrationsTab", () => {
     oauthPopupMocks.navigateToUrl.mockReset();
     oauthPopupMocks.closePopup.mockReset();
 
-    vi.mocked(getTVTimeStatus).mockResolvedValue({
-      linked: false,
-      email: null,
-      username: null,
-    });
     vi.mocked(getTraktStatus).mockResolvedValue({
+      linked: false,
+      username: null,
+      image: null,
+      hasCredentials: false,
+    });
+    vi.mocked(getSimklStatus).mockResolvedValue({
       linked: false,
       username: null,
       image: null,
@@ -218,11 +213,6 @@ describe("IntegrationsTab Simkl integration", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getTVTimeStatus).mockResolvedValue({
-      linked: false,
-      username: null,
-      email: null,
-    });
     vi.mocked(getTraktStatus).mockResolvedValue({
       linked: false,
       username: null,

@@ -106,6 +106,10 @@ vi.mock("@utils/logger", () => ({
   },
 }));
 
+vi.mock("@utils/userSanitizer", () => ({
+  getProxiedThumbUrl: vi.fn(() => undefined),
+}));
+
 import { authRoutes } from "./auth";
 
 describe("auth route sensitive guards", () => {
@@ -247,5 +251,27 @@ describe("auth route sensitive guards", () => {
       jellyfinUserId: null,
       jellyfinThumb: null,
     });
+  });
+
+  it("returns current user details from /me", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app).get("/api/v1/auth/me");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(
+      expect.objectContaining({
+        id: "current-user-id",
+        username: "plex-user",
+        isAdmin: false,
+        hasPlex: true,
+        hasJellyfin: false,
+        hasTrakt: false,
+        hasSimkl: false,
+      })
+    );
+    expect(response.body).not.toHaveProperty("hasTVTime");
   });
 });

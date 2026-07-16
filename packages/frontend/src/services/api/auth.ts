@@ -264,8 +264,6 @@ export async function getCurrentUser(): Promise<{
   thumb?: string;
   plexUsername?: string;
   jellyfinUsername?: string;
-  tvtimeMarkMoviesAsRewatched?: boolean;
-  tvtimeMarkEpisodesAsRewatched?: boolean;
 }> {
   const response = await fetch(`${API_BASE_URL}/auth/me`, {
     headers: getAuthHeaders(),
@@ -281,16 +279,12 @@ export async function getCurrentUser(): Promise<{
 export async function updateProfile(updates: {
   displayName?: string;
   email?: string;
-  tvtimeMarkMoviesAsRewatched?: boolean;
-  tvtimeMarkEpisodesAsRewatched?: boolean;
 }): Promise<{
   id: string;
   username: string;
   displayName?: string;
   email?: string;
   isAdmin: boolean;
-  tvtimeMarkMoviesAsRewatched?: boolean;
-  tvtimeMarkEpisodesAsRewatched?: boolean;
 }> {
   const response = await fetch(`${API_BASE_URL}/auth/me`, {
     method: "PATCH",

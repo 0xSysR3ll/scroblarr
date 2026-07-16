@@ -1,3 +1,4 @@
+import { TraktApiError } from "@integrations/trakt/TraktApiError";
 import type { MediaEvent } from "@scroblarr/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -19,20 +20,12 @@ const settingsRepositoryMocks = vi.hoisted(() => ({
   get: vi.fn(),
 }));
 
-const tvtimeClientMocks = vi.hoisted(() => ({
-  scrobble: vi.fn(),
-}));
-
 const traktClientMocks = vi.hoisted(() => ({
   scrobble: vi.fn(),
 }));
 
 const simklClientMocks = vi.hoisted(() => ({
   scrobble: vi.fn(),
-}));
-
-const tvtimeTokenManagerMocks = vi.hoisted(() => ({
-  getValidAccessToken: vi.fn(),
 }));
 
 const traktTokenManagerMocks = vi.hoisted(() => ({
@@ -68,12 +61,6 @@ vi.mock("@repositories/SettingsRepository", () => ({
   },
 }));
 
-vi.mock("@integrations/tvtime/TVTimeClient", () => ({
-  TVTimeClient: class {
-    scrobble = tvtimeClientMocks.scrobble;
-  },
-}));
-
 vi.mock("@integrations/trakt/TraktClient", () => ({
   TraktClient: class {
     scrobble = traktClientMocks.scrobble;
@@ -83,12 +70,6 @@ vi.mock("@integrations/trakt/TraktClient", () => ({
 vi.mock("@integrations/simkl/SimklClient", () => ({
   SimklClient: class {
     scrobble = simklClientMocks.scrobble;
-  },
-}));
-
-vi.mock("@integrations/tvtime/TVTimeTokenManager", () => ({
-  TVTimeTokenManager: class {
-    getValidAccessToken = tvtimeTokenManagerMocks.getValidAccessToken;
   },
 }));
 
@@ -115,8 +96,6 @@ vi.mock("@utils/logger", () => ({
     },
   },
 }));
-
-import { TraktApiError } from "@integrations/trakt/TraktApiError";
 
 import { SyncService } from "./SyncService";
 
@@ -178,7 +157,6 @@ describe("SyncService", () => {
       id: "u1",
       enabled: true,
       plexUsername: "plex-user",
-      tvtimeAccessToken: null,
       traktAccessToken: null,
     });
 
@@ -195,47 +173,11 @@ describe("SyncService", () => {
     );
   });
 
-  it("syncs to TVTime and records rewatched state when previous sync exists", async () => {
-    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
-      id: "u1",
-      enabled: true,
-      plexUsername: "plex-user",
-      tvtimeAccessToken: "tv-token",
-      tvtimeMarkMoviesAsRewatched: true,
-      tvtimeMarkEpisodesAsRewatched: false,
-      traktAccessToken: null,
-    });
-    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(true);
-    tvtimeTokenManagerMocks.getValidAccessToken.mockResolvedValue(
-      "tvtime-valid-token"
-    );
-    tvtimeClientMocks.scrobble.mockResolvedValue(undefined);
-
-    const service = new SyncService();
-    await service.syncEvent(makeEvent());
-
-    expect(tvtimeClientMocks.scrobble).toHaveBeenCalledWith(
-      expect.objectContaining({ event: "scrobble" }),
-      "tvtime-valid-token",
-      expect.objectContaining({ markMoviesAsRewatched: true })
-    );
-    expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId: "u1",
-        originalMediaId: "m1",
-        success: true,
-        wasRewatched: true,
-        destinations: JSON.stringify(["TVTime"]),
-      })
-    );
-  });
-
   it("syncs to Simkl when linked and records the destination", async () => {
     userRepositoryMocks.findBySourceUsername.mockResolvedValue({
       id: "u1",
       enabled: true,
       plexUsername: "plex-user",
-      tvtimeAccessToken: null,
       traktAccessToken: null,
       simklClientId: "simkl-client-id",
       simklAccessToken: "simkl-token",
@@ -269,7 +211,6 @@ describe("SyncService", () => {
       id: "u1",
       enabled: true,
       plexUsername: "plex-user",
-      tvtimeAccessToken: null,
       traktClientId: "trakt-client-id",
       traktClientSecret: "trakt-secret",
       traktAccessToken: "trakt-token",
@@ -303,10 +244,10 @@ describe("SyncService", () => {
 
   it("retries a failed history item using the linked media server account", async () => {
     syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
-    tvtimeTokenManagerMocks.getValidAccessToken.mockResolvedValue(
-      "tvtime-valid-token"
+    traktTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "trakt-valid-token"
     );
-    tvtimeClientMocks.scrobble.mockResolvedValue(undefined);
+    traktClientMocks.scrobble.mockResolvedValue(undefined);
 
     const service = new SyncService();
     const result = await service.retryHistoryItem({
@@ -316,10 +257,9 @@ describe("SyncService", () => {
         id: "u1",
         enabled: true,
         plexUsername: "plex-user",
-        tvtimeAccessToken: "tv-token",
-        tvtimeMarkMoviesAsRewatched: false,
-        tvtimeMarkEpisodesAsRewatched: false,
-        traktAccessToken: null,
+        traktClientId: "trakt-client-id",
+        traktClientSecret: "trakt-secret",
+        traktAccessToken: "trakt-token",
       },
       mediaType: "movie",
       mediaTitle: "Interstellar",
@@ -336,11 +276,11 @@ describe("SyncService", () => {
     expect(result).toEqual(
       expect.objectContaining({
         success: true,
-        destinations: ["TVTime"],
+        destinations: ["Trakt"],
         errorMessage: undefined,
       })
     );
-    expect(tvtimeClientMocks.scrobble).toHaveBeenCalledWith(
+    expect(traktClientMocks.scrobble).toHaveBeenCalledWith(
       expect.objectContaining({
         event: "scrobble",
         source: "plex",
@@ -354,7 +294,7 @@ describe("SyncService", () => {
           tmdbMovieId: 456,
         }),
       }),
-      "tvtime-valid-token",
+      "trakt-valid-token",
       expect.any(Object)
     );
     expect(syncHistoryRepositoryMocks.create).not.toHaveBeenCalled();
@@ -364,79 +304,16 @@ describe("SyncService", () => {
         success: true,
         errorMessage: undefined,
         retriedAt: expect.any(Date),
-        destinations: JSON.stringify(["TVTime"]),
+        destinations: JSON.stringify(["Trakt"]),
       })
     );
   });
 
-  it("retries only the destination that failed on the history item", async () => {
+  it("does not create another history item when a retry fails completely", async () => {
     syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
-    tvtimeTokenManagerMocks.getValidAccessToken.mockResolvedValue(
-      "tvtime-valid-token"
-    );
     traktTokenManagerMocks.getValidAccessToken.mockResolvedValue(
       "trakt-valid-token"
     );
-    tvtimeClientMocks.scrobble.mockResolvedValue(undefined);
-    traktClientMocks.scrobble.mockResolvedValue(undefined);
-
-    const service = new SyncService();
-    const result = await service.retryHistoryItem({
-      id: "sync-history-id",
-      userId: "u1",
-      user: {
-        id: "u1",
-        enabled: true,
-        plexUsername: "plex-user",
-        tvtimeAccessToken: "tv-token",
-        tvtimeMarkMoviesAsRewatched: false,
-        tvtimeMarkEpisodesAsRewatched: false,
-        traktClientId: "trakt-client-id",
-        traktClientSecret: "trakt-secret",
-        traktAccessToken: "trakt-token",
-      },
-      mediaType: "movie",
-      mediaTitle: "Interstellar",
-      source: "plex",
-      originalMediaId: "plex-media-id",
-      tvdbMovieId: "123",
-      destinations: JSON.stringify(["Trakt"]),
-      success: true,
-      errorMessage: "TVTime: TVTime failed",
-      syncedAt: new Date("2026-01-01T00:00:00.000Z"),
-    } as never);
-
-    expect(result).toEqual(
-      expect.objectContaining({
-        success: true,
-        destinations: ["TVTime"],
-        errorMessage: undefined,
-      })
-    );
-    expect(tvtimeClientMocks.scrobble).toHaveBeenCalledTimes(1);
-    expect(traktClientMocks.scrobble).not.toHaveBeenCalled();
-    expect(syncHistoryRepositoryMocks.create).not.toHaveBeenCalled();
-    expect(syncHistoryRepositoryMocks.save).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: "sync-history-id",
-        success: true,
-        errorMessage: undefined,
-        destinationResults: expect.stringContaining(
-          '"TVTime":{"status":"success"}'
-        ),
-      })
-    );
-  });
-
-  it("keeps a retried history item retryable when retry only partially succeeds", async () => {
-    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
-    tvtimeTokenManagerMocks.getValidAccessToken.mockResolvedValue(
-      "tvtime-valid-token"
-    );
-    traktTokenManagerMocks.getValidAccessToken.mockResolvedValue(
-      "trakt-valid-token"
-    );
-    tvtimeClientMocks.scrobble.mockResolvedValue(undefined);
     traktClientMocks.scrobble.mockRejectedValue(new Error("Trakt failed"));
 
     const service = new SyncService();
@@ -447,60 +324,9 @@ describe("SyncService", () => {
         id: "u1",
         enabled: true,
         plexUsername: "plex-user",
-        tvtimeAccessToken: "tv-token",
-        tvtimeMarkMoviesAsRewatched: false,
-        tvtimeMarkEpisodesAsRewatched: false,
         traktClientId: "trakt-client-id",
         traktClientSecret: "trakt-secret",
         traktAccessToken: "trakt-token",
-      },
-      mediaType: "movie",
-      mediaTitle: "Interstellar",
-      source: "plex",
-      originalMediaId: "plex-media-id",
-      tvdbMovieId: "123",
-      success: false,
-      syncedAt: new Date("2026-01-01T00:00:00.000Z"),
-    } as never);
-
-    expect(result).toEqual(
-      expect.objectContaining({
-        success: true,
-        destinations: ["TVTime"],
-        errorMessage: "Trakt: Trakt failed",
-      })
-    );
-    expect(syncHistoryRepositoryMocks.create).not.toHaveBeenCalled();
-    expect(syncHistoryRepositoryMocks.save).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: "sync-history-id",
-        success: true,
-        errorMessage: "Trakt: Trakt failed",
-        retriedAt: expect.any(Date),
-        destinations: JSON.stringify(["TVTime"]),
-      })
-    );
-  });
-
-  it("does not create another history item when a retry fails completely", async () => {
-    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
-    tvtimeTokenManagerMocks.getValidAccessToken.mockResolvedValue(
-      "tvtime-valid-token"
-    );
-    tvtimeClientMocks.scrobble.mockRejectedValue(new Error("TVTime failed"));
-
-    const service = new SyncService();
-    const result = await service.retryHistoryItem({
-      id: "sync-history-id",
-      userId: "u1",
-      user: {
-        id: "u1",
-        enabled: true,
-        plexUsername: "plex-user",
-        tvtimeAccessToken: "tv-token",
-        tvtimeMarkMoviesAsRewatched: false,
-        tvtimeMarkEpisodesAsRewatched: false,
-        traktAccessToken: null,
       },
       mediaType: "movie",
       mediaTitle: "Interstellar",
@@ -514,7 +340,7 @@ describe("SyncService", () => {
       expect.objectContaining({
         success: false,
         destinations: [],
-        errorMessage: "TVTime: TVTime failed",
+        errorMessage: "Trakt: Trakt failed",
       })
     );
     expect(syncHistoryRepositoryMocks.create).not.toHaveBeenCalled();
@@ -526,22 +352,21 @@ describe("SyncService", () => {
       id: "u1",
       enabled: true,
       plexUsername: "plex-user",
-      tvtimeAccessToken: "tv-token",
-      tvtimeMarkMoviesAsRewatched: true,
-      tvtimeMarkEpisodesAsRewatched: false,
       traktClientId: "trakt-client-id",
       traktClientSecret: "trakt-secret",
       traktAccessToken: "trakt-token",
+      simklClientId: "simkl-client-id",
+      simklAccessToken: "simkl-token",
     });
-    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(true);
-    tvtimeTokenManagerMocks.getValidAccessToken.mockResolvedValue(
-      "tvtime-valid-token"
-    );
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
     traktTokenManagerMocks.getValidAccessToken.mockResolvedValue(
       "trakt-valid-token"
     );
-    tvtimeClientMocks.scrobble.mockRejectedValue(new Error("TVTime failed"));
-    traktClientMocks.scrobble.mockResolvedValue(undefined);
+    simklTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "simkl-valid-token"
+    );
+    traktClientMocks.scrobble.mockRejectedValue(new Error("Trakt failed"));
+    simklClientMocks.scrobble.mockResolvedValue(undefined);
 
     const service = new SyncService();
     await service.syncEvent(makeEvent());
@@ -551,11 +376,10 @@ describe("SyncService", () => {
         userId: "u1",
         originalMediaId: "m1",
         success: true,
-        errorMessage: expect.stringContaining("TVTime: TVTime failed"),
-        wasRewatched: false,
-        destinations: JSON.stringify(["Trakt"]),
+        errorMessage: expect.stringContaining("Trakt: Trakt failed"),
+        destinations: JSON.stringify(["Simkl"]),
         destinationResults: expect.stringContaining(
-          '"TVTime":{"status":"failed"'
+          '"Trakt":{"status":"failed"'
         ),
       })
     );
@@ -576,9 +400,8 @@ describe("SyncService", () => {
         id: "u1",
         enabled: true,
         plexUsername: "plex-user",
-        tvtimeAccessToken: "tv-token",
-        tvtimeMarkMoviesAsRewatched: false,
-        tvtimeMarkEpisodesAsRewatched: false,
+        simklClientId: "simkl-client-id",
+        simklAccessToken: "simkl-token",
         traktClientId: "trakt-client-id",
         traktClientSecret: "trakt-secret",
         traktAccessToken: "trakt-token",
@@ -588,7 +411,7 @@ describe("SyncService", () => {
       source: "plex",
       originalMediaId: "plex-media-id",
       tvdbMovieId: "123",
-      destinations: JSON.stringify(["TVTime"]),
+      destinations: JSON.stringify(["Simkl"]),
       success: true,
       errorMessage: "Trakt: Trakt token expired or revoked",
       syncedAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -608,7 +431,7 @@ describe("SyncService", () => {
         id: "sync-history-id",
         success: true,
         errorMessage: undefined,
-        destinations: JSON.stringify(["TVTime", "Trakt"]),
+        destinations: expect.stringMatching(/Simkl.*Trakt|Trakt.*Simkl/),
       })
     );
   });
@@ -618,7 +441,6 @@ describe("SyncService", () => {
       id: "u1",
       enabled: true,
       plexUsername: "plex-user",
-      tvtimeAccessToken: null,
       traktClientId: "trakt-client-id",
       traktClientSecret: "trakt-secret",
       traktAccessToken: "trakt-token",
