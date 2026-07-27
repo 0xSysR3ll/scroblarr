@@ -3,12 +3,26 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const tmdbClientMocks = vi.hoisted(() => ({
   resolvePosterPath: vi.fn(),
   fetchPosterImage: vi.fn(),
+  searchTv: vi.fn(),
+  searchMovie: vi.fn(),
+  getEpisodeExternalIds: vi.fn(),
+  getMovieExternalIds: vi.fn(),
+  getTvShowDetails: vi.fn(),
+  hasTvSeason: vi.fn(),
+  getTvRecommendations: vi.fn(),
 }));
 
 vi.mock("@integrations/tmdb/TmdbClient", () => ({
   TmdbClient: class {
     resolvePosterPath = tmdbClientMocks.resolvePosterPath;
     fetchPosterImage = tmdbClientMocks.fetchPosterImage;
+    searchTv = tmdbClientMocks.searchTv;
+    searchMovie = tmdbClientMocks.searchMovie;
+    getEpisodeExternalIds = tmdbClientMocks.getEpisodeExternalIds;
+    getMovieExternalIds = tmdbClientMocks.getMovieExternalIds;
+    getTvShowDetails = tmdbClientMocks.getTvShowDetails;
+    hasTvSeason = tmdbClientMocks.hasTvSeason;
+    getTvRecommendations = tmdbClientMocks.getTvRecommendations;
   },
 }));
 
@@ -57,6 +71,13 @@ describe("PosterService", () => {
     vi.restoreAllMocks();
     tmdbClientMocks.resolvePosterPath.mockReset();
     tmdbClientMocks.fetchPosterImage.mockReset();
+    tmdbClientMocks.searchTv.mockReset();
+    tmdbClientMocks.searchMovie.mockReset();
+    tmdbClientMocks.getEpisodeExternalIds.mockReset();
+    tmdbClientMocks.getMovieExternalIds.mockReset();
+    tmdbClientMocks.getTvShowDetails.mockReset();
+    tmdbClientMocks.hasTvSeason.mockReset();
+    tmdbClientMocks.getTvRecommendations.mockReset();
     jellyfinClientMocks.fetchImage.mockReset();
   });
 
@@ -446,5 +467,121 @@ describe("PosterService", () => {
       status: 404,
       message: "Failed to fetch poster image",
     });
+  });
+
+  it("enriches episode IDs before TMDB poster lookup when history has only a title", async () => {
+    const imageBytes = new Uint8Array([1, 2, 3]).buffer;
+    tmdbClientMocks.searchTv.mockResolvedValue([
+      {
+        id: 308014,
+        name: "Berlin and the Lady with an Ermine",
+        firstAirDate: "2026-05-15",
+        popularity: 20,
+      },
+    ]);
+    tmdbClientMocks.getEpisodeExternalIds
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ imdbId: "tt31397887", tvdbId: 10597958 });
+    tmdbClientMocks.hasTvSeason
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    tmdbClientMocks.getTvShowDetails.mockResolvedValue({
+      id: 308014,
+      numberOfSeasons: 1,
+    });
+    tmdbClientMocks.resolvePosterPath.mockResolvedValue("/series.jpg");
+    tmdbClientMocks.fetchPosterImage.mockResolvedValue({
+      buffer: imageBytes,
+      contentType: "image/jpeg",
+    });
+
+    const service = new PosterService();
+    const result = await service.fetchPoster(
+      createSyncHistory({
+        mediaType: "episode",
+        mediaTitle: "Berlin and the Lady with an Ermine",
+        posterUrl: undefined,
+        tmdbMovieId: undefined,
+        tmdbSeriesId: undefined,
+        imdbEpisodeId: undefined,
+        tvdbEpisodeId: undefined,
+        seasonNumber: 2,
+        episodeNumber: 1,
+      }),
+      createUser(),
+      { tmdbAccessToken: "tmdb-token" }
+    );
+
+    expect(result).toEqual({
+      buffer: Buffer.from(imageBytes),
+      contentType: "image/jpeg",
+    });
+    expect(tmdbClientMocks.resolvePosterPath).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tmdbSeriesId: "308014",
+        imdbEpisodeId: "tt31397887",
+        tvdbEpisodeId: "10597958",
+      })
+    );
+  });
+
+  it("maps movie and episode IDs through poster enrichment lookup", async () => {
+    const imageBytes = new Uint8Array([9, 9, 9]).buffer;
+    tmdbClientMocks.resolvePosterPath.mockResolvedValue("/poster.jpg");
+    tmdbClientMocks.fetchPosterImage.mockResolvedValue({
+      buffer: imageBytes,
+      contentType: "image/jpeg",
+    });
+
+    const service = new PosterService();
+
+    await service.fetchPoster(
+      createSyncHistory({
+        posterUrl: undefined,
+        tmdbMovieId: undefined,
+        tvdbMovieId: "218",
+        imdbMovieId: "tt0816692",
+      }),
+      createUser(),
+      { tmdbAccessToken: "tmdb-token" }
+    );
+    await service.fetchPoster(
+      createSyncHistory({
+        mediaType: "episode",
+        mediaTitle: "Berlin",
+        posterUrl: undefined,
+        tmdbMovieId: undefined,
+        tmdbSeriesId: "146176",
+        tvdbEpisodeId: "8865290",
+        seasonNumber: 1,
+        episodeNumber: 1,
+      }),
+      createUser(),
+      { tmdbAccessToken: "tmdb-token" }
+    );
+    await service.fetchPoster(
+      createSyncHistory({
+        mediaType: "clip",
+        mediaTitle: "Trailer",
+        posterUrl: undefined,
+        tmdbMovieId: undefined,
+      }),
+      createUser(),
+      { tmdbAccessToken: "tmdb-token" }
+    );
+
+    expect(tmdbClientMocks.resolvePosterPath).toHaveBeenCalled();
+  });
+
+  it("treats title-only history as having poster lookup data", () => {
+    expect(
+      hasPosterLookupData(
+        createSyncHistory({
+          posterUrl: undefined,
+          tmdbMovieId: undefined,
+          mediaTitle: "Berlin",
+        })
+      )
+    ).toBe(true);
   });
 });

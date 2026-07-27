@@ -560,4 +560,198 @@ describe("TmdbClient", () => {
       contentType: "image/jpeg",
     });
   });
+
+  it("searches TV and movies and maps enrichment helpers", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          results: [
+            {
+              id: 146176,
+              name: "Berlin",
+              original_name: "Berlín",
+              first_air_date: "2023-12-29",
+              popularity: 20,
+            },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          results: [
+            {
+              id: 157336,
+              title: "Interstellar",
+              original_title: "Interstellar",
+              release_date: "2014-11-05",
+              popularity: 50,
+            },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          name: "Berlin",
+          original_name: "Berlín",
+          poster_path: "/p.jpg",
+          number_of_seasons: 1,
+          first_air_date: "2023-12-29",
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          results: [
+            {
+              id: 308014,
+              name: "Berlin and the Lady with an Ermine",
+              original_name: "Berlín y la dama del armiño",
+              first_air_date: "2026-05-15",
+              popularity: 23,
+            },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          imdb_id: "tt16288804",
+          tvdb_id: 413033,
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          imdb_id: "tt0816692",
+          tvdb_id: 218,
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          imdb_id: "tt31397887",
+          tvdb_id: 10597958,
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ season_number: 1 }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new TmdbClient("test-token");
+
+    await expect(client.searchTv("Berlin", 2023)).resolves.toEqual([
+      {
+        id: 146176,
+        name: "Berlin",
+        originalName: "Berlín",
+        firstAirDate: "2023-12-29",
+        popularity: 20,
+      },
+    ]);
+    await expect(client.searchMovie("Interstellar", 2014)).resolves.toEqual([
+      {
+        id: 157336,
+        title: "Interstellar",
+        originalTitle: "Interstellar",
+        releaseDate: "2014-11-05",
+        popularity: 50,
+      },
+    ]);
+    await expect(client.getTvShowDetails(146176)).resolves.toEqual({
+      id: 146176,
+      name: "Berlin",
+      originalName: "Berlín",
+      posterPath: "/p.jpg",
+      numberOfSeasons: 1,
+      firstAirDate: "2023-12-29",
+    });
+    await expect(client.getTvRecommendations(146176)).resolves.toEqual([
+      {
+        id: 308014,
+        name: "Berlin and the Lady with an Ermine",
+        originalName: "Berlín y la dama del armiño",
+        firstAirDate: "2026-05-15",
+        popularity: 23,
+      },
+    ]);
+    await expect(client.getTvExternalIds(146176)).resolves.toEqual({
+      imdbId: "tt16288804",
+      tvdbId: 413033,
+    });
+    await expect(client.getMovieExternalIds(157336)).resolves.toEqual({
+      imdbId: "tt0816692",
+      tvdbId: 218,
+    });
+    await expect(client.getEpisodeExternalIds(308014, 1, 1)).resolves.toEqual({
+      imdbId: "tt31397887",
+      tvdbId: 10597958,
+    });
+    await expect(client.hasTvSeason(308014, 1)).resolves.toBe(true);
+    await expect(client.hasTvSeason(308014, 2)).resolves.toBe(false);
+    await expect(client.getTvShowDetails("missing")).resolves.toBeNull();
+    await expect(client.getTvExternalIds("missing")).resolves.toBeNull();
+    await expect(client.getMovieExternalIds("missing")).resolves.toBeNull();
+    await expect(
+      client.getEpisodeExternalIds("missing", 1, 1)
+    ).resolves.toBeNull();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.themoviedb.org/3/search/tv?query=Berlin&include_adult=false&first_air_date_year=2023",
+      expect.any(Object)
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.themoviedb.org/3/search/movie?query=Interstellar&include_adult=false&year=2014",
+      expect.any(Object)
+    );
+  });
+
+  it("returns empty search results when TMDB payloads omit results", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({}),
+      })
+    );
+
+    const client = new TmdbClient("test-token");
+    await expect(client.searchTv("Nope")).resolves.toEqual([]);
+    await expect(client.searchMovie("Nope")).resolves.toEqual([]);
+    await expect(client.getTvRecommendations(1)).resolves.toEqual([]);
+  });
 });

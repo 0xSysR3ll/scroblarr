@@ -37,6 +37,10 @@ const simklTokenManagerMocks = vi.hoisted(() => ({
   getValidAccessToken: vi.fn(),
 }));
 
+const mediaIdEnricherMocks = vi.hoisted(() => ({
+  enrich: vi.fn(async (media: unknown) => media),
+}));
+
 vi.mock("@repositories/UserRepository", () => ({
   UserRepository: class {
     findBySourceUsername = userRepositoryMocks.findBySourceUsername;
@@ -86,6 +90,16 @@ vi.mock("@integrations/simkl/SimklTokenManager", () => ({
   },
 }));
 
+vi.mock("./MediaIdEnricher", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./MediaIdEnricher")>();
+  return {
+    ...actual,
+    MediaIdEnricher: class {
+      enrich = mediaIdEnricherMocks.enrich;
+    },
+  };
+});
+
 vi.mock("@utils/logger", () => ({
   logger: {
     sync: {
@@ -123,6 +137,7 @@ describe("SyncService", () => {
     settingsRepositoryMocks.get.mockResolvedValue("100");
     settingsRepositoryMocks.getAll.mockResolvedValue({});
     syncHistoryRepositoryMocks.clearOldByUser.mockResolvedValue(0);
+    mediaIdEnricherMocks.enrich.mockImplementation(async (media) => media);
   });
 
   it("ignores non-scrobble events", async () => {
@@ -475,6 +490,160 @@ describe("SyncService", () => {
         success: true,
         destinations: JSON.stringify(["Trakt"]),
       })
+    );
+  });
+
+  it("enriches media IDs from TMDB before syncing when identifiers are missing", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      simklClientId: "simkl-client-id",
+      simklAccessToken: "simkl-token",
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      tmdbAccessToken: "tmdb-token",
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    simklTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "simkl-valid-token"
+    );
+    simklClientMocks.scrobble.mockResolvedValue(undefined);
+    mediaIdEnricherMocks.enrich.mockResolvedValue({
+      id: "episode-Berlin-2-1",
+      type: "episode",
+      title: "Berlin",
+      seasonNumber: 1,
+      episodeNumber: 1,
+      tmdbSeriesId: 308014,
+      tvdbEpisodeId: 10597958,
+      imdbEpisodeId: "tt31397887",
+    });
+
+    const service = new SyncService();
+    await service.syncEvent(
+      makeEvent({
+        media: {
+          id: "episode-Berlin-2-1",
+          type: "episode",
+          title: "Berlin",
+          seasonNumber: 2,
+          episodeNumber: 1,
+        },
+      })
+    );
+
+    expect(mediaIdEnricherMocks.enrich).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Berlin",
+        seasonNumber: 2,
+        episodeNumber: 1,
+      })
+    );
+    expect(simklClientMocks.scrobble).toHaveBeenCalledWith(
+      expect.objectContaining({
+        media: expect.objectContaining({
+          seasonNumber: 1,
+          tmdbSeriesId: 308014,
+          tvdbEpisodeId: 10597958,
+        }),
+      }),
+      "simkl-valid-token",
+      expect.any(Object)
+    );
+    expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mediaTitle: "Berlin",
+        seasonNumber: 1,
+        tmdbSeriesId: "308014",
+        tvdbEpisodeId: "10597958",
+        imdbEpisodeId: "tt31397887",
+        success: true,
+      })
+    );
+  });
+
+  it("skips enrichment when no TMDB token is configured", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      simklClientId: "simkl-client-id",
+      simklAccessToken: "simkl-token",
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    simklTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "simkl-valid-token"
+    );
+    simklClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    await service.syncEvent(
+      makeEvent({
+        media: {
+          id: "episode-Berlin-2-1",
+          type: "episode",
+          title: "Berlin",
+          seasonNumber: 2,
+          episodeNumber: 1,
+        },
+      })
+    );
+
+    expect(mediaIdEnricherMocks.enrich).not.toHaveBeenCalled();
+    expect(simklClientMocks.scrobble).toHaveBeenCalledWith(
+      expect.objectContaining({
+        media: expect.objectContaining({
+          title: "Berlin",
+          seasonNumber: 2,
+        }),
+      }),
+      "simkl-valid-token",
+      expect.any(Object)
+    );
+  });
+
+  it("keeps the original event when TMDB enrichment finds nothing", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      simklClientId: "simkl-client-id",
+      simklAccessToken: "simkl-token",
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      tmdbAccessToken: "tmdb-token",
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    simklTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "simkl-valid-token"
+    );
+    simklClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    await service.syncEvent(
+      makeEvent({
+        media: {
+          id: "episode-Berlin-2-1",
+          type: "episode",
+          title: "Berlin",
+          seasonNumber: 2,
+          episodeNumber: 1,
+        },
+      })
+    );
+
+    expect(mediaIdEnricherMocks.enrich).toHaveBeenCalled();
+    expect(simklClientMocks.scrobble).toHaveBeenCalledWith(
+      expect.objectContaining({
+        media: expect.objectContaining({
+          seasonNumber: 2,
+          title: "Berlin",
+        }),
+      }),
+      "simkl-valid-token",
+      expect.any(Object)
     );
   });
 });

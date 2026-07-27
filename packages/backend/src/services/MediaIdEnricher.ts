@@ -359,7 +359,7 @@ export class MediaIdEnricher {
       return score(b) - score(a);
     });
 
-    return ranked[0] ?? null;
+    return ranked[0];
   }
 
   private rankTvMatches(
