@@ -2,7 +2,6 @@ import { TmdbClient } from "@integrations/tmdb/TmdbClient";
 import type { MediaItem } from "@scroblarr/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-
 import { MediaIdEnricher, needsMediaIdEnrichment } from "./MediaIdEnricher";
 
 vi.mock("@utils/logger", () => ({
