@@ -609,6 +609,17 @@ describe("TmdbClient", () => {
         ok: true,
         status: 200,
         json: async () => ({
+          name: "Berlin",
+          original_name: "Berlín",
+          poster_path: "/p.jpg",
+          number_of_seasons: 1,
+          first_air_date: "2023-12-29",
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
           results: [
             {
               id: 308014,
@@ -699,6 +710,14 @@ describe("TmdbClient", () => {
       numberOfSeasons: 1,
       firstAirDate: "2023-12-29",
     });
+    await expect(client.getTvShowDetails("146176")).resolves.toEqual({
+      id: 146176,
+      name: "Berlin",
+      originalName: "Berlín",
+      posterPath: "/p.jpg",
+      numberOfSeasons: 1,
+      firstAirDate: "2023-12-29",
+    });
     await expect(client.getTvRecommendations(146176)).resolves.toEqual([
       {
         id: 308014,
@@ -753,5 +772,33 @@ describe("TmdbClient", () => {
     await expect(client.searchTv("Nope")).resolves.toEqual([]);
     await expect(client.searchMovie("Nope")).resolves.toEqual([]);
     await expect(client.getTvRecommendations(1)).resolves.toEqual([]);
+  });
+
+  it("maps null external IDs to undefined", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          imdb_id: null,
+          tvdb_id: null,
+        }),
+      })
+    );
+
+    const client = new TmdbClient("test-token");
+    await expect(client.getTvExternalIds(1)).resolves.toEqual({
+      imdbId: undefined,
+      tvdbId: undefined,
+    });
+    await expect(client.getMovieExternalIds(1)).resolves.toEqual({
+      imdbId: undefined,
+      tvdbId: undefined,
+    });
+    await expect(client.getEpisodeExternalIds(1, 1, 1)).resolves.toEqual({
+      imdbId: undefined,
+      tvdbId: undefined,
+    });
   });
 });

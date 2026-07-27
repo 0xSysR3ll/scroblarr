@@ -227,7 +227,6 @@ describe("MediaIdEnricher", () => {
         }),
       getTvShowDetails: vi.fn().mockResolvedValue({
         id: 146176,
-        name: "Berlin",
         numberOfSeasons: 1,
       }),
       getTvRecommendations: vi.fn().mockResolvedValue([
@@ -235,7 +234,6 @@ describe("MediaIdEnricher", () => {
           id: 218351,
           name: "The Gold",
           firstAirDate: "2023-02-12",
-          popularity: 10,
         },
         {
           id: 308014,
@@ -406,7 +404,6 @@ describe("MediaIdEnricher", () => {
           id: 999,
           title: "Interstellar",
           releaseDate: "2010-01-01",
-          popularity: 1,
         },
         {
           id: 157336,
