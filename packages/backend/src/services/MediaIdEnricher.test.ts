@@ -1,0 +1,317 @@
+import { TmdbClient } from "@integrations/tmdb/TmdbClient";
+import type { MediaItem } from "@scroblarr/shared";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+
+import { MediaIdEnricher, needsMediaIdEnrichment } from "./MediaIdEnricher";
+
+vi.mock("@utils/logger", () => ({
+  logger: {
+    sync: {
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    },
+  },
+}));
+
+function episode(overrides: Partial<MediaItem> = {}): MediaItem {
+  return {
+    id: "episode-1",
+    type: "episode",
+    title: "Berlin and the Lady with an Ermine",
+    seasonNumber: 2,
+    episodeNumber: 1,
+    ...overrides,
+  };
+}
+
+describe("needsMediaIdEnrichment", () => {
+  it("is true when an episode has no external IDs", () => {
+    expect(needsMediaIdEnrichment(episode())).toBe(true);
+  });
+
+  it("is false when an episode already has identifiers", () => {
+    expect(
+      needsMediaIdEnrichment(episode({ tvdbEpisodeId: 123, tmdbSeriesId: 1 }))
+    ).toBe(false);
+    expect(needsMediaIdEnrichment(episode({ imdbEpisodeId: "tt1" }))).toBe(
+      false
+    );
+    expect(needsMediaIdEnrichment(episode({ tmdbSeriesId: 99 }))).toBe(false);
+  });
+});
+
+describe("MediaIdEnricher", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("enriches episode IDs from TMDB and remaps season for single-season shows", async () => {
+    const client = {
+      searchTv: vi.fn().mockResolvedValue([
+        {
+          id: 308014,
+          name: "Berlin and the Lady with an Ermine",
+          originalName: "Berlín y la dama del armiño",
+          firstAirDate: "2026-05-15",
+        },
+      ]),
+      getEpisodeExternalIds: vi
+        .fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ imdbId: "tt999", tvdbId: 555 }),
+      hasTvSeason: vi
+        .fn()
+        .mockResolvedValueOnce(false)
+        .mockResolvedValueOnce(true),
+      getTvShowDetails: vi.fn().mockResolvedValue({
+        id: 308014,
+        numberOfSeasons: 1,
+      }),
+    } as unknown as TmdbClient;
+
+    const enricher = new MediaIdEnricher(client);
+    const enriched = await enricher.enrich(episode());
+
+    expect(enriched).toEqual(
+      expect.objectContaining({
+        tmdbSeriesId: 308014,
+        seasonNumber: 1,
+        episodeNumber: 1,
+        imdbEpisodeId: "tt999",
+        tvdbEpisodeId: 555,
+      })
+    );
+    expect(client.getEpisodeExternalIds).toHaveBeenCalledWith(308014, 2, 1);
+    expect(client.getEpisodeExternalIds).toHaveBeenCalledWith(308014, 1, 1);
+  });
+
+  it("keeps the original season when TMDB has that season", async () => {
+    const client = {
+      searchTv: vi.fn().mockResolvedValue([
+        {
+          id: 146176,
+          name: "Berlin",
+          originalName: "Berlín",
+          firstAirDate: "2023-12-29",
+          popularity: 20,
+        },
+      ]),
+      getEpisodeExternalIds: vi.fn().mockResolvedValue({
+        imdbId: "tt111",
+        tvdbId: 777,
+      }),
+      hasTvSeason: vi.fn(),
+      getTvShowDetails: vi.fn(),
+    } as unknown as TmdbClient;
+
+    const enricher = new MediaIdEnricher(client);
+    const enriched = await enricher.enrich(
+      episode({
+        title: "Berlin",
+        seasonNumber: 2,
+        episodeNumber: 1,
+      })
+    );
+
+    expect(enriched).toEqual(
+      expect.objectContaining({
+        tmdbSeriesId: 146176,
+        seasonNumber: 2,
+        tvdbEpisodeId: 777,
+        imdbEpisodeId: "tt111",
+      })
+    );
+    expect(client.getTvShowDetails).not.toHaveBeenCalled();
+  });
+
+  it("ignores non-exact title matches like Babylon Berlin", async () => {
+    const client = {
+      searchTv: vi.fn().mockResolvedValue([
+        {
+          id: 146176,
+          name: "Berlin",
+          originalName: "Berlín",
+          firstAirDate: "2023-12-29",
+          popularity: 20,
+        },
+        {
+          id: 66980,
+          name: "Babylon Berlin",
+          originalName: "Babylon Berlin",
+          firstAirDate: "2017-10-13",
+          popularity: 25,
+        },
+      ]),
+      getEpisodeExternalIds: vi.fn().mockImplementation(async (id: number) => {
+        if (id === 146176) {
+          return null;
+        }
+        return { imdbId: "tt5753668", tvdbId: 6361964 };
+      }),
+      hasTvSeason: vi
+        .fn()
+        .mockImplementation(async (id: number, season: number) => {
+          return id === 66980 && season === 2;
+        }),
+      getTvShowDetails: vi.fn().mockResolvedValue({
+        id: 146176,
+        name: "Berlin",
+        numberOfSeasons: 1,
+      }),
+      getTvRecommendations: vi.fn().mockResolvedValue([]),
+    } as unknown as TmdbClient;
+
+    const media = episode({
+      title: "Berlin",
+      seasonNumber: 2,
+      episodeNumber: 1,
+    });
+    const enricher = new MediaIdEnricher(client);
+    await expect(enricher.enrich(media)).resolves.toBe(media);
+    expect(client.getEpisodeExternalIds).not.toHaveBeenCalledWith(
+      66980,
+      expect.anything(),
+      expect.anything()
+    );
+  });
+
+  it("resolves old Berlin S2 matches via TMDB sequel recommendations", async () => {
+    const client = {
+      searchTv: vi.fn().mockResolvedValue([
+        {
+          id: 146176,
+          name: "Berlin",
+          originalName: "Berlín",
+          firstAirDate: "2023-12-29",
+          popularity: 20,
+        },
+      ]),
+      getEpisodeExternalIds: vi.fn().mockImplementation(async (id: number) => {
+        if (id === 308014) {
+          return { imdbId: "tt31397887", tvdbId: 10597958 };
+        }
+        return null;
+      }),
+      hasTvSeason: vi
+        .fn()
+        .mockImplementation(async (id: number, season: number) => {
+          return id === 308014 && season === 1;
+        }),
+      getTvShowDetails: vi.fn().mockResolvedValue({
+        id: 146176,
+        name: "Berlin",
+        numberOfSeasons: 1,
+      }),
+      getTvRecommendations: vi.fn().mockResolvedValue([
+        {
+          id: 308014,
+          name: "Berlin and the Lady with an Ermine",
+          originalName: "Berlín y la dama del armiño",
+          firstAirDate: "2026-05-15",
+          popularity: 23,
+        },
+        {
+          id: 218351,
+          name: "The Gold",
+          firstAirDate: "2023-02-12",
+          popularity: 10,
+        },
+      ]),
+    } as unknown as TmdbClient;
+
+    const enricher = new MediaIdEnricher(client);
+    const enriched = await enricher.enrich(
+      episode({
+        title: "Berlin",
+        seasonNumber: 2,
+        episodeNumber: 1,
+      })
+    );
+
+    expect(enriched).toEqual(
+      expect.objectContaining({
+        title: "Berlin",
+        seasonNumber: 1,
+        episodeNumber: 1,
+        tmdbSeriesId: 308014,
+        imdbEpisodeId: "tt31397887",
+        tvdbEpisodeId: 10597958,
+      })
+    );
+  });
+
+  it("does not remap short parent titles like Berlin to season 1", async () => {
+    const client = {
+      searchTv: vi.fn().mockResolvedValue([
+        {
+          id: 146176,
+          name: "Berlin",
+          originalName: "Berlín",
+          firstAirDate: "2023-12-29",
+        },
+      ]),
+      getEpisodeExternalIds: vi.fn().mockResolvedValue(null),
+      hasTvSeason: vi.fn().mockResolvedValue(false),
+      getTvShowDetails: vi.fn().mockResolvedValue({
+        id: 146176,
+        name: "Berlin",
+        numberOfSeasons: 1,
+      }),
+      getTvRecommendations: vi.fn().mockResolvedValue([]),
+    } as unknown as TmdbClient;
+
+    const media = episode({
+      title: "Berlin",
+      seasonNumber: 2,
+      episodeNumber: 1,
+    });
+    const enricher = new MediaIdEnricher(client);
+    await expect(enricher.enrich(media)).resolves.toBe(media);
+  });
+
+  it("enriches movie IDs from TMDB search", async () => {
+    const client = {
+      searchMovie: vi.fn().mockResolvedValue([
+        {
+          id: 157336,
+          title: "Interstellar",
+          originalTitle: "Interstellar",
+          releaseDate: "2014-11-05",
+        },
+      ]),
+      getMovieExternalIds: vi.fn().mockResolvedValue({
+        imdbId: "tt0816692",
+        tvdbId: 1,
+      }),
+    } as unknown as TmdbClient;
+
+    const enricher = new MediaIdEnricher(client);
+    const enriched = await enricher.enrich({
+      id: "movie-1",
+      type: "movie",
+      title: "Interstellar",
+      year: 2014,
+    });
+
+    expect(enriched).toEqual(
+      expect.objectContaining({
+        tmdbMovieId: 157336,
+        imdbMovieId: "tt0816692",
+        tvdbMovieId: 1,
+      })
+    );
+  });
+
+  it("leaves media unchanged when TMDB finds no match", async () => {
+    const client = {
+      searchTv: vi.fn().mockResolvedValue([]),
+    } as unknown as TmdbClient;
+
+    const media = episode();
+    const enricher = new MediaIdEnricher(client);
+    await expect(enricher.enrich(media)).resolves.toBe(media);
+  });
+});

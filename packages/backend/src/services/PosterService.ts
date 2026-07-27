@@ -4,8 +4,11 @@ import { JellyfinClient } from "@integrations/jellyfin/JellyfinClient";
 import { TmdbRateLimitError } from "@integrations/tmdb/TmdbApiError";
 import { TmdbClient } from "@integrations/tmdb/TmdbClient";
 import { getTmdbAccessToken } from "@integrations/tmdb/tmdbConfig";
+import type { MediaItem } from "@scroblarr/shared";
 import { isPlexServerUrl } from "@scroblarr/shared";
 import { logger } from "@utils/logger";
+
+import { MediaIdEnricher } from "./MediaIdEnricher";
 
 const POSTER_FETCH_TIMEOUT_MS = 10_000;
 
@@ -33,7 +36,8 @@ export function hasPosterLookupData(syncHistory: SyncHistory): boolean {
     syncHistory.imdbMovieId ||
     syncHistory.imdbEpisodeId ||
     syncHistory.tvdbMovieId ||
-    syncHistory.tvdbEpisodeId
+    syncHistory.tvdbEpisodeId ||
+    syncHistory.mediaTitle
   );
 }
 
@@ -41,6 +45,46 @@ function isPosterFetchSuccess(
   result: PosterFetchResult
 ): result is PosterFetchSuccess {
   return !("message" in result);
+}
+
+function toMediaItem(syncHistory: SyncHistory): MediaItem | null {
+  if (syncHistory.mediaType === "movie") {
+    return {
+      id: syncHistory.originalMediaId || syncHistory.id,
+      type: "movie",
+      title: syncHistory.mediaTitle,
+      year: syncHistory.year,
+      tmdbMovieId: syncHistory.tmdbMovieId
+        ? Number(syncHistory.tmdbMovieId)
+        : undefined,
+      imdbMovieId: syncHistory.imdbMovieId,
+      tvdbMovieId: syncHistory.tvdbMovieId
+        ? Number(syncHistory.tvdbMovieId)
+        : undefined,
+      posterUrl: syncHistory.posterUrl,
+    };
+  }
+
+  if (syncHistory.mediaType === "episode") {
+    return {
+      id: syncHistory.originalMediaId || syncHistory.id,
+      type: "episode",
+      title: syncHistory.mediaTitle,
+      year: syncHistory.year,
+      seasonNumber: syncHistory.seasonNumber,
+      episodeNumber: syncHistory.episodeNumber,
+      tmdbSeriesId: syncHistory.tmdbSeriesId
+        ? Number(syncHistory.tmdbSeriesId)
+        : undefined,
+      imdbEpisodeId: syncHistory.imdbEpisodeId,
+      tvdbEpisodeId: syncHistory.tvdbEpisodeId
+        ? Number(syncHistory.tvdbEpisodeId)
+        : undefined,
+      posterUrl: syncHistory.posterUrl,
+    };
+  }
+
+  return null;
 }
 
 export class PosterService {
@@ -94,7 +138,27 @@ export class PosterService {
   ): Promise<PosterFetchSuccess | null> {
     try {
       const client = new TmdbClient(accessToken);
-      const posterPath = await client.resolvePosterPath(syncHistory);
+      let lookup = syncHistory;
+
+      const mediaItem = toMediaItem(syncHistory);
+      if (mediaItem) {
+        const enriched = await new MediaIdEnricher(client).enrich(mediaItem);
+        lookup = {
+          ...syncHistory,
+          tmdbMovieId:
+            enriched.tmdbMovieId?.toString() ?? syncHistory.tmdbMovieId,
+          tmdbSeriesId:
+            enriched.tmdbSeriesId?.toString() ?? syncHistory.tmdbSeriesId,
+          imdbMovieId: enriched.imdbMovieId ?? syncHistory.imdbMovieId,
+          imdbEpisodeId: enriched.imdbEpisodeId ?? syncHistory.imdbEpisodeId,
+          tvdbMovieId:
+            enriched.tvdbMovieId?.toString() ?? syncHistory.tvdbMovieId,
+          tvdbEpisodeId:
+            enriched.tvdbEpisodeId?.toString() ?? syncHistory.tvdbEpisodeId,
+        };
+      }
+
+      const posterPath = await client.resolvePosterPath(lookup);
       if (!posterPath) {
         return null;
       }

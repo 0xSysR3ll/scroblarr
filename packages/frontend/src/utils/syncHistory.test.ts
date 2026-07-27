@@ -254,6 +254,7 @@ describe("sync history utils", () => {
       hasPosterLookupData(
         syncItem({
           posterUrl: undefined,
+          mediaTitle: "",
           tmdbMovieId: undefined,
           tmdbSeriesId: undefined,
           imdbMovieId: undefined,

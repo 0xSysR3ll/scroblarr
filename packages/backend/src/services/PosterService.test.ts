@@ -73,6 +73,7 @@ describe("PosterService", () => {
       hasPosterLookupData(
         createSyncHistory({
           posterUrl: undefined,
+          mediaTitle: "",
           tmdbMovieId: undefined,
           tmdbSeriesId: undefined,
           imdbMovieId: undefined,

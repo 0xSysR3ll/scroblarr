@@ -51,7 +51,7 @@ const isValidLogLevel = (value: string): value is LogLevel => {
 };
 
 const resolvedLogLevel = ((): LogLevel => {
-  const envLevel = process.env.LOG_LEVEL;
+  const envLevel = process.env.LOG_LEVEL?.trim().toLowerCase();
   if (envLevel && isValidLogLevel(envLevel)) {
     return envLevel;
   }

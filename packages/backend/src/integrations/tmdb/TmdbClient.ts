@@ -10,12 +10,43 @@ const TMDB_API_BASE = "https://api.themoviedb.org/3";
 
 interface TmdbMediaDetails {
   poster_path: string | null;
+  number_of_seasons?: number;
+  name?: string;
+  original_name?: string;
+  first_air_date?: string;
 }
 
 interface TmdbFindResult {
   movie_results?: Array<{ poster_path: string | null }>;
   tv_results?: Array<{ poster_path: string | null; id?: number }>;
   tv_episode_results?: Array<{ show_id?: number; still_path?: string | null }>;
+}
+
+interface TmdbSearchTvResult {
+  results?: Array<{
+    id: number;
+    name?: string;
+    original_name?: string;
+    first_air_date?: string;
+    poster_path?: string | null;
+    popularity?: number;
+  }>;
+}
+
+interface TmdbSearchMovieResult {
+  results?: Array<{
+    id: number;
+    title?: string;
+    original_title?: string;
+    release_date?: string;
+    poster_path?: string | null;
+    popularity?: number;
+  }>;
+}
+
+interface TmdbExternalIds {
+  imdb_id?: string | null;
+  tvdb_id?: number | null;
 }
 
 export interface TmdbPosterLookupInput {
@@ -26,6 +57,22 @@ export interface TmdbPosterLookupInput {
   imdbEpisodeId?: string | null;
   tvdbMovieId?: string | null;
   tvdbEpisodeId?: string | null;
+}
+
+export interface TmdbTvSearchHit {
+  id: number;
+  name?: string;
+  originalName?: string;
+  firstAirDate?: string;
+  popularity?: number;
+}
+
+export interface TmdbMovieSearchHit {
+  id: number;
+  title?: string;
+  originalTitle?: string;
+  releaseDate?: string;
+  popularity?: number;
 }
 
 export class TmdbClient {
@@ -69,6 +116,154 @@ export class TmdbClient {
     const contentType = response.headers.get("content-type") || "image/jpeg";
     const buffer = await response.arrayBuffer();
     return { buffer, contentType };
+  }
+
+  async searchTv(query: string, year?: number): Promise<TmdbTvSearchHit[]> {
+    const params = new URLSearchParams({
+      query,
+      include_adult: "false",
+    });
+    if (year !== undefined) {
+      params.set("first_air_date_year", year.toString());
+    }
+
+    const result = await this.apiGet<TmdbSearchTvResult>(
+      `/search/tv?${params.toString()}`
+    );
+
+    return (result?.results ?? []).map((item) => ({
+      id: item.id,
+      name: item.name,
+      originalName: item.original_name,
+      firstAirDate: item.first_air_date,
+      popularity: item.popularity,
+    }));
+  }
+
+  async searchMovie(
+    query: string,
+    year?: number
+  ): Promise<TmdbMovieSearchHit[]> {
+    const params = new URLSearchParams({
+      query,
+      include_adult: "false",
+    });
+    if (year !== undefined) {
+      params.set("year", year.toString());
+    }
+
+    const result = await this.apiGet<TmdbSearchMovieResult>(
+      `/search/movie?${params.toString()}`
+    );
+
+    return (result?.results ?? []).map((item) => ({
+      id: item.id,
+      title: item.title,
+      originalTitle: item.original_title,
+      releaseDate: item.release_date,
+      popularity: item.popularity,
+    }));
+  }
+
+  async getTvShowDetails(seriesId: string | number): Promise<{
+    id: number;
+    name?: string;
+    originalName?: string;
+    posterPath?: string | null;
+    numberOfSeasons?: number;
+    firstAirDate?: string;
+  } | null> {
+    const details = await this.getTvDetails(seriesId.toString());
+    if (!details) {
+      return null;
+    }
+
+    return {
+      id: typeof seriesId === "number" ? seriesId : Number(seriesId),
+      name: details.name,
+      originalName: details.original_name,
+      posterPath: details.poster_path,
+      numberOfSeasons: details.number_of_seasons,
+      firstAirDate: details.first_air_date,
+    };
+  }
+
+  async getTvRecommendations(
+    seriesId: string | number
+  ): Promise<TmdbTvSearchHit[]> {
+    const result = await this.apiGet<TmdbSearchTvResult>(
+      `/tv/${seriesId}/recommendations`
+    );
+
+    return (result?.results ?? []).map((item) => ({
+      id: item.id,
+      name: item.name,
+      originalName: item.original_name,
+      firstAirDate: item.first_air_date,
+      popularity: item.popularity,
+    }));
+  }
+
+  async getTvExternalIds(seriesId: string | number): Promise<{
+    imdbId?: string;
+    tvdbId?: number;
+  } | null> {
+    const result = await this.apiGet<TmdbExternalIds>(
+      `/tv/${seriesId}/external_ids`
+    );
+    if (!result) {
+      return null;
+    }
+
+    return {
+      imdbId: result.imdb_id ?? undefined,
+      tvdbId: result.tvdb_id ?? undefined,
+    };
+  }
+
+  async getMovieExternalIds(movieId: string | number): Promise<{
+    imdbId?: string;
+    tvdbId?: number;
+  } | null> {
+    const result = await this.apiGet<TmdbExternalIds>(
+      `/movie/${movieId}/external_ids`
+    );
+    if (!result) {
+      return null;
+    }
+
+    return {
+      imdbId: result.imdb_id ?? undefined,
+      tvdbId: result.tvdb_id ?? undefined,
+    };
+  }
+
+  async getEpisodeExternalIds(
+    seriesId: string | number,
+    seasonNumber: number,
+    episodeNumber: number
+  ): Promise<{ imdbId?: string; tvdbId?: number } | null> {
+    const result = await this.apiGet<TmdbExternalIds>(
+      `/tv/${seriesId}/season/${seasonNumber}/episode/${episodeNumber}/external_ids`
+    );
+    if (!result) {
+      return null;
+    }
+
+    return {
+      imdbId: result.imdb_id ?? undefined,
+      tvdbId: result.tvdb_id ?? undefined,
+    };
+  }
+
+  async hasTvSeason(
+    seriesId: string | number,
+    seasonNumber: number
+  ): Promise<boolean> {
+    const season = await this.apiGet<{ season_number?: number }>(
+      `/tv/${seriesId}/season/${seasonNumber}`
+    );
+    return season !== null;
   }
 
   private async resolveMoviePosterPath(
