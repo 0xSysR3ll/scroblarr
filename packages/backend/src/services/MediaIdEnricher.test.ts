@@ -540,6 +540,59 @@ describe("MediaIdEnricher", () => {
     ).resolves.toBe(media);
   });
 
+  it("returns media unchanged from enrich when IDs are already present", async () => {
+    const client = {
+      searchTv: vi.fn(),
+      searchMovie: vi.fn(),
+    } as unknown as TmdbClient;
+    const enricher = new MediaIdEnricher(client);
+    const media = episode({ tmdbSeriesId: 146176 });
+
+    await expect(enricher.enrich(media)).resolves.toBe(media);
+    expect(client.searchTv).not.toHaveBeenCalled();
+    expect(client.searchMovie).not.toHaveBeenCalled();
+  });
+
+  it("reuses season-existence lookups within a single enrichment run", async () => {
+    const hasTvSeason = vi.fn().mockResolvedValue(false);
+    const client = {
+      searchTv: vi.fn().mockResolvedValue([
+        {
+          id: 146176,
+          name: "Berlin",
+          firstAirDate: "2023-12-29",
+          popularity: 20,
+        },
+        {
+          id: 146176,
+          name: "Berlin",
+          firstAirDate: "2023-12-29",
+          popularity: 19,
+        },
+      ]),
+      getEpisodeExternalIds: vi.fn().mockResolvedValue(null),
+      hasTvSeason,
+      getTvShowDetails: vi.fn().mockResolvedValue({
+        id: 146176,
+        name: "Berlin",
+        numberOfSeasons: 1,
+      }),
+      getTvRecommendations: vi.fn().mockResolvedValue([]),
+    } as unknown as TmdbClient;
+
+    const media = episode({
+      title: "Berlin",
+      seasonNumber: 2,
+      episodeNumber: 1,
+    });
+    const enricher = new MediaIdEnricher(client);
+    await expect(enricher.enrich(media)).resolves.toBe(media);
+
+    // Same series/season is checked for both duplicate candidates; second hit uses cache.
+    expect(hasTvSeason).toHaveBeenCalledTimes(1);
+    expect(hasTvSeason).toHaveBeenCalledWith(146176, 2);
+  });
+
   it("skips sequel lookup when requested season exists on the parent show", async () => {
     const client = {
       searchTv: vi.fn().mockResolvedValue([

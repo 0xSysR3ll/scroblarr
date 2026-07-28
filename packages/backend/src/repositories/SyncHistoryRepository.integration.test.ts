@@ -228,6 +228,121 @@ describe("SyncHistoryRepository integration", () => {
     expect(stats.lastFailure?.mediaTitle).toBe("Example Show");
   });
 
+  it("matches existing syncs by TVDB, IMDb, and TMDB identifiers", async () => {
+    await createHistory([
+      {
+        userId: user.id,
+        mediaType: "episode",
+        mediaTitle: "Show A",
+        success: true,
+        tvdbEpisodeId: "1001",
+        seasonNumber: 1,
+        episodeNumber: 1,
+      },
+      {
+        userId: user.id,
+        mediaType: "episode",
+        mediaTitle: "Show B",
+        success: true,
+        imdbEpisodeId: "tt2001",
+        seasonNumber: 2,
+        episodeNumber: 3,
+      },
+      {
+        userId: user.id,
+        mediaType: "episode",
+        mediaTitle: "Show C",
+        success: true,
+        tmdbSeriesId: "3001",
+        seasonNumber: 1,
+        episodeNumber: 2,
+      },
+      {
+        userId: user.id,
+        mediaType: "movie",
+        mediaTitle: "Movie A",
+        success: true,
+        tvdbMovieId: "4001",
+      },
+      {
+        userId: user.id,
+        mediaType: "movie",
+        mediaTitle: "Movie B",
+        success: true,
+        imdbMovieId: "tt5001",
+      },
+      {
+        userId: user.id,
+        mediaType: "movie",
+        mediaTitle: "Movie C",
+        success: true,
+        tmdbMovieId: "6001",
+      },
+      {
+        userId: user.id,
+        mediaType: "episode",
+        mediaTitle: "Failed episode",
+        success: false,
+        tmdbSeriesId: "9999",
+        seasonNumber: 1,
+        episodeNumber: 1,
+      },
+    ]);
+
+    await expect(
+      repository.hasExistingSync(user.id, "episode", {
+        tvdbEpisodeId: "1001",
+      })
+    ).resolves.toBe(true);
+    await expect(
+      repository.hasExistingSync(user.id, "episode", {
+        imdbEpisodeId: "tt2001",
+      })
+    ).resolves.toBe(true);
+    await expect(
+      repository.hasExistingSync(user.id, "episode", {
+        tmdbSeriesId: "3001",
+        seasonNumber: 1,
+        episodeNumber: 2,
+      })
+    ).resolves.toBe(true);
+    await expect(
+      repository.hasExistingSync(user.id, "episode", {
+        tmdbSeriesId: "3001",
+        seasonNumber: 1,
+        episodeNumber: 9,
+      })
+    ).resolves.toBe(false);
+    await expect(
+      repository.hasExistingSync(user.id, "episode", {
+        tmdbSeriesId: "9999",
+        seasonNumber: 1,
+        episodeNumber: 1,
+      })
+    ).resolves.toBe(false);
+
+    await expect(
+      repository.hasExistingSync(user.id, "movie", {
+        tvdbMovieId: "4001",
+      })
+    ).resolves.toBe(true);
+    await expect(
+      repository.hasExistingSync(user.id, "movie", {
+        imdbMovieId: "tt5001",
+      })
+    ).resolves.toBe(true);
+    await expect(
+      repository.hasExistingSync(user.id, "movie", {
+        tmdbMovieId: "6001",
+      })
+    ).resolves.toBe(true);
+    await expect(
+      repository.hasExistingSync(user.id, "movie", {
+        tmdbMovieId: "6002",
+      })
+    ).resolves.toBe(false);
+  });
+
   async function createHistory(items: Array<Partial<SyncHistory>>) {
     await dataSource.getRepository(SyncHistoryEntity).save(
       items.map((item) => ({
