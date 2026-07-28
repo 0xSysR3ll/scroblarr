@@ -195,6 +195,108 @@ describe("trakt routes", () => {
     expect(response.body).toEqual({ error: "authorization pending" });
   });
 
+  it("returns slow down as a 400 while polling", async () => {
+    traktOAuthMocks.exchangePinForToken.mockRejectedValueOnce(
+      new Error("slow down")
+    );
+
+    const response = await request(app)
+      .post("/trakt/link")
+      .send({ userCode: "ABCD1234" })
+      .expect(400);
+
+    expect(response.body).toEqual({ error: "slow down" });
+  });
+
+  it("requires credentials before linking", async () => {
+    userRepositoryMocks.findById.mockResolvedValueOnce({
+      ...linkedUser,
+      traktClientId: null,
+      traktClientSecret: null,
+    });
+
+    const response = await request(app)
+      .post("/trakt/link")
+      .send({ userCode: "ABCD1234" })
+      .expect(400);
+
+    expect(response.body.error).toMatch(/client ID and secret/i);
+    expect(traktOAuthMocks.exchangePinForToken).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 when PIN authorization request fails", async () => {
+    traktOAuthMocks.requestPinCode.mockRejectedValueOnce(
+      new Error("Trakt down")
+    );
+
+    const response = await request(app).get("/trakt/authorize").expect(500);
+
+    expect(response.body).toEqual({ error: "Trakt down" });
+  });
+
+  it("returns a generic authorize error for non-Error failures", async () => {
+    traktOAuthMocks.requestPinCode.mockRejectedValueOnce("trakt unavailable");
+
+    const response = await request(app).get("/trakt/authorize").expect(500);
+
+    expect(response.body).toEqual({
+      error: "Failed to get Trakt authorization URL",
+    });
+  });
+
+  it("links even when profile lookup fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("profile unavailable"))
+    );
+
+    const response = await request(app)
+      .post("/trakt/link")
+      .send({ userCode: "ABCD1234" })
+      .expect(200);
+
+    expect(response.body).toEqual({ success: true });
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith(
+      "user-id",
+      expect.objectContaining({
+        traktAccessToken: "new-access-token",
+        traktRefreshToken: "new-refresh-token",
+      })
+    );
+  });
+
+  it("returns 500 when linking fails for non-pending reasons", async () => {
+    traktOAuthMocks.exchangePinForToken.mockRejectedValueOnce(
+      new Error("invalid client")
+    );
+
+    const response = await request(app)
+      .post("/trakt/link")
+      .send({ userCode: "ABCD1234" })
+      .expect(500);
+
+    expect(response.body).toEqual({ error: "invalid client" });
+  });
+
+  it("returns 401 when the authorize user no longer exists", async () => {
+    userRepositoryMocks.findById.mockResolvedValueOnce(null);
+
+    const response = await request(app).get("/trakt/authorize").expect(401);
+
+    expect(response.body).toEqual({ error: "User not found" });
+  });
+
+  it("returns 401 when the link user no longer exists", async () => {
+    userRepositoryMocks.findById.mockResolvedValueOnce(null);
+
+    const response = await request(app)
+      .post("/trakt/link")
+      .send({ userCode: "ABCD1234" })
+      .expect(401);
+
+    expect(response.body).toEqual({ error: "User not found" });
+  });
+
   it("returns Trakt status when the stored access token is valid", async () => {
     const response = await request(app).get("/trakt/status").expect(200);
 

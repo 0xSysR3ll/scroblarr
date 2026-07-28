@@ -313,85 +313,65 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
   }
 
   async function handleGetTraktAuthUrl() {
+    setTraktError(null);
+    setTraktPinMessage(null);
+    setTraktSaving(true);
+    setTraktPinPolling(false);
+    const pollId = traktPinPollIdRef.current + 1;
+    traktPinPollIdRef.current = pollId;
+
     try {
-      setTraktError(null);
-      setTraktPinMessage(null);
-      setTraktSaving(true);
-      setTraktPinPolling(false);
-      const pollId = traktPinPollIdRef.current + 1;
-      traktPinPollIdRef.current = pollId;
-
-      try {
-        traktOAuthPopup.preparePopup("Trakt Auth");
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error
-            ? error.message
-            : "Failed to open authentication window. Please allow popups and try again.";
-        setTraktError(errorMessage);
-        setTraktSaving(false);
-        return;
-      }
-
-      setTimeout(async () => {
-        try {
-          const clientId = traktClientId.trim() || undefined;
-          const clientSecret = traktClientSecret.trim() || undefined;
-
-          const response = await getTraktAuthorizeUrl(clientId, clientSecret);
-          if (pollId !== traktPinPollIdRef.current) {
-            return;
-          }
-
-          setTraktCode(response.userCode);
-          setTraktAuthUrl(response.verificationUrl);
-
-          traktOAuthPopup.navigateToUrl(response.verificationUrl);
-          void startTraktPinPolling(
-            response.userCode,
-            clientId,
-            clientSecret,
-            response.interval,
-            response.expiresIn,
-            pollId
-          );
-        } catch (err) {
-          traktOAuthPopup.closePopup();
-          setTraktError(
-            err instanceof Error
-              ? err.message
-              : t("trakt.getAuthUrlFailed", {
-                  defaultValue: "Failed to get Trakt PIN code",
-                })
-          );
-        } finally {
-          if (pollId === traktPinPollIdRef.current) {
-            setTraktSaving(false);
-          }
-        }
-      }, 1500);
-    } catch (err) {
-      setTraktError(
-        err instanceof Error
-          ? err.message
-          : t("trakt.getAuthUrlFailed", {
-              defaultValue: "Failed to get Trakt PIN code",
-            })
-      );
+      traktOAuthPopup.preparePopup("Trakt Auth");
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to open authentication window. Please allow popups and try again.";
+      setTraktError(errorMessage);
       setTraktSaving(false);
-    }
-  }
-
-  async function handleLinkTrakt() {
-    if (!traktCode.trim()) {
-      setTraktError(
-        t("trakt.codeRequired", {
-          defaultValue: "Trakt PIN code is required",
-        })
-      );
       return;
     }
 
+    setTimeout(async () => {
+      try {
+        const clientId = traktClientId.trim() || undefined;
+        const clientSecret = traktClientSecret.trim() || undefined;
+
+        const response = await getTraktAuthorizeUrl(clientId, clientSecret);
+        if (pollId !== traktPinPollIdRef.current) {
+          return;
+        }
+
+        setTraktCode(response.userCode);
+        setTraktAuthUrl(response.verificationUrl);
+
+        traktOAuthPopup.navigateToUrl(response.verificationUrl);
+        void startTraktPinPolling(
+          response.userCode,
+          clientId,
+          clientSecret,
+          response.interval,
+          response.expiresIn,
+          pollId
+        );
+      } catch (err) {
+        traktOAuthPopup.closePopup();
+        setTraktError(
+          err instanceof Error
+            ? err.message
+            : t("trakt.getAuthUrlFailed", {
+                defaultValue: "Failed to get Trakt PIN code",
+              })
+        );
+      } finally {
+        if (pollId === traktPinPollIdRef.current) {
+          setTraktSaving(false);
+        }
+      }
+    }, 1500);
+  }
+
+  async function handleLinkTrakt() {
     const clientId = traktClientId.trim() || undefined;
     const clientSecret = traktClientSecret.trim() || undefined;
     await completeTraktLink(traktCode.trim(), clientId, clientSecret);

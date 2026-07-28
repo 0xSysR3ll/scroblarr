@@ -188,4 +188,96 @@ describe("trakt api", () => {
       "Failed to fetch Trakt status"
     );
   });
+
+  it("surfaces link errors from the backend", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "authorization pending" }, false, 400)
+    );
+
+    await expect(linkTrakt("ABCD1234")).rejects.toThrow(
+      "authorization pending"
+    );
+  });
+
+  it("surfaces unlink errors from the backend", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "Failed to unlink Trakt account" }, false, 500)
+    );
+
+    await expect(unlinkTrakt()).rejects.toThrow(
+      "Failed to unlink Trakt account"
+    );
+  });
+
+  it("surfaces non-JSON authorize, link, and unlink errors", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response("proxy failed", {
+          status: 502,
+          statusText: "Bad Gateway",
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response("link proxy failed", {
+          status: 503,
+          statusText: "Service Unavailable",
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response("unlink proxy failed", {
+          status: 504,
+          statusText: "Gateway Timeout",
+        })
+      );
+
+    await expect(getTraktAuthorizeUrl()).rejects.toThrow("proxy failed");
+    await expect(linkTrakt("ABCD1234")).rejects.toThrow("link proxy failed");
+    await expect(unlinkTrakt()).rejects.toThrow("unlink proxy failed");
+  });
+
+  it("falls back to status text when error bodies are empty", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      statusText: "Service Unavailable",
+      clone: () => ({
+        json: vi.fn().mockRejectedValue(new Error("invalid json")),
+      }),
+      text: vi.fn().mockResolvedValue("   "),
+    });
+
+    await expect(getTraktAuthorizeUrl()).rejects.toThrow(
+      "Failed to get Trakt PIN code (503 Service Unavailable)"
+    );
+  });
+
+  it("falls back to status text when reading the error body throws", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 502,
+      statusText: "Bad Gateway",
+      clone: () => ({
+        json: vi.fn().mockRejectedValue(new Error("invalid json")),
+      }),
+      text: vi.fn().mockRejectedValue(new Error("stream failed")),
+    });
+
+    await expect(getTraktAuthorizeUrl()).rejects.toThrow(
+      "Failed to get Trakt PIN code (502 Bad Gateway)"
+    );
+  });
+
+  it("falls back to the default message when status metadata is missing", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 0,
+      statusText: "",
+      json: vi.fn().mockRejectedValue(new Error("invalid json")),
+      text: vi.fn().mockResolvedValue(""),
+    });
+
+    await expect(getTraktAuthorizeUrl()).rejects.toThrow(
+      "Failed to get Trakt PIN code"
+    );
+  });
 });

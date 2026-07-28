@@ -317,7 +317,6 @@
   },
   "trakt": {
     "getAuthUrlFailed": "Failed to get Trakt PIN code",
-    "codeRequired": "Trakt PIN code is required",
     "linked": "Trakt account linked successfully",
     "linkFailed": "Failed to link Trakt account",
     "unlinked": "Trakt account unlinked successfully",
