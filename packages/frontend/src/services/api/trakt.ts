@@ -11,14 +11,51 @@ export interface TraktStatus {
   hasCredentials: boolean;
 }
 
+export interface TraktPinAuthorization {
+  userCode: string;
+  verificationUrl: string;
+  expiresIn: number;
+  interval: number;
+}
+
 export function invalidateTraktCache(): void {
   invalidateCached(CACHE_KEY_STATUS);
+}
+
+async function getErrorMessage(
+  response: Response,
+  fallback: string
+): Promise<string> {
+  try {
+    const jsonSource =
+      typeof response.clone === "function" ? response.clone() : response;
+    const error = (await jsonSource.json()) as { error?: unknown };
+    if (typeof error.error === "string" && error.error) {
+      return error.error;
+    }
+  } catch {
+    // Fall through to text/status fallback.
+  }
+
+  try {
+    const text = await response.text();
+    if (text.trim()) {
+      return text.trim();
+    }
+  } catch {
+    // Fall through to status fallback.
+  }
+
+  const status = [response.status, response.statusText]
+    .filter(Boolean)
+    .join(" ");
+  return status ? `${fallback} (${status})` : fallback;
 }
 
 export async function getTraktAuthorizeUrl(
   clientId?: string,
   clientSecret?: string
-): Promise<{ authUrl: string }> {
+): Promise<TraktPinAuthorization> {
   const params = new URLSearchParams();
   if (clientId) params.append("clientId", clientId);
   if (clientSecret) params.append("clientSecret", clientSecret);
@@ -31,25 +68,27 @@ export async function getTraktAuthorizeUrl(
     headers: getAuthHeaders(),
   });
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to get Trakt authorization URL");
+    throw new Error(
+      await getErrorMessage(response, "Failed to get Trakt PIN code")
+    );
   }
   return response.json();
 }
 
 export async function linkTrakt(
-  code: string,
+  userCode: string,
   clientId?: string,
   clientSecret?: string
 ): Promise<{ success: boolean }> {
   const response = await fetch(`${API_BASE_URL}/trakt/link`, {
     method: "POST",
     headers: getAuthHeaders(),
-    body: JSON.stringify({ code, clientId, clientSecret }),
+    body: JSON.stringify({ userCode, clientId, clientSecret }),
   });
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to link Trakt account");
+    throw new Error(
+      await getErrorMessage(response, "Failed to link Trakt account")
+    );
   }
   invalidateTraktCache();
   return response.json();
@@ -61,8 +100,9 @@ export async function unlinkTrakt(): Promise<{ success: boolean }> {
     headers: getAuthHeaders(),
   });
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to unlink Trakt account");
+    throw new Error(
+      await getErrorMessage(response, "Failed to unlink Trakt account")
+    );
   }
   invalidateTraktCache();
   return response.json();

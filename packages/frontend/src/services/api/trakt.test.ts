@@ -24,14 +24,24 @@ describe("trakt api", () => {
     invalidateTraktCache();
   });
 
-  it("builds authorization URLs with optional credentials", async () => {
+  it("builds PIN authorization requests with optional credentials", async () => {
     fetchMock.mockResolvedValueOnce(
-      jsonResponse({ authUrl: "https://trakt.tv/oauth/authorize" })
+      jsonResponse({
+        userCode: "ABCD1234",
+        verificationUrl: "https://trakt.tv/activate",
+        expiresIn: 600,
+        interval: 5,
+      })
     );
 
     await expect(
       getTraktAuthorizeUrl("client id", "client secret")
-    ).resolves.toEqual({ authUrl: "https://trakt.tv/oauth/authorize" });
+    ).resolves.toEqual({
+      userCode: "ABCD1234",
+      verificationUrl: "https://trakt.tv/activate",
+      expiresIn: 600,
+      interval: 5,
+    });
 
     const actualUrl = new URL(String(fetchMock.mock.calls[0][0]), "http://app");
     expect(actualUrl.pathname).toBe("/api/v1/trakt/authorize");
@@ -52,7 +62,7 @@ describe("trakt api", () => {
     );
   });
 
-  it("posts link codes and invalidates cached status", async () => {
+  it("posts PIN codes and invalidates cached status", async () => {
     fetchMock
       .mockResolvedValueOnce(
         jsonResponse({
@@ -73,7 +83,7 @@ describe("trakt api", () => {
       );
 
     await getTraktStatus();
-    await expect(linkTrakt("oauth-code", "id", "secret")).resolves.toEqual({
+    await expect(linkTrakt("ABCD1234", "id", "secret")).resolves.toEqual({
       success: true,
     });
     await expect(getTraktStatus()).resolves.toMatchObject({
@@ -85,7 +95,7 @@ describe("trakt api", () => {
       method: "POST",
       headers: expectedHeaders,
       body: JSON.stringify({
-        code: "oauth-code",
+        userCode: "ABCD1234",
         clientId: "id",
         clientSecret: "secret",
       }),

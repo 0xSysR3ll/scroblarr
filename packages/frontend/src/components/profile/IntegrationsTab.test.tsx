@@ -97,9 +97,12 @@ describe("IntegrationsTab", () => {
     vi.useRealTimers();
   });
 
-  it("shows the polished Trakt authorization panel after generating an auth URL", async () => {
+  it("shows the Trakt PIN panel after generating a PIN code", async () => {
     vi.mocked(getTraktAuthorizeUrl).mockResolvedValue({
-      authUrl: "https://trakt.tv/oauth/authorize",
+      userCode: "ABCD1234",
+      verificationUrl: "https://trakt.tv/activate",
+      expiresIn: 600,
+      interval: 5,
     });
 
     renderWithProviders(<IntegrationsTab />);
@@ -132,25 +135,21 @@ describe("IntegrationsTab", () => {
 
     const authorizationPanel = screen.getByTestId("trakt-auth-panel");
 
-    expect(
-      within(authorizationPanel).getByText(
-        "Paste the code Trakt shows after authorization."
-      )
-    ).toBeVisible();
+    expect(within(authorizationPanel).getByText("ABCD1234")).toBeVisible();
     expect(
       within(authorizationPanel).getByRole("link", {
-        name: "Open Trakt auth page",
+        name: "Open Trakt activation page",
       })
-    ).toHaveAttribute("href", "https://trakt.tv/oauth/authorize");
-    const codeInput = within(authorizationPanel).getByRole("textbox", {
-      name: "Authorization Code",
-      description: "Paste the code Trakt shows after authorization.",
-    });
+    ).toHaveAttribute("href", "https://trakt.tv/activate");
+    expect(
+      within(authorizationPanel).getByRole("button", {
+        name: "Check approval now",
+      })
+    ).toBeVisible();
 
-    expect(codeInput).toBeVisible();
     expect(oauthPopupMocks.preparePopup).toHaveBeenCalledWith("Trakt Auth");
     expect(oauthPopupMocks.navigateToUrl).toHaveBeenCalledWith(
-      "https://trakt.tv/oauth/authorize"
+      "https://trakt.tv/activate"
     );
   });
 

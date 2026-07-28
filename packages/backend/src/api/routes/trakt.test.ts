@@ -12,6 +12,17 @@ const traktTokenManagerMocks = vi.hoisted(() => ({
   refreshAccessToken: vi.fn(),
 }));
 
+const traktOAuthMocks = vi.hoisted(() => ({
+  requestPinCode: vi.fn(),
+  exchangePinForToken: vi.fn(),
+}));
+
+const traktPinStoreMocks = vi.hoisted(() => ({
+  rememberTraktPin: vi.fn(),
+  resolveTraktDeviceCode: vi.fn(),
+  clearTraktPin: vi.fn(),
+}));
+
 vi.mock("../middleware/auth", () => ({
   auth: (
     req: express.Request,
@@ -35,6 +46,16 @@ vi.mock("@integrations/trakt/TraktTokenManager", () => ({
     validateAccessToken = traktTokenManagerMocks.validateAccessToken;
     refreshAccessToken = traktTokenManagerMocks.refreshAccessToken;
   },
+}));
+
+vi.mock("@integrations/trakt/TraktOAuth", () => ({
+  TraktOAuth: class {
+    requestPinCode = traktOAuthMocks.requestPinCode;
+    exchangePinForToken = traktOAuthMocks.exchangePinForToken;
+  },
+  rememberTraktPin: traktPinStoreMocks.rememberTraktPin,
+  resolveTraktDeviceCode: traktPinStoreMocks.resolveTraktDeviceCode,
+  clearTraktPin: traktPinStoreMocks.clearTraktPin,
 }));
 
 vi.mock("@utils/logger", () => ({
@@ -72,6 +93,106 @@ describe("trakt routes", () => {
     traktTokenManagerMocks.refreshAccessToken.mockResolvedValue(
       "refreshed-access-token"
     );
+    traktOAuthMocks.requestPinCode.mockResolvedValue({
+      device_code: "device-code",
+      user_code: "ABCD1234",
+      verification_url: "https://trakt.tv/activate",
+      expires_in: 600,
+      interval: 5,
+    });
+    traktOAuthMocks.exchangePinForToken.mockResolvedValue({
+      accessToken: "new-access-token",
+      refreshToken: "new-refresh-token",
+      expiresAt: Date.now() + 3600_000,
+    });
+    traktPinStoreMocks.resolveTraktDeviceCode.mockReturnValue("device-code");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          username: "alice",
+          images: { avatar: { full: "https://img.example/alice.png" } },
+        }),
+      })
+    );
+  });
+
+  it("returns PIN authorization details", async () => {
+    const response = await request(app).get("/trakt/authorize").expect(200);
+
+    expect(response.body).toEqual({
+      userCode: "ABCD1234",
+      verificationUrl: "https://trakt.tv/activate",
+      expiresIn: 600,
+      interval: 5,
+    });
+    expect(traktOAuthMocks.requestPinCode).toHaveBeenCalledOnce();
+    expect(traktPinStoreMocks.rememberTraktPin).toHaveBeenCalledWith(
+      "user-id",
+      expect.objectContaining({
+        device_code: "device-code",
+        user_code: "ABCD1234",
+      })
+    );
+  });
+
+  it("requires credentials before requesting a PIN code", async () => {
+    userRepositoryMocks.findById.mockResolvedValueOnce({
+      ...linkedUser,
+      traktClientId: null,
+      traktClientSecret: null,
+    });
+
+    const response = await request(app).get("/trakt/authorize").expect(400);
+
+    expect(response.body.error).toMatch(/client ID and secret/i);
+    expect(traktOAuthMocks.requestPinCode).not.toHaveBeenCalled();
+  });
+
+  it("links a Trakt account after PIN approval", async () => {
+    const response = await request(app)
+      .post("/trakt/link")
+      .send({
+        userCode: "ABCD1234",
+        clientId: "provided-client-id",
+        clientSecret: "provided-client-secret",
+      })
+      .expect(200);
+
+    expect(response.body).toEqual({ success: true });
+    expect(traktPinStoreMocks.resolveTraktDeviceCode).toHaveBeenCalledWith(
+      "user-id",
+      "ABCD1234"
+    );
+    expect(traktOAuthMocks.exchangePinForToken).toHaveBeenCalledWith(
+      "device-code"
+    );
+    expect(traktPinStoreMocks.clearTraktPin).toHaveBeenCalledWith("user-id");
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith(
+      "user-id",
+      expect.objectContaining({
+        traktAccessToken: "new-access-token",
+        traktRefreshToken: "new-refresh-token",
+        traktUsername: "alice",
+        traktThumb: "https://img.example/alice.png",
+        traktClientId: "provided-client-id",
+        traktClientSecret: "provided-client-secret",
+      })
+    );
+  });
+
+  it("returns pending authorization as a 400 while polling", async () => {
+    traktOAuthMocks.exchangePinForToken.mockRejectedValueOnce(
+      new Error("authorization pending")
+    );
+
+    const response = await request(app)
+      .post("/trakt/link")
+      .send({ userCode: "ABCD1234" })
+      .expect(400);
+
+    expect(response.body).toEqual({ error: "authorization pending" });
   });
 
   it("returns Trakt status when the stored access token is valid", async () => {
