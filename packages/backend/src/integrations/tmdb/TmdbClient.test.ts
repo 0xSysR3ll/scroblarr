@@ -562,12 +562,20 @@ describe("TmdbClient", () => {
   });
 
   it("searches TV and movies and maps enrichment helpers", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
+    const okJson = (body: unknown) => ({
+      ok: true,
+      status: 200,
+      json: async () => body,
+    });
+    const notFound = { ok: false, status: 404 };
+
+    const responsesByUrlPrefix: Array<{
+      match: string | RegExp;
+      response: unknown;
+    }> = [
+      {
+        match: "/search/tv?",
+        response: okJson({
           results: [
             {
               id: 146176,
@@ -578,11 +586,10 @@ describe("TmdbClient", () => {
             },
           ],
         }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
+      },
+      {
+        match: "/search/movie?",
+        response: okJson({
           results: [
             {
               id: 157336,
@@ -593,33 +600,10 @@ describe("TmdbClient", () => {
             },
           ],
         }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          name: "Berlin",
-          original_name: "Berlín",
-          poster_path: "/p.jpg",
-          number_of_seasons: 1,
-          first_air_date: "2023-12-29",
-        }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          name: "Berlin",
-          original_name: "Berlín",
-          poster_path: "/p.jpg",
-          number_of_seasons: 1,
-          first_air_date: "2023-12-29",
-        }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
+      },
+      {
+        match: "/tv/146176/recommendations",
+        response: okJson({
           results: [
             {
               id: 308014,
@@ -630,56 +614,65 @@ describe("TmdbClient", () => {
             },
           ],
         }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
+      },
+      {
+        match: "/tv/146176/external_ids",
+        response: okJson({
           imdb_id: "tt16288804",
           tvdb_id: 413033,
         }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          imdb_id: "tt0816692",
-          tvdb_id: 218,
+      },
+      {
+        match: "/tv/146176",
+        response: okJson({
+          name: "Berlin",
+          original_name: "Berlín",
+          poster_path: "/p.jpg",
+          number_of_seasons: 1,
+          first_air_date: "2023-12-29",
         }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
+      },
+      {
+        match: "/movie/157336/external_ids",
+        response: okJson({
+          imdb_id: "tt0816692",
+        }),
+      },
+      {
+        match: "/tv/308014/season/1/episode/1/external_ids",
+        response: okJson({
           imdb_id: "tt31397887",
           tvdb_id: 10597958,
         }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({ season_number: 1 }),
-      })
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-      })
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-      })
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-      })
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-      })
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-      });
+      },
+      {
+        match: "/tv/308014/season/1",
+        response: okJson({ season_number: 1 }),
+      },
+      {
+        match: "/tv/308014/season/2",
+        response: notFound,
+      },
+      {
+        match: "/tv/missing",
+        response: notFound,
+      },
+      {
+        match: "/movie/missing",
+        response: notFound,
+      },
+    ];
+
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      const entry = responsesByUrlPrefix.find(({ match }) =>
+        typeof match === "string" ? url.includes(match) : match.test(url)
+      );
+      if (!entry) {
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      }
+      return entry.response;
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     const client = new TmdbClient("test-token");
@@ -733,7 +726,6 @@ describe("TmdbClient", () => {
     });
     await expect(client.getMovieExternalIds(157336)).resolves.toEqual({
       imdbId: "tt0816692",
-      tvdbId: 218,
     });
     await expect(client.getEpisodeExternalIds(308014, 1, 1)).resolves.toEqual({
       imdbId: "tt31397887",
@@ -794,7 +786,6 @@ describe("TmdbClient", () => {
     });
     await expect(client.getMovieExternalIds(1)).resolves.toEqual({
       imdbId: undefined,
-      tvdbId: undefined,
     });
     await expect(client.getEpisodeExternalIds(1, 1, 1)).resolves.toEqual({
       imdbId: undefined,

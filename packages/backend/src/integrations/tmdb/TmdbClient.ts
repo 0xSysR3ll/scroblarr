@@ -221,10 +221,10 @@ export class TmdbClient {
     };
   }
 
-  async getMovieExternalIds(movieId: string | number): Promise<{
-    imdbId?: string;
-    tvdbId?: number;
-  } | null> {
+  async getMovieExternalIds(
+    movieId: string | number
+  ): Promise<{ imdbId?: string } | null> {
+    // TMDB movie external_ids does not include tvdb_id (TV/episode only).
     const result = await this.apiGet<TmdbExternalIds>(
       `/movie/${movieId}/external_ids`
     );
@@ -234,7 +234,6 @@ export class TmdbClient {
 
     return {
       imdbId: result.imdb_id ?? undefined,
-      tvdbId: result.tvdb_id ?? undefined,
     };
   }
 

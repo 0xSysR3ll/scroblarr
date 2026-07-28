@@ -301,6 +301,10 @@ export class SyncService {
         tvdbMovieId: event.media.tvdbMovieId?.toString(),
         imdbMovieId: event.media.imdbMovieId,
         imdbEpisodeId: event.media.imdbEpisodeId,
+        tmdbMovieId: event.media.tmdbMovieId?.toString(),
+        tmdbSeriesId: event.media.tmdbSeriesId?.toString(),
+        seasonNumber: event.media.seasonNumber,
+        episodeNumber: event.media.episodeNumber,
       }
     );
 

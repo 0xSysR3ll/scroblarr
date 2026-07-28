@@ -254,6 +254,35 @@ describe("sync history utils", () => {
       hasPosterLookupData(
         syncItem({
           posterUrl: undefined,
+          mediaTitle: "Berlin",
+          tmdbMovieId: undefined,
+          tmdbSeriesId: undefined,
+          imdbMovieId: undefined,
+          imdbEpisodeId: undefined,
+          tvdbMovieId: undefined,
+          tvdbEpisodeId: undefined,
+        })
+      )
+    ).toBe(true);
+    expect(
+      getPosterUrl(
+        syncItem({
+          id: "poster-title-only",
+          posterUrl: undefined,
+          mediaTitle: "Berlin",
+          tmdbMovieId: undefined,
+          tmdbSeriesId: undefined,
+          imdbMovieId: undefined,
+          imdbEpisodeId: undefined,
+          tvdbMovieId: undefined,
+          tvdbEpisodeId: undefined,
+        })
+      )
+    ).toBe("/api/v1/sync/poster/poster-title-only");
+    expect(
+      hasPosterLookupData(
+        syncItem({
+          posterUrl: undefined,
           mediaTitle: "",
           tmdbMovieId: undefined,
           tmdbSeriesId: undefined,

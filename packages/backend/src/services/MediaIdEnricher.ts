@@ -4,6 +4,9 @@ import type { MediaItem } from "@scroblarr/shared";
 import { logger } from "@utils/logger";
 
 const MAX_TV_CANDIDATES = 5;
+/** Sequel fan-out is expensive; only try it for the top search hit. */
+const MAX_SEQUEL_PARENT_CANDIDATES = 1;
+const MAX_SEQUEL_RECOMMENDATIONS = 3;
 
 function normalizeTitle(value: string): string {
   return value
@@ -83,7 +86,7 @@ export class MediaIdEnricher {
       ...media,
       tmdbMovieId: match.id,
       imdbMovieId: media.imdbMovieId ?? externalIds?.imdbId,
-      tvdbMovieId: media.tvdbMovieId ?? externalIds?.tvdbId,
+      tvdbMovieId: media.tvdbMovieId,
     };
 
     logger.sync.info(
@@ -115,18 +118,25 @@ export class MediaIdEnricher {
       media.year
     ).filter((candidate) => candidate.score >= 10);
 
-    for (const candidate of candidates.slice(0, MAX_TV_CANDIDATES)) {
+    const cache = this.createLookupCache();
+    const ranked = candidates.slice(0, MAX_TV_CANDIDATES);
+
+    for (const candidate of ranked) {
       const resolved = await this.resolveEpisodeAgainstShow(
         media,
-        candidate.id
+        candidate.id,
+        cache
       );
       if (resolved) {
         return resolved;
       }
+    }
 
+    for (const candidate of ranked.slice(0, MAX_SEQUEL_PARENT_CANDIDATES)) {
       const sequelResolved = await this.resolveEpisodeViaSequelRecommendations(
         media,
-        candidate.id
+        candidate.id,
+        cache
       );
       if (sequelResolved) {
         return sequelResolved;
@@ -146,15 +156,46 @@ export class MediaIdEnricher {
     return media;
   }
 
+  private createLookupCache() {
+    const showDetails = new Map<
+      number,
+      Awaited<ReturnType<TmdbClient["getTvShowDetails"]>>
+    >();
+    const seasonExists = new Map<string, boolean>();
+
+    return {
+      getTvShowDetails: async (seriesId: number) => {
+        if (showDetails.has(seriesId)) {
+          return showDetails.get(seriesId)!;
+        }
+        const details = await this.tmdbClient.getTvShowDetails(seriesId);
+        showDetails.set(seriesId, details);
+        return details;
+      },
+      hasTvSeason: async (seriesId: number, seasonNumber: number) => {
+        const key = `${seriesId}:${seasonNumber}`;
+        if (seasonExists.has(key)) {
+          return seasonExists.get(key)!;
+        }
+        const exists = await this.tmdbClient.hasTvSeason(
+          seriesId,
+          seasonNumber
+        );
+        seasonExists.set(key, exists);
+        return exists;
+      },
+    };
+  }
+
   private async resolveEpisodeViaSequelRecommendations(
     media: MediaItem,
-    parentSeriesId: number
+    parentSeriesId: number,
+    cache: ReturnType<MediaIdEnricher["createLookupCache"]>
   ): Promise<MediaItem | null> {
     const seasonNumber = media.seasonNumber!;
     const episodeNumber = media.episodeNumber!;
 
-    const parentDetails =
-      await this.tmdbClient.getTvShowDetails(parentSeriesId);
+    const parentDetails = await cache.getTvShowDetails(parentSeriesId);
     const parentSeasonCount = parentDetails?.numberOfSeasons;
     if (!parentSeasonCount || seasonNumber <= parentSeasonCount) {
       return null;
@@ -188,7 +229,7 @@ export class MediaIdEnricher {
     const sequelSeason = seasonNumber - parentSeasonCount;
     const seasonsToTry = [...new Set([sequelSeason, 1].filter((s) => s >= 1))];
 
-    for (const recommendation of ranked.slice(0, MAX_TV_CANDIDATES)) {
+    for (const recommendation of ranked.slice(0, MAX_SEQUEL_RECOMMENDATIONS)) {
       for (const trySeason of seasonsToTry) {
         const episodeIds = await this.tmdbClient.getEpisodeExternalIds(
           recommendation.id,
@@ -197,7 +238,7 @@ export class MediaIdEnricher {
         );
         const seasonExists =
           episodeIds !== null ||
-          (await this.tmdbClient.hasTvSeason(recommendation.id, trySeason));
+          (await cache.hasTvSeason(recommendation.id, trySeason));
         if (!seasonExists) {
           continue;
         }
@@ -234,7 +275,8 @@ export class MediaIdEnricher {
 
   private async resolveEpisodeAgainstShow(
     media: MediaItem,
-    seriesId: number
+    seriesId: number,
+    cache: ReturnType<MediaIdEnricher["createLookupCache"]>
   ): Promise<MediaItem | null> {
     const seasonNumber = media.seasonNumber!;
     const episodeNumber = media.episodeNumber!;
@@ -246,12 +288,12 @@ export class MediaIdEnricher {
       episodeNumber
     );
 
-    const seasonExists =
+    let seasonExists =
       episodeIds !== null ||
-      (await this.tmdbClient.hasTvSeason(seriesId, effectiveSeason));
+      (await cache.hasTvSeason(seriesId, effectiveSeason));
 
     if (!seasonExists) {
-      const details = await this.tmdbClient.getTvShowDetails(seriesId);
+      const details = await cache.getTvShowDetails(seriesId);
       const canRemapSeason =
         details?.numberOfSeasons === 1 &&
         seasonNumber !== 1 &&
@@ -266,7 +308,10 @@ export class MediaIdEnricher {
           episodeNumber
         );
 
-        if (!episodeIds && !(await this.tmdbClient.hasTvSeason(seriesId, 1))) {
+        seasonExists =
+          episodeIds !== null ||
+          (await cache.hasTvSeason(seriesId, effectiveSeason));
+        if (!seasonExists) {
           return null;
         }
 
@@ -283,13 +328,6 @@ export class MediaIdEnricher {
       } else {
         return null;
       }
-    }
-
-    if (
-      episodeIds === null &&
-      !(await this.tmdbClient.hasTvSeason(seriesId, effectiveSeason))
-    ) {
-      return null;
     }
 
     const enriched: MediaItem = {

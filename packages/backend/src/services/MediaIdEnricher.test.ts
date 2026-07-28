@@ -366,10 +366,7 @@ describe("MediaIdEnricher", () => {
         },
       ]),
       getEpisodeExternalIds: vi.fn().mockResolvedValue(null),
-      hasTvSeason: vi
-        .fn()
-        .mockResolvedValueOnce(true)
-        .mockResolvedValueOnce(false),
+      hasTvSeason: vi.fn().mockResolvedValue(true),
       getTvShowDetails: vi.fn(),
     } as unknown as TmdbClient;
 
@@ -379,7 +376,13 @@ describe("MediaIdEnricher", () => {
       episodeNumber: 1,
     });
     const enricher = new MediaIdEnricher(client);
-    await expect(enricher.enrich(media)).resolves.toBe(media);
+    await expect(enricher.enrich(media)).resolves.toEqual(
+      expect.objectContaining({
+        tmdbSeriesId: 146176,
+        seasonNumber: 1,
+        episodeNumber: 1,
+      })
+    );
   });
 
   it("skips episode enrichment when title or season/episode numbers are missing", async () => {
@@ -415,7 +418,6 @@ describe("MediaIdEnricher", () => {
       ]),
       getMovieExternalIds: vi.fn().mockResolvedValue({
         imdbId: "tt0816692",
-        tvdbId: 1,
       }),
     } as unknown as TmdbClient;
 
@@ -431,9 +433,9 @@ describe("MediaIdEnricher", () => {
       expect.objectContaining({
         tmdbMovieId: 157336,
         imdbMovieId: "tt0816692",
-        tvdbMovieId: 1,
       })
     );
+    expect(enriched.tvdbMovieId).toBeUndefined();
   });
 
   it("leaves movies unchanged when title is missing or TMDB finds no exact match", async () => {

@@ -571,6 +571,20 @@ describe("PosterService", () => {
     );
 
     expect(tmdbClientMocks.resolvePosterPath).toHaveBeenCalled();
+    expect(tmdbClientMocks.resolvePosterPath).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        tvdbMovieId: "218",
+        imdbMovieId: "tt0816692",
+      })
+    );
+    expect(tmdbClientMocks.resolvePosterPath).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        tmdbSeriesId: "146176",
+        tvdbEpisodeId: "8865290",
+      })
+    );
   });
 
   it("treats title-only history as having poster lookup data", () => {
