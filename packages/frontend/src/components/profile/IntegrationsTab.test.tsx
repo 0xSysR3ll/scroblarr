@@ -430,7 +430,9 @@ describe("IntegrationsTab Trakt integration", () => {
     await clickTraktAuthorize(user);
     await advanceAuthorizeDelay();
 
-    expect(await screen.findByText("Failed to get Trakt PIN code")).toBeVisible();
+    expect(
+      await screen.findByText("Failed to get Trakt PIN code")
+    ).toBeVisible();
   });
 
   it("ignores a late PIN response after the tab unmounts", async () => {
