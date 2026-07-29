@@ -17,68 +17,125 @@ export interface TraktTokens {
   expiresAt: number;
 }
 
+export interface TraktPinCodeResponse {
+  device_code: string;
+  user_code: string;
+  verification_url: string;
+  expires_in: number;
+  interval: number;
+}
+
+interface PendingTraktPin {
+  deviceCode: string;
+  userCode: string;
+  expiresAt: number;
+}
+
 const TRAKT_USER_AGENT = "Scroblarr/1.0.0";
+const TRAKT_OAUTH_TIMEOUT_MS = 30_000;
+const TRAKT_API_BASE_URL = "https://api.trakt.tv";
+const pendingPinsByUserId = new Map<string, PendingTraktPin>();
+
+async function fetchWithTimeout(
+  url: Parameters<typeof fetch>[0],
+  init: Parameters<typeof fetch>[1],
+  errorContext: string
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TRAKT_OAUTH_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    return response;
+  } catch (error) {
+    clearTimeout(timeout);
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`${errorContext} timed out`);
+    }
+    throw error;
+  }
+}
+
+function parseOAuthErrorBody(errorText: string): {
+  error?: string;
+  errorDescription?: string;
+} {
+  try {
+    const body = JSON.parse(errorText) as {
+      error?: string;
+      error_description?: string;
+    };
+    return {
+      error: body.error,
+      errorDescription: body.error_description,
+    };
+  } catch {
+    return {};
+  }
+}
+
+export function rememberTraktPin(
+  userId: string,
+  pin: Pick<TraktPinCodeResponse, "device_code" | "user_code" | "expires_in">
+): void {
+  const now = Date.now();
+  for (const [pendingUserId, pendingPin] of pendingPinsByUserId) {
+    if (pendingPin.expiresAt <= now) {
+      pendingPinsByUserId.delete(pendingUserId);
+    }
+  }
+
+  pendingPinsByUserId.set(userId, {
+    deviceCode: pin.device_code,
+    userCode: pin.user_code,
+    expiresAt: now + pin.expires_in * 1000,
+  });
+}
+
+export function resolveTraktDeviceCode(
+  userId: string,
+  userCode: string
+): string {
+  const pending = pendingPinsByUserId.get(userId);
+  if (!pending || pending.expiresAt <= Date.now()) {
+    pendingPinsByUserId.delete(userId);
+    throw new Error(
+      "Trakt device code expired. Generate a new one to try again."
+    );
+  }
+
+  if (pending.userCode !== userCode) {
+    throw new Error("Trakt PIN code does not match the active authorization");
+  }
+
+  return pending.deviceCode;
+}
+
+export function clearTraktPin(userId: string): void {
+  pendingPinsByUserId.delete(userId);
+}
 
 export class TraktOAuth {
-  private clientId: string;
-  private clientSecret: string;
-  private baseUrl = "https://api.trakt.tv";
-  private authUrl = "https://trakt.tv/oauth/authorize";
+  constructor(
+    private readonly clientId: string,
+    private readonly clientSecret: string
+  ) {}
 
-  constructor(clientId: string, clientSecret: string) {
-    this.clientId = clientId;
-    this.clientSecret = clientSecret;
+  private getJsonHeaders(): Record<string, string> {
+    return {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "User-Agent": TRAKT_USER_AGENT,
+      "trakt-api-version": "2",
+      "trakt-api-key": this.clientId,
+    };
   }
 
-  getAuthUrl(redirectUri: string, state?: string): string {
-    const params = new URLSearchParams({
-      client_id: this.clientId,
-      redirect_uri: redirectUri,
-      response_type: "code",
-    });
-
-    if (state) {
-      params.append("state", state);
-    }
-
-    return `${this.authUrl}?${params.toString()}`;
-  }
-
-  async exchangeCodeForToken(
-    code: string,
-    redirectUri: string
-  ): Promise<TraktTokens> {
-    const response = await fetch(`${this.baseUrl}/oauth/token`, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        "User-Agent": TRAKT_USER_AGENT,
-        "trakt-api-version": "2",
-        "trakt-api-key": this.clientId,
-      },
-      body: JSON.stringify({
-        code,
-        client_id: this.clientId,
-        client_secret: this.clientSecret,
-        redirect_uri: redirectUri,
-        grant_type: "authorization_code",
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      logger.trakt.error(
-        { status: response.status, errorText },
-        "Failed to exchange Trakt authorization code"
-      );
-      throw new Error(
-        `Failed to exchange Trakt authorization code: ${response.status} - ${errorText}`
-      );
-    }
-
-    const tokenData = (await response.json()) as TraktTokenResponse;
-
+  private toTokens(tokenData: TraktTokenResponse): TraktTokens {
     return {
       accessToken: tokenData.access_token,
       refreshToken: tokenData.refresh_token,
@@ -86,24 +143,133 @@ export class TraktOAuth {
     };
   }
 
-  async refreshToken(refreshToken: string): Promise<TraktTokens> {
-    const response = await fetch(`${this.baseUrl}/oauth/token`, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        "User-Agent": TRAKT_USER_AGENT,
-        "trakt-api-version": "2",
-        "trakt-api-key": this.clientId,
+  async requestPinCode(): Promise<TraktPinCodeResponse> {
+    const response = await fetchWithTimeout(
+      `${TRAKT_API_BASE_URL}/oauth/device/code`,
+      {
+        method: "POST",
+        headers: this.getJsonHeaders(),
+        body: JSON.stringify({
+          client_id: this.clientId,
+        }),
       },
-      body: JSON.stringify({
-        refresh_token: refreshToken,
-        client_id: this.clientId,
-        client_secret: this.clientSecret,
-        redirect_uri: "urn:ietf:wg:oauth:2.0:oob",
-        grant_type: "refresh_token",
-      }),
-    });
+      "Trakt PIN code request"
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.trakt.error(
+        { status: response.status, errorText },
+        "Failed to request Trakt PIN code"
+      );
+      throw new Error(
+        `Failed to request Trakt PIN code: ${response.status} - ${errorText}`
+      );
+    }
+
+    const pinData = (await response.json()) as Partial<TraktPinCodeResponse>;
+    if (
+      !pinData.device_code ||
+      !pinData.user_code ||
+      !pinData.verification_url ||
+      !pinData.expires_in ||
+      !pinData.interval
+    ) {
+      throw new Error("Trakt PIN response did not include a user code");
+    }
+
+    return {
+      device_code: pinData.device_code,
+      user_code: pinData.user_code,
+      verification_url: pinData.verification_url,
+      expires_in: pinData.expires_in,
+      interval: pinData.interval,
+    };
+  }
+
+  async exchangePinForToken(deviceCode: string): Promise<TraktTokens> {
+    const response = await fetchWithTimeout(
+      `${TRAKT_API_BASE_URL}/oauth/device/token`,
+      {
+        method: "POST",
+        headers: this.getJsonHeaders(),
+        body: JSON.stringify({
+          code: deviceCode,
+          client_id: this.clientId,
+          client_secret: this.clientSecret,
+        }),
+      },
+      "Trakt PIN status check"
+    );
+
+    if (response.ok) {
+      const tokenData = (await response.json()) as TraktTokenResponse;
+      if (!tokenData.access_token || !tokenData.refresh_token) {
+        throw new Error("Trakt token response did not include an access token");
+      }
+      return this.toTokens(tokenData);
+    }
+
+    const errorText = await response.text();
+    const { error, errorDescription } = parseOAuthErrorBody(errorText);
+
+    // Prefer explicit OAuth error codes over HTTP status fallbacks.
+    // Trakt often returns bare 400 (empty body) while authorization is pending.
+    if (error === "authorization_pending" || error === "pending") {
+      throw new Error("authorization pending");
+    }
+    if (error === "slow_down" || response.status === 429) {
+      throw new Error("slow down");
+    }
+    if (
+      error === "expired_token" ||
+      error === "expired" ||
+      response.status === 410
+    ) {
+      throw new Error(
+        "Trakt device code expired. Generate a new one to try again."
+      );
+    }
+    if (response.status === 404) {
+      throw new Error("Trakt device code is invalid");
+    }
+    if (response.status === 409) {
+      throw new Error("Trakt device code has already been used");
+    }
+    if (response.status === 418) {
+      throw new Error("Trakt authorization was denied");
+    }
+    if (response.status === 400 && !error) {
+      throw new Error("authorization pending");
+    }
+
+    logger.trakt.error(
+      { status: response.status, errorText, error },
+      "Failed to check Trakt PIN status"
+    );
+    throw new Error(
+      errorDescription ||
+        error ||
+        `Failed to check Trakt PIN status: ${response.status} - ${errorText}`
+    );
+  }
+
+  async refreshToken(refreshToken: string): Promise<TraktTokens> {
+    const response = await fetchWithTimeout(
+      `${TRAKT_API_BASE_URL}/oauth/token`,
+      {
+        method: "POST",
+        headers: this.getJsonHeaders(),
+        body: JSON.stringify({
+          refresh_token: refreshToken,
+          client_id: this.clientId,
+          client_secret: this.clientSecret,
+          redirect_uri: "urn:ietf:wg:oauth:2.0:oob",
+          grant_type: "refresh_token",
+        }),
+      },
+      "Trakt token refresh"
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -124,11 +290,6 @@ export class TraktOAuth {
     }
 
     const tokenData = (await response.json()) as TraktTokenResponse;
-
-    return {
-      accessToken: tokenData.access_token,
-      refreshToken: tokenData.refresh_token,
-      expiresAt: Date.now() + tokenData.expires_in * 1000,
-    };
+    return this.toTokens(tokenData);
   }
 }

@@ -157,6 +157,10 @@ export class SyncHistoryRepository {
       tvdbMovieId?: string;
       imdbMovieId?: string;
       imdbEpisodeId?: string;
+      tmdbMovieId?: string;
+      tmdbSeriesId?: string;
+      seasonNumber?: number;
+      episodeNumber?: number;
     }
   ): Promise<boolean> {
     const where: FindOptionsWhere<SyncHistory> = {
@@ -177,6 +181,19 @@ export class SyncHistoryRepository {
         const existing = await this.repository.findOne({ where });
         if (existing) return true;
       }
+      if (
+        identifiers.tmdbSeriesId &&
+        identifiers.seasonNumber !== undefined &&
+        identifiers.episodeNumber !== undefined
+      ) {
+        where.tvdbEpisodeId = undefined;
+        where.imdbEpisodeId = undefined;
+        where.tmdbSeriesId = identifiers.tmdbSeriesId;
+        where.seasonNumber = identifiers.seasonNumber;
+        where.episodeNumber = identifiers.episodeNumber;
+        const existing = await this.repository.findOne({ where });
+        if (existing) return true;
+      }
     }
 
     if (mediaType === "movie") {
@@ -188,6 +205,13 @@ export class SyncHistoryRepository {
       if (identifiers.imdbMovieId) {
         where.tvdbMovieId = undefined;
         where.imdbMovieId = identifiers.imdbMovieId;
+        const existing = await this.repository.findOne({ where });
+        if (existing) return true;
+      }
+      if (identifiers.tmdbMovieId) {
+        where.tvdbMovieId = undefined;
+        where.imdbMovieId = undefined;
+        where.tmdbMovieId = identifiers.tmdbMovieId;
         const existing = await this.repository.findOne({ where });
         if (existing) return true;
       }

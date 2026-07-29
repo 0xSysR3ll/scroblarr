@@ -4,27 +4,31 @@ sidebar_position: 3
 
 # Trakt Configuration
 
-Link your Trakt account to sync watch history. Each user on your media server needs to link their own Trakt account.
+Link your Trakt account to sync watch history. Each user on your media server needs to link their own Trakt account (one Scroblarr user = one Trakt API app).
 
 ## Create a Trakt application
 
 Before linking your account, you need to create a Trakt application to get OAuth credentials:
 
-1. Go to https://trakt.tv/oauth/applications
-2. Click **New Application**
+1. Go to https://app.trakt.tv/settings/apps/api
+2. Click **+** in the top right to create a new API application
 3. Fill in the details:
    - **Name**: Scroblarr (or any name you prefer)
    - **Description**: Optional description
    - **Redirect URI**: Should be exactly `urn:ietf:wg:oauth:2.0:oob`
 4. Save and copy your **Client ID** and **Client Secret**
 
+:::note
+Trakt currently limits free accounts to **one API application**. VIP accounts can create more. If you already have an app, edit that one instead of creating another.
+:::
+
 ## Link your account
 
 1. Go to **Profile > Integrations** in Scroblarr
 2. In the Trakt section, enter your Trakt Client ID and Client Secret
 3. Click **Authorize**
-4. A popup will open asking you to authorize Scroblarr with Trakt
-5. After authorizing, you'll get a code. Paste it into Scroblarr and click **Link Account**
+4. A popup opens Trakt's activation page. Enter the PIN code shown in Scroblarr
+5. Approve the app on Trakt — Scroblarr polls automatically and finishes linking when approval succeeds
 
 Your Trakt account is now linked!
 

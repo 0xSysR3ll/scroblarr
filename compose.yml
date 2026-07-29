@@ -1,6 +1,6 @@
 services:
   scroblarr:
-    image: ghcr.io/0xsysr3ll/scroblarr:latest@sha256:a78b1e5014e371ced6db502bf6aaa57b549f34ca1a39d9f1d6e401c451373cec
+    image: ghcr.io/0xsysr3ll/scroblarr:latest@sha256:48722df227121f1dd806126079ff398fb6ad1c516d21818c61735031234d85b0
     container_name: scroblarr
     restart: unless-stopped
     ports:
