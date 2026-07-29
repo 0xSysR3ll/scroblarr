@@ -39,6 +39,7 @@ vi.mock("@integrations/jellyfin/JellyfinClient", () => ({
 import type { SyncHistory } from "@entities/SyncHistory";
 import type { User } from "@entities/User";
 import { TmdbRateLimitError } from "@integrations/tmdb/TmdbApiError";
+import { logger } from "@utils/logger";
 
 import {
   clearPosterEnrichmentCache,
@@ -712,6 +713,7 @@ describe("PosterService", () => {
       contentType: "image/jpeg",
     });
 
+    const warnSpy = vi.spyOn(logger.api, "warn").mockImplementation(() => {});
     const save = vi.fn().mockRejectedValue(new Error("db down"));
     const service = new PosterService({ save });
     const result = await service.fetchPoster(
@@ -731,6 +733,13 @@ describe("PosterService", () => {
       contentType: "image/jpeg",
     });
     expect(save).toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: expect.any(Error),
+        syncHistoryId: "sync-1",
+      }),
+      "Failed to persist TMDB enrichment IDs from poster lookup"
+    );
   });
 
   it("extends rate-limit backoff after a prior title-search miss", async () => {
@@ -763,6 +772,10 @@ describe("PosterService", () => {
     });
     // Second attempt: enrich misses again (sets miss backoff), then
     // resolvePosterPath rate-limits and upgrades to rate_limited backoff.
+    expect(hasPosterLookupData(history)).toBe(false);
+
+    // A normal title-search miss would clear after five minutes; rate_limited must not.
+    vi.advanceTimersByTime(5 * 60_000);
     expect(hasPosterLookupData(history)).toBe(false);
   });
 
