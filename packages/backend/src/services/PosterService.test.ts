@@ -657,6 +657,115 @@ describe("PosterService", () => {
     );
   });
 
+  it("merges numeric tvdb movie ids from enrichment into the poster lookup", async () => {
+    const { MediaIdEnricher } = await import("./MediaIdEnricher");
+    vi.spyOn(MediaIdEnricher.prototype, "enrich").mockResolvedValue({
+      id: "movie-1",
+      type: "movie",
+      title: "Interstellar",
+      tmdbMovieId: 157336,
+      tvdbMovieId: 218,
+    });
+    tmdbClientMocks.resolvePosterPath.mockResolvedValue("/poster.jpg");
+    tmdbClientMocks.fetchPosterImage.mockResolvedValue({
+      buffer: new Uint8Array([1]).buffer,
+      contentType: "image/jpeg",
+    });
+
+    const service = new PosterService();
+    await service.fetchPoster(
+      createSyncHistory({
+        posterUrl: undefined,
+        tmdbMovieId: undefined,
+        imdbMovieId: undefined,
+        tvdbMovieId: undefined,
+        mediaTitle: "Interstellar",
+      }),
+      createUser(),
+      { tmdbAccessToken: "tmdb-token" }
+    );
+
+    expect(tmdbClientMocks.resolvePosterPath).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tmdbMovieId: "157336",
+        tvdbMovieId: "218",
+      })
+    );
+  });
+
+  it("logs and continues when persisting enrichment IDs fails", async () => {
+    const imageBytes = new Uint8Array([7, 8, 9]).buffer;
+    tmdbClientMocks.searchMovie.mockResolvedValue([
+      {
+        id: 157336,
+        title: "Interstellar",
+        releaseDate: "2014-11-07",
+        popularity: 50,
+      },
+    ]);
+    tmdbClientMocks.getMovieExternalIds.mockResolvedValue({
+      imdbId: "tt0816692",
+    });
+    tmdbClientMocks.resolvePosterPath.mockResolvedValue("/interstellar.jpg");
+    tmdbClientMocks.fetchPosterImage.mockResolvedValue({
+      buffer: imageBytes,
+      contentType: "image/jpeg",
+    });
+
+    const save = vi.fn().mockRejectedValue(new Error("db down"));
+    const service = new PosterService({ save });
+    const result = await service.fetchPoster(
+      createSyncHistory({
+        posterUrl: undefined,
+        tmdbMovieId: undefined,
+        imdbMovieId: undefined,
+        mediaTitle: "Interstellar",
+        year: 2014,
+      }),
+      createUser(),
+      { tmdbAccessToken: "tmdb-token" }
+    );
+
+    expect(result).toEqual({
+      buffer: Buffer.from(imageBytes),
+      contentType: "image/jpeg",
+    });
+    expect(save).toHaveBeenCalled();
+  });
+
+  it("extends rate-limit backoff after a prior title-search miss", async () => {
+    vi.useFakeTimers();
+    tmdbClientMocks.searchMovie.mockResolvedValue([]);
+    tmdbClientMocks.resolvePosterPath
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new TmdbRateLimitError());
+
+    const service = new PosterService();
+    const history = createSyncHistory({
+      id: "sync-rate-limit",
+      posterUrl: undefined,
+      tmdbMovieId: undefined,
+      imdbMovieId: undefined,
+      mediaTitle: "Unknown Title",
+      year: 2099,
+    });
+
+    await service.fetchPoster(history, createUser(), {
+      tmdbAccessToken: "tmdb-token",
+    });
+    expect(hasPosterLookupData(history)).toBe(false);
+
+    vi.advanceTimersByTime(5 * 60_000);
+    expect(hasPosterLookupData(history)).toBe(true);
+
+    await service.fetchPoster(history, createUser(), {
+      tmdbAccessToken: "tmdb-token",
+    });
+    // Second attempt: enrich misses again (sets miss backoff), then
+    // resolvePosterPath rate-limits and upgrades to rate_limited backoff.
+    expect(hasPosterLookupData(history)).toBe(false);
+  });
+
   it("backs off failed title searches so mediaTitle alone does not re-hit TMDB", async () => {
     vi.useFakeTimers();
     tmdbClientMocks.searchMovie.mockResolvedValue([]);
