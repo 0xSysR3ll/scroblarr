@@ -187,6 +187,20 @@ export class MediaIdEnricher {
     };
   }
 
+  private async seasonLooksValid(
+    seriesId: number,
+    season: number,
+    episodeIds: Awaited<ReturnType<TmdbClient["getEpisodeExternalIds"]>>,
+    cache: ReturnType<MediaIdEnricher["createLookupCache"]>
+  ): Promise<boolean> {
+    return episodeIds !== null || (await cache.hasTvSeason(seriesId, season));
+  }
+
+  private isTitleContinuation(names: string[], parentTitle: string): boolean {
+    const parentPrefix = `${normalizeTitle(parentTitle)} `;
+    return names.some((name) => normalizeTitle(name).startsWith(parentPrefix));
+  }
+
   private async resolveEpisodeViaSequelRecommendations(
     media: MediaItem,
     parentSeriesId: number,
@@ -214,11 +228,7 @@ export class MediaIdEnricher {
         const names = [item.name, item.originalName].filter(
           Boolean
         ) as string[];
-        if (
-          names.some((name) =>
-            normalizeTitle(name).startsWith(`${normalizeTitle(parentTitle)} `)
-          )
-        ) {
+        if (this.isTitleContinuation(names, parentTitle)) {
           value += 1000;
         }
         return value;
@@ -230,16 +240,31 @@ export class MediaIdEnricher {
     const seasonsToTry = [...new Set([sequelSeason, 1].filter((s) => s >= 1))];
 
     for (const recommendation of ranked.slice(0, MAX_SEQUEL_RECOMMENDATIONS)) {
+      const names = [recommendation.name, recommendation.originalName].filter(
+        Boolean
+      ) as string[];
+      const titleContinues = this.isTitleContinuation(names, parentTitle);
+
       for (const trySeason of seasonsToTry) {
         const episodeIds = await this.tmdbClient.getEpisodeExternalIds(
           recommendation.id,
           trySeason,
           episodeNumber
         );
-        const seasonExists =
-          episodeIds !== null ||
-          (await cache.hasTvSeason(recommendation.id, trySeason));
-        if (!seasonExists) {
+        if (
+          !(await this.seasonLooksValid(
+            recommendation.id,
+            trySeason,
+            episodeIds,
+            cache
+          ))
+        ) {
+          continue;
+        }
+
+        // Episode external IDs establish a match; season-existence alone
+        // (especially fallback season 1) requires a title-continuation signal.
+        if (episodeIds === null && !titleContinues) {
           continue;
         }
 
@@ -288,9 +313,12 @@ export class MediaIdEnricher {
       episodeNumber
     );
 
-    let seasonExists =
-      episodeIds !== null ||
-      (await cache.hasTvSeason(seriesId, effectiveSeason));
+    let seasonExists = await this.seasonLooksValid(
+      seriesId,
+      effectiveSeason,
+      episodeIds,
+      cache
+    );
 
     if (!seasonExists) {
       const details = await cache.getTvShowDetails(seriesId);
@@ -308,9 +336,12 @@ export class MediaIdEnricher {
           episodeNumber
         );
 
-        seasonExists =
-          episodeIds !== null ||
-          (await cache.hasTvSeason(seriesId, effectiveSeason));
+        seasonExists = await this.seasonLooksValid(
+          seriesId,
+          effectiveSeason,
+          episodeIds,
+          cache
+        );
         if (!seasonExists) {
           return null;
         }

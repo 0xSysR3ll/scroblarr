@@ -302,6 +302,50 @@ describe("MediaIdEnricher", () => {
     await expect(enricher.enrich(media)).resolves.toBe(media);
   });
 
+  it("skips season-existence-only sequel matches without title continuation", async () => {
+    const client = {
+      searchTv: vi.fn().mockResolvedValue([
+        {
+          id: 146176,
+          name: "Berlin",
+          originalName: "Berlín",
+          firstAirDate: "2023-12-29",
+          popularity: 20,
+        },
+      ]),
+      getEpisodeExternalIds: vi.fn().mockResolvedValue(null),
+      hasTvSeason: vi
+        .fn()
+        .mockImplementation(async (id: number, season: number) => {
+          // Parent lacks S2; unrelated recommendation has S1 existence only.
+          if (id === 146176) {
+            return season === 1;
+          }
+          return id === 218351 && season === 1;
+        }),
+      getTvShowDetails: vi.fn().mockResolvedValue({
+        id: 146176,
+        name: "Berlin",
+        numberOfSeasons: 1,
+      }),
+      getTvRecommendations: vi.fn().mockResolvedValue([
+        {
+          id: 218351,
+          name: "The Gold",
+          popularity: 10,
+        },
+      ]),
+    } as unknown as TmdbClient;
+
+    const media = episode({
+      title: "Berlin",
+      seasonNumber: 2,
+      episodeNumber: 1,
+    });
+    const enricher = new MediaIdEnricher(client);
+    await expect(enricher.enrich(media)).resolves.toBe(media);
+  });
+
   it("does not remap short parent titles like Berlin to season 1", async () => {
     const client = {
       searchTv: vi.fn().mockResolvedValue([
