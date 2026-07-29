@@ -226,6 +226,23 @@ describe("trakt routes", () => {
     expect(traktOAuthMocks.exchangePinForToken).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["Trakt device code is invalid"],
+    ["Trakt device code has already been used"],
+    ["Trakt authorization was denied"],
+  ])("returns %s as a 400", async (message) => {
+    traktOAuthMocks.exchangePinForToken.mockRejectedValueOnce(
+      new Error(message)
+    );
+
+    const response = await request(app)
+      .post("/trakt/link")
+      .send({ userCode: "ABCD1234" })
+      .expect(400);
+
+    expect(response.body).toEqual({ error: message });
+  });
+
   it("requires credentials before linking", async () => {
     userRepositoryMocks.findById.mockResolvedValueOnce({
       ...linkedUser,

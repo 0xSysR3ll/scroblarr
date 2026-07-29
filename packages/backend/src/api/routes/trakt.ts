@@ -205,7 +205,7 @@ router.post("/link", async (req: Request, res: Response) => {
     const errorMessage =
       error instanceof Error ? error.message : "Failed to link Trakt account";
     if (
-      /authorization pending|slow down|device code expired|does not match/i.test(
+      /authorization pending|slow down|device code expired|does not match|device code is invalid|already been used|authorization was denied/i.test(
         errorMessage
       )
     ) {

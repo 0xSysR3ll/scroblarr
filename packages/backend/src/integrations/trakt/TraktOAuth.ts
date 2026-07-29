@@ -229,6 +229,15 @@ export class TraktOAuth {
         "Trakt device code expired. Generate a new one to try again."
       );
     }
+    if (response.status === 404) {
+      throw new Error("Trakt device code is invalid");
+    }
+    if (response.status === 409) {
+      throw new Error("Trakt device code has already been used");
+    }
+    if (response.status === 418) {
+      throw new Error("Trakt authorization was denied");
+    }
     if (response.status === 400 && !error) {
       throw new Error("authorization pending");
     }

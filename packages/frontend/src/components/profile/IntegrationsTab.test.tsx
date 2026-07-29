@@ -730,6 +730,38 @@ describe("IntegrationsTab Trakt integration", () => {
 
     expect(linkTrakt).not.toHaveBeenCalled();
   });
+
+  it("authorizes without credentials when inputs are empty", async () => {
+    const user = setupUser();
+    vi.mocked(getTraktStatus).mockResolvedValue({
+      linked: false,
+      username: null,
+      image: null,
+      hasCredentials: true,
+    });
+    vi.mocked(getTraktAuthorizeUrl).mockResolvedValue({
+      userCode: "ABCD1234",
+      verificationUrl: "https://trakt.tv/activate",
+      expiresIn: 900,
+      interval: 5,
+    });
+
+    renderWithProviders(
+      <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+    );
+
+    await screen.findByRole("heading", { name: "Trakt" });
+    expect(
+      within(getTraktSection()).getByRole("button", { name: "Authorize" })
+    ).toBeEnabled();
+    await clickTraktAuthorize(user);
+    await advanceAuthorizeDelay();
+
+    await waitFor(() => {
+      expect(getTraktAuthorizeUrl).toHaveBeenCalledWith(undefined, undefined);
+    });
+    expect(await screen.findByText("ABCD1234")).toBeVisible();
+  });
 });
 
 describe("IntegrationsTab Simkl integration", () => {
@@ -942,5 +974,211 @@ describe("IntegrationsTab Simkl integration", () => {
     );
 
     expect(await screen.findByText("Invalid PIN")).toBeVisible();
+  });
+
+  it("continues polling while authorization is pending then links", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({
+        advanceTimers: vi.advanceTimersByTime,
+      });
+      vi.mocked(getSimklAuthorizeUrl).mockResolvedValue({
+        userCode: "ABCDE",
+        verificationUrl: "https://simkl.com/pin/",
+        expiresIn: 60,
+        interval: 5,
+      });
+      vi.mocked(linkSimkl)
+        .mockRejectedValueOnce(new Error("authorization pending"))
+        .mockResolvedValueOnce({ success: true });
+      vi.mocked(getSimklStatus)
+        .mockResolvedValueOnce({
+          linked: false,
+          username: null,
+          image: null,
+          hasCredentials: false,
+        })
+        .mockResolvedValue({
+          linked: true,
+          username: "simkl-user",
+          image: "https://img.example/simkl.png",
+          hasCredentials: true,
+        });
+
+      renderWithProviders(
+        <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+      );
+
+      await user.type(
+        await screen.findByPlaceholderText("Enter your Simkl Client ID"),
+        "client-id"
+      );
+      await clickSimklAuthorize(user);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+
+      await waitFor(() => {
+        expect(linkSimkl).toHaveBeenCalledTimes(2);
+        expect(showSuccess).toHaveBeenCalledWith(
+          "Simkl account linked successfully"
+        );
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("increases the polling interval after a slow down response", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({
+        advanceTimers: vi.advanceTimersByTime,
+      });
+      vi.mocked(getSimklAuthorizeUrl).mockResolvedValue({
+        userCode: "ABCDE",
+        verificationUrl: "https://simkl.com/pin/",
+        expiresIn: 60,
+        interval: 5,
+      });
+      vi.mocked(linkSimkl)
+        .mockRejectedValueOnce(new Error("slow down"))
+        .mockResolvedValueOnce({ success: true });
+      vi.mocked(getSimklStatus)
+        .mockResolvedValueOnce({
+          linked: false,
+          username: null,
+          image: null,
+          hasCredentials: false,
+        })
+        .mockResolvedValue({
+          linked: true,
+          username: "simkl-user",
+          image: "https://img.example/simkl.png",
+          hasCredentials: true,
+        });
+
+      renderWithProviders(
+        <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+      );
+
+      await user.type(
+        await screen.findByPlaceholderText("Enter your Simkl Client ID"),
+        "client-id"
+      );
+      await clickSimklAuthorize(user);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+      expect(linkSimkl).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+      expect(linkSimkl).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+      await waitFor(() => {
+        expect(linkSimkl).toHaveBeenCalledTimes(2);
+        expect(showSuccess).toHaveBeenCalledWith(
+          "Simkl account linked successfully"
+        );
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("ignores a late authorize error after the tab unmounts", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({
+        advanceTimers: vi.advanceTimersByTime,
+      });
+      let rejectAuthorize!: (reason?: unknown) => void;
+      vi.mocked(getSimklAuthorizeUrl).mockImplementation(
+        () =>
+          new Promise((_, reject) => {
+            rejectAuthorize = reject;
+          })
+      );
+
+      const view = renderWithProviders(
+        <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+      );
+
+      await user.type(
+        await screen.findByPlaceholderText("Enter your Simkl Client ID"),
+        "client-id"
+      );
+      await clickSimklAuthorize(user);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500);
+      });
+
+      view.unmount();
+      rejectAuthorize(new Error("stale authorize failure"));
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(
+        screen.queryByText("stale authorize failure")
+      ).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("authorizes without a client id when credentials are empty", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({
+        advanceTimers: vi.advanceTimersByTime,
+      });
+      vi.mocked(getSimklStatus).mockResolvedValue({
+        linked: false,
+        username: null,
+        image: null,
+        hasCredentials: true,
+      });
+      vi.mocked(getSimklAuthorizeUrl).mockResolvedValue({
+        userCode: "ABCDE",
+        verificationUrl: "https://simkl.com/pin/",
+        expiresIn: 900,
+        interval: 5,
+      });
+
+      renderWithProviders(
+        <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+      );
+
+      await screen.findByRole("heading", { name: "Simkl" });
+      expect(
+        within(getSimklSection()).getByRole("button", { name: "Authorize" })
+      ).toBeEnabled();
+      await clickSimklAuthorize(user);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500);
+      });
+
+      await waitFor(() => {
+        expect(getSimklAuthorizeUrl).toHaveBeenCalledWith(undefined);
+      });
+      expect(await screen.findByText("ABCDE")).toBeVisible();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

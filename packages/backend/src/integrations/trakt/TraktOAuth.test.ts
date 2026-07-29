@@ -128,7 +128,7 @@ describe("TraktOAuth", () => {
   it("maps pending PIN poll responses", async () => {
     fetchMock.mockResolvedValue({
       ok: false,
-      status: 418,
+      status: 422,
       text: vi.fn().mockResolvedValue(
         JSON.stringify({
           error: "authorization_pending",
@@ -188,7 +188,7 @@ describe("TraktOAuth", () => {
   it("maps expired_token OAuth errors", async () => {
     fetchMock.mockResolvedValue({
       ok: false,
-      status: 418,
+      status: 422,
       text: vi.fn().mockResolvedValue(
         JSON.stringify({
           error: "expired_token",
@@ -218,7 +218,7 @@ describe("TraktOAuth", () => {
   it("maps slow_down OAuth errors", async () => {
     fetchMock.mockResolvedValue({
       ok: false,
-      status: 418,
+      status: 422,
       text: vi.fn().mockResolvedValue(
         JSON.stringify({
           error: "slow_down",
@@ -229,6 +229,45 @@ describe("TraktOAuth", () => {
 
     await expect(oauth.exchangePinForToken("device-code")).rejects.toThrow(
       "slow down"
+    );
+  });
+
+  it("maps invalid device codes from HTTP 404", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: vi.fn().mockResolvedValue(""),
+    });
+    const oauth = new TraktOAuth("client-id", "client-secret");
+
+    await expect(oauth.exchangePinForToken("device-code")).rejects.toThrow(
+      "Trakt device code is invalid"
+    );
+  });
+
+  it("maps already-used device codes from HTTP 409", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 409,
+      text: vi.fn().mockResolvedValue(""),
+    });
+    const oauth = new TraktOAuth("client-id", "client-secret");
+
+    await expect(oauth.exchangePinForToken("device-code")).rejects.toThrow(
+      "Trakt device code has already been used"
+    );
+  });
+
+  it("maps denied device codes from HTTP 418", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 418,
+      text: vi.fn().mockResolvedValue(""),
+    });
+    const oauth = new TraktOAuth("client-id", "client-secret");
+
+    await expect(oauth.exchangePinForToken("device-code")).rejects.toThrow(
+      "Trakt authorization was denied"
     );
   });
 
@@ -298,6 +337,24 @@ describe("TraktOAuth", () => {
     );
   });
 
+  it("sweeps expired pending PIN entries when remembering a new one", () => {
+    rememberTraktPin("expired-user", {
+      device_code: "old-device",
+      user_code: "OLDCODE1",
+      expires_in: -1,
+    });
+    rememberTraktPin("fresh-user", {
+      device_code: "new-device",
+      user_code: "NEWCODE1",
+      expires_in: 600,
+    });
+
+    expect(() => resolveTraktDeviceCode("expired-user", "OLDCODE1")).toThrow(
+      /expired/i
+    );
+    expect(resolveTraktDeviceCode("fresh-user", "NEWCODE1")).toBe("new-device");
+  });
+
   it("surfaces fetch timeouts", async () => {
     vi.useFakeTimers();
     try {
@@ -332,6 +389,13 @@ describe("TraktOAuth", () => {
     const oauth = new TraktOAuth("client-id", "client-secret");
 
     await expect(oauth.requestPinCode()).rejects.toThrow("network down");
+  });
+
+  it("rethrows non-Error fetch failures", async () => {
+    fetchMock.mockRejectedValue("socket reset");
+    const oauth = new TraktOAuth("client-id", "client-secret");
+
+    await expect(oauth.requestPinCode()).rejects.toBe("socket reset");
   });
 
   it("refreshes access tokens", async () => {
