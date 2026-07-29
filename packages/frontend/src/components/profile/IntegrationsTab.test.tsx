@@ -976,6 +976,38 @@ describe("IntegrationsTab Simkl integration", () => {
     expect(await screen.findByText("Invalid PIN")).toBeVisible();
   });
 
+  it("surfaces a default link failure for non-Error rejections", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getSimklAuthorizeUrl).mockResolvedValue({
+      userCode: "ABCDE",
+      verificationUrl: "https://simkl.com/pin/",
+      expiresIn: 900,
+      interval: 5,
+    });
+    vi.mocked(linkSimkl).mockRejectedValue("link blew up");
+
+    renderWithProviders(
+      <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+    );
+
+    await user.type(
+      await screen.findByPlaceholderText("Enter your Simkl Client ID"),
+      "client-id"
+    );
+    await clickSimklAuthorize(user);
+
+    expect(
+      await screen.findByText("ABCDE", {}, { timeout: 3000 })
+    ).toBeVisible();
+    await user.click(
+      screen.getByRole("button", { name: "Check approval now" })
+    );
+
+    expect(
+      await screen.findByText("Failed to link Simkl account")
+    ).toBeVisible();
+  });
+
   it("continues polling while authorization is pending then links", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {

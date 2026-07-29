@@ -134,6 +134,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
     clientSecret: string | undefined,
     showPendingError = true
   ): Promise<PinPollResult> {
+    let result: PinPollResult = "failed";
     try {
       if (showPendingError) {
         setTraktSaving(true);
@@ -156,7 +157,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         })
       );
       onProfileUpdated?.();
-      return "linked";
+      result = "linked";
     } catch (err) {
       const errorMessage =
         err instanceof Error
@@ -165,23 +166,22 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
               defaultValue: "Failed to link Trakt account",
             });
       if (!showPendingError && isPinAuthSlowDownMessage(errorMessage)) {
-        return "slow_down";
-      }
-      if (!showPendingError && isPinAuthPendingMessage(errorMessage)) {
-        return "pending";
-      }
-      setTraktError(errorMessage);
-      if (!showPendingError) {
-        setTraktPinPolling(false);
-        setTraktPinMessage(null);
-        return "failed";
-      }
-      return "failed";
-    } finally {
-      if (showPendingError) {
-        setTraktSaving(false);
+        result = "slow_down";
+      } else if (!showPendingError && isPinAuthPendingMessage(errorMessage)) {
+        result = "pending";
+      } else {
+        setTraktError(errorMessage);
+        if (!showPendingError) {
+          setTraktPinPolling(false);
+          setTraktPinMessage(null);
+        }
+        result = "failed";
       }
     }
+    if (showPendingError) {
+      setTraktSaving(false);
+    }
+    return result;
   }
 
   async function startTraktPinPolling(
@@ -238,6 +238,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
     clientId: string | undefined,
     showPendingError = true
   ): Promise<PinPollResult> {
+    let result: PinPollResult = "failed";
     try {
       if (showPendingError) {
         setSimklSaving(true);
@@ -259,7 +260,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         })
       );
       onProfileUpdated?.();
-      return "linked";
+      result = "linked";
     } catch (err) {
       const errorMessage =
         err instanceof Error
@@ -268,23 +269,22 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
               defaultValue: "Failed to link Simkl account",
             });
       if (!showPendingError && isPinAuthSlowDownMessage(errorMessage)) {
-        return "slow_down";
-      }
-      if (!showPendingError && isPinAuthPendingMessage(errorMessage)) {
-        return "pending";
-      }
-      setSimklError(errorMessage);
-      if (!showPendingError) {
-        setSimklPinPolling(false);
-        setSimklPinMessage(null);
-        return "failed";
-      }
-      return "failed";
-    } finally {
-      if (showPendingError) {
-        setSimklSaving(false);
+        result = "slow_down";
+      } else if (!showPendingError && isPinAuthPendingMessage(errorMessage)) {
+        result = "pending";
+      } else {
+        setSimklError(errorMessage);
+        if (!showPendingError) {
+          setSimklPinPolling(false);
+          setSimklPinMessage(null);
+        }
+        result = "failed";
       }
     }
+    if (showPendingError) {
+      setSimklSaving(false);
+    }
+    return result;
   }
 
   async function startSimklPinPolling(

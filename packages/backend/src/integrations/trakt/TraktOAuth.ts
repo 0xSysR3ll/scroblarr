@@ -45,17 +45,18 @@ async function fetchWithTimeout(
   const timeout = setTimeout(() => controller.abort(), TRAKT_OAUTH_TIMEOUT_MS);
 
   try {
-    return await fetch(url, {
+    const response = await fetch(url, {
       ...init,
       signal: controller.signal,
     });
+    clearTimeout(timeout);
+    return response;
   } catch (error) {
+    clearTimeout(timeout);
     if (error instanceof Error && error.name === "AbortError") {
       throw new Error(`${errorContext} timed out`);
     }
     throw error;
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
