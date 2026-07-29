@@ -118,12 +118,16 @@ export class TmdbClient {
     return { buffer, contentType };
   }
 
-  async searchTv(query: string, year?: number): Promise<TmdbTvSearchHit[]> {
+  async searchTv(
+    query: string,
+    year?: number | null
+  ): Promise<TmdbTvSearchHit[]> {
     const params = new URLSearchParams({
       query,
       include_adult: "false",
     });
-    if (year !== undefined) {
+    // Year can be null from nullable DB columns / webhook payloads.
+    if (typeof year === "number") {
       params.set("first_air_date_year", year.toString());
     }
 
@@ -142,13 +146,14 @@ export class TmdbClient {
 
   async searchMovie(
     query: string,
-    year?: number
+    year?: number | null
   ): Promise<TmdbMovieSearchHit[]> {
     const params = new URLSearchParams({
       query,
       include_adult: "false",
     });
-    if (year !== undefined) {
+    // Year can be null from nullable DB columns / webhook payloads.
+    if (typeof year === "number") {
       params.set("year", year.toString());
     }
 
