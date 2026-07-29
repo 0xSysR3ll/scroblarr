@@ -155,6 +155,23 @@ describe("TraktOAuth", () => {
     );
   });
 
+  it("surfaces explicit OAuth errors on HTTP 400 instead of pending", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          error: "invalid_client",
+        })
+      ),
+    });
+    const oauth = new TraktOAuth("client-id", "client-secret");
+
+    await expect(oauth.exchangePinForToken("device-code")).rejects.toThrow(
+      "invalid_client"
+    );
+  });
+
   it("maps expired device codes from HTTP 410", async () => {
     fetchMock.mockResolvedValue({
       ok: false,

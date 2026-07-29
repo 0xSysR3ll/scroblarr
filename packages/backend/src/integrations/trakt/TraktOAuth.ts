@@ -81,10 +81,17 @@ export function rememberTraktPin(
   userId: string,
   pin: Pick<TraktPinCodeResponse, "device_code" | "user_code" | "expires_in">
 ): void {
+  const now = Date.now();
+  for (const [pendingUserId, pendingPin] of pendingPinsByUserId) {
+    if (pendingPin.expiresAt <= now) {
+      pendingPinsByUserId.delete(pendingUserId);
+    }
+  }
+
   pendingPinsByUserId.set(userId, {
     deviceCode: pin.device_code,
     userCode: pin.user_code,
-    expiresAt: Date.now() + pin.expires_in * 1000,
+    expiresAt: now + pin.expires_in * 1000,
   });
 }
 
@@ -205,26 +212,25 @@ export class TraktOAuth {
     const errorText = await response.text();
     const { error, errorDescription } = parseOAuthErrorBody(errorText);
 
-    // Trakt device auth uses status codes: 400 pending, 410 expired, 429 slow down.
-    // Pending responses are often an empty body without an OAuth error field.
-    if (
-      response.status === 400 ||
-      error === "authorization_pending" ||
-      error === "pending"
-    ) {
+    // Prefer explicit OAuth error codes over HTTP status fallbacks.
+    // Trakt often returns bare 400 (empty body) while authorization is pending.
+    if (error === "authorization_pending" || error === "pending") {
       throw new Error("authorization pending");
     }
-    if (response.status === 429 || error === "slow_down") {
+    if (error === "slow_down" || response.status === 429) {
       throw new Error("slow down");
     }
     if (
-      response.status === 410 ||
       error === "expired_token" ||
-      error === "expired"
+      error === "expired" ||
+      response.status === 410
     ) {
       throw new Error(
         "Trakt device code expired. Generate a new one to try again."
       );
+    }
+    if (response.status === 400 && !error) {
+      throw new Error("authorization pending");
     }
 
     logger.trakt.error(

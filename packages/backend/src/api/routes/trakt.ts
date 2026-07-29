@@ -91,11 +91,11 @@ router.get("/authorize", async (req: Request, res: Response) => {
         details: error.issues,
       });
     }
-    logger.trakt.error({ error }, "Error getting Trakt authorization URL");
+    logger.trakt.error({ error }, "Error requesting Trakt PIN code");
     const errorMessage =
       error instanceof Error
         ? error.message
-        : "Failed to get Trakt authorization URL";
+        : "Failed to request Trakt PIN code";
     return res.status(500).json({ error: errorMessage });
   }
 });
@@ -204,7 +204,11 @@ router.post("/link", async (req: Request, res: Response) => {
     }
     const errorMessage =
       error instanceof Error ? error.message : "Failed to link Trakt account";
-    if (/authorization pending|slow down/i.test(errorMessage)) {
+    if (
+      /authorization pending|slow down|device code expired|does not match/i.test(
+        errorMessage
+      )
+    ) {
       return res.status(400).json({ error: errorMessage });
     }
     return res.status(500).json({ error: errorMessage });

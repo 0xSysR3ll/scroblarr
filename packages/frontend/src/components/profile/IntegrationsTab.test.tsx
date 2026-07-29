@@ -549,6 +549,84 @@ describe("IntegrationsTab Trakt integration", () => {
     });
   });
 
+  it("increases the polling interval after a slow down response", async () => {
+    const user = setupUser();
+    vi.mocked(getTraktAuthorizeUrl).mockResolvedValue({
+      userCode: "ABCD1234",
+      verificationUrl: "https://trakt.tv/activate",
+      expiresIn: 60,
+      interval: 5,
+    });
+    vi.mocked(linkTrakt)
+      .mockRejectedValueOnce(new Error("slow down"))
+      .mockResolvedValueOnce({ success: true });
+    vi.mocked(getTraktStatus)
+      .mockResolvedValueOnce({
+        linked: false,
+        username: null,
+        image: null,
+        hasCredentials: false,
+      })
+      .mockResolvedValue({
+        linked: true,
+        username: "trakt-user",
+        image: "https://img.example/trakt.png",
+        hasCredentials: true,
+      });
+
+    renderWithProviders(
+      <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+    );
+
+    await fillTraktCredentials(user);
+    await clickTraktAuthorize(user);
+    await advanceAuthorizeDelay();
+    await advancePinPoll(5000);
+
+    expect(linkTrakt).toHaveBeenCalledTimes(1);
+
+    await advancePinPoll(5000);
+    expect(linkTrakt).toHaveBeenCalledTimes(1);
+
+    await advancePinPoll(5000);
+    await waitFor(() => {
+      expect(linkTrakt).toHaveBeenCalledTimes(2);
+      expect(showSuccess).toHaveBeenCalledWith(
+        "Trakt account linked successfully"
+      );
+    });
+  });
+
+  it("ignores a late authorize error after the tab unmounts", async () => {
+    const user = setupUser();
+    let rejectAuthorize!: (reason?: unknown) => void;
+    vi.mocked(getTraktAuthorizeUrl).mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          rejectAuthorize = reject;
+        })
+    );
+
+    const view = renderWithProviders(
+      <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+    );
+
+    await fillTraktCredentials(user);
+    await clickTraktAuthorize(user);
+    await advanceAuthorizeDelay();
+
+    view.unmount();
+    rejectAuthorize(new Error("stale authorize failure"));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(oauthPopupMocks.closePopup).toHaveBeenCalled();
+    expect(
+      screen.queryByText("stale authorize failure")
+    ).not.toBeInTheDocument();
+  });
+
   it("surfaces manual link failures", async () => {
     const user = setupUser();
     vi.mocked(getTraktAuthorizeUrl).mockResolvedValue({

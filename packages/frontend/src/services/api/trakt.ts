@@ -26,10 +26,12 @@ async function getErrorMessage(
   response: Response,
   fallback: string
 ): Promise<string> {
+  let parsedJson = false;
   try {
     const jsonSource =
       typeof response.clone === "function" ? response.clone() : response;
     const error = (await jsonSource.json()) as { error?: unknown };
+    parsedJson = true;
     if (typeof error.error === "string" && error.error) {
       return error.error;
     }
@@ -37,13 +39,16 @@ async function getErrorMessage(
     // Fall through to text/status fallback.
   }
 
-  try {
-    const text = await response.text();
-    if (text.trim()) {
-      return text.trim();
+  // Only use the text body when the response was not JSON.
+  if (!parsedJson) {
+    try {
+      const text = await response.text();
+      if (text.trim()) {
+        return text.trim();
+      }
+    } catch {
+      // Fall through to status fallback.
     }
-  } catch {
-    // Fall through to status fallback.
   }
 
   const status = [response.status, response.statusText]

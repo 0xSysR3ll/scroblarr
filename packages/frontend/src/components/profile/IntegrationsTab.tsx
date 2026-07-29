@@ -36,12 +36,18 @@ const DOCS_URL =
 const TRAKT_DOCS_URL = `${DOCS_URL}/configuration/trakt`;
 
 function isPinAuthPendingMessage(message: string): boolean {
-  return /authorization pending|slow down/i.test(message);
+  return /authorization pending/i.test(message);
+}
+
+function isPinAuthSlowDownMessage(message: string): boolean {
+  return /slow down/i.test(message);
 }
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+type PinPollResult = "linked" | "pending" | "slow_down" | "failed";
 
 interface IntegrationsTabProps {
   onProfileUpdated?: () => void;
@@ -127,7 +133,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
     clientId: string | undefined,
     clientSecret: string | undefined,
     showPendingError = true
-  ): Promise<boolean> {
+  ): Promise<PinPollResult> {
     try {
       if (showPendingError) {
         setTraktSaving(true);
@@ -150,7 +156,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         })
       );
       onProfileUpdated?.();
-      return true;
+      return "linked";
     } catch (err) {
       const errorMessage =
         err instanceof Error
@@ -158,16 +164,19 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
           : t("trakt.linkFailed", {
               defaultValue: "Failed to link Trakt account",
             });
+      if (!showPendingError && isPinAuthSlowDownMessage(errorMessage)) {
+        return "slow_down";
+      }
       if (!showPendingError && isPinAuthPendingMessage(errorMessage)) {
-        return false;
+        return "pending";
       }
       setTraktError(errorMessage);
       if (!showPendingError) {
         setTraktPinPolling(false);
         setTraktPinMessage(null);
-        return true;
+        return "failed";
       }
-      return false;
+      return "failed";
     } finally {
       if (showPendingError) {
         setTraktSaving(false);
@@ -183,7 +192,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
     expiresIn: number,
     pollId: number
   ): Promise<void> {
-    const intervalMs = Math.max(interval, 5) * 1000;
+    let intervalMs = Math.max(interval, 5) * 1000;
     const expiresAt = Date.now() + expiresIn * 1000;
 
     setTraktPinPolling(true);
@@ -199,14 +208,17 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         return;
       }
 
-      const linked = await completeTraktLink(
+      const result = await completeTraktLink(
         userCode,
         clientId,
         clientSecret,
         false
       );
-      if (linked) {
+      if (result === "linked" || result === "failed") {
         return;
+      }
+      if (result === "slow_down") {
+        intervalMs += 5000;
       }
     }
 
@@ -225,7 +237,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
     userCode: string,
     clientId: string | undefined,
     showPendingError = true
-  ): Promise<boolean> {
+  ): Promise<PinPollResult> {
     try {
       if (showPendingError) {
         setSimklSaving(true);
@@ -247,7 +259,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         })
       );
       onProfileUpdated?.();
-      return true;
+      return "linked";
     } catch (err) {
       const errorMessage =
         err instanceof Error
@@ -255,16 +267,19 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
           : t("simkl.linkFailed", {
               defaultValue: "Failed to link Simkl account",
             });
+      if (!showPendingError && isPinAuthSlowDownMessage(errorMessage)) {
+        return "slow_down";
+      }
       if (!showPendingError && isPinAuthPendingMessage(errorMessage)) {
-        return false;
+        return "pending";
       }
       setSimklError(errorMessage);
       if (!showPendingError) {
         setSimklPinPolling(false);
         setSimklPinMessage(null);
-        return true;
+        return "failed";
       }
-      return false;
+      return "failed";
     } finally {
       if (showPendingError) {
         setSimklSaving(false);
@@ -279,7 +294,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
     expiresIn: number,
     pollId: number
   ): Promise<void> {
-    const intervalMs = Math.max(interval, 5) * 1000;
+    let intervalMs = Math.max(interval, 5) * 1000;
     const expiresAt = Date.now() + expiresIn * 1000;
 
     setSimklPinPolling(true);
@@ -295,9 +310,12 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         return;
       }
 
-      const linked = await completeSimklLink(userCode, clientId, false);
-      if (linked) {
+      const result = await completeSimklLink(userCode, clientId, false);
+      if (result === "linked" || result === "failed") {
         return;
+      }
+      if (result === "slow_down") {
+        intervalMs += 5000;
       }
     }
 
@@ -355,6 +373,9 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
           pollId
         );
       } catch (err) {
+        if (pollId !== traktPinPollIdRef.current) {
+          return;
+        }
         traktOAuthPopup.closePopup();
         setTraktError(
           err instanceof Error
@@ -458,6 +479,9 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
             pollId
           );
         } catch (err) {
+          if (pollId !== simklPinPollIdRef.current) {
+            return;
+          }
           setSimklError(
             err instanceof Error
               ? err.message

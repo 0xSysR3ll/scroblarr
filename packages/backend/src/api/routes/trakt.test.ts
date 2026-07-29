@@ -208,6 +208,24 @@ describe("trakt routes", () => {
     expect(response.body).toEqual({ error: "slow down" });
   });
 
+  it("returns expired device codes as a 400", async () => {
+    traktPinStoreMocks.resolveTraktDeviceCode.mockImplementationOnce(() => {
+      throw new Error(
+        "Trakt device code expired. Generate a new one to try again."
+      );
+    });
+
+    const response = await request(app)
+      .post("/trakt/link")
+      .send({ userCode: "ABCD1234" })
+      .expect(400);
+
+    expect(response.body).toEqual({
+      error: "Trakt device code expired. Generate a new one to try again.",
+    });
+    expect(traktOAuthMocks.exchangePinForToken).not.toHaveBeenCalled();
+  });
+
   it("requires credentials before linking", async () => {
     userRepositoryMocks.findById.mockResolvedValueOnce({
       ...linkedUser,
@@ -240,7 +258,7 @@ describe("trakt routes", () => {
     const response = await request(app).get("/trakt/authorize").expect(500);
 
     expect(response.body).toEqual({
-      error: "Failed to get Trakt authorization URL",
+      error: "Failed to request Trakt PIN code",
     });
   });
 

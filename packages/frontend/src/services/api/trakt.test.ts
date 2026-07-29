@@ -251,6 +251,29 @@ describe("trakt api", () => {
     );
   });
 
+  it("falls back to status when JSON has no error field", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: "Internal Server Error",
+      clone: () => ({
+        json: vi.fn().mockResolvedValue({
+          message: "boom",
+          statusCode: 500,
+        }),
+      }),
+      text: vi
+        .fn()
+        .mockResolvedValue(
+          JSON.stringify({ message: "boom", statusCode: 500 })
+        ),
+    });
+
+    await expect(getTraktAuthorizeUrl()).rejects.toThrow(
+      "Failed to get Trakt PIN code (500 Internal Server Error)"
+    );
+  });
+
   it("falls back to status text when reading the error body throws", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: false,
