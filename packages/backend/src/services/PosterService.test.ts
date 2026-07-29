@@ -40,7 +40,11 @@ import type { SyncHistory } from "@entities/SyncHistory";
 import type { User } from "@entities/User";
 import { TmdbRateLimitError } from "@integrations/tmdb/TmdbApiError";
 
-import { hasPosterLookupData, PosterService } from "./PosterService";
+import {
+  clearPosterEnrichmentCache,
+  hasPosterLookupData,
+  PosterService,
+} from "./PosterService";
 
 function createSyncHistory(overrides: Partial<SyncHistory> = {}): SyncHistory {
   return {
@@ -69,6 +73,8 @@ function createUser(overrides: Partial<User> = {}): User {
 describe("PosterService", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.useRealTimers();
+    clearPosterEnrichmentCache();
     tmdbClientMocks.resolvePosterPath.mockReset();
     tmdbClientMocks.fetchPosterImage.mockReset();
     tmdbClientMocks.searchTv.mockReset();
@@ -597,5 +603,89 @@ describe("PosterService", () => {
         })
       )
     ).toBe(true);
+  });
+
+  it("caches successful title enrichment and skips repeated TMDB searches", async () => {
+    const imageBytes = new Uint8Array([4, 5, 6]).buffer;
+    tmdbClientMocks.searchMovie.mockResolvedValue([
+      {
+        id: 157336,
+        title: "Interstellar",
+        releaseDate: "2014-11-07",
+        popularity: 50,
+      },
+    ]);
+    tmdbClientMocks.getMovieExternalIds.mockResolvedValue({
+      imdbId: "tt0816692",
+    });
+    tmdbClientMocks.resolvePosterPath.mockResolvedValue("/interstellar.jpg");
+    tmdbClientMocks.fetchPosterImage.mockResolvedValue({
+      buffer: imageBytes,
+      contentType: "image/jpeg",
+    });
+
+    const save = vi.fn().mockResolvedValue(undefined);
+    const service = new PosterService({ save });
+    const history = createSyncHistory({
+      posterUrl: undefined,
+      tmdbMovieId: undefined,
+      imdbMovieId: undefined,
+      mediaTitle: "Interstellar",
+      year: 2014,
+    });
+
+    await service.fetchPoster(history, createUser(), {
+      tmdbAccessToken: "tmdb-token",
+    });
+    await service.fetchPoster(
+      createSyncHistory({
+        ...history,
+        tmdbMovieId: undefined,
+        imdbMovieId: undefined,
+      }),
+      createUser(),
+      { tmdbAccessToken: "tmdb-token" }
+    );
+
+    expect(tmdbClientMocks.searchMovie).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tmdbMovieId: "157336",
+        imdbMovieId: "tt0816692",
+      })
+    );
+  });
+
+  it("backs off failed title searches so mediaTitle alone does not re-hit TMDB", async () => {
+    vi.useFakeTimers();
+    tmdbClientMocks.searchMovie.mockResolvedValue([]);
+    tmdbClientMocks.resolvePosterPath.mockResolvedValue(null);
+
+    const service = new PosterService();
+    const history = createSyncHistory({
+      posterUrl: undefined,
+      tmdbMovieId: undefined,
+      imdbMovieId: undefined,
+      mediaTitle: "Unknown Title",
+      year: 2099,
+    });
+
+    await service.fetchPoster(history, createUser(), {
+      tmdbAccessToken: "tmdb-token",
+    });
+
+    expect(hasPosterLookupData(history)).toBe(false);
+    await service.fetchPoster(history, createUser(), {
+      tmdbAccessToken: "tmdb-token",
+    });
+    expect(tmdbClientMocks.searchMovie).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(5 * 60_000);
+    expect(hasPosterLookupData(history)).toBe(true);
+    await service.fetchPoster(history, createUser(), {
+      tmdbAccessToken: "tmdb-token",
+    });
+    expect(tmdbClientMocks.searchMovie).toHaveBeenCalledTimes(2);
   });
 });
