@@ -3,6 +3,8 @@ import { User } from "@entities/User";
 import { ISyncClient, SyncOptions } from "@integrations/common/ISyncClient";
 import { SimklClient } from "@integrations/simkl/SimklClient";
 import { SimklTokenManager } from "@integrations/simkl/SimklTokenManager";
+import { TmdbClient } from "@integrations/tmdb/TmdbClient";
+import { getTmdbAccessToken } from "@integrations/tmdb/tmdbConfig";
 import { isTraktAuthError } from "@integrations/trakt/TraktApiError";
 import { TraktClient } from "@integrations/trakt/TraktClient";
 import { TraktTokenManager } from "@integrations/trakt/TraktTokenManager";
@@ -12,6 +14,7 @@ import { UserRepository } from "@repositories/UserRepository";
 import { MediaEvent, serializeDestinationResults } from "@scroblarr/shared";
 import { logger } from "@utils/logger";
 
+import { MediaIdEnricher, needsMediaIdEnrichment } from "./MediaIdEnricher";
 import {
   buildAttemptResult,
   buildGlobalFailureResult,
@@ -288,6 +291,8 @@ export class SyncService {
     const userIdentifier =
       event.source === "plex" ? user.plexUsername : user.jellyfinUsername;
 
+    event = await this.enrichMediaIds(event);
+
     const hasExistingSync = await this.syncHistoryRepository.hasExistingSync(
       user.id,
       event.media.type,
@@ -296,6 +301,10 @@ export class SyncService {
         tvdbMovieId: event.media.tvdbMovieId?.toString(),
         imdbMovieId: event.media.imdbMovieId,
         imdbEpisodeId: event.media.imdbEpisodeId,
+        tmdbMovieId: event.media.tmdbMovieId?.toString(),
+        tmdbSeriesId: event.media.tmdbSeriesId?.toString(),
+        seasonNumber: event.media.seasonNumber,
+        episodeNumber: event.media.episodeNumber,
       }
     );
 
@@ -488,5 +497,35 @@ export class SyncService {
       const refreshedToken = await destination.refreshAccessToken(user);
       await destination.client.scrobble(event, refreshedToken, options);
     }
+  }
+
+  private async enrichMediaIds(event: MediaEvent): Promise<MediaEvent> {
+    if (!needsMediaIdEnrichment(event.media)) {
+      return event;
+    }
+
+    const settings = await this.settingsRepository.getAll();
+    const tmdbToken = getTmdbAccessToken(settings);
+    if (!tmdbToken) {
+      logger.sync.debug(
+        {
+          mediaTitle: event.media.title,
+          mediaType: event.media.type,
+        },
+        "Skipping media ID enrichment; TMDB access token not configured"
+      );
+      return event;
+    }
+
+    const enricher = new MediaIdEnricher(new TmdbClient(tmdbToken));
+    const enrichedMedia = await enricher.enrich(event.media);
+    if (enrichedMedia === event.media) {
+      return event;
+    }
+
+    return {
+      ...event,
+      media: enrichedMedia,
+    };
   }
 }

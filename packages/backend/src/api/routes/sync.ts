@@ -15,7 +15,7 @@ const router = Router();
 const syncHistoryRepository = new SyncHistoryRepository();
 const settingsRepository = new SettingsRepository();
 const syncService = new SyncService();
-const posterService = new PosterService();
+const posterService = new PosterService(syncHistoryRepository);
 
 async function retryHistoryItemForUser(
   id: string,

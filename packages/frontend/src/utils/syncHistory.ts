@@ -151,7 +151,8 @@ export function hasPosterLookupData(item: SyncHistoryItem): boolean {
     item.imdbMovieId ||
     item.imdbEpisodeId ||
     item.tvdbMovieId ||
-    item.tvdbEpisodeId
+    item.tvdbEpisodeId ||
+    item.mediaTitle
   );
 }
 
