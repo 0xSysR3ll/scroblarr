@@ -316,13 +316,12 @@
     }
   },
   "trakt": {
-    "getAuthUrlFailed": "Failed to get authorization URL",
-    "codeRequired": "Authorization code is required",
+    "getAuthUrlFailed": "Failed to get Trakt PIN code",
     "linked": "Trakt account linked successfully",
     "linkFailed": "Failed to link Trakt account",
     "unlinked": "Trakt account unlinked successfully",
     "unlinkFailed": "Failed to unlink Trakt account",
-    "description": "Sync your watched movies and episodes to Trakt. Uses OAuth for secure authentication.",
+    "description": "Sync your watched movies and episodes to Trakt. Uses Trakt PIN authorization for secure authentication.",
     "unlink": "Unlink",
     "profile": {
       "username": "Username"
@@ -334,13 +333,14 @@
     "clientIdPlaceholder": "Enter your Trakt Client ID",
     "clientSecret": "Client Secret",
     "clientSecretPlaceholder": "Enter your Trakt Client Secret",
-    "oauthInstructions": "Click 'Authorize' to open Trakt in a new window. After authorizing, you'll receive an authorization code. Paste it below to complete the linking process.",
+    "oauthInstructions": "Click 'Authorize' to get a Trakt PIN code, then enter that code on Trakt's activation page.",
     "authorize": "Authorize",
-    "authorizationCode": "Authorization Code",
-    "authorizationCodeHelp": "Paste the code Trakt shows after authorization.",
-    "openAuthPage": "Open Trakt auth page",
-    "codePlaceholder": "Paste the authorization code here",
-    "link": "Link Account",
+    "authorizationCode": "PIN Code",
+    "openAuthPage": "Open Trakt activation page",
+    "pinWaiting": "Waiting for approval on Trakt...",
+    "pinExpired": "The Trakt PIN expired. Generate a new one to try again.",
+    "checkingPin": "Checking...",
+    "checkPin": "Check approval now",
     "unlinkTitle": "Unlink Trakt Account",
     "unlinkMessage": "Are you sure you want to unlink your Trakt account? This will stop syncing to Trakt.",
     "cancel": "Cancel",
@@ -487,7 +487,6 @@
     },
     "retrySelectedFailed": "Retry Failed",
     "destinations": {
-      "tvtime": "TVTime",
       "trakt": "Trakt",
       "simkl": "Simkl"
     }

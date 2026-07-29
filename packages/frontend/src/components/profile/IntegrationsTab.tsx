@@ -19,7 +19,7 @@ import {
 } from "@services/api";
 import { OAuthPopup } from "@utils/OAuthPopup";
 import { showSuccess } from "@utils/toast";
-import { useState, useEffect, useRef, useId } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import {
   FaCheckCircle,
@@ -35,13 +35,19 @@ const DOCS_URL =
   "https://0xsysr3ll.github.io/scroblarr/docs";
 const TRAKT_DOCS_URL = `${DOCS_URL}/configuration/trakt`;
 
-function isSimklPinPendingMessage(message: string): boolean {
-  return /authorization pending|slow down/i.test(message);
+function isPinAuthPendingMessage(message: string): boolean {
+  return /authorization pending/i.test(message);
+}
+
+function isPinAuthSlowDownMessage(message: string): boolean {
+  return /slow down/i.test(message);
 }
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+type PinPollResult = "linked" | "pending" | "slow_down" | "failed";
 
 interface IntegrationsTabProps {
   onProfileUpdated?: () => void;
@@ -58,6 +64,8 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
   const [traktClientSecret, setTraktClientSecret] = useState("");
   const [showTraktSecret, setShowTraktSecret] = useState(false);
   const [traktAuthUrl, setTraktAuthUrl] = useState<string | null>(null);
+  const [traktPinPolling, setTraktPinPolling] = useState(false);
+  const [traktPinMessage, setTraktPinMessage] = useState<string | null>(null);
   const [showTraktUnlinkModal, setShowTraktUnlinkModal] = useState(false);
   const [traktOAuthPopup] = useState(() => new OAuthPopup());
   const [simklStatus, setSimklStatus] = useState<SimklStatus | null>(null);
@@ -71,9 +79,8 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
   const [simklPinMessage, setSimklPinMessage] = useState<string | null>(null);
   const [showSimklUnlinkModal, setShowSimklUnlinkModal] = useState(false);
   const [simklOAuthPopup] = useState(() => new OAuthPopup());
+  const traktPinPollIdRef = useRef(0);
   const simklPinPollIdRef = useRef(0);
-  const traktAuthorizationCodeLabelId = useId();
-  const traktAuthorizationCodeDescriptionId = useId();
 
   useEffect(() => {
     async function loadTraktStatus() {
@@ -109,6 +116,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
 
   useEffect(() => {
     return () => {
+      traktPinPollIdRef.current += 1;
       traktOAuthPopup.closePopup();
     };
   }, [traktOAuthPopup]);
@@ -120,11 +128,117 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
     };
   }, [simklOAuthPopup]);
 
+  async function completeTraktLink(
+    userCode: string,
+    clientId: string | undefined,
+    clientSecret: string | undefined,
+    showPendingError = true
+  ): Promise<PinPollResult> {
+    let result: PinPollResult = "failed";
+    try {
+      if (showPendingError) {
+        setTraktSaving(true);
+      }
+      setTraktError(null);
+      await linkTrakt(userCode.trim(), clientId, clientSecret);
+      traktPinPollIdRef.current += 1;
+      setTraktPinPolling(false);
+      setTraktPinMessage(null);
+      setTraktCode("");
+      setTraktClientId("");
+      setTraktClientSecret("");
+      setTraktAuthUrl(null);
+      traktOAuthPopup.closePopup();
+      const status = await getTraktStatus({ force: true });
+      setTraktStatus(status);
+      showSuccess(
+        t("trakt.linked", {
+          defaultValue: "Trakt account linked successfully",
+        })
+      );
+      onProfileUpdated?.();
+      result = "linked";
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : t("trakt.linkFailed", {
+              defaultValue: "Failed to link Trakt account",
+            });
+      if (!showPendingError && isPinAuthSlowDownMessage(errorMessage)) {
+        result = "slow_down";
+      } else if (!showPendingError && isPinAuthPendingMessage(errorMessage)) {
+        result = "pending";
+      } else {
+        setTraktError(errorMessage);
+        if (!showPendingError) {
+          setTraktPinPolling(false);
+          setTraktPinMessage(null);
+        }
+        result = "failed";
+      }
+    }
+    if (showPendingError) {
+      setTraktSaving(false);
+    }
+    return result;
+  }
+
+  async function startTraktPinPolling(
+    userCode: string,
+    clientId: string | undefined,
+    clientSecret: string | undefined,
+    interval: number,
+    expiresIn: number,
+    pollId: number
+  ): Promise<void> {
+    let intervalMs = Math.max(interval, 5) * 1000;
+    const expiresAt = Date.now() + expiresIn * 1000;
+
+    setTraktPinPolling(true);
+    setTraktPinMessage(
+      t("trakt.pinWaiting", {
+        defaultValue: "Waiting for approval on Trakt...",
+      })
+    );
+
+    while (Date.now() < expiresAt && pollId === traktPinPollIdRef.current) {
+      await sleep(intervalMs);
+      if (pollId !== traktPinPollIdRef.current) {
+        return;
+      }
+
+      const result = await completeTraktLink(
+        userCode,
+        clientId,
+        clientSecret,
+        false
+      );
+      if (result === "linked" || result === "failed") {
+        return;
+      }
+      if (result === "slow_down") {
+        intervalMs += 5000;
+      }
+    }
+
+    if (pollId === traktPinPollIdRef.current) {
+      setTraktPinPolling(false);
+      setTraktPinMessage(
+        t("trakt.pinExpired", {
+          defaultValue:
+            "The Trakt PIN expired. Generate a new one to try again.",
+        })
+      );
+    }
+  }
+
   async function completeSimklLink(
     userCode: string,
     clientId: string | undefined,
     showPendingError = true
-  ): Promise<boolean> {
+  ): Promise<PinPollResult> {
+    let result: PinPollResult = "failed";
     try {
       if (showPendingError) {
         setSimklSaving(true);
@@ -146,7 +260,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         })
       );
       onProfileUpdated?.();
-      return true;
+      result = "linked";
     } catch (err) {
       const errorMessage =
         err instanceof Error
@@ -154,21 +268,23 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
           : t("simkl.linkFailed", {
               defaultValue: "Failed to link Simkl account",
             });
-      if (!showPendingError && isSimklPinPendingMessage(errorMessage)) {
-        return false;
-      }
-      setSimklError(errorMessage);
-      if (!showPendingError) {
-        setSimklPinPolling(false);
-        setSimklPinMessage(null);
-        return true;
-      }
-      return false;
-    } finally {
-      if (showPendingError) {
-        setSimklSaving(false);
+      if (!showPendingError && isPinAuthSlowDownMessage(errorMessage)) {
+        result = "slow_down";
+      } else if (!showPendingError && isPinAuthPendingMessage(errorMessage)) {
+        result = "pending";
+      } else {
+        setSimklError(errorMessage);
+        if (!showPendingError) {
+          setSimklPinPolling(false);
+          setSimklPinMessage(null);
+        }
+        result = "failed";
       }
     }
+    if (showPendingError) {
+      setSimklSaving(false);
+    }
+    return result;
   }
 
   async function startSimklPinPolling(
@@ -178,7 +294,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
     expiresIn: number,
     pollId: number
   ): Promise<void> {
-    const intervalMs = Math.max(interval, 5) * 1000;
+    let intervalMs = Math.max(interval, 5) * 1000;
     const expiresAt = Date.now() + expiresIn * 1000;
 
     setSimklPinPolling(true);
@@ -194,9 +310,12 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         return;
       }
 
-      const linked = await completeSimklLink(userCode, clientId, false);
-      if (linked) {
+      const result = await completeSimklLink(userCode, clientId, false);
+      if (result === "linked" || result === "failed") {
         return;
+      }
+      if (result === "slow_down") {
+        intervalMs += 5000;
       }
     }
 
@@ -212,91 +331,71 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
   }
 
   async function handleGetTraktAuthUrl() {
+    setTraktError(null);
+    setTraktPinMessage(null);
+    setTraktSaving(true);
+    setTraktPinPolling(false);
+    const pollId = traktPinPollIdRef.current + 1;
+    traktPinPollIdRef.current = pollId;
+
     try {
-      setTraktError(null);
-
-      try {
-        traktOAuthPopup.preparePopup("Trakt Auth");
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error
-            ? error.message
-            : "Failed to open authentication window. Please allow popups and try again.";
-        setTraktError(errorMessage);
-        return;
-      }
-
-      setTimeout(async () => {
-        try {
-          const clientId = traktClientId.trim() || undefined;
-          const clientSecret = traktClientSecret.trim() || undefined;
-
-          const response = await getTraktAuthorizeUrl(clientId, clientSecret);
-          setTraktAuthUrl(response.authUrl);
-
-          traktOAuthPopup.navigateToUrl(response.authUrl);
-        } catch (err) {
-          setTraktError(
-            err instanceof Error
-              ? err.message
-              : t("trakt.getAuthUrlFailed", {
-                  defaultValue: "Failed to get authorization URL",
-                })
-          );
-        }
-      }, 1500);
-    } catch (err) {
-      setTraktError(
-        err instanceof Error
-          ? err.message
-          : t("trakt.getAuthUrlFailed", {
-              defaultValue: "Failed to get authorization URL",
-            })
-      );
-    }
-  }
-
-  async function handleLinkTrakt() {
-    if (!traktCode.trim()) {
-      setTraktError(
-        t("trakt.codeRequired", {
-          defaultValue: "Authorization code is required",
-        })
-      );
+      traktOAuthPopup.preparePopup("Trakt Auth");
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to open authentication window. Please allow popups and try again.";
+      setTraktError(errorMessage);
+      setTraktSaving(false);
       return;
     }
 
+    setTimeout(async () => {
+      try {
+        const clientId = traktClientId.trim() || undefined;
+        const clientSecret = traktClientSecret.trim() || undefined;
+
+        const response = await getTraktAuthorizeUrl(clientId, clientSecret);
+        if (pollId !== traktPinPollIdRef.current) {
+          return;
+        }
+
+        setTraktCode(response.userCode);
+        setTraktAuthUrl(response.verificationUrl);
+
+        traktOAuthPopup.navigateToUrl(response.verificationUrl);
+        void startTraktPinPolling(
+          response.userCode,
+          clientId,
+          clientSecret,
+          response.interval,
+          response.expiresIn,
+          pollId
+        );
+      } catch (err) {
+        if (pollId !== traktPinPollIdRef.current) {
+          return;
+        }
+        traktOAuthPopup.closePopup();
+        setTraktError(
+          err instanceof Error
+            ? err.message
+            : t("trakt.getAuthUrlFailed", {
+                defaultValue: "Failed to get Trakt PIN code",
+              })
+        );
+      } finally {
+        if (pollId === traktPinPollIdRef.current) {
+          setTraktSaving(false);
+        }
+      }
+    }, 1500);
+  }
+
+  async function handleLinkTrakt() {
     const clientId = traktClientId.trim() || undefined;
     const clientSecret = traktClientSecret.trim() || undefined;
-
-    try {
-      setTraktSaving(true);
-      setTraktError(null);
-      await linkTrakt(traktCode.trim(), clientId, clientSecret);
-      setTraktCode("");
-      setTraktClientId("");
-      setTraktClientSecret("");
-      setTraktAuthUrl(null);
-      traktOAuthPopup.closePopup();
-      const status = await getTraktStatus();
-      setTraktStatus(status);
-      showSuccess(
-        t("trakt.linked", {
-          defaultValue: "Trakt account linked successfully",
-        })
-      );
-      onProfileUpdated?.();
-    } catch (err) {
-      setTraktError(
-        err instanceof Error
-          ? err.message
-          : t("trakt.linkFailed", {
-              defaultValue: "Failed to link Trakt account",
-            })
-      );
-    } finally {
-      setTraktSaving(false);
-    }
+    await completeTraktLink(traktCode.trim(), clientId, clientSecret);
   }
 
   async function handleUnlinkTrakt() {
@@ -309,12 +408,15 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
     try {
       setTraktSaving(true);
       setTraktError(null);
+      setTraktPinMessage(null);
+      setTraktPinPolling(false);
+      traktPinPollIdRef.current += 1;
       await unlinkTrakt();
       setTraktCode("");
       setTraktAuthUrl(null);
       setTraktClientId("");
       setTraktClientSecret("");
-      const status = await getTraktStatus();
+      const status = await getTraktStatus({ force: true });
       setTraktStatus(status);
       showSuccess(
         t("trakt.unlinked", {
@@ -377,6 +479,9 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
             pollId
           );
         } catch (err) {
+          if (pollId !== simklPinPollIdRef.current) {
+            return;
+          }
           setSimklError(
             err instanceof Error
               ? err.message
@@ -499,7 +604,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
               <p className="text-xs text-muted-foreground wrap-break-word">
                 {t("trakt.description", {
                   defaultValue:
-                    "Sync your watched movies and episodes to Trakt. Uses OAuth for secure authentication.",
+                    "Sync your watched movies and episodes to Trakt. Uses Trakt PIN authorization for secure authentication.",
                 })}
               </p>
             </div>
@@ -721,7 +826,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                 <p className="mb-2 text-sm text-foreground/90">
                   {t("trakt.oauthInstructions", {
                     defaultValue:
-                      "Click 'Authorize' to open Trakt in a new window. After authorizing, you'll receive an authorization code. Paste it below to complete the linking process.",
+                      "Click 'Authorize' to get a Trakt PIN code, then enter that code on Trakt's activation page.",
                   })}
                 </p>
                 <button
@@ -745,22 +850,13 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                 >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <p
-                        id={traktAuthorizationCodeLabelId}
-                        className="text-xs font-medium uppercase tracking-wide text-purple-800 dark:text-purple-200"
-                      >
+                      <p className="text-xs font-medium uppercase tracking-wide text-purple-800 dark:text-purple-200">
                         {t("trakt.authorizationCode", {
-                          defaultValue: "Authorization Code",
+                          defaultValue: "PIN Code",
                         })}
                       </p>
-                      <p
-                        id={traktAuthorizationCodeDescriptionId}
-                        className="mt-1 text-sm text-muted-foreground"
-                      >
-                        {t("trakt.authorizationCodeHelp", {
-                          defaultValue:
-                            "Paste the code Trakt shows after authorization.",
-                        })}
+                      <p className="mt-1 font-mono text-2xl font-semibold tracking-[0.25em] text-foreground">
+                        {traktCode}
                       </p>
                     </div>
                     <a
@@ -770,21 +866,16 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                       className="inline-flex w-fit items-center rounded-md border border-purple-300 bg-background px-2.5 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:text-purple-300 dark:hover:bg-purple-950"
                     >
                       {t("trakt.openAuthPage", {
-                        defaultValue: "Open Trakt auth page",
+                        defaultValue: "Open Trakt activation page",
                       })}
                     </a>
                   </div>
-                  <input
-                    type="text"
-                    aria-labelledby={traktAuthorizationCodeLabelId}
-                    aria-describedby={traktAuthorizationCodeDescriptionId}
-                    value={traktCode}
-                    onChange={(e) => setTraktCode(e.target.value)}
-                    placeholder={t("trakt.codePlaceholder", {
-                      defaultValue: "Paste the authorization code here",
-                    })}
-                    className="mt-3 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
-                  />
+                  {traktPinMessage && (
+                    <div className="mt-3 flex items-center gap-2 text-xs text-purple-800 dark:text-purple-200">
+                      {traktPinPolling && <Spinner size="sm" />}
+                      <span>{traktPinMessage}</span>
+                    </div>
+                  )}
                   <button
                     onClick={handleLinkTrakt}
                     disabled={
@@ -793,11 +884,15 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                       (!traktStatus?.hasCredentials &&
                         (!traktClientId.trim() || !traktClientSecret.trim()))
                     }
-                    className="mt-3 w-full sm:w-auto px-3 py-2 text-sm font-medium bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="mt-3 w-full rounded-md border border-purple-300 bg-background px-2.5 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto dark:border-purple-800 dark:text-purple-300 dark:hover:bg-purple-950"
                   >
                     {traktSaving
-                      ? t("common.loading", { defaultValue: "Linking..." })
-                      : t("trakt.link", { defaultValue: "Link Account" })}
+                      ? t("trakt.checkingPin", {
+                          defaultValue: "Checking...",
+                        })
+                      : t("trakt.checkPin", {
+                          defaultValue: "Check approval now",
+                        })}
                   </button>
                 </div>
               )}

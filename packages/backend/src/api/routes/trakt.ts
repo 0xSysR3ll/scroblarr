@@ -1,5 +1,10 @@
 import { User } from "@entities/User";
-import { TraktOAuth } from "@integrations/trakt/TraktOAuth";
+import {
+  clearTraktPin,
+  rememberTraktPin,
+  resolveTraktDeviceCode,
+  TraktOAuth,
+} from "@integrations/trakt/TraktOAuth";
 import { TraktTokenManager } from "@integrations/trakt/TraktTokenManager";
 import { UserRepository } from "@repositories/UserRepository";
 import { logger } from "@utils/logger";
@@ -12,18 +17,34 @@ const router = Router();
 const userRepository = new UserRepository();
 const traktTokenManager = new TraktTokenManager();
 
+const authorizeTraktSchema = z.object({
+  clientId: z.string().optional(),
+  clientSecret: z.string().optional(),
+});
+
 const linkTraktSchema = z.object({
-  code: z.string().min(1),
+  userCode: z.string().min(1),
   clientId: z.string().optional(),
   clientSecret: z.string().optional(),
 });
 
 router.use(auth);
 
-const authorizeTraktSchema = z.object({
-  clientId: z.string().optional(),
-  clientSecret: z.string().optional(),
-});
+function getTraktCredentials(
+  validated: {
+    clientId?: string;
+    clientSecret?: string;
+  },
+  user: User
+): {
+  clientId?: string;
+  clientSecret?: string;
+} {
+  return {
+    clientId: validated.clientId || user.traktClientId,
+    clientSecret: validated.clientSecret || user.traktClientSecret,
+  };
+}
 
 router.get("/authorize", async (req: Request, res: Response) => {
   try {
@@ -41,9 +62,10 @@ router.get("/authorize", async (req: Request, res: Response) => {
       clientId: req.query.clientId as string | undefined,
       clientSecret: req.query.clientSecret as string | undefined,
     });
-
-    const clientId = validated.clientId || freshUser.traktClientId;
-    const clientSecret = validated.clientSecret || freshUser.traktClientSecret;
+    const { clientId, clientSecret } = getTraktCredentials(
+      validated,
+      freshUser
+    );
 
     if (!clientId || !clientSecret) {
       return res.status(400).json({
@@ -52,12 +74,15 @@ router.get("/authorize", async (req: Request, res: Response) => {
       });
     }
 
-    const redirectUri = "urn:ietf:wg:oauth:2.0:oob";
     const traktOAuth = new TraktOAuth(clientId, clientSecret);
-    const authUrl = traktOAuth.getAuthUrl(redirectUri);
+    const pin = await traktOAuth.requestPinCode();
+    rememberTraktPin(user.id, pin);
 
     return res.json({
-      authUrl,
+      userCode: pin.user_code,
+      verificationUrl: pin.verification_url,
+      expiresIn: pin.expires_in,
+      interval: pin.interval,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -66,11 +91,11 @@ router.get("/authorize", async (req: Request, res: Response) => {
         details: error.issues,
       });
     }
-    logger.trakt.error({ error }, "Error getting Trakt authorization URL");
+    logger.trakt.error({ error }, "Error requesting Trakt PIN code");
     const errorMessage =
       error instanceof Error
         ? error.message
-        : "Failed to get authorization URL";
+        : "Failed to request Trakt PIN code";
     return res.status(500).json({ error: errorMessage });
   }
 });
@@ -88,9 +113,10 @@ router.post("/link", async (req: Request, res: Response) => {
     }
 
     const validated = linkTraktSchema.parse(req.body);
-
-    const clientId = validated.clientId || freshUser.traktClientId;
-    const clientSecret = validated.clientSecret || freshUser.traktClientSecret;
+    const { clientId, clientSecret } = getTraktCredentials(
+      validated,
+      freshUser
+    );
 
     if (!clientId || !clientSecret) {
       return res.status(400).json({
@@ -99,12 +125,9 @@ router.post("/link", async (req: Request, res: Response) => {
       });
     }
 
-    const redirectUri = "urn:ietf:wg:oauth:2.0:oob";
+    const deviceCode = resolveTraktDeviceCode(user.id, validated.userCode);
     const traktOAuth = new TraktOAuth(clientId, clientSecret);
-    const tokens = await traktOAuth.exchangeCodeForToken(
-      validated.code,
-      redirectUri
-    );
+    const tokens = await traktOAuth.exchangePinForToken(deviceCode);
 
     let username: string | undefined;
     let avatar: string | undefined;
@@ -153,6 +176,7 @@ router.post("/link", async (req: Request, res: Response) => {
     }
 
     await userRepository.update(user.id, updateData);
+    clearTraktPin(user.id);
 
     logger.trakt.info(
       {
@@ -180,6 +204,13 @@ router.post("/link", async (req: Request, res: Response) => {
     }
     const errorMessage =
       error instanceof Error ? error.message : "Failed to link Trakt account";
+    if (
+      /authorization pending|slow down|device code expired|does not match|device code is invalid|already been used|authorization was denied/i.test(
+        errorMessage
+      )
+    ) {
+      return res.status(400).json({ error: errorMessage });
+    }
     return res.status(500).json({ error: errorMessage });
   }
 });

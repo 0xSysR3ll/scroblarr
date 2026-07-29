@@ -47,7 +47,7 @@ Scroblarr compares the webhook JSON `Server.uuid` to the machine identifier save
 
 - **Trakt**: Your OAuth token might have expired. Try unlinking and re-linking your Trakt account
 - **Simkl**: Your access token or Client ID might be invalid. Try unlinking and re-linking your Simkl account with the Client ID from your Simkl developer app.
-- **Trakt OAuth app**: Confirm your **Trakt Client ID** and **Client Secret** (from [trakt.tv/oauth/applications](https://trakt.tv/oauth/applications)) match what you entered in Scroblarr—these are not the same as the Scroblarr **Settings → General** API key used for webhooks.
+- **Trakt OAuth app**: Confirm your **Trakt Client ID** and **Client Secret** (from [app.trakt.tv/settings/apps/api](https://app.trakt.tv/settings/apps/api)) match what you entered in Scroblarr—these are not the same as the Scroblarr **Settings → General** API key used for webhooks.
 
 ### Simkl sync fails with "could not match" or missing metadata
 
