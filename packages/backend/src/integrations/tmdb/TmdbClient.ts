@@ -126,8 +126,8 @@ export class TmdbClient {
       query,
       include_adult: "false",
     });
-    // Year can be null from nullable DB columns / webhook payloads.
-    if (typeof year === "number") {
+    // Year can be null/NaN from nullable DB columns / webhook payloads.
+    if (typeof year === "number" && Number.isFinite(year)) {
       params.set("first_air_date_year", year.toString());
     }
 
@@ -152,8 +152,8 @@ export class TmdbClient {
       query,
       include_adult: "false",
     });
-    // Year can be null from nullable DB columns / webhook payloads.
-    if (typeof year === "number") {
+    // Year can be null/NaN from nullable DB columns / webhook payloads.
+    if (typeof year === "number" && Number.isFinite(year)) {
       params.set("year", year.toString());
     }
 
