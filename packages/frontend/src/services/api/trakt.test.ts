@@ -43,12 +43,13 @@ describe("trakt api", () => {
       interval: 5,
     });
 
-    const actualUrl = new URL(String(fetchMock.mock.calls[0][0]), "http://app");
-    expect(actualUrl.pathname).toBe("/api/v1/trakt/authorize");
-    expect(actualUrl.searchParams.get("clientId")).toBe("client id");
-    expect(actualUrl.searchParams.get("clientSecret")).toBe("client secret");
-    expect(fetchMock).toHaveBeenCalledWith(expect.any(String), {
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/trakt/authorize", {
+      method: "POST",
       headers: expectedHeaders,
+      body: JSON.stringify({
+        clientId: "client id",
+        clientSecret: "client secret",
+      }),
     });
   });
 

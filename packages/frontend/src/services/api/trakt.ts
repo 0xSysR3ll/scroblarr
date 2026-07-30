@@ -61,16 +61,10 @@ export async function getTraktAuthorizeUrl(
   clientId?: string,
   clientSecret?: string
 ): Promise<TraktPinAuthorization> {
-  const params = new URLSearchParams();
-  if (clientId) params.append("clientId", clientId);
-  if (clientSecret) params.append("clientSecret", clientSecret);
-
-  const url = `${API_BASE_URL}/trakt/authorize${
-    params.toString() ? `?${params.toString()}` : ""
-  }`;
-
-  const response = await fetch(url, {
+  const response = await fetch(`${API_BASE_URL}/trakt/authorize`, {
+    method: "POST",
     headers: getAuthHeaders(),
+    body: JSON.stringify({ clientId, clientSecret }),
   });
   if (!response.ok) {
     throw new Error(

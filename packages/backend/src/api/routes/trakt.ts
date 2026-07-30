@@ -46,7 +46,7 @@ function getTraktCredentials(
   };
 }
 
-router.get("/authorize", async (req: Request, res: Response) => {
+router.post("/authorize", async (req: Request, res: Response) => {
   try {
     const user = req.user;
     if (!user) {
@@ -58,10 +58,7 @@ router.get("/authorize", async (req: Request, res: Response) => {
       return res.status(401).json({ error: "User not found" });
     }
 
-    const validated = authorizeTraktSchema.parse({
-      clientId: req.query.clientId as string | undefined,
-      clientSecret: req.query.clientSecret as string | undefined,
-    });
+    const validated = authorizeTraktSchema.parse(req.body ?? {});
     const { clientId, clientSecret } = getTraktCredentials(
       validated,
       freshUser
