@@ -119,7 +119,7 @@ describe("trakt routes", () => {
   });
 
   it("returns PIN authorization details", async () => {
-    const response = await request(app).get("/trakt/authorize").expect(200);
+    const response = await request(app).post("/trakt/authorize").expect(200);
 
     expect(response.body).toEqual({
       userCode: "ABCD1234",
@@ -144,10 +144,34 @@ describe("trakt routes", () => {
       traktClientSecret: null,
     });
 
-    const response = await request(app).get("/trakt/authorize").expect(400);
+    const response = await request(app).post("/trakt/authorize").expect(400);
 
     expect(response.body.error).toMatch(/client ID and secret/i);
     expect(traktOAuthMocks.requestPinCode).not.toHaveBeenCalled();
+  });
+
+  it("accepts credentials from the authorize request body", async () => {
+    userRepositoryMocks.findById.mockResolvedValueOnce({
+      ...linkedUser,
+      traktClientId: null,
+      traktClientSecret: null,
+    });
+
+    const response = await request(app)
+      .post("/trakt/authorize")
+      .send({
+        clientId: "provided-client-id",
+        clientSecret: "provided-client-secret",
+      })
+      .expect(200);
+
+    expect(response.body).toEqual({
+      userCode: "ABCD1234",
+      verificationUrl: "https://trakt.tv/activate",
+      expiresIn: 600,
+      interval: 5,
+    });
+    expect(traktOAuthMocks.requestPinCode).toHaveBeenCalledOnce();
   });
 
   it("links a Trakt account after PIN approval", async () => {
@@ -264,7 +288,7 @@ describe("trakt routes", () => {
       new Error("Trakt down")
     );
 
-    const response = await request(app).get("/trakt/authorize").expect(500);
+    const response = await request(app).post("/trakt/authorize").expect(500);
 
     expect(response.body).toEqual({ error: "Trakt down" });
   });
@@ -272,7 +296,7 @@ describe("trakt routes", () => {
   it("returns a generic authorize error for non-Error failures", async () => {
     traktOAuthMocks.requestPinCode.mockRejectedValueOnce("trakt unavailable");
 
-    const response = await request(app).get("/trakt/authorize").expect(500);
+    const response = await request(app).post("/trakt/authorize").expect(500);
 
     expect(response.body).toEqual({
       error: "Failed to request Trakt PIN code",
@@ -316,7 +340,7 @@ describe("trakt routes", () => {
   it("returns 401 when the authorize user no longer exists", async () => {
     userRepositoryMocks.findById.mockResolvedValueOnce(null);
 
-    const response = await request(app).get("/trakt/authorize").expect(401);
+    const response = await request(app).post("/trakt/authorize").expect(401);
 
     expect(response.body).toEqual({ error: "User not found" });
   });

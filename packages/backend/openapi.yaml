@@ -1566,20 +1566,21 @@ paths:
           description: Internal server error
 
   /api/v1/trakt/authorize:
-    get:
+    post:
       summary: Get Trakt PIN authorization codes
       tags: [Trakt]
       security:
         - sessionAuth: []
-      parameters:
-        - name: clientId
-          in: query
-          schema:
-            type: string
-        - name: clientSecret
-          in: query
-          schema:
-            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                clientId:
+                  type: string
+                clientSecret:
+                  type: string
       responses:
         '200':
           description: PIN authorization codes
