@@ -766,6 +766,39 @@ describe("TmdbClient", () => {
     await expect(client.getTvRecommendations(1)).resolves.toEqual([]);
   });
 
+  it("omits year query params when year is nullish or non-finite", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ results: [] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new TmdbClient("test-token");
+    await expect(client.searchTv("Berlin", null)).resolves.toEqual([]);
+    await expect(client.searchMovie("Interstellar", null)).resolves.toEqual([]);
+    await expect(client.searchTv("Berlin")).resolves.toEqual([]);
+    await expect(client.searchMovie("Interstellar")).resolves.toEqual([]);
+    await expect(client.searchTv("Berlin", Number.NaN)).resolves.toEqual([]);
+    await expect(
+      client.searchMovie("Interstellar", Number.POSITIVE_INFINITY)
+    ).resolves.toEqual([]);
+    await expect(
+      client.searchTv("Berlin", Number.NEGATIVE_INFINITY)
+    ).resolves.toEqual([]);
+
+    const urls = fetchMock.mock.calls.map(([url]) => url as string);
+    expect(urls).toEqual([
+      "https://api.themoviedb.org/3/search/tv?query=Berlin&include_adult=false",
+      "https://api.themoviedb.org/3/search/movie?query=Interstellar&include_adult=false",
+      "https://api.themoviedb.org/3/search/tv?query=Berlin&include_adult=false",
+      "https://api.themoviedb.org/3/search/movie?query=Interstellar&include_adult=false",
+      "https://api.themoviedb.org/3/search/tv?query=Berlin&include_adult=false",
+      "https://api.themoviedb.org/3/search/movie?query=Interstellar&include_adult=false",
+      "https://api.themoviedb.org/3/search/tv?query=Berlin&include_adult=false",
+    ]);
+  });
+
   it("maps null external IDs to undefined", async () => {
     vi.stubGlobal(
       "fetch",
