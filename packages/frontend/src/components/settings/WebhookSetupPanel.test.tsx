@@ -146,4 +146,16 @@ describe("WebhookSetupPanel", () => {
     });
     expect(showSuccess).not.toHaveBeenCalled();
   });
+
+  it("shows an empty Jellyfin API key field when no key is saved", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<WebhookSetupPanel source="jellyfin" />);
+    await expandWebhooks(user);
+
+    expect(
+      screen.getByText(/Set and save an API key under Settings → General first/)
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("X-API-Key header value")).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Copy API key" })).toBeDisabled();
+  });
 });

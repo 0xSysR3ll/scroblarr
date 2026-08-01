@@ -81,7 +81,6 @@ function CopyField({
           type="button"
           disabled={disabled || !value}
           onClick={async () => {
-            if (!value) return;
             const ok = await copyText(value);
             if (ok) {
               showSuccess(
