@@ -27,11 +27,14 @@ Scroblarr compares the webhook JSON `Server.uuid` to the machine identifier save
 
 ### Jellyfin webhooks not received
 
-- **Install the Webhooks plugin**: Jellyfin requires a plugin for webhooks. Install it from the Plugins section
+- **Install the Webhooks plugin**: Jellyfin requires a plugin for webhooks. Install it from the Plugins section, then restart Jellyfin
 - **Set an API key in Scroblarr first**: Under **Settings → General**, without a stored API key, webhooks return **503** (`Webhook authentication not ready`).
-- **Check the webhook URL**: Should be `http://your-url/api/v1/webhooks/jellyfin`
+- **Check the webhook URL**: Should be `http://your-url/api/v1/webhooks/jellyfin` on a **Generic** destination
+- **Checkboxes**: Enable **Playback Start** and **Playback Stop** only; enable **Movies** and **Episodes** item types; leave **Send All Properties** unchecked
+- **Template + Content-Type**: Paste the Handlebars template from [Jellyfin Configuration](/docs/configuration/jellyfin). Prefer a `Content-Type: application/json` request header (the plugin defaults to `text/plain`; Scroblarr still accepts JSON in that case)
 - **Send the API key on every request**: Use the `X-API-Key` header or include `"apiKey": "..."` in the JSON body; it must exactly match **Settings → General**. Missing or wrong keys return **401**.
-- **Check Jellyfin logs**: Look for webhook delivery errors
+- **Check Jellyfin logs**: Look for webhook delivery errors; enable `Jellyfin.Plugin.Webhook` debug logging if needed
+- **Check Scroblarr logs**: Settings → Logs — look for rejected auth or empty/invalid payload errors
 
 ## Syncs not appearing
 
