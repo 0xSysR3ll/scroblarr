@@ -4,6 +4,7 @@ import { getAppVersion } from "@services/api/meta";
 import { renderWithProviders } from "@test/render";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { buildPlexWebhookUrl } from "@utils/webhooks";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SettingsPage } from "./SettingsPage";
@@ -16,6 +17,11 @@ vi.mock("@services/api", () => ({
   getSettings: vi.fn(),
   updateSettings: vi.fn(),
   getPlexServers: vi.fn().mockResolvedValue([]),
+  getAuthProviders: vi.fn().mockResolvedValue({
+    hasAdmin: true,
+    plexConfigured: true,
+    jellyfinConfigured: true,
+  }),
   linkPlexAccount: vi.fn(),
   removePlexServer: vi.fn(),
   removeJellyfinServer: vi.fn(),
@@ -190,5 +196,66 @@ describe("SettingsPage", () => {
         apiKey: "sk_saved",
       });
     });
+  });
+
+  it("passes the Scroblarr API key into media server webhook setup", async () => {
+    vi.mocked(getSettings).mockResolvedValue({
+      syncHistoryLimit: "100",
+      apiKey: "sk_from_settings",
+      plexServerUrl: "http://192.168.1.10:32400",
+    });
+    const { getPlexServers } = await import("@services/api");
+    vi.mocked(getPlexServers).mockResolvedValue([
+      {
+        name: "Home Plex",
+        address: "192.168.1.10",
+        port: "32400",
+        version: "1.40.0",
+        machineIdentifier: "machine-1",
+        url: "http://192.168.1.10:32400",
+        connections: [
+          {
+            uri: "http://192.168.1.10:32400",
+            protocol: "http",
+            address: "192.168.1.10",
+            port: 32400,
+            local: true,
+            reachable: true,
+          },
+        ],
+      },
+    ]);
+    vi.mocked(useAuth).mockReturnValue({
+      user: {
+        id: "admin-1",
+        username: "admin",
+        isAdmin: true,
+        plexUsername: "admin",
+      },
+      loading: false,
+      logout: vi.fn(),
+      checkAuth: vi.fn(),
+      setUserFromLogin: vi.fn(),
+      isAuthenticated: true,
+      isAdmin: true,
+    });
+
+    const user = userEvent.setup();
+    renderWithProviders(<SettingsPage />, {
+      route: "/settings/mediaServer",
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /Plex Server/i })
+      ).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: /Plex Server/i }));
+    await user.click(await screen.findByRole("button", { name: /Webhooks/i }));
+
+    expect(screen.getByLabelText("Webhook URL")).toHaveValue(
+      buildPlexWebhookUrl("sk_from_settings")
+    );
   });
 });

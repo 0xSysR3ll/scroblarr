@@ -460,6 +460,7 @@ export function SettingsPage() {
               plexLinkError={plexLinkError}
               settings={settings}
               onJellyfinSettingsChange={setJellyfinSettings}
+              scroblarrApiKey={settings.apiKey}
               onSettingsUpdated={async () => {
                 try {
                   const updatedSettings = await getSettings();
