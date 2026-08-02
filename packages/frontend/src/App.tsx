@@ -47,7 +47,10 @@ function AppRoutes() {
   const [apiUnreachable, setApiUnreachable] = useState(false);
   const isCheckingAdminRef = useRef(false);
   const hasAdminRef = useRef(hasAdmin);
-  hasAdminRef.current = hasAdmin;
+
+  useEffect(() => {
+    hasAdminRef.current = hasAdmin;
+  }, [hasAdmin]);
 
   const checkAdmin = useCallback(async (options?: { retry?: boolean }) => {
     if (isCheckingAdminRef.current) {
