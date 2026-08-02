@@ -523,7 +523,10 @@
     "routeLoadTitle": "Could not load this screen",
     "routeLoadBody": "The page failed to load. This sometimes happens after an update. Reload the app or return home.",
     "reloadPage": "Reload page",
-    "goHome": "Go home"
+    "goHome": "Go home",
+    "unavailableTitle": "Scroblarr is unavailable",
+    "unavailableBody": "Can't reach the server right now. It may be starting up, restarting, or having issues. Try again in a moment.",
+    "tryAgain": "Try again"
   },
   "userImport": {
     "loadSettingsFailed": "Failed to load settings",

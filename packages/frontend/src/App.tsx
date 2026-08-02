@@ -6,6 +6,7 @@ import { RouteErrorBoundary } from "@components/ui/route-error-boundary";
 import { Spinner } from "@components/ui/spinner";
 import { AuthProvider, useAuth } from "@contexts/AuthContext";
 import { LoginPage } from "@pages/auth/LoginPage";
+import { OfflinePage } from "@pages/auth/OfflinePage";
 import { SetupPage } from "@pages/auth/SetupPage";
 import { DashboardPage } from "@pages/user/DashboardPage";
 import { showError } from "@utils/toast";
@@ -43,21 +44,37 @@ function AppRoutes() {
   const { isAuthenticated, loading } = useAuth();
   const [hasAdmin, setHasAdmin] = useState<boolean | null>(null);
   const [checkingAdmin, setCheckingAdmin] = useState(true);
+  const [apiUnreachable, setApiUnreachable] = useState(false);
   const isCheckingAdminRef = useRef(false);
+  const hasAdminRef = useRef(hasAdmin);
+  hasAdminRef.current = hasAdmin;
 
-  const checkAdmin = useCallback(async () => {
+  const checkAdmin = useCallback(async (options?: { retry?: boolean }) => {
     if (isCheckingAdminRef.current) {
       return;
     }
     isCheckingAdminRef.current = true;
+    if (options?.retry) {
+      setCheckingAdmin(true);
+      setApiUnreachable(false);
+    }
     try {
       const response = await fetch("/api/v1/auth/check-admin");
       if (response.ok) {
         const data = await response.json();
         setHasAdmin(data?.hasAdmin ?? false);
+        setApiUnreachable(false);
+        return;
+      }
+      // Keep a known setup state on transient failures; only show offline
+      // when we never successfully determined whether setup is complete.
+      if (hasAdminRef.current === null) {
+        setApiUnreachable(true);
       }
     } catch {
-      // Keep previous hasAdmin value on transient fetch errors.
+      if (hasAdminRef.current === null) {
+        setApiUnreachable(true);
+      }
     } finally {
       isCheckingAdminRef.current = false;
       setCheckingAdmin(false);
@@ -84,7 +101,7 @@ function AppRoutes() {
   }, [t, checkAdmin]);
 
   useEffect(() => {
-    if (!(isAuthenticated && !hasAdmin)) {
+    if (!(isAuthenticated && hasAdmin === false)) {
       return;
     }
     const id = requestAnimationFrame(() => {
@@ -111,7 +128,17 @@ function AppRoutes() {
     );
   }
 
-  if (!hasAdmin) {
+  if (apiUnreachable) {
+    return (
+      <OfflinePage
+        onRetry={() => {
+          void checkAdmin({ retry: true });
+        }}
+      />
+    );
+  }
+
+  if (hasAdmin === false) {
     return (
       <Routes>
         <Route path="/setup" element={<SetupPage />} />
