@@ -42,6 +42,17 @@ describe("GeneralSettingsTab", () => {
     );
   }
 
+  it("describes the API key as required for webhooks", () => {
+    renderTab();
+
+    expect(
+      screen.getByText(/Used for media-server webhooks and API authentication/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Required before Plex or Jellyfin can send events/)
+    ).toBeInTheDocument();
+  });
+
   it("renders TMDB settings and updates the token field", async () => {
     const user = userEvent.setup();
     renderTab();
@@ -199,6 +210,36 @@ describe("GeneralSettingsTab", () => {
       expect(onApiKeyChange).toHaveBeenCalledWith(
         expect.stringMatching(/^sk_/)
       );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("silently ignores clipboard failures when copying the API key", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockRejectedValue(new Error("denied"));
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      clipboard: { writeText },
+    });
+
+    try {
+      renderWithProviders(
+        <GeneralSettingsTab
+          syncHistoryLimit={100}
+          onSyncHistoryLimitChange={onSyncHistoryLimitChange}
+          apiKey="sk_test"
+          onApiKeyChange={onApiKeyChange}
+          tmdbAccessToken=""
+          onTmdbAccessTokenChange={onTmdbAccessTokenChange}
+        />
+      );
+
+      await user.click(screen.getByRole("button", { name: "Copy" }));
+      await waitFor(() => {
+        expect(writeText).toHaveBeenCalledWith("sk_test");
+      });
+      expect(showSuccess).not.toHaveBeenCalled();
     } finally {
       vi.unstubAllGlobals();
     }

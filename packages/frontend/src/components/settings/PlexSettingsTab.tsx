@@ -14,7 +14,7 @@ import {
 } from "@services/api";
 import type { PlexServer } from "@services/api";
 import { showSuccess, showError } from "@utils/toast";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { useTranslation } from "react-i18next";
 import {
   FaTrash,
@@ -22,6 +22,9 @@ import {
   FaExclamationCircle,
   FaSyncAlt,
 } from "react-icons/fa";
+
+import { CollapsibleSettingsCard } from "./CollapsibleSettingsCard";
+import { WebhookSetupPanel } from "./WebhookSetupPanel";
 
 interface PlexSettingsTabProps {
   servers: PlexServer[];
@@ -38,6 +41,7 @@ interface PlexSettingsTabProps {
   onRefreshPlexServers: () => void;
   plexLinkError: string | null;
   onSettingsUpdated?: () => void;
+  scroblarrApiKey?: string;
 }
 
 export function PlexSettingsTab({
@@ -55,6 +59,7 @@ export function PlexSettingsTab({
   onRefreshPlexServers,
   plexLinkError,
   onSettingsUpdated,
+  scroblarrApiKey,
 }: PlexSettingsTabProps) {
   const { t } = useTranslation();
   const { isAdmin } = useAuth();
@@ -62,6 +67,7 @@ export function PlexSettingsTab({
   const [removing, setRemoving] = useState(false);
   const [saving, setSaving] = useState(false);
   const [manualServerUrl, setManualServerUrl] = useState(selectedServerUrl);
+  const connectionGroupLabelId = useId();
   const [authProviders, setAuthProviders] = useState<{
     hasAdmin: boolean;
     plexConfigured: boolean;
@@ -73,6 +79,13 @@ export function PlexSettingsTab({
   const canRemove = !isAdmin || !!authProviders?.jellyfinConfigured;
   const hasUnsavedChanges =
     selectedServerUrl !== savedServerUrl && !!selectedServerUrl;
+
+  const title = t("settings.plexServer", { defaultValue: "Plex Server" });
+  const description = t("settings.plexServerDescription", {
+    defaultValue:
+      "Select the Plex server connection to use for importing users. Click 'Save' to apply your selection.",
+  });
+  const icon = <img src="/logos/plex.svg" alt="" className="w-5 h-5" />;
 
   useEffect(() => {
     async function loadAuthProviders() {
@@ -163,24 +176,11 @@ export function PlexSettingsTab({
 
   if (!hasPlexAccount || servers.length === 0) {
     return (
-      <div className="space-y-4 sm:space-y-6">
-        <div className="flex items-center gap-3 mb-4 sm:mb-6">
-          <div className="shrink-0 rounded-lg bg-primary/15 p-2">
-            <img src="/logos/plex.svg" alt="Plex" className="w-5 h-5" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-foreground sm:text-xl">
-              {t("settings.plexServer", { defaultValue: "Plex Server" })}
-            </h2>
-            <p className="text-xs text-muted-foreground sm:text-sm">
-              {t("settings.plexServerDescription", {
-                defaultValue:
-                  "Select the Plex server connection to use for importing users. This setting will be saved and used automatically.",
-              })}
-            </p>
-          </div>
-        </div>
-
+      <CollapsibleSettingsCard
+        title={title}
+        description={description}
+        icon={icon}
+      >
         <div className="space-y-3">
           <div className="rounded border-l-4 border-primary bg-primary/5 p-4">
             <p className="mb-2 text-sm text-primary">
@@ -208,301 +208,294 @@ export function PlexSettingsTab({
             </p>
           )}
         </div>
-      </div>
+      </CollapsibleSettingsCard>
     );
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="mb-4 sm:mb-6 relative">
-        <div className="flex items-center gap-3">
-          <div className="shrink-0 rounded-lg bg-primary/15 p-2">
-            <img src="/logos/plex.svg" alt="Plex" className="w-5 h-5" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-foreground sm:text-xl">
-                {t("settings.plexServer", { defaultValue: "Plex Server" })}
-              </h2>
-              {hasUnsavedChanges && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200">
-                  <FaExclamationCircle className="w-3 h-3" />
-                  {t("settings.unsavedChanges", { defaultValue: "Unsaved" })}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground sm:text-sm">
-              {t("settings.plexServerDescription", {
-                defaultValue:
-                  "Select the Plex server connection to use for importing users. Click 'Save' to apply your selection.",
-              })}
-            </p>
-          </div>
-        </div>
-        {hasPlexAccount && (
-          <div className="mt-3 sm:mt-0 sm:absolute sm:top-0 sm:right-0 flex items-center gap-2">
+    <>
+      <CollapsibleSettingsCard
+        title={title}
+        description={description}
+        icon={icon}
+        headerMeta={
+          hasUnsavedChanges ? (
+            <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+              <FaExclamationCircle className="w-3 h-3" />
+              {t("settings.unsavedChanges", { defaultValue: "Unsaved" })}
+            </span>
+          ) : undefined
+        }
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={onRefreshPlexServers}
+            disabled={plexRefreshLoading}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {plexRefreshLoading ? (
+              <>
+                <Spinner size="sm" />
+                {t("common.loading", { defaultValue: "Loading..." })}
+              </>
+            ) : (
+              <>
+                <FaSyncAlt className="w-3 h-3" />
+                {t("settings.refreshServers", {
+                  defaultValue: "Refresh servers",
+                })}
+              </>
+            )}
+          </button>
+          {isConfigured && hasUnsavedChanges && (
             <button
               type="button"
-              onClick={onRefreshPlexServers}
-              disabled={plexRefreshLoading}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={handleSave}
+              disabled={saving}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {plexRefreshLoading ? (
+              {saving ? (
                 <>
-                  <Spinner size="sm" />
-                  {t("common.loading", { defaultValue: "Loading..." })}
+                  <Spinner size="sm" variant="onPrimary" />
+                  {t("common.loading", { defaultValue: "Saving..." })}
                 </>
               ) : (
                 <>
-                  <FaSyncAlt className="w-3 h-3" />
-                  {t("settings.refreshServers", {
-                    defaultValue: "Refresh servers",
-                  })}
+                  <FaCheck className="w-3 h-3" />
+                  {t("common.save", { defaultValue: "Save" })}
                 </>
               )}
             </button>
-            {isConfigured && hasUnsavedChanges && (
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {saving ? (
-                  <>
-                    <Spinner size="sm" variant="onPrimary" />
-                    {t("common.loading", { defaultValue: "Saving..." })}
-                  </>
-                ) : (
-                  <>
-                    <FaCheck className="w-3 h-3" />
-                    {t("common.save", { defaultValue: "Save" })}
-                  </>
-                )}
-              </button>
-            )}
-            {isConfigured && (
-              <button
-                type="button"
-                onClick={() => setShowRemoveModal(true)}
-                disabled={!canRemove}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                title={
-                  !canRemove
-                    ? t("settings.cannotRemoveOnlyServer", {
-                        service: "Jellyfin",
-                        defaultValue:
-                          "Cannot remove the only configured server. Configure Jellyfin first.",
-                      })
-                    : undefined
-                }
-              >
-                <FaTrash className="w-4 h-4" />
-                {t("settings.removePlexServer", {
-                  defaultValue: "Remove Server",
-                })}
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
-      {hasPlexAccount && servers.length === 0 && (
-        <div className="bg-yellow-50 dark:bg-yellow-950 border-l-4 border-yellow-400 dark:border-yellow-600 p-4 rounded">
-          <p className="text-sm text-yellow-700 dark:text-yellow-300">
-            {t("settings.noServersFound", {
-              defaultValue:
-                "No Plex servers found. Make sure your Plex Media Server is signed in to your Plex account.",
-            })}
-          </p>
-        </div>
-      )}
-
-      <div className="space-y-4">
-        <div className="rounded-lg border border-border bg-card p-4 sm:p-5">
-          <label className="mb-2 block text-sm font-medium text-foreground">
-            {t("settings.manualConnectionUrl", {
-              defaultValue: "Manual Connection URL",
-            })}
-          </label>
-          <div>
-            <input
-              type="url"
-              value={manualServerUrl}
-              onChange={(e) => setManualServerUrl(e.target.value)}
-              onBlur={() => {
-                const trimmed = manualServerUrl.trim();
-                if (trimmed && trimmed !== selectedServerUrl) {
-                  onSelectedServerUrlChange(trimmed);
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter") return;
-                const trimmed = manualServerUrl.trim();
-                if (trimmed && trimmed !== selectedServerUrl) {
-                  onSelectedServerUrlChange(trimmed);
-                }
-              }}
-              placeholder="http://192.168.1.10:32400"
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
-            />
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {t("settings.manualConnectionHelp", {
-              defaultValue:
-                "Use this if auto-discovered Plex connections are unreachable from your Docker network.",
-            })}
-          </p>
-        </div>
-
-        {servers.map((server) => {
-          const isEditing = editingServer === server.machineIdentifier;
-          const selectedConnection = getSelectedConnection(server);
-          const connectionsToShow = isEditing
-            ? server.connections
-            : selectedConnection
-              ? [selectedConnection]
-              : [];
-
-          return (
-            <div
-              key={server.machineIdentifier}
-              className="rounded-lg border border-border bg-muted/30 p-4 sm:p-6"
+          )}
+          {isConfigured && (
+            <button
+              type="button"
+              onClick={() => setShowRemoveModal(true)}
+              disabled={!canRemove}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:text-red-300"
+              title={
+                !canRemove
+                  ? t("settings.cannotRemoveOnlyServer", {
+                      service: "Jellyfin",
+                      defaultValue:
+                        "Cannot remove the only configured server. Configure Jellyfin first.",
+                    })
+                  : undefined
+              }
             >
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
-                <div className="flex-1 min-w-0">
-                  <h3 className="mb-1 truncate text-base font-semibold text-foreground sm:text-lg">
-                    {server.name}
-                  </h3>
-                  <p className="break-words text-xs text-muted-foreground sm:text-sm">
-                    Version {server.version} •{" "}
-                    <span className="break-all">
-                      {server.machineIdentifier}
-                    </span>
-                  </p>
-                </div>
-                {!isEditing && selectedConnection && (
-                  <button
-                    onClick={() =>
-                      onEditingServerChange(server.machineIdentifier)
-                    }
-                    className="shrink-0 whitespace-nowrap rounded px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/10 hover:text-primary/80"
-                  >
-                    {t("settings.changeConnection", { defaultValue: "Change" })}
-                  </button>
-                )}
-                {isEditing && (
-                  <button
-                    onClick={onCancelEdit}
-                    className="shrink-0 whitespace-nowrap rounded px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  >
-                    {t("common.cancel", { defaultValue: "Cancel" })}
-                  </button>
-                )}
-              </div>
-              <div className="space-y-3">
-                {connectionsToShow.length > 0 && (
-                  <>
-                    <label className="mb-2 block text-sm font-medium text-foreground">
-                      {isEditing
-                        ? t("settings.selectConnection", {
-                            defaultValue: "Select Connection",
-                          })
-                        : t("settings.currentConnection", {
-                            defaultValue: "Current Connection",
-                          })}
-                    </label>
-                    <div className="space-y-2">
-                      {connectionsToShow.map((connection, index) => (
-                        <label
-                          key={index}
-                          className={`flex items-start sm:items-center p-3 sm:p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                            selectedServerUrl === connection.uri
-                              ? "border-primary bg-primary/10"
-                              : "border-border bg-card hover:border-muted-foreground/40"
-                          }`}
-                        >
-                          <div className="mr-3 shrink-0 mt-0.5 sm:mt-0">
-                            <CustomRadio
-                              name={`server-${server.machineIdentifier}`}
-                              value={connection.uri}
-                              checked={selectedServerUrl === connection.uri}
-                              onChange={() =>
-                                onSelectedServerUrlChange(connection.uri)
-                              }
-                            />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap">
-                              <span className="break-all font-medium text-foreground sm:break-words">
-                                {connection.uri}
-                              </span>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {connection.local && (
-                                  <span className="whitespace-nowrap rounded bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary">
-                                    Local
-                                  </span>
-                                )}
-                                {connection.reachable === false && (
-                                  <span className="whitespace-nowrap rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800 dark:bg-red-900 dark:text-red-200">
-                                    {t("settings.unreachableConnection", {
-                                      defaultValue: "Unreachable",
-                                    })}
-                                  </span>
-                                )}
-                                {connection.reachable === true && (
-                                  <span className="whitespace-nowrap rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
-                                    {t("settings.reachableConnection", {
-                                      defaultValue: "Reachable",
-                                    })}
-                                  </span>
-                                )}
-                                {connection.relay && (
-                                  <span className="px-2 py-0.5 text-xs font-semibold rounded bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 whitespace-nowrap">
-                                    Relay
-                                  </span>
-                                )}
-                                {!connection.local && !connection.relay && (
-                                  <span className="px-2 py-0.5 text-xs font-semibold rounded bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 whitespace-nowrap">
-                                    Remote
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="mt-1 break-words text-xs text-muted-foreground">
-                              {connection.protocol.toUpperCase()} •{" "}
-                              {connection.address}:{connection.port}
-                            </div>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </>
-                )}
-                {!selectedConnection && !isEditing && (
-                  <div className="bg-yellow-50 dark:bg-yellow-950 border-l-4 border-yellow-400 dark:border-yellow-600 p-4 rounded">
-                    <p className="text-sm text-yellow-700 dark:text-yellow-300 mb-2">
-                      {t("settings.noConnectionSelected", {
-                        defaultValue: "No connection selected for this server.",
-                      })}
+              <FaTrash className="w-4 h-4" />
+              {t("settings.removePlexServer", {
+                defaultValue: "Remove Server",
+              })}
+            </button>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          <div className="rounded-lg border border-border bg-muted/30 p-4 sm:p-5">
+            <label
+              htmlFor="plex-manual-connection-url"
+              className="mb-2 block text-sm font-medium text-foreground"
+            >
+              {t("settings.manualConnectionUrl", {
+                defaultValue: "Manual Connection URL",
+              })}
+            </label>
+            <div>
+              <input
+                id="plex-manual-connection-url"
+                type="url"
+                value={manualServerUrl}
+                onChange={(e) => setManualServerUrl(e.target.value)}
+                onBlur={() => {
+                  const trimmed = manualServerUrl.trim();
+                  if (trimmed && trimmed !== selectedServerUrl) {
+                    onSelectedServerUrlChange(trimmed);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  const trimmed = manualServerUrl.trim();
+                  if (trimmed && trimmed !== selectedServerUrl) {
+                    onSelectedServerUrlChange(trimmed);
+                  }
+                }}
+                placeholder="http://192.168.1.10:32400"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+              />
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {t("settings.manualConnectionHelp", {
+                defaultValue:
+                  "Use this if auto-discovered Plex connections are unreachable from your Docker network.",
+              })}
+            </p>
+          </div>
+
+          {servers.map((server) => {
+            const isEditing = editingServer === server.machineIdentifier;
+            const selectedConnection = getSelectedConnection(server);
+            const connectionsToShow = isEditing
+              ? server.connections
+              : selectedConnection
+                ? [selectedConnection]
+                : [];
+
+            return (
+              <div
+                key={server.machineIdentifier}
+                className="rounded-lg border border-border bg-muted/30 p-4 sm:p-6"
+              >
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="mb-1 truncate text-base font-semibold text-foreground sm:text-lg">
+                      {server.name}
+                    </h3>
+                    <p className="break-words text-xs text-muted-foreground sm:text-sm">
+                      Version {server.version} •{" "}
+                      <span className="break-all">
+                        {server.machineIdentifier}
+                      </span>
                     </p>
+                  </div>
+                  {!isEditing && selectedConnection && (
                     <button
                       onClick={() =>
                         onEditingServerChange(server.machineIdentifier)
                       }
-                      className="text-sm font-medium text-primary hover:text-primary/80"
+                      className="shrink-0 whitespace-nowrap rounded px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/10 hover:text-primary/80"
                     >
-                      {t("settings.selectConnection", {
-                        defaultValue: "Select Connection",
+                      {t("settings.changeConnection", {
+                        defaultValue: "Change",
                       })}
                     </button>
-                  </div>
-                )}
+                  )}
+                  {isEditing && (
+                    <button
+                      onClick={onCancelEdit}
+                      className="shrink-0 whitespace-nowrap rounded px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                      {t("common.cancel", { defaultValue: "Cancel" })}
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-3">
+                  {connectionsToShow.length > 0 && (
+                    <>
+                      <p
+                        id={connectionGroupLabelId}
+                        className="mb-2 block text-sm font-medium text-foreground"
+                      >
+                        {isEditing
+                          ? t("settings.selectConnection", {
+                              defaultValue: "Select Connection",
+                            })
+                          : t("settings.currentConnection", {
+                              defaultValue: "Current Connection",
+                            })}
+                      </p>
+                      <div
+                        role="radiogroup"
+                        aria-labelledby={connectionGroupLabelId}
+                        className="space-y-2"
+                      >
+                        {connectionsToShow.map((connection) => (
+                          <label
+                            key={connection.uri}
+                            className={`flex cursor-pointer items-start rounded-lg border-2 p-3 transition-all sm:items-center sm:p-4 ${
+                              selectedServerUrl === connection.uri
+                                ? "border-primary bg-primary/10"
+                                : "border-border bg-card hover:border-muted-foreground/40"
+                            }`}
+                          >
+                            <div className="mr-3 mt-0.5 shrink-0 sm:mt-0">
+                              <CustomRadio
+                                name={`server-${server.machineIdentifier}`}
+                                value={connection.uri}
+                                checked={selectedServerUrl === connection.uri}
+                                onChange={() =>
+                                  onSelectedServerUrlChange(connection.uri)
+                                }
+                              />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-col flex-wrap gap-2 sm:flex-row sm:items-center">
+                                <span className="break-all font-medium text-foreground sm:break-words">
+                                  {connection.uri}
+                                </span>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {connection.local && (
+                                    <span className="whitespace-nowrap rounded bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary">
+                                      Local
+                                    </span>
+                                  )}
+                                  {connection.reachable === false && (
+                                    <span className="whitespace-nowrap rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800 dark:bg-red-900 dark:text-red-200">
+                                      {t("settings.unreachableConnection", {
+                                        defaultValue: "Unreachable",
+                                      })}
+                                    </span>
+                                  )}
+                                  {connection.reachable === true && (
+                                    <span className="whitespace-nowrap rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
+                                      {t("settings.reachableConnection", {
+                                        defaultValue: "Reachable",
+                                      })}
+                                    </span>
+                                  )}
+                                  {connection.relay && (
+                                    <span className="whitespace-nowrap rounded bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                      Relay
+                                    </span>
+                                  )}
+                                  {!connection.local && !connection.relay && (
+                                    <span className="whitespace-nowrap rounded bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                      Remote
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="mt-1 break-words text-xs text-muted-foreground">
+                                {connection.protocol.toUpperCase()} •{" "}
+                                {connection.address}:{connection.port}
+                              </div>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {!selectedConnection && !isEditing && (
+                    <div className="rounded border-l-4 border-yellow-400 bg-yellow-50 p-4 dark:border-yellow-600 dark:bg-yellow-950">
+                      <p className="mb-2 text-sm text-yellow-700 dark:text-yellow-300">
+                        {t("settings.noConnectionSelected", {
+                          defaultValue:
+                            "No connection selected for this server.",
+                        })}
+                      </p>
+                      <button
+                        onClick={() =>
+                          onEditingServerChange(server.machineIdentifier)
+                        }
+                        className="text-sm font-medium text-primary hover:text-primary/80"
+                      >
+                        {t("settings.selectConnection", {
+                          defaultValue: "Select Connection",
+                        })}
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+
+        {!!savedServerUrl && (
+          <WebhookSetupPanel source="plex" apiKey={scroblarrApiKey} />
+        )}
+      </CollapsibleSettingsCard>
 
       <Dialog open={showRemoveModal} onOpenChange={setShowRemoveModal}>
         <DialogContent className="max-w-md">
@@ -551,6 +544,6 @@ export function PlexSettingsTab({
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }

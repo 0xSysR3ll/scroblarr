@@ -28,6 +28,8 @@ interface MediaServerSettingsTabProps {
     apiKey: string;
   }) => void;
   onSettingsUpdated?: () => void;
+  /** Scroblarr Settings → General API key used for webhook auth. */
+  scroblarrApiKey?: string;
 }
 
 export function MediaServerSettingsTab({
@@ -47,40 +49,34 @@ export function MediaServerSettingsTab({
   settings,
   onJellyfinSettingsChange,
   onSettingsUpdated,
+  scroblarrApiKey,
 }: MediaServerSettingsTabProps) {
   return (
-    <div className="space-y-8">
-      {/* Plex Section */}
-      <div>
-        <PlexSettingsTab
-          servers={servers}
-          selectedServerUrl={selectedServerUrl}
-          savedServerUrl={savedServerUrl}
-          editingServer={editingServer}
-          onSelectedServerUrlChange={onSelectedServerUrlChange}
-          onEditingServerChange={onEditingServerChange}
-          onCancelEdit={onCancelEdit}
-          hasPlexAccount={hasPlexAccount}
-          onPlexAuthenticate={onPlexAuthenticate}
-          plexAuthLoading={plexAuthLoading}
-          plexRefreshLoading={plexRefreshLoading}
-          onRefreshPlexServers={onRefreshPlexServers}
-          plexLinkError={plexLinkError}
-          onSettingsUpdated={onSettingsUpdated}
-        />
-      </div>
+    <div className="space-y-4">
+      <PlexSettingsTab
+        servers={servers}
+        selectedServerUrl={selectedServerUrl}
+        savedServerUrl={savedServerUrl}
+        editingServer={editingServer}
+        onSelectedServerUrlChange={onSelectedServerUrlChange}
+        onEditingServerChange={onEditingServerChange}
+        onCancelEdit={onCancelEdit}
+        hasPlexAccount={hasPlexAccount}
+        onPlexAuthenticate={onPlexAuthenticate}
+        plexAuthLoading={plexAuthLoading}
+        plexRefreshLoading={plexRefreshLoading}
+        onRefreshPlexServers={onRefreshPlexServers}
+        plexLinkError={plexLinkError}
+        onSettingsUpdated={onSettingsUpdated}
+        scroblarrApiKey={scroblarrApiKey}
+      />
 
-      {/* Divider */}
-      <div className="border-t border-border"></div>
-
-      {/* Jellyfin Section */}
-      <div>
-        <JellyfinSettingsTab
-          settings={settings}
-          onJellyfinSettingsChange={onJellyfinSettingsChange}
-          onSettingsUpdated={onSettingsUpdated}
-        />
-      </div>
+      <JellyfinSettingsTab
+        settings={settings}
+        onJellyfinSettingsChange={onJellyfinSettingsChange}
+        onSettingsUpdated={onSettingsUpdated}
+        scroblarrApiKey={scroblarrApiKey}
+      />
     </div>
   );
 }

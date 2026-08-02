@@ -67,7 +67,8 @@ export function GeneralSettingsTab({
           </label>
           <p className="mb-2 text-xs text-muted-foreground">
             {t("settings.general.apiKeyDescription", {
-              defaultValue: "Global API key for API authentication.",
+              defaultValue:
+                "Used for media-server webhooks and API authentication. Required before Plex or Jellyfin can send events.",
             })}
           </p>
           <div className="flex gap-2 items-start">
