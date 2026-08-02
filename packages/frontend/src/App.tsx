@@ -39,7 +39,7 @@ const SyncDashboardPage = lazy(() =>
   }))
 );
 
-function AppRoutes() {
+export function AppRoutes() {
   const { t } = useTranslation();
   const { isAuthenticated, loading } = useAuth();
   const [hasAdmin, setHasAdmin] = useState<boolean | null>(null);
@@ -61,11 +61,25 @@ function AppRoutes() {
       setCheckingAdmin(true);
       setApiUnreachable(false);
     }
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 8_000);
+
     try {
-      const response = await fetch("/api/v1/auth/check-admin");
+      const response = await fetch("/api/v1/auth/check-admin", {
+        signal: controller.signal,
+      });
       if (response.ok) {
-        const data = await response.json();
-        setHasAdmin(data?.hasAdmin ?? false);
+        const data: unknown = await response.json();
+        if (
+          typeof data !== "object" ||
+          data === null ||
+          !("hasAdmin" in data) ||
+          typeof data.hasAdmin !== "boolean"
+        ) {
+          throw new Error("Invalid check-admin response");
+        }
+        setHasAdmin(data.hasAdmin);
         setApiUnreachable(false);
         return;
       }
@@ -79,6 +93,7 @@ function AppRoutes() {
         setApiUnreachable(true);
       }
     } finally {
+      window.clearTimeout(timeoutId);
       isCheckingAdminRef.current = false;
       setCheckingAdmin(false);
     }
