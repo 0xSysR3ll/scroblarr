@@ -69,26 +69,23 @@ export function AppRoutes() {
       const response = await fetch("/api/v1/auth/check-admin", {
         signal: controller.signal,
       });
-      if (response.ok) {
-        const data: unknown = await response.json();
-        if (
-          typeof data !== "object" ||
-          data === null ||
-          !("hasAdmin" in data) ||
-          typeof data.hasAdmin !== "boolean"
-        ) {
-          throw new Error("Invalid check-admin response");
-        }
-        setHasAdmin(data.hasAdmin);
-        setApiUnreachable(false);
-        return;
+      if (!response.ok) {
+        throw new Error(`check-admin failed with status ${response.status}`);
       }
+      const data: unknown = await response.json();
+      if (
+        typeof data !== "object" ||
+        data === null ||
+        !("hasAdmin" in data) ||
+        typeof data.hasAdmin !== "boolean"
+      ) {
+        throw new Error("Invalid check-admin response");
+      }
+      setHasAdmin(data.hasAdmin);
+      setApiUnreachable(false);
+    } catch {
       // Keep a known setup state on transient failures; only show offline
       // when we never successfully determined whether setup is complete.
-      if (hasAdminRef.current === null) {
-        setApiUnreachable(true);
-      }
-    } catch {
       if (hasAdminRef.current === null) {
         setApiUnreachable(true);
       }
