@@ -52,39 +52,62 @@ vi.mock("@services/api", () => ({
   unlinkSimkl: vi.fn(),
 }));
 
-function getTraktSection(): HTMLElement {
-  const heading = screen.getByRole("heading", { name: "Trakt" });
+async function getTraktSection(): Promise<HTMLElement> {
+  const heading = await screen.findByRole("heading", { name: /Trakt/i });
   const section = heading.closest(".rounded-lg.border");
   expect(section).not.toBeNull();
   return section as HTMLElement;
 }
 
-function getSimklSection(): HTMLElement {
-  const heading = screen.getByRole("heading", { name: "Simkl" });
+async function getSimklSection(): Promise<HTMLElement> {
+  const heading = await screen.findByRole("heading", { name: /Simkl/i });
   const section = heading.closest(".rounded-lg.border");
   expect(section).not.toBeNull();
   return section as HTMLElement;
+}
+
+async function expandSection(
+  user: ReturnType<typeof userEvent.setup>,
+  section: HTMLElement,
+  name: RegExp
+): Promise<HTMLElement> {
+  const toggle = within(section).getByRole("button", { name });
+  if (toggle.getAttribute("aria-expanded") === "false") {
+    await user.click(toggle);
+  }
+  return section;
+}
+
+async function expandTraktSection(
+  user: ReturnType<typeof userEvent.setup>
+): Promise<HTMLElement> {
+  return expandSection(user, await getTraktSection(), /Trakt/i);
+}
+
+async function expandSimklSection(
+  user: ReturnType<typeof userEvent.setup>
+): Promise<HTMLElement> {
+  return expandSection(user, await getSimklSection(), /Simkl/i);
 }
 
 async function clickSimklAuthorize(
   user: ReturnType<typeof userEvent.setup>
 ): Promise<void> {
-  await user.click(
-    within(getSimklSection()).getByRole("button", { name: "Authorize" })
-  );
+  const section = await expandSimklSection(user);
+  await user.click(within(section).getByRole("button", { name: "Authorize" }));
 }
 
 async function clickTraktAuthorize(
   user: ReturnType<typeof userEvent.setup>
 ): Promise<void> {
-  await user.click(
-    within(getTraktSection()).getByRole("button", { name: "Authorize" })
-  );
+  const section = await expandTraktSection(user);
+  await user.click(within(section).getByRole("button", { name: "Authorize" }));
 }
 
 async function fillTraktCredentials(
   user: ReturnType<typeof userEvent.setup>
 ): Promise<void> {
+  await expandTraktSection(user);
   await user.type(
     await screen.findByPlaceholderText("Enter your Trakt Client ID"),
     "client-id"
@@ -95,9 +118,19 @@ async function fillTraktCredentials(
   );
 }
 
+async function fillSimklClientId(
+  user: ReturnType<typeof userEvent.setup>
+): Promise<void> {
+  await expandSimklSection(user);
+  await user.type(
+    await screen.findByPlaceholderText("Enter your Simkl Client ID"),
+    "client-id"
+  );
+}
+
 describe("IntegrationsTab", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     oauthPopupMocks.preparePopup.mockReset();
     oauthPopupMocks.navigateToUrl.mockReset();
     oauthPopupMocks.closePopup.mockReset();
@@ -135,6 +168,10 @@ describe("IntegrationsTab", () => {
     });
     expect(getTraktStatus).toHaveBeenCalled();
 
+    fireEvent.click(
+      within(await getTraktSection()).getByRole("button", { name: /Trakt/i })
+    );
+
     fireEvent.change(
       screen.getByPlaceholderText("Enter your Trakt Client ID"),
       {
@@ -148,7 +185,7 @@ describe("IntegrationsTab", () => {
       }
     );
     fireEvent.click(
-      within(getTraktSection()).getByRole("button", { name: "Authorize" })
+      within(await getTraktSection()).getByRole("button", { name: "Authorize" })
     );
 
     await act(async () => {
@@ -174,6 +211,48 @@ describe("IntegrationsTab", () => {
     expect(oauthPopupMocks.navigateToUrl).toHaveBeenCalledWith(
       "https://trakt.tv/activate"
     );
+  });
+
+  it("keeps Trakt and Simkl cards collapsed by default", async () => {
+    renderWithProviders(<IntegrationsTab />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(
+      within(await getTraktSection()).getByRole("button", { name: /Trakt/i })
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(
+      within(await getSimklSection()).getByRole("button", { name: /Simkl/i })
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryByPlaceholderText("Enter your Trakt Client ID")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText("Enter your Simkl Client ID")
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens Trakt when re-authorization is required", async () => {
+    vi.mocked(getTraktStatus).mockResolvedValue({
+      linked: true,
+      needsReauthorization: true,
+      username: "trakt-user",
+      image: "https://img.example/trakt.png",
+      hasCredentials: true,
+    });
+
+    renderWithProviders(<IntegrationsTab />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(
+      within(await getTraktSection()).getByRole("button", { name: /Trakt/i })
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("trakt-user")).toBeVisible();
   });
 
   it("shows a re-authorization warning for linked Trakt accounts", async () => {
@@ -202,7 +281,7 @@ describe("IntegrationsTab", () => {
       )
     ).toBeVisible();
     expect(
-      within(getTraktSection()).queryByText("Linked")
+      within(await getTraktSection()).queryByText("Linked")
     ).not.toBeInTheDocument();
   });
 
@@ -222,11 +301,118 @@ describe("IntegrationsTab", () => {
     });
 
     expect(
-      within(getTraktSection()).getAllByText("Linked").length
+      within(await getTraktSection()).getAllByText("Linked").length
     ).toBeGreaterThan(0);
     expect(
-      within(getTraktSection()).queryByText("Re-authorization required")
+      within(await getTraktSection()).queryByText("Re-authorization required")
     ).not.toBeInTheDocument();
+  });
+
+  it("shows a linked badge for linked Simkl accounts while collapsed", async () => {
+    vi.mocked(getSimklStatus).mockResolvedValue({
+      linked: true,
+      username: "simkl-user",
+      image: "https://img.example/simkl.png",
+      hasCredentials: true,
+    });
+
+    renderWithProviders(<IntegrationsTab />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const section = await getSimklSection();
+    expect(
+      within(section).getByRole("button", { name: /Simkl/i })
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(within(section).getByText("Linked")).toBeVisible();
+    expect(screen.queryByText("simkl-user")).not.toBeInTheDocument();
+  });
+
+  it("hides integration logos when they fail to load", async () => {
+    renderWithProviders(<IntegrationsTab />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const traktLogo = document.querySelector(
+      'img[src="/logos/trakt.svg"]'
+    ) as HTMLImageElement;
+    const simklLogo = document.querySelector(
+      'img[src="/logos/simkl.svg"]'
+    ) as HTMLImageElement;
+
+    expect(traktLogo).toBeTruthy();
+    expect(simklLogo).toBeTruthy();
+
+    fireEvent.error(traktLogo);
+    fireEvent.error(simklLogo);
+
+    expect(traktLogo.style.display).toBe("none");
+    expect(simklLogo.style.display).toBe("none");
+  });
+
+  it("toggles Trakt client secret visibility", async () => {
+    const user = userEvent.setup({
+      advanceTimers: vi.advanceTimersByTime,
+    });
+
+    renderWithProviders(<IntegrationsTab />);
+
+    await expandTraktSection(user);
+
+    const secretInput = await screen.findByPlaceholderText(
+      "Enter your Trakt Client Secret"
+    );
+    expect(secretInput).toHaveAttribute("type", "password");
+
+    await user.click(screen.getByRole("button", { name: "Show password" }));
+    expect(secretInput).toHaveAttribute("type", "text");
+    expect(screen.getByRole("button", { name: "Hide password" })).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Hide password" }));
+    expect(secretInput).toHaveAttribute("type", "password");
+  });
+
+  it("expands and collapses an integration card from the header", async () => {
+    const user = userEvent.setup({
+      advanceTimers: vi.advanceTimersByTime,
+    });
+
+    renderWithProviders(<IntegrationsTab />);
+
+    const section = await expandTraktSection(user);
+    const toggle = within(section).getByRole("button", { name: /Trakt/i });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen.getByPlaceholderText("Enter your Trakt Client ID")
+    ).toBeVisible();
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryByPlaceholderText("Enter your Trakt Client ID")
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders after status loads fail", async () => {
+    vi.mocked(getTraktStatus).mockRejectedValue(new Error("trakt down"));
+    vi.mocked(getSimklStatus).mockRejectedValue(new Error("simkl down"));
+
+    renderWithProviders(<IntegrationsTab />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(
+      within(await getTraktSection()).getByRole("button", { name: /Trakt/i })
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(
+      within(await getSimklSection()).getByRole("button", { name: /Simkl/i })
+    ).toHaveAttribute("aria-expanded", "false");
   });
 });
 
@@ -350,8 +536,9 @@ describe("IntegrationsTab Trakt integration", () => {
       <IntegrationsTab onProfileUpdated={onProfileUpdated} />
     );
 
+    await expandTraktSection(user);
     expect(await screen.findByText("trakt-user")).toBeVisible();
-    await user.click(screen.getAllByRole("button", { name: "Unlink" })[0]);
+    await user.click(screen.getByRole("button", { name: "Unlink" }));
     await user.click(screen.getByRole("button", { name: "Confirm" }));
 
     await waitFor(() => {
@@ -361,6 +548,78 @@ describe("IntegrationsTab Trakt integration", () => {
       );
       expect(onProfileUpdated).toHaveBeenCalled();
     });
+  });
+
+  it("shows an error when unlinking Trakt fails", async () => {
+    const user = setupUser();
+    vi.mocked(getTraktStatus).mockResolvedValue({
+      linked: true,
+      username: "trakt-user",
+      image: "https://img.example/trakt.png",
+      hasCredentials: true,
+    });
+    vi.mocked(unlinkTrakt).mockRejectedValue(new Error("unlink denied"));
+
+    renderWithProviders(
+      <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+    );
+
+    await expandTraktSection(user);
+    expect(await screen.findByText("trakt-user")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Unlink" }));
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+
+    expect(await screen.findByText("unlink denied")).toBeVisible();
+    expect(onProfileUpdated).not.toHaveBeenCalled();
+  });
+
+  it("shows a default error when Trakt unlink rejects a non-Error", async () => {
+    const user = setupUser();
+    vi.mocked(getTraktStatus).mockResolvedValue({
+      linked: true,
+      username: "trakt-user",
+      image: "https://img.example/trakt.png",
+      hasCredentials: true,
+    });
+    vi.mocked(unlinkTrakt).mockRejectedValue("unlink blew up");
+
+    renderWithProviders(
+      <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+    );
+
+    await expandTraktSection(user);
+    expect(await screen.findByText("trakt-user")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Unlink" }));
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+
+    expect(
+      await screen.findByText("Failed to unlink Trakt account")
+    ).toBeVisible();
+  });
+
+  it("cancels the Trakt unlink confirmation dialog", async () => {
+    const user = setupUser();
+    vi.mocked(getTraktStatus).mockResolvedValue({
+      linked: true,
+      username: "trakt-user",
+      image: "https://img.example/trakt.png",
+      hasCredentials: true,
+    });
+
+    renderWithProviders(
+      <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+    );
+
+    await expandTraktSection(user);
+    await user.click(screen.getByRole("button", { name: "Unlink" }));
+    expect(
+      screen.getByText(
+        "Are you sure you want to unlink your Trakt account? This will stop syncing to Trakt."
+      )
+    ).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(unlinkTrakt).not.toHaveBeenCalled();
+    expect(screen.getByText("trakt-user")).toBeVisible();
   });
 
   it("shows an error when Trakt popup setup fails", async () => {
@@ -750,9 +1009,12 @@ describe("IntegrationsTab Trakt integration", () => {
       <IntegrationsTab onProfileUpdated={onProfileUpdated} />
     );
 
-    await screen.findByRole("heading", { name: "Trakt" });
     expect(
-      within(getTraktSection()).getByRole("button", { name: "Authorize" })
+      await screen.findByRole("heading", { name: /Trakt/i })
+    ).toBeVisible();
+    await expandTraktSection(user);
+    expect(
+      within(await getTraktSection()).getByRole("button", { name: "Authorize" })
     ).toBeEnabled();
     await clickTraktAuthorize(user);
     await advanceAuthorizeDelay();
@@ -761,6 +1023,25 @@ describe("IntegrationsTab Trakt integration", () => {
       expect(getTraktAuthorizeUrl).toHaveBeenCalledWith(undefined, undefined);
     });
     expect(await screen.findByText("ABCD1234")).toBeVisible();
+
+    vi.mocked(linkTrakt).mockResolvedValue({ success: true });
+    vi.mocked(getTraktStatus).mockResolvedValue({
+      linked: true,
+      username: "trakt-user",
+      image: null,
+      hasCredentials: true,
+    });
+
+    await user.click(
+      screen.getByRole("button", { name: "Check approval now" })
+    );
+
+    await waitFor(() => {
+      expect(linkTrakt).toHaveBeenCalledWith("ABCD1234", undefined, undefined);
+      expect(showSuccess).toHaveBeenCalledWith(
+        "Trakt account linked successfully"
+      );
+    });
   });
 });
 
@@ -812,10 +1093,7 @@ describe("IntegrationsTab Simkl integration", () => {
       <IntegrationsTab onProfileUpdated={onProfileUpdated} />
     );
 
-    await user.type(
-      await screen.findByPlaceholderText("Enter your Simkl Client ID"),
-      "client-id"
-    );
+    await fillSimklClientId(user);
     await clickSimklAuthorize(user);
 
     expect(
@@ -859,8 +1137,9 @@ describe("IntegrationsTab Simkl integration", () => {
       <IntegrationsTab onProfileUpdated={onProfileUpdated} />
     );
 
+    await expandSimklSection(user);
     expect(await screen.findByText("simkl-user")).toBeVisible();
-    await user.click(screen.getAllByRole("button", { name: "Unlink" })[0]);
+    await user.click(screen.getByRole("button", { name: "Unlink" }));
     await user.click(screen.getByRole("button", { name: "Confirm" }));
 
     await waitFor(() => {
@@ -870,6 +1149,78 @@ describe("IntegrationsTab Simkl integration", () => {
       );
       expect(onProfileUpdated).toHaveBeenCalled();
     });
+  });
+
+  it("shows an error when unlinking Simkl fails", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getSimklStatus).mockResolvedValue({
+      linked: true,
+      username: "simkl-user",
+      image: "https://img.example/simkl.png",
+      hasCredentials: true,
+    });
+    vi.mocked(unlinkSimkl).mockRejectedValue(new Error("unlink denied"));
+
+    renderWithProviders(
+      <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+    );
+
+    await expandSimklSection(user);
+    expect(await screen.findByText("simkl-user")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Unlink" }));
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+
+    expect(await screen.findByText("unlink denied")).toBeVisible();
+    expect(onProfileUpdated).not.toHaveBeenCalled();
+  });
+
+  it("shows a default error when Simkl unlink rejects a non-Error", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getSimklStatus).mockResolvedValue({
+      linked: true,
+      username: "simkl-user",
+      image: "https://img.example/simkl.png",
+      hasCredentials: true,
+    });
+    vi.mocked(unlinkSimkl).mockRejectedValue("unlink blew up");
+
+    renderWithProviders(
+      <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+    );
+
+    await expandSimklSection(user);
+    expect(await screen.findByText("simkl-user")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Unlink" }));
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+
+    expect(
+      await screen.findByText("Failed to unlink Simkl account")
+    ).toBeVisible();
+  });
+
+  it("cancels the Simkl unlink confirmation dialog", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getSimklStatus).mockResolvedValue({
+      linked: true,
+      username: "simkl-user",
+      image: "https://img.example/simkl.png",
+      hasCredentials: true,
+    });
+
+    renderWithProviders(
+      <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+    );
+
+    await expandSimklSection(user);
+    await user.click(screen.getByRole("button", { name: "Unlink" }));
+    expect(
+      screen.getByText(
+        "Are you sure you want to unlink your Simkl account? This will stop syncing to Simkl."
+      )
+    ).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(unlinkSimkl).not.toHaveBeenCalled();
+    expect(screen.getByText("simkl-user")).toBeVisible();
   });
 
   it("shows an error when Simkl popup setup fails", async () => {
@@ -882,13 +1233,31 @@ describe("IntegrationsTab Simkl integration", () => {
       <IntegrationsTab onProfileUpdated={onProfileUpdated} />
     );
 
-    await user.type(
-      await screen.findByPlaceholderText("Enter your Simkl Client ID"),
-      "client-id"
-    );
+    await fillSimklClientId(user);
     await clickSimklAuthorize(user);
 
     expect(await screen.findByText("Popup blocked")).toBeVisible();
+    expect(getSimklAuthorizeUrl).not.toHaveBeenCalled();
+  });
+
+  it("shows a default error when Simkl popup setup rejects a non-Error", async () => {
+    const user = userEvent.setup();
+    oauthPopupMocks.preparePopup.mockImplementation(() => {
+      throw "popup blocked";
+    });
+
+    renderWithProviders(
+      <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+    );
+
+    await fillSimklClientId(user);
+    await clickSimklAuthorize(user);
+
+    expect(
+      await screen.findByText(
+        "Failed to open authentication window. Please allow popups and try again."
+      )
+    ).toBeVisible();
     expect(getSimklAuthorizeUrl).not.toHaveBeenCalled();
   });
 
@@ -902,14 +1271,31 @@ describe("IntegrationsTab Simkl integration", () => {
       <IntegrationsTab onProfileUpdated={onProfileUpdated} />
     );
 
-    await user.type(
-      await screen.findByPlaceholderText("Enter your Simkl Client ID"),
-      "client-id"
-    );
+    await fillSimklClientId(user);
     await clickSimklAuthorize(user);
 
     expect(
       await screen.findByText("PIN service down", {}, { timeout: 3000 })
+    ).toBeVisible();
+  });
+
+  it("shows a default error when Simkl PIN authorization rejects a non-Error", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getSimklAuthorizeUrl).mockRejectedValue("pin unavailable");
+
+    renderWithProviders(
+      <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+    );
+
+    await fillSimklClientId(user);
+    await clickSimklAuthorize(user);
+
+    expect(
+      await screen.findByText(
+        "Failed to get Simkl PIN code",
+        {},
+        { timeout: 3000 }
+      )
     ).toBeVisible();
   });
 
@@ -927,10 +1313,7 @@ describe("IntegrationsTab Simkl integration", () => {
       <IntegrationsTab onProfileUpdated={onProfileUpdated} />
     );
 
-    await user.type(
-      await screen.findByPlaceholderText("Enter your Simkl Client ID"),
-      "client-id"
-    );
+    await fillSimklClientId(user);
     await clickSimklAuthorize(user);
 
     await waitFor(
@@ -960,10 +1343,7 @@ describe("IntegrationsTab Simkl integration", () => {
       <IntegrationsTab onProfileUpdated={onProfileUpdated} />
     );
 
-    await user.type(
-      await screen.findByPlaceholderText("Enter your Simkl Client ID"),
-      "client-id"
-    );
+    await fillSimklClientId(user);
     await clickSimklAuthorize(user);
 
     expect(
@@ -990,10 +1370,7 @@ describe("IntegrationsTab Simkl integration", () => {
       <IntegrationsTab onProfileUpdated={onProfileUpdated} />
     );
 
-    await user.type(
-      await screen.findByPlaceholderText("Enter your Simkl Client ID"),
-      "client-id"
-    );
+    await fillSimklClientId(user);
     await clickSimklAuthorize(user);
 
     expect(
@@ -1041,10 +1418,7 @@ describe("IntegrationsTab Simkl integration", () => {
         <IntegrationsTab onProfileUpdated={onProfileUpdated} />
       );
 
-      await user.type(
-        await screen.findByPlaceholderText("Enter your Simkl Client ID"),
-        "client-id"
-      );
+      await fillSimklClientId(user);
       await clickSimklAuthorize(user);
       await act(async () => {
         await vi.advanceTimersByTimeAsync(1500);
@@ -1100,10 +1474,7 @@ describe("IntegrationsTab Simkl integration", () => {
         <IntegrationsTab onProfileUpdated={onProfileUpdated} />
       );
 
-      await user.type(
-        await screen.findByPlaceholderText("Enter your Simkl Client ID"),
-        "client-id"
-      );
+      await fillSimklClientId(user);
       await clickSimklAuthorize(user);
       await act(async () => {
         await vi.advanceTimersByTimeAsync(1500);
@@ -1150,10 +1521,7 @@ describe("IntegrationsTab Simkl integration", () => {
         <IntegrationsTab onProfileUpdated={onProfileUpdated} />
       );
 
-      await user.type(
-        await screen.findByPlaceholderText("Enter your Simkl Client ID"),
-        "client-id"
-      );
+      await fillSimklClientId(user);
       await clickSimklAuthorize(user);
       await act(async () => {
         await vi.advanceTimersByTimeAsync(1500);
@@ -1168,6 +1536,95 @@ describe("IntegrationsTab Simkl integration", () => {
       expect(
         screen.queryByText("stale authorize failure")
       ).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("ignores a late PIN response after the tab unmounts", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({
+        advanceTimers: vi.advanceTimersByTime,
+      });
+      let resolveAuthorize!: (value: {
+        userCode: string;
+        verificationUrl: string;
+        expiresIn: number;
+        interval: number;
+      }) => void;
+      vi.mocked(getSimklAuthorizeUrl).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveAuthorize = resolve;
+          })
+      );
+
+      const view = renderWithProviders(
+        <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+      );
+
+      await fillSimklClientId(user);
+      await clickSimklAuthorize(user);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500);
+      });
+
+      view.unmount();
+      resolveAuthorize({
+        userCode: "ABCDE",
+        verificationUrl: "https://simkl.com/pin/",
+        expiresIn: 900,
+        interval: 5,
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(oauthPopupMocks.navigateToUrl).not.toHaveBeenCalled();
+      expect(linkSimkl).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("shows when the Simkl PIN expires while waiting", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({
+        advanceTimers: vi.advanceTimersByTime,
+      });
+      vi.mocked(getSimklAuthorizeUrl).mockResolvedValue({
+        userCode: "ABCDE",
+        verificationUrl: "https://simkl.com/pin/",
+        expiresIn: 6,
+        interval: 5,
+      });
+      vi.mocked(linkSimkl).mockRejectedValue(
+        new Error("authorization pending")
+      );
+
+      renderWithProviders(
+        <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+      );
+
+      await fillSimklClientId(user);
+      await clickSimklAuthorize(user);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+
+      expect(
+        await screen.findByText(
+          "The Simkl PIN expired. Generate a new one to try again."
+        )
+      ).toBeVisible();
     } finally {
       vi.useRealTimers();
     }
@@ -1196,9 +1653,12 @@ describe("IntegrationsTab Simkl integration", () => {
         <IntegrationsTab onProfileUpdated={onProfileUpdated} />
       );
 
-      await screen.findByRole("heading", { name: "Simkl" });
+      await screen.findByRole("heading", { name: /Simkl/i });
+      await expandSimklSection(user);
       expect(
-        within(getSimklSection()).getByRole("button", { name: "Authorize" })
+        within(await getSimklSection()).getByRole("button", {
+          name: "Authorize",
+        })
       ).toBeEnabled();
       await clickSimklAuthorize(user);
       await act(async () => {
@@ -1209,6 +1669,25 @@ describe("IntegrationsTab Simkl integration", () => {
         expect(getSimklAuthorizeUrl).toHaveBeenCalledWith(undefined);
       });
       expect(await screen.findByText("ABCDE")).toBeVisible();
+
+      vi.mocked(linkSimkl).mockResolvedValue({ success: true });
+      vi.mocked(getSimklStatus).mockResolvedValue({
+        linked: true,
+        username: "simkl-user",
+        image: null,
+        hasCredentials: true,
+      });
+
+      await user.click(
+        screen.getByRole("button", { name: "Check approval now" })
+      );
+
+      await waitFor(() => {
+        expect(linkSimkl).toHaveBeenCalledWith("ABCDE", undefined);
+        expect(showSuccess).toHaveBeenCalledWith(
+          "Simkl account linked successfully"
+        );
+      });
     } finally {
       vi.useRealTimers();
     }
