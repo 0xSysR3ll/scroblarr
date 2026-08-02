@@ -1,6 +1,6 @@
 import { useAuth } from "@contexts/AuthContext";
 import { renderWithProviders } from "@test/render";
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -158,5 +158,102 @@ describe("AppRoutes", () => {
     expect(
       await screen.findByRole("heading", { name: /scroblarr is unavailable/i })
     ).toBeVisible();
+  });
+
+  it("aborts a stalled check-admin request and shows the offline page", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (_url: string, init?: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => {
+              reject(new DOMException("Aborted", "AbortError"));
+            });
+          })
+      )
+    );
+
+    try {
+      renderWithProviders(<AppRoutes />);
+
+      await vi.advanceTimersByTimeAsync(8_000);
+
+      expect(
+        await screen.findByRole("heading", {
+          name: /scroblarr is unavailable/i,
+        })
+      ).toBeVisible();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("ignores overlapping retry clicks while an admin check is in flight", async () => {
+    let releaseCheck: ((value: unknown) => void) | undefined;
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            releaseCheck = resolve;
+          })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithProviders(<AppRoutes />, { route: "/login" });
+
+    expect(
+      await screen.findByRole("heading", { name: /scroblarr is unavailable/i })
+    ).toBeVisible();
+
+    const retry = screen.getByRole("button", { name: /try again/i });
+    // Fire both clicks before React re-renders away from the offline page.
+    act(() => {
+      retry.click();
+      retry.click();
+    });
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    releaseCheck?.({
+      ok: true,
+      json: async () => ({ hasAdmin: true }),
+    });
+
+    expect(
+      await screen.findByRole("heading", { name: /login page/i })
+    ).toBeVisible();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps setup routing when a later check-admin failure happens after a known state", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ hasAdmin: false }),
+      })
+      .mockRejectedValueOnce(new Error("transient"));
+    vi.stubGlobal("fetch", fetchMock);
+    mockAuth({ isAuthenticated: true });
+
+    renderWithProviders(<AppRoutes />, { route: "/" });
+
+    expect(
+      await screen.findByRole("heading", { name: /setup page/i })
+    ).toBeVisible();
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    expect(screen.getByRole("heading", { name: /setup page/i })).toBeVisible();
+    expect(
+      screen.queryByRole("heading", { name: /scroblarr is unavailable/i })
+    ).not.toBeInTheDocument();
   });
 });
