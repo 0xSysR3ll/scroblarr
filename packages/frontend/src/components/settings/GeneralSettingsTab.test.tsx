@@ -48,6 +48,9 @@ describe("GeneralSettingsTab", () => {
     expect(
       screen.getByText(/Used for media-server webhooks and API authentication/)
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Required before Plex or Jellyfin can send events/)
+    ).toBeInTheDocument();
   });
 
   it("renders TMDB settings and updates the token field", async () => {
@@ -236,9 +239,7 @@ describe("GeneralSettingsTab", () => {
       await waitFor(() => {
         expect(writeText).toHaveBeenCalledWith("sk_test");
       });
-      expect(showSuccess).not.toHaveBeenCalledWith(
-        "API key copied to clipboard"
-      );
+      expect(showSuccess).not.toHaveBeenCalled();
     } finally {
       vi.unstubAllGlobals();
     }

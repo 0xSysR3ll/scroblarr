@@ -1,7 +1,7 @@
 import { renderWithProviders } from "@test/render";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { showSuccess } from "@utils/toast";
+import { showError, showSuccess } from "@utils/toast";
 import {
   buildJellyfinWebhookUrl,
   buildPlexWebhookUrl,
@@ -126,7 +126,7 @@ describe("WebhookSetupPanel", () => {
     });
   });
 
-  it("does not toast when clipboard copy fails", async () => {
+  it("shows an error toast when clipboard copy fails", async () => {
     const user = userEvent.setup();
     const writeText = vi.fn().mockRejectedValue(new Error("denied"));
     Object.defineProperty(navigator, "clipboard", {
@@ -143,6 +143,7 @@ describe("WebhookSetupPanel", () => {
 
     await waitFor(() => {
       expect(writeText).toHaveBeenCalled();
+      expect(showError).toHaveBeenCalledWith("Failed to copy to clipboard");
     });
     expect(showSuccess).not.toHaveBeenCalled();
   });

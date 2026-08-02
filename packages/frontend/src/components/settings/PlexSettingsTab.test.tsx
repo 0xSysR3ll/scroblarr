@@ -341,11 +341,9 @@ describe("PlexSettingsTab", () => {
     });
   });
 
-  it("shows a warning when the account is linked but no servers are returned", async () => {
+  it("falls back to the authenticate prompt when no servers are returned", async () => {
     const user = userEvent.setup();
-    // The empty-servers branch with hasPlexAccount uses the auth-required early return
-    // when servers.length === 0. Cover the inline warning by rendering configured
-    // layout isn't possible with servers=[], so assert the auth empty state instead.
+    // Empty servers with a linked account still uses the auth-required early return.
     renderPlex({
       servers: [],
       selectedServerUrl: "",

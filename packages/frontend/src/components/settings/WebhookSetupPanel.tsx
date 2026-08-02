@@ -1,4 +1,4 @@
-import { showSuccess } from "@utils/toast";
+import { showError, showSuccess } from "@utils/toast";
 import {
   buildJellyfinWebhookUrl,
   buildPlexWebhookUrl,
@@ -86,6 +86,12 @@ function CopyField({
               showSuccess(
                 t("settings.webhook.copied", {
                   defaultValue: "Copied to clipboard",
+                })
+              );
+            } else {
+              showError(
+                t("settings.webhook.copyFailed", {
+                  defaultValue: "Failed to copy to clipboard",
                 })
               );
             }
@@ -179,14 +185,14 @@ export function WebhookSetupPanel({ source, apiKey }: WebhookSetupPanelProps) {
           }`}
           aria-hidden
         />
-        <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-foreground sm:text-base">
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-foreground sm:text-base">
             {t("settings.webhook.title", { defaultValue: "Webhooks" })}
-          </h3>
-          <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">
+          </span>
+          <span className="mt-0.5 block text-xs text-muted-foreground sm:text-sm">
             {description}
-          </p>
-        </div>
+          </span>
+        </span>
       </button>
 
       {open && (

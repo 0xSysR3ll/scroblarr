@@ -256,7 +256,7 @@
     "plexServerRemoved": "Plex server removed successfully",
     "removePlexServerFailed": "Failed to remove Plex server",
     "plexServer": "Plex Server",
-    "plexServerDescription": "Select the Plex server connection to use for importing users. This setting will be saved and used automatically.",
+    "plexServerDescription": "Select the Plex server connection to use for importing users. Click 'Save' to apply your selection.",
     "plexAuthRequired": "To configure a Plex server, first authenticate with your Plex account as the admin. This will link your account and let Scroblarr discover your servers.",
     "unsavedChanges": "Unsaved",
     "refreshServers": "Refresh servers",
@@ -304,8 +304,11 @@
       "template": "Payload template",
       "copyTemplate": "Copy payload template",
       "checklist": "Checklist",
-      "urlHint": "If your media server cannot reach this host (Docker, reverse proxy), replace the origin with a URL it can access."
-    }
+      "urlHint": "If your media server cannot reach this host (Docker, reverse proxy), replace the origin with a URL it can access.",
+      "copyFailed": "Failed to copy to clipboard"
+    },
+    "hideApiKey": "Hide API key",
+    "showApiKey": "Show API key"
   },
   "theme": {
     "auto": "Auto (system)",

@@ -14,7 +14,7 @@ import {
 } from "@services/api";
 import type { PlexServer } from "@services/api";
 import { showSuccess, showError } from "@utils/toast";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { useTranslation } from "react-i18next";
 import {
   FaTrash,
@@ -67,6 +67,7 @@ export function PlexSettingsTab({
   const [removing, setRemoving] = useState(false);
   const [saving, setSaving] = useState(false);
   const [manualServerUrl, setManualServerUrl] = useState(selectedServerUrl);
+  const connectionGroupLabelId = useId();
   const [authProviders, setAuthProviders] = useState<{
     hasAdmin: boolean;
     plexConfigured: boolean;
@@ -177,10 +178,7 @@ export function PlexSettingsTab({
     return (
       <CollapsibleSettingsCard
         title={title}
-        description={t("settings.plexServerDescription", {
-          defaultValue:
-            "Select the Plex server connection to use for importing users. This setting will be saved and used automatically.",
-        })}
+        description={description}
         icon={icon}
       >
         <div className="space-y-3">
@@ -296,13 +294,17 @@ export function PlexSettingsTab({
 
         <div className="space-y-4">
           <div className="rounded-lg border border-border bg-muted/30 p-4 sm:p-5">
-            <label className="mb-2 block text-sm font-medium text-foreground">
+            <label
+              htmlFor="plex-manual-connection-url"
+              className="mb-2 block text-sm font-medium text-foreground"
+            >
               {t("settings.manualConnectionUrl", {
                 defaultValue: "Manual Connection URL",
               })}
             </label>
             <div>
               <input
+                id="plex-manual-connection-url"
                 type="url"
                 value={manualServerUrl}
                 onChange={(e) => setManualServerUrl(e.target.value)}
@@ -381,7 +383,10 @@ export function PlexSettingsTab({
                 <div className="space-y-3">
                   {connectionsToShow.length > 0 && (
                     <>
-                      <label className="mb-2 block text-sm font-medium text-foreground">
+                      <p
+                        id={connectionGroupLabelId}
+                        className="mb-2 block text-sm font-medium text-foreground"
+                      >
                         {isEditing
                           ? t("settings.selectConnection", {
                               defaultValue: "Select Connection",
@@ -389,11 +394,15 @@ export function PlexSettingsTab({
                           : t("settings.currentConnection", {
                               defaultValue: "Current Connection",
                             })}
-                      </label>
-                      <div className="space-y-2">
-                        {connectionsToShow.map((connection, index) => (
+                      </p>
+                      <div
+                        role="radiogroup"
+                        aria-labelledby={connectionGroupLabelId}
+                        className="space-y-2"
+                      >
+                        {connectionsToShow.map((connection) => (
                           <label
-                            key={index}
+                            key={connection.uri}
                             className={`flex cursor-pointer items-start rounded-lg border-2 p-3 transition-all sm:items-center sm:p-4 ${
                               selectedServerUrl === connection.uri
                                 ? "border-primary bg-primary/10"

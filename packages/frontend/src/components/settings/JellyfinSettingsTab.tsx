@@ -250,7 +250,10 @@ export function JellyfinSettingsTab({
 
             <div className="space-y-4">
               <div>
-                <label className="mb-1 block text-sm font-medium text-foreground">
+                <label
+                  htmlFor="jellyfin-hostname"
+                  className="mb-1 block text-sm font-medium text-foreground"
+                >
                   {t("auth.jellyfin.serverHostname", {
                     defaultValue: "Server Hostname",
                   })}
@@ -260,6 +263,7 @@ export function JellyfinSettingsTab({
                     {useSsl ? "https://" : "http://"}
                   </span>
                   <input
+                    id="jellyfin-hostname"
                     type="text"
                     value={hostname}
                     onChange={(e) => handleHostnameChange(e.target.value)}
@@ -273,10 +277,14 @@ export function JellyfinSettingsTab({
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-foreground">
+                  <label
+                    htmlFor="jellyfin-port"
+                    className="mb-1 block text-sm font-medium text-foreground"
+                  >
                     {t("auth.jellyfin.port", { defaultValue: "Port" })}
                   </label>
                   <input
+                    id="jellyfin-port"
                     type="number"
                     value={port}
                     onChange={(e) =>
@@ -302,12 +310,16 @@ export function JellyfinSettingsTab({
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-foreground">
+                <label
+                  htmlFor="jellyfin-url-base"
+                  className="mb-1 block text-sm font-medium text-foreground"
+                >
                   {t("auth.jellyfin.urlBase", {
                     defaultValue: "URL Base (optional)",
                   })}
                 </label>
                 <input
+                  id="jellyfin-url-base"
                   type="text"
                   value={urlBase}
                   onChange={(e) => handleUrlBaseChange(e.target.value)}
@@ -424,11 +436,15 @@ export function JellyfinSettingsTab({
               )}
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-foreground">
+                <label
+                  htmlFor="jellyfin-api-key"
+                  className="mb-1 block text-sm font-medium text-foreground"
+                >
                   {t("settings.jellyfinApiKey", { defaultValue: "API Key" })}
                 </label>
                 <div className="relative">
                   <input
+                    id="jellyfin-api-key"
                     type={showApiKey ? "text" : "password"}
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
@@ -443,10 +459,10 @@ export function JellyfinSettingsTab({
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
                     aria-label={
                       showApiKey
-                        ? t("auth.hidePassword", {
+                        ? t("settings.hideApiKey", {
                             defaultValue: "Hide API key",
                           })
-                        : t("auth.showPassword", {
+                        : t("settings.showApiKey", {
                             defaultValue: "Show API key",
                           })
                     }

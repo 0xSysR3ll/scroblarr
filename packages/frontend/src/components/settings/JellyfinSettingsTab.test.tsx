@@ -78,7 +78,11 @@ describe("JellyfinSettingsTab", () => {
       jellyfinConfigured: true,
     });
     vi.mocked(removeJellyfinServer).mockResolvedValue({});
-    vi.mocked(linkJellyfinAccount).mockResolvedValue(undefined as never);
+    vi.mocked(linkJellyfinAccount).mockResolvedValue({
+      id: "1",
+      username: "admin",
+      isAdmin: true,
+    });
   });
 
   it("renders a collapsed Jellyfin card by default", async () => {
@@ -152,11 +156,9 @@ describe("JellyfinSettingsTab", () => {
     await user.click(screen.getByRole("button", { name: "Remove Server" }));
 
     const dialog = await screen.findByRole("dialog");
-    const confirm = Array.from(dialog.querySelectorAll("button")).find((btn) =>
-      (btn.textContent ?? "").includes("Remove Server")
+    await user.click(
+      within(dialog).getByRole("button", { name: "Remove Server" })
     );
-    expect(confirm).toBeTruthy();
-    await user.click(confirm!);
 
     await waitFor(() => {
       expect(removeJellyfinServer).toHaveBeenCalled();
@@ -200,7 +202,7 @@ describe("JellyfinSettingsTab", () => {
     await user.type(urlBase, "/media");
 
     const apiKeyToggle = screen.getByRole("button", {
-      name: /Show (API key|password)/i,
+      name: "Show API key",
     });
     await user.click(apiKeyToggle);
     expect(screen.getByDisplayValue("jellyfin-key")).toHaveAttribute(
