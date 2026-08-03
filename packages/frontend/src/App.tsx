@@ -6,6 +6,7 @@ import { RouteErrorBoundary } from "@components/ui/route-error-boundary";
 import { Spinner } from "@components/ui/spinner";
 import { AuthProvider, useAuth } from "@contexts/AuthContext";
 import { LoginPage } from "@pages/auth/LoginPage";
+import { OfflinePage } from "@pages/auth/OfflinePage";
 import { SetupPage } from "@pages/auth/SetupPage";
 import { DashboardPage } from "@pages/user/DashboardPage";
 import { showError } from "@utils/toast";
@@ -38,27 +39,58 @@ const SyncDashboardPage = lazy(() =>
   }))
 );
 
-function AppRoutes() {
+export function AppRoutes() {
   const { t } = useTranslation();
   const { isAuthenticated, loading } = useAuth();
   const [hasAdmin, setHasAdmin] = useState<boolean | null>(null);
   const [checkingAdmin, setCheckingAdmin] = useState(true);
+  const [apiUnreachable, setApiUnreachable] = useState(false);
   const isCheckingAdminRef = useRef(false);
+  const hasAdminRef = useRef(hasAdmin);
 
-  const checkAdmin = useCallback(async () => {
+  useEffect(() => {
+    hasAdminRef.current = hasAdmin;
+  }, [hasAdmin]);
+
+  const checkAdmin = useCallback(async (options?: { retry?: boolean }) => {
     if (isCheckingAdminRef.current) {
       return;
     }
     isCheckingAdminRef.current = true;
+    if (options?.retry) {
+      setCheckingAdmin(true);
+      setApiUnreachable(false);
+    }
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 8_000);
+
     try {
-      const response = await fetch("/api/v1/auth/check-admin");
-      if (response.ok) {
-        const data = await response.json();
-        setHasAdmin(data?.hasAdmin ?? false);
+      const response = await fetch("/api/v1/auth/check-admin", {
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        throw new Error(`check-admin failed with status ${response.status}`);
       }
+      const data: unknown = await response.json();
+      if (
+        typeof data !== "object" ||
+        data === null ||
+        !("hasAdmin" in data) ||
+        typeof data.hasAdmin !== "boolean"
+      ) {
+        throw new Error("Invalid check-admin response");
+      }
+      setHasAdmin(data.hasAdmin);
+      setApiUnreachable(false);
     } catch {
-      // Keep previous hasAdmin value on transient fetch errors.
+      // Keep a known setup state on transient failures; only show offline
+      // when we never successfully determined whether setup is complete.
+      if (hasAdminRef.current === null) {
+        setApiUnreachable(true);
+      }
     } finally {
+      window.clearTimeout(timeoutId);
       isCheckingAdminRef.current = false;
       setCheckingAdmin(false);
     }
@@ -84,7 +116,7 @@ function AppRoutes() {
   }, [t, checkAdmin]);
 
   useEffect(() => {
-    if (!(isAuthenticated && !hasAdmin)) {
+    if (!(isAuthenticated && hasAdmin === false)) {
       return;
     }
     const id = requestAnimationFrame(() => {
@@ -111,7 +143,17 @@ function AppRoutes() {
     );
   }
 
-  if (!hasAdmin) {
+  if (apiUnreachable) {
+    return (
+      <OfflinePage
+        onRetry={() => {
+          void checkAdmin({ retry: true });
+        }}
+      />
+    );
+  }
+
+  if (hasAdmin === false) {
     return (
       <Routes>
         <Route path="/setup" element={<SetupPage />} />
