@@ -482,6 +482,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         if (pollId !== simklPinPollIdRef.current) {
           return;
         }
+        simklOAuthPopup.closePopup();
         setSimklError(
           err instanceof Error
             ? err.message
@@ -569,6 +570,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
 
       {/* Trakt Integration */}
       <CollapsibleSettingsCard
+        key={traktStatus?.needsReauthorization ? "reauth" : "default"}
         title="Trakt"
         description={t("trakt.description", {
           defaultValue:

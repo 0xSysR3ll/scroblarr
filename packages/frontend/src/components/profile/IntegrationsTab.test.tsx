@@ -255,6 +255,51 @@ describe("IntegrationsTab", () => {
     expect(screen.getByText("trakt-user")).toBeVisible();
   });
 
+  it("opens Trakt for re-authorization when Simkl status resolves first", async () => {
+    let resolveTrakt!: (
+      value: Awaited<ReturnType<typeof getTraktStatus>>
+    ) => void;
+    vi.mocked(getTraktStatus).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveTrakt = resolve;
+        })
+    );
+    vi.mocked(getSimklStatus).mockResolvedValue({
+      linked: false,
+      username: null,
+      image: null,
+      hasCredentials: false,
+    });
+
+    renderWithProviders(<IntegrationsTab />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // Simkl finished first, so the cards mount before Trakt status is known.
+    expect(
+      within(await getTraktSection()).getByRole("button", { name: /Trakt/i })
+    ).toHaveAttribute("aria-expanded", "false");
+
+    await act(async () => {
+      resolveTrakt({
+        linked: true,
+        needsReauthorization: true,
+        username: "trakt-user",
+        image: "https://img.example/trakt.png",
+        hasCredentials: true,
+      });
+      await Promise.resolve();
+    });
+
+    expect(
+      within(await getTraktSection()).getByRole("button", { name: /Trakt/i })
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("trakt-user")).toBeVisible();
+  });
+
   it("shows a re-authorization warning for linked Trakt accounts", async () => {
     vi.mocked(getTraktStatus).mockResolvedValue({
       linked: true,
@@ -1277,6 +1322,7 @@ describe("IntegrationsTab Simkl integration", () => {
     expect(
       await screen.findByText("PIN service down", {}, { timeout: 3000 })
     ).toBeVisible();
+    expect(oauthPopupMocks.closePopup).toHaveBeenCalled();
   });
 
   it("shows a default error when Simkl PIN authorization rejects a non-Error", async () => {
@@ -1297,6 +1343,7 @@ describe("IntegrationsTab Simkl integration", () => {
         { timeout: 3000 }
       )
     ).toBeVisible();
+    expect(oauthPopupMocks.closePopup).toHaveBeenCalled();
   });
 
   it("stops PIN polling after a fatal authorization error", async () => {
