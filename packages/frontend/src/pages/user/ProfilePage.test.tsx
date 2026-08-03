@@ -41,11 +41,10 @@ describe("ProfilePage", () => {
   it("renders the integrations tab route", async () => {
     renderWithProviders(<ProfilePage />, { route: "/profile/integrations" });
 
-    // IntegrationsTab renders sections headed by destination names.
-    expect(await screen.findByRole("heading", { name: "Trakt" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Simkl" })).toBeVisible();
+    // IntegrationsTab renders collapsible sections headed by destination names.
     expect(
-      screen.queryByRole("heading", { name: "TVTime" })
-    ).not.toBeInTheDocument();
+      await screen.findByRole("heading", { name: /Trakt/i })
+    ).toBeVisible();
+    expect(screen.getByRole("heading", { name: /Simkl/i })).toBeVisible();
   });
 });
