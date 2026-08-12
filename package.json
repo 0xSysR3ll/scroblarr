@@ -23,7 +23,8 @@
     "check": "pnpm lint && pnpm format:check && pnpm type-check",
     "test": "pnpm --filter '@scroblarr/backend' test && pnpm --filter '@scroblarr/frontend' test",
     "test:coverage": "pnpm --filter '@scroblarr/backend' test:coverage && pnpm --filter '@scroblarr/frontend' test:coverage",
-    "i18n:extract": "pnpm --filter '@scroblarr/frontend' i18n:extract"
+    "i18n:extract": "pnpm --filter '@scroblarr/frontend' i18n:extract",
+    "release": "./scripts/release.sh"
   },
   "devDependencies": {
     "@eslint/js": "9.39.4",
