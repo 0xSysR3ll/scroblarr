@@ -113,6 +113,10 @@ suggest_version() {
 
 restore_branch() {
   if [[ -n "$START_BRANCH" && "$DRY_RUN" -eq 0 ]]; then
+    # Abort a failed merge so checkout is not blocked by unmerged paths.
+    if [[ -e "$(git rev-parse --git-path MERGE_HEAD)" ]]; then
+      git merge --abort >/dev/null 2>&1 || true
+    fi
     local current
     current="$(git branch --show-current 2>/dev/null || true)"
     if [[ "$current" != "$START_BRANCH" ]] && git show-ref --verify --quiet "refs/heads/${START_BRANCH}"; then
