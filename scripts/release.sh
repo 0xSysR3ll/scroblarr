@@ -58,6 +58,13 @@ normalize_version() {
   fi
 }
 
+# Return 0 if $1 is strictly greater than $2 (e.g. v0.4.0 > v0.3.1).
+version_greater() {
+  local left="${1#v}"
+  local right="${2#v}"
+  [[ "$left" != "$right" && "$(printf '%s\n' "$right" "$left" | sort -V | tail -n1)" == "$left" ]]
+}
+
 latest_tag() {
   git describe --tags --abbrev=0 2>/dev/null || true
 }
@@ -208,6 +215,10 @@ else
   VERSION="$(normalize_version "$VERSION")"
 fi
 
+if [[ -n "$latest" ]] && ! version_greater "$VERSION" "$latest"; then
+  die "version ${VERSION} must be greater than latest tag ${latest}"
+fi
+
 if git rev-parse -q --verify "refs/tags/${VERSION}" >/dev/null; then
   die "tag ${VERSION} already exists locally"
 fi
@@ -222,6 +233,13 @@ fi
 info "Releasing:  ${VERSION}"
 info "Merging ${pending} commit(s) from develop into main"
 
+if [[ "$DRY_RUN" -eq 0 ]]; then
+  info "Checking atomic push support on ${REMOTE}"
+  if ! git push --atomic --dry-run "$REMOTE" "refs/heads/develop:refs/heads/develop" >/dev/null 2>&1; then
+    die "remote ${REMOTE} does not support atomic pushes (required to publish main and the tag together)"
+  fi
+fi
+
 if [[ "$ASSUME_YES" -eq 0 && "$DRY_RUN" -eq 0 ]]; then
   echo
   git log "${MAIN_REF}..${DEVELOP_REF}" --oneline --no-merges || true
@@ -233,14 +251,20 @@ fi
 trap restore_branch EXIT
 
 info "Checking out main"
-run git checkout main
-
-info "Updating local main to ${MAIN_REF}"
-if [[ "$DRY_RUN" -eq 1 ]]; then
-  echo "  [dry-run] git reset --hard ${MAIN_REF}"
+if git show-ref --verify --quiet "refs/heads/main"; then
+  if ! git merge-base --is-ancestor main "$MAIN_REF"; then
+    die "local main has unpublished commits not on ${MAIN_REF}; push or reset them first"
+  fi
+  run git checkout main
+  info "Updating local main to ${MAIN_REF}"
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    echo "  [dry-run] git reset --hard ${MAIN_REF}"
+  else
+    git reset --hard "$MAIN_REF"
+  fi
 else
-  # Safe: working tree is clean and we just checked out main
-  git reset --hard "$MAIN_REF"
+  info "Creating local main from ${MAIN_REF}"
+  run git checkout -B main "$MAIN_REF"
 fi
 
 info "Merging ${DEVELOP_REF} into main"
@@ -257,8 +281,8 @@ run git commit --allow-empty -m "chore: release ${VERSION}"
 info "Creating annotated tag ${VERSION}"
 run git tag -a "$VERSION" -m "$VERSION"
 
-info "Pushing main and ${VERSION} to ${REMOTE}"
-run git push "$REMOTE" main "refs/tags/${VERSION}"
+info "Pushing main and ${VERSION} to ${REMOTE} (atomic)"
+run git push --atomic "$REMOTE" main "refs/tags/${VERSION}"
 
 info "Syncing develop with main (release commit)"
 run git checkout develop
