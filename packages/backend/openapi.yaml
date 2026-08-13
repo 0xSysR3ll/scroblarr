@@ -177,6 +177,8 @@ components:
         webhookApiKey:
           type: string
           nullable: true
+          minLength: 1
+          pattern: '.*\S.*'
           description: API key for Plex/Jellyfin webhook authentication
         tmdbAccessToken:
           type: string
@@ -216,6 +218,7 @@ components:
         webhookApiKey:
           type: string
           minLength: 1
+          pattern: '.*\S.*'
           description: API key for Plex/Jellyfin webhook authentication
         tmdbAccessToken:
           type: string

@@ -62,7 +62,7 @@ const settings: Settings = {
   jellyfinPort: "8096",
   jellyfinUseSsl: "false",
   jellyfinApiKey: "jellyfin-key",
-  apiKey: "sk_saved",
+  apiKey: "sk_admin",
 };
 
 describe("MediaServerSettingsTab", () => {
@@ -90,7 +90,7 @@ describe("MediaServerSettingsTab", () => {
         plexLinkError={null}
         settings={settings}
         onJellyfinSettingsChange={vi.fn()}
-        webhookApiKey="sk_saved"
+        webhookApiKey="sk_webhook"
       />
     );
 
@@ -105,7 +105,7 @@ describe("MediaServerSettingsTab", () => {
     await user.click(screen.getByRole("button", { name: /Webhooks/i }));
 
     expect(screen.getByLabelText("Webhook URL")).toHaveValue(
-      buildPlexWebhookUrl("sk_saved")
+      buildPlexWebhookUrl("sk_webhook")
     );
   });
 });

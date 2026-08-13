@@ -148,4 +148,19 @@ describe("settings PATCH", () => {
       "sk_webhook"
     );
   });
+
+  it("rejects whitespace-only webhook API keys", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/settings", settingsRoutes);
+
+    const response = await request(app)
+      .patch("/api/v1/settings")
+      .set("authorization", "Bearer admin-token")
+      .send({ webhookApiKey: "   " });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe("Validation error");
+    expect(settingsRepositoryMocks.set).not.toHaveBeenCalled();
+  });
 });

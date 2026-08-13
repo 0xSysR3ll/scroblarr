@@ -52,15 +52,15 @@ Scroblarr **rejects** Plex webhooks unless a **webhook API key** is set under **
 4. Click **Add Webhook**
 5. Enter your Scroblarr webhook URL (replace placeholders):
 
-   ```
-   http://your-scroblarr-url/api/v1/webhooks/plex?apiKey=sk_your_webhook_api_key_here
+   ```text
+   YOUR_SCROBLARR_ORIGIN/api/v1/webhooks/plex?apiKey=sk_your_webhook_api_key_here
    ```
 
    Replace:
-   - `your-scroblarr-url` with your actual Scroblarr URL:
-     - If running locally: `http://localhost:3000` or `http://192.168.1.100:3000`
-     - If using Docker on the same machine: `http://host.docker.internal:3000` (from Plex container) or your host IP
-     - If using a reverse proxy: `https://scroblarr.example.com`
+   - `YOUR_SCROBLARR_ORIGIN` with your Scroblarr origin (scheme + host + port), for example:
+     - Local: `http://localhost:3000` or `http://192.168.1.100:3000`
+     - Docker on the same machine: `http://host.docker.internal:3000` (from the Plex container) or your host IP
+     - Reverse proxy: `https://scroblarr.example.com`
    - `sk_your_webhook_api_key_here` with the **exact** webhook API key from **Settings → General** (URL-encode if your key contains special characters)
 
 6. Save
