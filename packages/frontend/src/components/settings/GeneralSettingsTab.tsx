@@ -95,7 +95,6 @@ function SecretKeyField({
         <button
           type="button"
           onClick={async () => {
-            if (!value) return;
             try {
               await navigator.clipboard.writeText(value);
               showSuccess(copiedMessage);

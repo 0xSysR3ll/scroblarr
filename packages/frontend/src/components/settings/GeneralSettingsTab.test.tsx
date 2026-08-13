@@ -177,6 +177,24 @@ describe("GeneralSettingsTab", () => {
     expect(onSyncHistoryLimitChange).toHaveBeenCalledWith(250);
   });
 
+  it("falls back to 100 when the sync history limit is cleared", () => {
+    renderTab();
+
+    fireEvent.change(screen.getByLabelText("Sync History Limit"), {
+      target: { value: "" },
+    });
+
+    expect(onSyncHistoryLimitChange).toHaveBeenCalledWith(100);
+  });
+
+  it("updates the webhook API key field", async () => {
+    const user = userEvent.setup();
+    renderTab();
+
+    await user.type(screen.getByLabelText("Webhook API Key"), "x");
+    expect(onWebhookApiKeyChange).toHaveBeenCalled();
+  });
+
   it("copies, generates, and toggles the API key", async () => {
     const user = userEvent.setup();
     const writeText = vi.fn().mockResolvedValue(undefined);
