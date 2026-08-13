@@ -187,12 +187,25 @@ describe("GeneralSettingsTab", () => {
     expect(onSyncHistoryLimitChange).toHaveBeenCalledWith(100);
   });
 
-  it("updates the webhook API key field", async () => {
-    const user = userEvent.setup();
-    renderTab();
+  it("updates the webhook API key field", () => {
+    renderWithProviders(
+      <GeneralSettingsTab
+        syncHistoryLimit={100}
+        onSyncHistoryLimitChange={onSyncHistoryLimitChange}
+        apiKey="sk_test"
+        onApiKeyChange={onApiKeyChange}
+        webhookApiKey=""
+        onWebhookApiKeyChange={onWebhookApiKeyChange}
+        tmdbAccessToken=""
+        onTmdbAccessTokenChange={onTmdbAccessTokenChange}
+      />
+    );
 
-    await user.type(screen.getByLabelText("Webhook API Key"), "x");
-    expect(onWebhookApiKeyChange).toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("Webhook API Key"), {
+      target: { value: "sk_typed" },
+    });
+
+    expect(onWebhookApiKeyChange).toHaveBeenCalledWith("sk_typed");
   });
 
   it("copies, generates, and toggles the API key", async () => {

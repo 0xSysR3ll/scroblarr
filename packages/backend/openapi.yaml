@@ -45,6 +45,16 @@ components:
       in: header
       name: X-API-Key
       description: Global API key for programmatic API authentication
+    webhookApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Dedicated webhook API key (Jellyfin X-API-Key header)
+    webhookQueryApiKeyAuth:
+      type: apiKey
+      in: query
+      name: apiKey
+      description: Dedicated webhook API key (Plex query parameter)
 
   schemas:
     Error:
@@ -1697,7 +1707,7 @@ paths:
       summary: Plex webhook endpoint
       tags: [Webhooks]
       security:
-        - apiKeyAuth: []
+        - webhookQueryApiKeyAuth: []
       requestBody:
         required: true
         content:
@@ -1727,7 +1737,7 @@ paths:
       summary: Jellyfin webhook endpoint
       tags: [Webhooks]
       security:
-        - apiKeyAuth: []
+        - webhookApiKeyAuth: []
       requestBody:
         required: true
         content:
