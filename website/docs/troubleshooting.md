@@ -10,9 +10,9 @@ Having issues? Here are some common problems and how to fix them.
 
 ### Plex webhooks not received
 
-- **Set an API key in Scroblarr first**: Under **Settings → General**, without a stored API key, webhooks return **503** (`Webhook authentication not ready`).
-- **Check the webhook URL**: It must include your key as a query parameter, e.g. `http://your-url/api/v1/webhooks/plex?apiKey=your_key` (Plex cannot send `X-API-Key` headers).
-- **Check the key matches**: The `apiKey` query value must exactly match **Settings → General** (copy-paste; watch for trailing spaces or URL encoding issues).
+- **Set a webhook API key in Scroblarr first**: Under **Settings → General**, without a stored webhook API key, webhooks return **503** (`Webhook authentication not ready`).
+- **Check the webhook URL**: It must include your webhook key as a query parameter, e.g. `http://your-url/api/v1/webhooks/plex?apiKey=your_webhook_key` (Plex cannot send `X-API-Key` headers).
+- **Check the key matches**: The `apiKey` query value must exactly match **Settings → General → Webhook API Key** (copy-paste; watch for trailing spaces or URL encoding issues).
 - **Check Plex Pass**: Webhooks require an active Plex Pass subscription
 - **Check network access**: Plex must be able to reach your Scroblarr URL (firewall, Docker networking, HTTPS vs HTTP). Webhooks are **POST** requests with a body; opening the URL in a browser (GET) is not a reliable test of delivery—use Plex webhook logs and Scroblarr logs instead.
 - **Check Plex logs**: Plex logs will show if webhook delivery failed
@@ -28,11 +28,11 @@ Scroblarr compares the webhook JSON `Server.uuid` to the machine identifier save
 ### Jellyfin webhooks not received
 
 - **Install the Webhooks plugin**: Jellyfin requires a plugin for webhooks. Install it from the Plugins section, then restart Jellyfin
-- **Set an API key in Scroblarr first**: Under **Settings → General**, without a stored API key, webhooks return **503** (`Webhook authentication not ready`).
+- **Set a webhook API key in Scroblarr first**: Under **Settings → General**, without a stored webhook API key, webhooks return **503** (`Webhook authentication not ready`).
 - **Check the webhook URL**: Should be `http://your-url/api/v1/webhooks/jellyfin` on a **Generic** destination
 - **Checkboxes**: Enable **Playback Start** and **Playback Stop** only; enable **Movies** and **Episodes** item types; leave **Send All Properties** unchecked
 - **Template + Content-Type**: Paste the Handlebars template from [Jellyfin Configuration](/docs/configuration/jellyfin). Prefer a `Content-Type: application/json` request header (the plugin defaults to `text/plain`; Scroblarr still accepts JSON in that case)
-- **Send the API key on every request**: Use the `X-API-Key` header or include `"apiKey": "..."` in the JSON body; it must exactly match **Settings → General**. Missing or wrong keys return **401**.
+- **Send the webhook API key on every request**: Use the `X-API-Key` header or include `"apiKey": "..."` in the JSON body; it must exactly match **Settings → General → Webhook API Key**. Missing or wrong keys return **401**.
 - **Check Jellyfin logs**: Look for webhook delivery errors; enable `Jellyfin.Plugin.Webhook` debug logging if needed
 - **Check Scroblarr logs**: Settings → Logs — look for rejected auth or empty/invalid payload errors
 
@@ -50,7 +50,7 @@ Scroblarr compares the webhook JSON `Server.uuid` to the machine identifier save
 
 - **Trakt**: Your OAuth token might have expired. Try unlinking and re-linking your Trakt account
 - **Simkl**: Your access token or Client ID might be invalid. Try unlinking and re-linking your Simkl account with the Client ID from your Simkl developer app.
-- **Trakt OAuth app**: Confirm your **Trakt Client ID** and **Client Secret** (from [app.trakt.tv/settings/apps/api](https://app.trakt.tv/settings/apps/api)) match what you entered in Scroblarr—these are not the same as the Scroblarr **Settings → General** API key used for webhooks.
+- **Trakt OAuth app**: Confirm your **Trakt Client ID** and **Client Secret** (from [app.trakt.tv/settings/apps/api](https://app.trakt.tv/settings/apps/api)) match what you entered in Scroblarr—these are not the same as the Scroblarr **Settings → General** webhook API key.
 
 ### Simkl sync fails with "could not match" or missing metadata
 

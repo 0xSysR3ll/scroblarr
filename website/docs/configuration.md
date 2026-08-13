@@ -22,11 +22,12 @@ Scroblarr needs two types of configuration:
 
 In **Settings > General**, you can configure:
 
-- **API Key**: Required for **webhook** authentication (Plex query string; Jellyfin header or JSON field). Also used where the app expects an API key for programmatic access. Generate or set a key before configuring Plex/Jellyfin webhooks, or deliveries will fail with **503** / **401**.
+- **API Key**: Used for programmatic API access via the `X-API-Key` header.
+- **Webhook API Key**: Required for **webhook** authentication (Plex query string; Jellyfin header or JSON field). Generate or set a key before configuring Plex/Jellyfin webhooks, or deliveries will fail with **503** / **401**.
 - **Sync History Limit**: How many sync history entries to keep (default: 1000)
 
 :::warning
-Keep your API key secret! Anyone with the key can call webhook endpoints as if they were your media servers. Don't share it publicly or commit it to version control.
+Keep your API keys secret! Don't share them publicly or commit them to version control.
 :::
 
 ## User management

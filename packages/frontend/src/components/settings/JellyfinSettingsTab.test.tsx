@@ -50,7 +50,7 @@ const configuredSettings: Settings = {
 function renderJellyfin(
   overrides: Partial<{
     settings: Settings;
-    scroblarrApiKey?: string;
+    webhookApiKey?: string;
     onJellyfinSettingsChange?: ReturnType<typeof vi.fn>;
     onSettingsUpdated?: ReturnType<typeof vi.fn>;
   }> = {}
@@ -60,7 +60,7 @@ function renderJellyfin(
       settings={overrides.settings ?? {}}
       onJellyfinSettingsChange={overrides.onJellyfinSettingsChange ?? vi.fn()}
       onSettingsUpdated={overrides.onSettingsUpdated}
-      scroblarrApiKey={overrides.scroblarrApiKey ?? "sk_test"}
+      webhookApiKey={overrides.webhookApiKey ?? "sk_test"}
     />
   );
 }

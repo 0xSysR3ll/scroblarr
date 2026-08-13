@@ -70,7 +70,7 @@ describe("MediaServerSettingsTab", () => {
     vi.clearAllMocks();
   });
 
-  it("renders collapsed Plex and Jellyfin cards and wires the Scroblarr API key", async () => {
+  it("renders collapsed Plex and Jellyfin cards and wires the webhook API key", async () => {
     const user = userEvent.setup();
 
     renderWithProviders(
@@ -90,7 +90,7 @@ describe("MediaServerSettingsTab", () => {
         plexLinkError={null}
         settings={settings}
         onJellyfinSettingsChange={vi.fn()}
-        scroblarrApiKey="sk_saved"
+        webhookApiKey="sk_saved"
       />
     );
 

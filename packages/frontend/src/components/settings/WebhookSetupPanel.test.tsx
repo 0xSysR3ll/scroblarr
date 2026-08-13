@@ -53,7 +53,7 @@ describe("WebhookSetupPanel", () => {
       screen.getByText(/Set and save an API key under Settings → General first/)
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Webhook URL")).toHaveValue(
-      buildPlexWebhookUrl("YOUR_API_KEY")
+      buildPlexWebhookUrl("YOUR_WEBHOOK_API_KEY")
     );
     expect(screen.getByRole("link", { name: "Setup docs" })).toHaveAttribute(
       "href",
@@ -70,7 +70,7 @@ describe("WebhookSetupPanel", () => {
     });
 
     renderWithProviders(
-      <WebhookSetupPanel source="plex" apiKey="sk_live_key" />
+      <WebhookSetupPanel source="plex" webhookApiKey="sk_live_key" />
     );
     await expandWebhooks(user);
 
@@ -99,7 +99,7 @@ describe("WebhookSetupPanel", () => {
     });
 
     renderWithProviders(
-      <WebhookSetupPanel source="jellyfin" apiKey="sk_jelly" />
+      <WebhookSetupPanel source="jellyfin" webhookApiKey="sk_jelly" />
     );
     await expandWebhooks(user);
 
@@ -135,7 +135,7 @@ describe("WebhookSetupPanel", () => {
     });
 
     renderWithProviders(
-      <WebhookSetupPanel source="plex" apiKey="sk_live_key" />
+      <WebhookSetupPanel source="plex" webhookApiKey="sk_live_key" />
     );
     await expandWebhooks(user);
 

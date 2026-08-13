@@ -131,4 +131,21 @@ describe("settings PATCH", () => {
     expect(response.status).toBe(400);
     expect(response.body.error).toBe("Validation error");
   });
+
+  it("persists a webhook API key", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/settings", settingsRoutes);
+
+    const response = await request(app)
+      .patch("/api/v1/settings")
+      .set("authorization", "Bearer admin-token")
+      .send({ webhookApiKey: "  sk_webhook  " });
+
+    expect(response.status).toBe(200);
+    expect(settingsRepositoryMocks.set).toHaveBeenCalledWith(
+      "webhookApiKey",
+      "sk_webhook"
+    );
+  });
 });

@@ -26,6 +26,7 @@ const updateSettingsSchema = z.object({
   jellyfinUrlBase: z.string().optional(),
   jellyfinApiKey: z.string().optional(),
   apiKey: z.string().min(1).optional(),
+  webhookApiKey: z.string().min(1).optional(),
   tmdbAccessToken: z.union([z.string().min(1), z.literal("")]).optional(),
 });
 
@@ -103,6 +104,13 @@ router.patch("/", async (req: Request, res: Response): Promise<void> => {
 
     if (validated.apiKey !== undefined) {
       await settingsRepository.set("apiKey", validated.apiKey.trim());
+    }
+
+    if (validated.webhookApiKey !== undefined) {
+      await settingsRepository.set(
+        "webhookApiKey",
+        validated.webhookApiKey.trim()
+      );
     }
 
     if (validated.tmdbAccessToken !== undefined) {

@@ -26,12 +26,12 @@ Jellyfin requires the [Webhooks plugin](https://github.com/jellyfin/jellyfin-plu
 :::
 
 :::warning API key required
-Scroblarr **rejects** Jellyfin webhooks unless an API key is set under **Settings → General** and each request sends that same key via the **`X-API-Key`** header or an **`apiKey`** field in the JSON body (the server strips `apiKey` from the payload before parsing the event).
+Scroblarr **rejects** Jellyfin webhooks unless a **webhook API key** is set under **Settings → General** and each request sends that same key via the **`X-API-Key`** header or an **`apiKey`** field in the JSON body (the server strips `apiKey` from the payload before parsing the event). This is separate from the admin API key.
 :::
 
-### 1. Set the Scroblarr API key
+### 1. Set the Scroblarr webhook API key
 
-In Scroblarr, open **Settings → General**, generate or set an **API key**, and save.
+In Scroblarr, open **Settings → General**, generate or set a **Webhook API key**, and save.
 
 ### 2. Add a Generic webhook destination
 
@@ -103,10 +103,10 @@ Notes:
 
 Add these request headers (Generic destination → **Add Request Header**):
 
-| Header         | Value                                    |
-| -------------- | ---------------------------------------- |
-| `Content-Type` | `application/json`                       |
-| `X-API-Key`    | Your API key from **Settings → General** |
+| Header         | Value                                            |
+| -------------- | ------------------------------------------------ |
+| `Content-Type` | `application/json`                               |
+| `X-API-Key`    | Your webhook API key from **Settings → General** |
 
 `Content-Type: application/json` is **recommended**. The plugin defaults to `text/plain`; Scroblarr can still parse JSON from that content type, but setting `application/json` makes the intent explicit.
 

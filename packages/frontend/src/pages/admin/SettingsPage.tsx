@@ -45,6 +45,7 @@ export function SettingsPage() {
   const [editingServer, setEditingServer] = useState<string | null>(null);
   const [syncHistoryLimit, setSyncHistoryLimit] = useState<number>(100);
   const [apiKey, setApiKey] = useState<string>("");
+  const [webhookApiKey, setWebhookApiKey] = useState<string>("");
   const [tmdbAccessToken, setTmdbAccessToken] = useState<string>("");
   const [jellyfinSettings, setJellyfinSettings] = useState<{
     hostname: string;
@@ -174,6 +175,10 @@ export function SettingsPage() {
           setApiKey(settingsData.apiKey);
         }
 
+        if (settingsData.webhookApiKey) {
+          setWebhookApiKey(settingsData.webhookApiKey);
+        }
+
         setTmdbAccessToken(settingsData.tmdbAccessToken || "");
 
         if (settingsData.jellyfinHost) {
@@ -249,6 +254,9 @@ export function SettingsPage() {
       if (activeTab === "general") {
         if (apiKey) {
           updated.apiKey = apiKey;
+        }
+        if (webhookApiKey) {
+          updated.webhookApiKey = webhookApiKey;
         }
         if (tmdbAccessToken) {
           updated.tmdbAccessToken = tmdbAccessToken;
@@ -433,6 +441,8 @@ export function SettingsPage() {
               onSyncHistoryLimitChange={setSyncHistoryLimit}
               apiKey={apiKey}
               onApiKeyChange={setApiKey}
+              webhookApiKey={webhookApiKey}
+              onWebhookApiKeyChange={setWebhookApiKey}
               tmdbAccessToken={tmdbAccessToken}
               onTmdbAccessTokenChange={setTmdbAccessToken}
             />
@@ -460,7 +470,7 @@ export function SettingsPage() {
               plexLinkError={plexLinkError}
               settings={settings}
               onJellyfinSettingsChange={setJellyfinSettings}
-              scroblarrApiKey={settings.apiKey}
+              webhookApiKey={settings.webhookApiKey}
               onSettingsUpdated={async () => {
                 try {
                   const updatedSettings = await getSettings();
