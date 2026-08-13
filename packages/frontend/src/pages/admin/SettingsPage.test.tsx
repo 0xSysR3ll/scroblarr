@@ -175,10 +175,12 @@ describe("SettingsPage", () => {
     vi.mocked(getSettings).mockResolvedValue({
       syncHistoryLimit: "100",
       apiKey: "sk_saved",
+      webhookApiKey: "sk_webhook_saved",
     });
     vi.mocked(updateSettings).mockResolvedValue({
       syncHistoryLimit: "100",
       apiKey: "sk_saved",
+      webhookApiKey: "sk_webhook_saved",
     });
 
     const user = userEvent.setup();
@@ -186,6 +188,9 @@ describe("SettingsPage", () => {
 
     await waitFor(() => {
       expect(screen.getByLabelText("API Key")).toHaveValue("sk_saved");
+      expect(screen.getByLabelText("Webhook API Key")).toHaveValue(
+        "sk_webhook_saved"
+      );
     });
 
     await user.click(screen.getByRole("button", { name: "Save" }));
@@ -194,14 +199,16 @@ describe("SettingsPage", () => {
       expect(updateSettings).toHaveBeenCalledWith({
         syncHistoryLimit: 100,
         apiKey: "sk_saved",
+        webhookApiKey: "sk_webhook_saved",
       });
     });
   });
 
-  it("passes the Scroblarr API key into media server webhook setup", async () => {
+  it("passes the webhook API key into media server webhook setup", async () => {
     vi.mocked(getSettings).mockResolvedValue({
       syncHistoryLimit: "100",
-      apiKey: "sk_from_settings",
+      apiKey: "sk_admin",
+      webhookApiKey: "sk_from_settings",
       plexServerUrl: "http://192.168.1.10:32400",
     });
     const { getPlexServers } = await import("@services/api");

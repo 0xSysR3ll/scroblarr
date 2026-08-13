@@ -21,8 +21,7 @@ export type WebhookSource = "plex" | "jellyfin";
 
 interface WebhookSetupPanelProps {
   source: WebhookSource;
-  /** Scroblarr Settings → General API key (not the media-server API key). */
-  apiKey?: string;
+  webhookApiKey?: string;
 }
 
 async function copyText(value: string): Promise<boolean> {
@@ -110,11 +109,14 @@ function CopyField({
   );
 }
 
-export function WebhookSetupPanel({ source, apiKey }: WebhookSetupPanelProps) {
+export function WebhookSetupPanel({
+  source,
+  webhookApiKey,
+}: WebhookSetupPanelProps) {
   const { t } = useTranslation();
   const panelId = useId();
   const [open, setOpen] = useState(false);
-  const hasApiKey = !!apiKey?.trim();
+  const hasApiKey = !!webhookApiKey?.trim();
   const docsHref =
     source === "plex"
       ? `${DOCS_URL}/configuration/plex`
@@ -123,8 +125,8 @@ export function WebhookSetupPanel({ source, apiKey }: WebhookSetupPanelProps) {
   const webhookUrl =
     source === "plex"
       ? hasApiKey
-        ? buildPlexWebhookUrl(apiKey!.trim())
-        : buildPlexWebhookUrl("YOUR_API_KEY")
+        ? buildPlexWebhookUrl(webhookApiKey!.trim())
+        : buildPlexWebhookUrl("YOUR_WEBHOOK_API_KEY")
       : buildJellyfinWebhookUrl();
 
   const description =
@@ -241,7 +243,7 @@ export function WebhookSetupPanel({ source, apiKey }: WebhookSetupPanelProps) {
                 label={t("settings.webhook.apiKeyHeader", {
                   defaultValue: "X-API-Key header value",
                 })}
-                value={hasApiKey ? apiKey!.trim() : ""}
+                value={hasApiKey ? webhookApiKey!.trim() : ""}
                 disabled={!hasApiKey}
                 copyLabel={t("settings.webhook.copyApiKey", {
                   defaultValue: "Copy API key",

@@ -41,7 +41,7 @@ interface PlexSettingsTabProps {
   onRefreshPlexServers: () => void;
   plexLinkError: string | null;
   onSettingsUpdated?: () => void;
-  scroblarrApiKey?: string;
+  webhookApiKey?: string;
 }
 
 export function PlexSettingsTab({
@@ -59,7 +59,7 @@ export function PlexSettingsTab({
   onRefreshPlexServers,
   plexLinkError,
   onSettingsUpdated,
-  scroblarrApiKey,
+  webhookApiKey,
 }: PlexSettingsTabProps) {
   const { t } = useTranslation();
   const { isAdmin } = useAuth();
@@ -493,7 +493,7 @@ export function PlexSettingsTab({
         </div>
 
         {!!savedServerUrl && (
-          <WebhookSetupPanel source="plex" apiKey={scroblarrApiKey} />
+          <WebhookSetupPanel source="plex" webhookApiKey={webhookApiKey} />
         )}
       </CollapsibleSettingsCard>
 

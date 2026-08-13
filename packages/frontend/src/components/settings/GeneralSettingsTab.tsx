@@ -17,8 +17,121 @@ interface GeneralSettingsTabProps {
   onSyncHistoryLimitChange: (value: number) => void;
   apiKey: string;
   onApiKeyChange: (value: string) => void;
+  webhookApiKey: string;
+  onWebhookApiKeyChange: (value: string) => void;
   tmdbAccessToken: string;
   onTmdbAccessTokenChange: (value: string) => void;
+}
+
+function generateSkKey(): string {
+  const randomBytes = new Uint8Array(32);
+  crypto.getRandomValues(randomBytes);
+  const hexKey = Array.from(randomBytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return `sk_${hexKey}`;
+}
+
+function SecretKeyField({
+  id,
+  label,
+  description,
+  value,
+  onChange,
+  placeholder,
+  copiedMessage,
+  copyLabel,
+  generateLabel,
+  showLabel,
+  hideLabel,
+}: {
+  id: string;
+  label: string;
+  description: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  copiedMessage: string;
+  copyLabel: string;
+  generateLabel: string;
+  showLabel: string;
+  hideLabel: string;
+}) {
+  const { t } = useTranslation();
+  const [show, setShow] = useState(false);
+
+  return (
+    <div>
+      <label
+        htmlFor={id}
+        className="mb-1 block text-sm font-medium text-foreground"
+      >
+        {label}
+      </label>
+      <p className="mb-2 text-xs text-muted-foreground">{description}</p>
+      <div className="flex gap-2 items-start">
+        <div className="relative flex-1 max-w-md">
+          <input
+            id={id}
+            type={show ? "text" : "password"}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 pr-10 font-mono text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
+            placeholder={placeholder}
+          />
+          <button
+            type="button"
+            onClick={() => setShow(!show)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-muted-foreground transition-colors hover:text-foreground"
+            aria-label={show ? hideLabel : showLabel}
+          >
+            {show ? (
+              <FaEyeSlash className="w-4 h-4" />
+            ) : (
+              <FaEye className="w-4 h-4" />
+            )}
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(value);
+              showSuccess(copiedMessage);
+            } catch {
+              // Clipboard API may fail in non-HTTPS or unsupported contexts
+            }
+          }}
+          disabled={!value}
+          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-input bg-muted px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
+          title={copyLabel}
+          aria-label={copyLabel}
+        >
+          <FaCopy className="w-4 h-4" />
+          <span className="hidden sm:inline">
+            {t("settings.general.copy", { defaultValue: "Copy" })}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            onChange(generateSkKey());
+            setShow(true);
+          }}
+          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-input bg-muted px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/80"
+          title={generateLabel}
+          aria-label={generateLabel}
+        >
+          <FaSync className="w-4 h-4" />
+          <span className="hidden sm:inline">
+            {t("settings.general.generate", {
+              defaultValue: "Generate",
+            })}
+          </span>
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export function GeneralSettingsTab({
@@ -26,11 +139,12 @@ export function GeneralSettingsTab({
   onSyncHistoryLimitChange,
   apiKey,
   onApiKeyChange,
+  webhookApiKey,
+  onWebhookApiKeyChange,
   tmdbAccessToken,
   onTmdbAccessTokenChange,
 }: GeneralSettingsTabProps) {
   const { t } = useTranslation();
-  const [showApiKey, setShowApiKey] = useState(false);
   const [showTmdbAccessToken, setShowTmdbAccessToken] = useState(false);
   const [testingTmdb, setTestingTmdb] = useState(false);
 
@@ -56,97 +170,58 @@ export function GeneralSettingsTab({
       </div>
 
       <div className="space-y-3">
-        <div>
-          <label
-            htmlFor="apiKey"
-            className="mb-1 block text-sm font-medium text-foreground"
-          >
-            {t("settings.general.apiKey", {
-              defaultValue: "API Key",
-            })}
-          </label>
-          <p className="mb-2 text-xs text-muted-foreground">
-            {t("settings.general.apiKeyDescription", {
-              defaultValue:
-                "Used for media-server webhooks and API authentication. Required before Plex or Jellyfin can send events.",
-            })}
-          </p>
-          <div className="flex gap-2 items-start">
-            <div className="relative flex-1 max-w-md">
-              <input
-                id="apiKey"
-                type={showApiKey ? "text" : "password"}
-                value={apiKey}
-                onChange={(e) => onApiKeyChange(e.target.value)}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 pr-10 font-mono text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
-                placeholder={t("settings.general.apiKeyPlaceholder", {
-                  defaultValue: "sk_...",
-                })}
-              />
-              <button
-                type="button"
-                onClick={() => setShowApiKey(!showApiKey)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-muted-foreground transition-colors hover:text-foreground"
-                aria-label={showApiKey ? "Hide API key" : "Show API key"}
-              >
-                {showApiKey ? (
-                  <FaEyeSlash className="w-4 h-4" />
-                ) : (
-                  <FaEye className="w-4 h-4" />
-                )}
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={async () => {
-                if (!apiKey) return;
-                try {
-                  await navigator.clipboard.writeText(apiKey);
-                  showSuccess(
-                    t("settings.general.apiKeyCopied", {
-                      defaultValue: "API key copied to clipboard",
-                    })
-                  );
-                } catch {
-                  // Clipboard API may fail in non-HTTPS or unsupported contexts
-                }
-              }}
-              disabled={!apiKey}
-              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-input bg-muted px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
-              title={t("settings.general.copyApiKey", {
-                defaultValue: "Copy API key",
-              })}
-            >
-              <FaCopy className="w-4 h-4" />
-              <span className="hidden sm:inline">
-                {t("settings.general.copy", { defaultValue: "Copy" })}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const randomBytes = new Uint8Array(32);
-                crypto.getRandomValues(randomBytes);
-                const hexKey = Array.from(randomBytes)
-                  .map((b) => b.toString(16).padStart(2, "0"))
-                  .join("");
-                onApiKeyChange(`sk_${hexKey}`);
-                setShowApiKey(true);
-              }}
-              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-input bg-muted px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/80"
-              title={t("settings.general.generateApiKey", {
-                defaultValue: "Generate new API key",
-              })}
-            >
-              <FaSync className="w-4 h-4" />
-              <span className="hidden sm:inline">
-                {t("settings.general.generate", {
-                  defaultValue: "Generate",
-                })}
-              </span>
-            </button>
-          </div>
-        </div>
+        <SecretKeyField
+          id="apiKey"
+          label={t("settings.general.apiKey", {
+            defaultValue: "API Key",
+          })}
+          description={t("settings.general.apiKeyDescription", {
+            defaultValue: "Used for API authentication.",
+          })}
+          value={apiKey}
+          onChange={onApiKeyChange}
+          placeholder={t("settings.general.apiKeyPlaceholder", {
+            defaultValue: "sk_...",
+          })}
+          copiedMessage={t("settings.general.apiKeyCopied", {
+            defaultValue: "API key copied to clipboard",
+          })}
+          copyLabel={t("settings.general.copyApiKey", {
+            defaultValue: "Copy API key",
+          })}
+          generateLabel={t("settings.general.generateApiKey", {
+            defaultValue: "Generate new API key",
+          })}
+          showLabel="Show API key"
+          hideLabel="Hide API key"
+        />
+
+        <SecretKeyField
+          id="webhookApiKey"
+          label={t("settings.general.webhookApiKey", {
+            defaultValue: "Webhook API Key",
+          })}
+          description={t("settings.general.webhookApiKeyDescription", {
+            defaultValue:
+              "Used for media-server webhooks. Required before Plex or Jellyfin can send events.",
+          })}
+          value={webhookApiKey}
+          onChange={onWebhookApiKeyChange}
+          placeholder={t("settings.general.webhookApiKeyPlaceholder", {
+            defaultValue: "sk_...",
+          })}
+          copiedMessage={t("settings.general.webhookApiKeyCopied", {
+            defaultValue: "Webhook API key copied to clipboard",
+          })}
+          copyLabel={t("settings.general.copyWebhookApiKey", {
+            defaultValue: "Copy webhook API key",
+          })}
+          generateLabel={t("settings.general.generateWebhookApiKey", {
+            defaultValue: "Generate new webhook API key",
+          })}
+          showLabel="Show webhook API key"
+          hideLabel="Hide webhook API key"
+        />
 
         <div>
           <label

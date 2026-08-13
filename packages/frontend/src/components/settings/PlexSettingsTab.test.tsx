@@ -86,7 +86,7 @@ function renderPlex(
       plexRefreshLoading={false}
       onRefreshPlexServers={vi.fn()}
       plexLinkError={null}
-      scroblarrApiKey="sk_test"
+      webhookApiKey="sk_test"
       {...overrides}
     />
   );

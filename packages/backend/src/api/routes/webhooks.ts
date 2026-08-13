@@ -18,28 +18,42 @@ const syncService = new SyncService();
 const settingsRepository = new SettingsRepository();
 const upload = multer({ storage: multer.memoryStorage() });
 
+async function getStoredWebhookApiKey(): Promise<string | null> {
+  return settingsRepository.get("webhookApiKey");
+}
+
+function rejectMissingWebhookKey(res: Response): Response {
+  logger.webhook.warn(
+    {},
+    "Webhook rejected: webhook API key not configured on server"
+  );
+  return res.status(503).json({ error: "Webhook authentication not ready" });
+}
+
+function rejectInvalidWebhookKey(
+  res: Response,
+  provided: boolean,
+  stored: boolean
+): Response {
+  logger.webhook.warn(
+    { hasApiKey: provided, hasStoredKey: stored },
+    "Webhook rejected: Missing or invalid webhook API key"
+  );
+  return res.status(401).json({ error: "Invalid API key" });
+}
+
 router.post("/plex", upload.any(), async (req: Request, res: Response) => {
   try {
     const apiKey =
       typeof req.query.apiKey === "string" ? req.query.apiKey : undefined;
-    const storedApiKey = await settingsRepository.get("apiKey");
+    const storedWebhookApiKey = await getStoredWebhookApiKey();
 
-    if (!storedApiKey) {
-      logger.webhook.warn(
-        {},
-        "Plex webhook rejected: API key not configured on server"
-      );
-      return res
-        .status(503)
-        .json({ error: "Webhook authentication not ready" });
+    if (!storedWebhookApiKey) {
+      return rejectMissingWebhookKey(res);
     }
 
-    if (!apiKey || !timingSafeStringEqual(apiKey, storedApiKey)) {
-      logger.webhook.warn(
-        { hasApiKey: !!apiKey, hasStoredKey: !!storedApiKey },
-        "Plex webhook rejected: Missing or invalid API key"
-      );
-      return res.status(401).json({ error: "Invalid API key" });
+    if (!apiKey || !timingSafeStringEqual(apiKey, storedWebhookApiKey)) {
+      return rejectInvalidWebhookKey(res, !!apiKey, !!storedWebhookApiKey);
     }
 
     let payload: PlexWebhookPayload;
@@ -152,23 +166,13 @@ router.post("/jellyfin", async (req: Request, res: Response) => {
       apiKey = typeof k === "string" ? k : undefined;
     }
 
-    const storedApiKey = await settingsRepository.get("apiKey");
-    if (!storedApiKey) {
-      logger.webhook.warn(
-        {},
-        "Jellyfin webhook rejected: API key not configured on server"
-      );
-      return res
-        .status(503)
-        .json({ error: "Webhook authentication not ready" });
+    const storedWebhookApiKey = await getStoredWebhookApiKey();
+    if (!storedWebhookApiKey) {
+      return rejectMissingWebhookKey(res);
     }
 
-    if (!apiKey || !timingSafeStringEqual(apiKey, storedApiKey)) {
-      logger.webhook.warn(
-        { hasApiKey: !!apiKey, hasStoredKey: !!storedApiKey },
-        "Jellyfin webhook rejected: Missing or invalid API key"
-      );
-      return res.status(401).json({ error: "Invalid API key" });
+    if (!apiKey || !timingSafeStringEqual(apiKey, storedWebhookApiKey)) {
+      return rejectInvalidWebhookKey(res, !!apiKey, !!storedWebhookApiKey);
     }
 
     const payloadWithApiKey = payload as Record<string, unknown>;

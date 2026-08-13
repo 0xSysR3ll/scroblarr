@@ -214,7 +214,7 @@
       "title": "General Settings",
       "description": "General application settings will be available here.",
       "apiKey": "API Key",
-      "apiKeyDescription": "Used for media-server webhooks and API authentication. Required before Plex or Jellyfin can send events.",
+      "apiKeyDescription": "Used for API authentication.",
       "apiKeyPlaceholder": "sk_...",
       "apiKeyCopied": "API key copied to clipboard",
       "copyApiKey": "Copy API key",
@@ -230,7 +230,13 @@
       "tmdbTestSuccess": "TMDB connection successful",
       "tmdbTestFailed": "TMDB connection failed",
       "tmdbTesting": "Testing...",
-      "tmdbTest": "Test connection"
+      "tmdbTest": "Test connection",
+      "webhookApiKey": "Webhook API Key",
+      "webhookApiKeyDescription": "Used for media-server webhooks. Required before Plex or Jellyfin can send events.",
+      "webhookApiKeyPlaceholder": "sk_...",
+      "webhookApiKeyCopied": "Webhook API key copied to clipboard",
+      "copyWebhookApiKey": "Copy webhook API key",
+      "generateWebhookApiKey": "Generate new webhook API key"
     },
     "jellyfinServerRemoved": "Jellyfin server removed successfully",
     "removeJellyfinServerFailed": "Failed to remove Jellyfin server",
@@ -558,7 +564,6 @@
   },
   "simkl": {
     "getAuthUrlFailed": "Failed to get Simkl PIN code",
-    "codeRequired": "Simkl PIN code is required",
     "linked": "Simkl account linked successfully",
     "linkFailed": "Failed to link Simkl account",
     "unlinked": "Simkl account unlinked successfully",

@@ -19,6 +19,7 @@ vi.mock("@utils/toast", () => ({
 describe("GeneralSettingsTab", () => {
   const onSyncHistoryLimitChange = vi.fn();
   const onApiKeyChange = vi.fn();
+  const onWebhookApiKeyChange = vi.fn();
   const onTmdbAccessTokenChange = vi.fn();
 
   beforeEach(() => {
@@ -36,20 +37,20 @@ describe("GeneralSettingsTab", () => {
         onSyncHistoryLimitChange={onSyncHistoryLimitChange}
         apiKey="sk_test"
         onApiKeyChange={onApiKeyChange}
+        webhookApiKey="sk_webhook"
+        onWebhookApiKeyChange={onWebhookApiKeyChange}
         tmdbAccessToken={overrides.tmdbAccessToken ?? ""}
         onTmdbAccessTokenChange={onTmdbAccessTokenChange}
       />
     );
   }
 
-  it("describes the API key as required for webhooks", () => {
+  it("describes separate admin and webhook API keys", () => {
     renderTab();
 
+    expect(screen.getByText(/Used for API authentication/)).toBeInTheDocument();
     expect(
-      screen.getByText(/Used for media-server webhooks and API authentication/)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Required before Plex or Jellyfin can send events/)
+      screen.getByText(/Used for media-server webhooks/)
     ).toBeInTheDocument();
   });
 
@@ -176,6 +177,37 @@ describe("GeneralSettingsTab", () => {
     expect(onSyncHistoryLimitChange).toHaveBeenCalledWith(250);
   });
 
+  it("falls back to 100 when the sync history limit is cleared", () => {
+    renderTab();
+
+    fireEvent.change(screen.getByLabelText("Sync History Limit"), {
+      target: { value: "" },
+    });
+
+    expect(onSyncHistoryLimitChange).toHaveBeenCalledWith(100);
+  });
+
+  it("updates the webhook API key field", () => {
+    renderWithProviders(
+      <GeneralSettingsTab
+        syncHistoryLimit={100}
+        onSyncHistoryLimitChange={onSyncHistoryLimitChange}
+        apiKey="sk_test"
+        onApiKeyChange={onApiKeyChange}
+        webhookApiKey=""
+        onWebhookApiKeyChange={onWebhookApiKeyChange}
+        tmdbAccessToken=""
+        onTmdbAccessTokenChange={onTmdbAccessTokenChange}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Webhook API Key"), {
+      target: { value: "sk_typed" },
+    });
+
+    expect(onWebhookApiKeyChange).toHaveBeenCalledWith("sk_typed");
+  });
+
   it("copies, generates, and toggles the API key", async () => {
     const user = userEvent.setup();
     const writeText = vi.fn().mockResolvedValue(undefined);
@@ -191,6 +223,8 @@ describe("GeneralSettingsTab", () => {
           onSyncHistoryLimitChange={onSyncHistoryLimitChange}
           apiKey="sk_test"
           onApiKeyChange={onApiKeyChange}
+          webhookApiKey="sk_webhook"
+          onWebhookApiKeyChange={onWebhookApiKeyChange}
           tmdbAccessToken=""
           onTmdbAccessTokenChange={onTmdbAccessTokenChange}
         />
@@ -202,11 +236,13 @@ describe("GeneralSettingsTab", () => {
       await user.click(screen.getByRole("button", { name: "Show API key" }));
       expect(apiKeyInput).toHaveAttribute("type", "text");
 
-      await user.click(screen.getByRole("button", { name: "Copy" }));
+      await user.click(screen.getByRole("button", { name: "Copy API key" }));
       expect(writeText).toHaveBeenCalledWith("sk_test");
       expect(showSuccess).toHaveBeenCalledWith("API key copied to clipboard");
 
-      await user.click(screen.getByRole("button", { name: "Generate" }));
+      await user.click(
+        screen.getByRole("button", { name: "Generate new API key" })
+      );
       expect(onApiKeyChange).toHaveBeenCalledWith(
         expect.stringMatching(/^sk_/)
       );
@@ -230,12 +266,14 @@ describe("GeneralSettingsTab", () => {
           onSyncHistoryLimitChange={onSyncHistoryLimitChange}
           apiKey="sk_test"
           onApiKeyChange={onApiKeyChange}
+          webhookApiKey="sk_webhook"
+          onWebhookApiKeyChange={onWebhookApiKeyChange}
           tmdbAccessToken=""
           onTmdbAccessTokenChange={onTmdbAccessTokenChange}
         />
       );
 
-      await user.click(screen.getByRole("button", { name: "Copy" }));
+      await user.click(screen.getByRole("button", { name: "Copy API key" }));
       await waitFor(() => {
         expect(writeText).toHaveBeenCalledWith("sk_test");
       });

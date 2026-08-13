@@ -30,14 +30,14 @@ interface JellyfinSettingsTabProps {
     apiKey: string;
   }) => void;
   onSettingsUpdated?: () => void;
-  scroblarrApiKey?: string;
+  webhookApiKey?: string;
 }
 
 export function JellyfinSettingsTab({
   settings,
   onJellyfinSettingsChange,
   onSettingsUpdated,
-  scroblarrApiKey,
+  webhookApiKey,
 }: JellyfinSettingsTabProps) {
   const { t } = useTranslation();
   const { checkAuth, isAdmin } = useAuth();
@@ -502,7 +502,10 @@ export function JellyfinSettingsTab({
               )}
 
               {!!(settings.jellyfinHost && settings.jellyfinApiKey) && (
-                <WebhookSetupPanel source="jellyfin" apiKey={scroblarrApiKey} />
+                <WebhookSetupPanel
+                  source="jellyfin"
+                  webhookApiKey={webhookApiKey}
+                />
               )}
             </div>
           </>

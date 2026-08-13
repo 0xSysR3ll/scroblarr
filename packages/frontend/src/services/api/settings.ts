@@ -11,6 +11,7 @@ export interface Settings {
   jellyfinUrlBase?: string;
   jellyfinApiKey?: string;
   apiKey?: string;
+  webhookApiKey?: string;
   tmdbAccessToken?: string;
 }
 

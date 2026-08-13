@@ -28,8 +28,7 @@ interface MediaServerSettingsTabProps {
     apiKey: string;
   }) => void;
   onSettingsUpdated?: () => void;
-  /** Scroblarr Settings → General API key used for webhook auth. */
-  scroblarrApiKey?: string;
+  webhookApiKey?: string;
 }
 
 export function MediaServerSettingsTab({
@@ -49,7 +48,7 @@ export function MediaServerSettingsTab({
   settings,
   onJellyfinSettingsChange,
   onSettingsUpdated,
-  scroblarrApiKey,
+  webhookApiKey,
 }: MediaServerSettingsTabProps) {
   return (
     <div className="space-y-4">
@@ -68,14 +67,14 @@ export function MediaServerSettingsTab({
         onRefreshPlexServers={onRefreshPlexServers}
         plexLinkError={plexLinkError}
         onSettingsUpdated={onSettingsUpdated}
-        scroblarrApiKey={scroblarrApiKey}
+        webhookApiKey={webhookApiKey}
       />
 
       <JellyfinSettingsTab
         settings={settings}
         onJellyfinSettingsChange={onJellyfinSettingsChange}
         onSettingsUpdated={onSettingsUpdated}
-        scroblarrApiKey={scroblarrApiKey}
+        webhookApiKey={webhookApiKey}
       />
     </div>
   );

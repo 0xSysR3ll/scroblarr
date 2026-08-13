@@ -127,7 +127,7 @@ With plain `docker run`, same idea: stop, remove, pull, run again — your **`sc
 
 1. Open the UI (e.g. **`http://localhost:3000`**)
 2. Create the first admin user
-3. Set an **API key** under **Settings → General** (webhooks won't work until this exists)
+3. Confirm a **Webhook API key** exists under **Settings → General** (auto-generated on first boot; webhooks won't work without it)
 4. Add Plex/Jellyfin under **Settings → Media Server** — [Configuration](/docs/configuration) walks through it
 5. Paste webhook URLs into Plex/Jellyfin and link Trakt or Simkl when you're ready
 
@@ -235,7 +235,7 @@ CORS only bites when the **address in the browser's address bar** doesn't match 
 
 1. Open the UI — **`http://localhost:5173`** if you're on **`pnpm dev`** (Vite + proxied API), or **`http://localhost:3000`** after **`pnpm start`** (built UI + API on one port)
 2. Create the first admin user
-3. Set an **API key** under **Settings → General** (webhooks won't work until this exists)
+3. Confirm a **Webhook API key** exists under **Settings → General** (auto-generated on first boot; webhooks won't work without it)
 4. Add Plex/Jellyfin under **Settings → Media Server** — [Configuration](/docs/configuration) walks through it
 5. Paste webhook URLs into Plex/Jellyfin and link Trakt or Simkl when you're ready
 

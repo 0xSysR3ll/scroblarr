@@ -64,7 +64,7 @@ This ensures type safety between frontend and backend.
 
 The backend exposes a REST API at `/api/v1/`:
 
-- `/api/v1/webhooks/*` - Plex and Jellyfin webhooks (no session; **require** the Scroblarr API key from Settings → General, per [Configuration](/docs/configuration))
+- `/api/v1/webhooks/*` - Plex and Jellyfin webhooks (no session; **require** the webhook API key from Settings → General, per [Configuration](/docs/configuration))
 - `/api/v1/auth/*` - Sign-in, registration, OAuth callbacks, session checks
 - `/api/v1/logout` - End the current session
 - `/api/v1/users/*` - User management (admin)

@@ -17,9 +17,27 @@ async function bootstrap() {
 
     const settingsRepository = new SettingsRepository();
     const existingApiKey = await settingsRepository.get("apiKey");
+    let createdApiKey = false;
     if (!existingApiKey) {
       const apiKey = `sk_${randomBytes(32).toString("hex")}`;
       await settingsRepository.set("apiKey", apiKey);
+      createdApiKey = true;
+    }
+
+    const existingWebhookApiKey = await settingsRepository.get("webhookApiKey");
+    if (!existingWebhookApiKey) {
+      if (createdApiKey) {
+        await settingsRepository.set(
+          "webhookApiKey",
+          `sk_${randomBytes(32).toString("hex")}`
+        );
+      } else {
+        const adminKey = await settingsRepository.get("apiKey");
+        await settingsRepository.set(
+          "webhookApiKey",
+          adminKey ?? `sk_${randomBytes(32).toString("hex")}`
+        );
+      }
     }
 
     const env = getEnv();

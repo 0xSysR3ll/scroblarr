@@ -44,7 +44,17 @@ components:
       type: apiKey
       in: header
       name: X-API-Key
-      description: Global API key for API authentication
+      description: Global API key for programmatic API authentication
+    webhookApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Dedicated webhook API key (Jellyfin X-API-Key header)
+    webhookQueryApiKeyAuth:
+      type: apiKey
+      in: query
+      name: apiKey
+      description: Dedicated webhook API key (Plex query parameter)
 
   schemas:
     Error:
@@ -174,6 +184,12 @@ components:
           type: string
           nullable: true
           description: Global API key for API authentication
+        webhookApiKey:
+          type: string
+          nullable: true
+          minLength: 1
+          pattern: '.*\S.*'
+          description: API key for Plex/Jellyfin webhook authentication
         tmdbAccessToken:
           type: string
           nullable: true
@@ -209,6 +225,11 @@ components:
           type: string
           minLength: 1
           description: Global API key for API authentication
+        webhookApiKey:
+          type: string
+          minLength: 1
+          pattern: '.*\S.*'
+          description: API key for Plex/Jellyfin webhook authentication
         tmdbAccessToken:
           type: string
           description: TMDB API Read Access Token for poster lookups; empty string clears it
@@ -1686,7 +1707,7 @@ paths:
       summary: Plex webhook endpoint
       tags: [Webhooks]
       security:
-        - apiKeyAuth: []
+        - webhookQueryApiKeyAuth: []
       requestBody:
         required: true
         content:
@@ -1716,7 +1737,7 @@ paths:
       summary: Jellyfin webhook endpoint
       tags: [Webhooks]
       security:
-        - apiKeyAuth: []
+        - webhookApiKeyAuth: []
       requestBody:
         required: true
         content:
