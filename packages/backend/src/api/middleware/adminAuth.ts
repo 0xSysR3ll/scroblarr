@@ -36,9 +36,7 @@ export async function adminAuth(
     const userRepository = new UserRepository();
     const tokenToUse = cookieToken || bearerToken!;
 
-    const userFromSession = await userRepository.findBySessionToken(tokenToUse);
-    const user =
-      userFromSession || (await userRepository.findByAccessToken(tokenToUse));
+    const user = await userRepository.findBySessionToken(tokenToUse);
 
     if (!user || !user.isAdmin) {
       res.status(403).json({ error: "Forbidden: Admin access required" });

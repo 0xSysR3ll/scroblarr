@@ -9,7 +9,6 @@ const settingsRepositoryMocks = vi.hoisted(() => ({
 
 const userRepositoryMocks = vi.hoisted(() => ({
   findBySessionToken: vi.fn(),
-  findByAccessToken: vi.fn(),
 }));
 
 vi.mock("@repositories/SettingsRepository", () => ({
@@ -25,7 +24,6 @@ vi.mock("@repositories/SettingsRepository", () => ({
 vi.mock("@repositories/UserRepository", () => ({
   UserRepository: class {
     findBySessionToken = userRepositoryMocks.findBySessionToken;
-    findByAccessToken = userRepositoryMocks.findByAccessToken;
   },
 }));
 

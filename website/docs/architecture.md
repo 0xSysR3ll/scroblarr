@@ -76,7 +76,7 @@ The backend exposes a REST API at `/api/v1/`:
 - `/api/v1/avatars/*` - User avatar proxy/fetch helpers
 - `/api/v1/meta/*` - Build/version metadata (e.g. `/version` for health and diagnostics)
 
-**Interactive use:** the web UI relies on **cookie-based sessions** after login. **Automation:** use the OpenAPI description at **`/api-docs`** (and the served **`openapi.json`**) for exact paths, request bodies, and which operations accept session cookies vs other auth. Do not expose your webhook API key in client-side code.
+**Interactive use:** the web UI relies on **cookie-based sessions** after login. **Automation:** use the OpenAPI description at **`/api-docs`** (and the served **`openapi.json`**) for exact paths, request bodies, and which operations accept session cookies vs other auth. A `Bearer` token is accepted only if it is a Scroblarr session token, not a Plex or Jellyfin access token. Do not expose your webhook API key in client-side code.
 
 ## API documentation
 

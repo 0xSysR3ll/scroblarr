@@ -36,9 +36,7 @@ export async function auth(
     const userRepository = new UserRepository();
     const tokenToUse = cookieToken || bearerToken!;
 
-    const userFromSession = await userRepository.findBySessionToken(tokenToUse);
-    const user =
-      userFromSession || (await userRepository.findByAccessToken(tokenToUse));
+    const user = await userRepository.findBySessionToken(tokenToUse);
 
     if (!user) {
       res.status(401).json({ error: "Unauthorized" });

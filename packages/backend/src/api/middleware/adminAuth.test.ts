@@ -1,3 +1,4 @@
+import cookieParser from "cookie-parser";
 import express from "express";
 import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,7 +9,6 @@ const settingsRepositoryMocks = vi.hoisted(() => ({
 
 const userRepositoryMocks = vi.hoisted(() => ({
   findBySessionToken: vi.fn(),
-  findByAccessToken: vi.fn(),
 }));
 
 vi.mock("@repositories/SettingsRepository", () => ({
@@ -20,7 +20,6 @@ vi.mock("@repositories/SettingsRepository", () => ({
 vi.mock("@repositories/UserRepository", () => ({
   UserRepository: class {
     findBySessionToken = userRepositoryMocks.findBySessionToken;
-    findByAccessToken = userRepositoryMocks.findByAccessToken;
   },
 }));
 
@@ -28,6 +27,7 @@ import { adminAuth } from "./adminAuth";
 
 function buildApp() {
   const app = express();
+  app.use(cookieParser());
   app.get("/admin", adminAuth, (req, res) => {
     res.status(200).json({
       ok: true,
@@ -80,5 +80,19 @@ describe("adminAuth middleware", () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ ok: true, userId: "admin-id" });
+  });
+
+  it("rejects a Bearer token that is not a Scroblarr session", async () => {
+    userRepositoryMocks.findBySessionToken.mockResolvedValue(null);
+
+    const app = buildApp();
+    const response = await request(app)
+      .get("/admin")
+      .set("authorization", "Bearer plex-or-jellyfin-token");
+
+    expect(response.status).toBe(403);
+    expect(response.body).toEqual({
+      error: "Forbidden: Admin access required",
+    });
   });
 });
