@@ -1,9 +1,6 @@
 import { dataSource } from "@config/database";
 import { User } from "@entities/User";
-import { JellyfinClient } from "@integrations/jellyfin/JellyfinClient";
-import { PlexOAuth } from "@integrations/plex/PlexOAuth";
 import { SessionRepository } from "@repositories/SessionRepository";
-import { SettingsRepository } from "@repositories/SettingsRepository";
 import { Repository } from "typeorm";
 
 export class UserRepository {
@@ -130,94 +127,6 @@ export class UserRepository {
 
   async delete(id: string): Promise<void> {
     await this.repository.delete(id);
-  }
-
-  async findByAccessToken(token: string): Promise<User | null> {
-    const users = await this.findAll();
-    const exactMatch = users.find(
-      (u) =>
-        (u.plexAccessToken && u.plexAccessToken.trim() === token) ||
-        (u.jellyfinAccessToken && u.jellyfinAccessToken.trim() === token)
-    );
-
-    if (exactMatch) {
-      return exactMatch;
-    }
-
-    try {
-      const plexOAuth = new PlexOAuth();
-      const userInfo = await plexOAuth.getUserInfo(token);
-
-      if (userInfo.username) {
-        const userByUsername = await this.findByPlexUsername(userInfo.username);
-        if (userByUsername) {
-          return userByUsername;
-        }
-      }
-
-      if (userInfo.email) {
-        const userByEmail = users.find((u) => u.email === userInfo.email);
-        if (userByEmail) {
-          return userByEmail;
-        }
-      }
-    } catch {
-      // Token is not a valid Plex token, try Jellyfin
-    }
-
-    try {
-      const settingsRepository = new SettingsRepository();
-      const settings = await settingsRepository.getAll();
-      const jellyfinHost = settings.jellyfinHost;
-
-      if (!jellyfinHost) {
-        return null;
-      }
-
-      const jellyfinClient = new JellyfinClient(jellyfinHost);
-      const jellyfinUsers = users.filter((u) => u.jellyfinUsername);
-
-      for (const user of jellyfinUsers) {
-        if (user.jellyfinUserId && user.jellyfinUsername) {
-          try {
-            const userInfo = await jellyfinClient.getUserInfo(
-              token,
-              user.jellyfinUserId
-            );
-
-            if (userInfo.username === user.jellyfinUsername) {
-              return user;
-            }
-          } catch {
-            // Token can't access this user's info, try next user
-            continue;
-          }
-        } else if (user.jellyfinUsername) {
-          try {
-            const jellyfinUsersList = await jellyfinClient.getUsers(token);
-            const matchingJellyfinUser = jellyfinUsersList.find(
-              (ju) => ju.Name === user.jellyfinUsername
-            );
-            if (matchingJellyfinUser) {
-              if (matchingJellyfinUser.Id) {
-                const normalizedId = matchingJellyfinUser.Id.replace(/-/g, "");
-                await this.update(user.id, {
-                  jellyfinUserId: normalizedId,
-                });
-              }
-              return user;
-            }
-          } catch {
-            // Can't get users or match failed, try next user
-            continue;
-          }
-        }
-      }
-    } catch {
-      // Token is not a valid Jellyfin token, continue to return null
-    }
-
-    return null;
   }
 
   async findBySessionToken(token: string): Promise<User | null> {

@@ -54,7 +54,6 @@ vi.mock("@repositories/UserRepository", () => ({
     update = userRepositoryMocks.update;
     findAdmin = vi.fn();
     findBySessionToken = vi.fn();
-    findByAccessToken = vi.fn();
     findByPlexUsernameOrCreate = vi.fn();
     findByJellyfinUsernameOrCreate = vi.fn();
     findAll = vi.fn();
