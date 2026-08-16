@@ -32,4 +32,4 @@ Plex/Jellyfin → Webhook → Scroblarr → Trakt/Simkl
 
 ## Need help?
 
-Use [Troubleshooting](/docs/troubleshooting) first, then [GitHub Issues](https://github.com/0xsysr3ll/scroblarr/issues) for bugs or features.
+Use [Troubleshooting](/docs/troubleshooting) first, join [Discord](https://discord.gg/pS6rRyxctw) for community help, or open a [GitHub Issue](https://github.com/0xsysr3ll/scroblarr/issues) for bugs or features.

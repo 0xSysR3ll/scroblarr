@@ -9,6 +9,7 @@
 [![Release](https://img.shields.io/github/v/release/0xsysr3ll/scroblarr?label=release&logo=github&logoColor=white&style=flat-square)](https://github.com/0xsysr3ll/scroblarr/releases)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io%2F0xsysr3ll%2Fscroblarr-2496ED?logo=docker&logoColor=white&style=flat-square)](https://github.com/0xSysR3ll/scroblarr/pkgs/container/scroblarr)
 [![License](https://img.shields.io/github/license/0xsysr3ll/scroblarr?style=flat-square)](LICENSE)
+[![Discord](https://img.shields.io/badge/discord-join-5865F2?logo=discord&logoColor=white&style=flat-square)](https://discord.gg/pS6rRyxctw)
 
 **Scroblarr** automatically syncs your watch history from [Plex](https://plex.tv) and [Jellyfin](https://jellyfin.org) to [Trakt](https://trakt.tv) and [Simkl](https://simkl.com). \
 No manual logging — just watch and sync.
@@ -37,6 +38,7 @@ Check out the documentation for installation (Docker or build from source), conf
 ## Support
 
 - Check the [documentation](https://0xsysr3ll.github.io/scroblarr/docs) first — your question might already be covered.
+- [Discord](https://discord.gg/pS6rRyxctw) — community chat and support.
 - [GitHub Issues](https://github.com/0xsysr3ll/scroblarr/issues) — bugs and feature requests.
 
 ## Testing

@@ -108,7 +108,8 @@ If you're still having issues:
 
 1. **Check the logs**: Settings → Logs has detailed information about what's happening
 2. **Check sync history**: The Dashboard shows all sync attempts and their status
-3. **Open an issue**: If it's a bug, open an issue on GitHub with:
+3. **Ask on Discord**: [Join the community](https://discord.gg/pS6rRyxctw) for help from other users.
+4. **Open an issue**: If it's a bug, open an issue on GitHub with:
    - What you're trying to do
    - What error messages you're seeing
    - Relevant log entries (remove any sensitive information)
