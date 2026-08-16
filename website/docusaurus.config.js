@@ -97,6 +97,11 @@ const config = {
             label: "API Reference",
           },
           {
+            href: "https://discord.gg/pS6rRyxctw",
+            label: "Discord",
+            position: "right",
+          },
+          {
             href: "https://github.com/0xsysr3ll/scroblarr",
             label: "GitHub",
             position: "right",
