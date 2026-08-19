@@ -20,6 +20,8 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+    outputs:
+      notes: ${{ steps.git-cliff.outputs.content }}
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -99,3 +101,16 @@ jobs:
         run: gh release edit "${{ github.ref_name }}" --draft=false --repo "${{ github.repository }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Post release to Discord
+        uses: SethCohen/github-releases-to-discord@24d166886aee4646d448c8a389ff9e1ebcab3682 # v1.20.0
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          color: "5793266"
+          username: "Scroblarr Releases"
+          footer_title: "Changelog"
+          footer_timestamp: true
+          reduce_headings: true
+          release_name: ${{ github.ref_name }}
+          release_body: ${{ needs.draft-release.outputs.notes }}
+          release_html_url: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}
