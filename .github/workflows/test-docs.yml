@@ -5,7 +5,7 @@ name: Test docs build
 
 on:
   pull_request:
-    branches: [main]
+    branches: [develop]
     paths:
       - "website/**"
       - "docs/**"
