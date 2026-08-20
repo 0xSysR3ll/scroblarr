@@ -106,8 +106,10 @@ describe("DashboardPage", () => {
   it("renders destination statistics including Simkl", async () => {
     renderWithProviders(<DashboardPage />, { route: "/" });
 
-    const heading = await screen.findByText("By Destination");
-    const card = heading.closest("div");
+    const heading = await screen.findByRole("heading", {
+      name: "By Destination",
+    });
+    const card = heading.parentElement;
     expect(card).not.toBeNull();
     const simklLabel = within(card!).getByText("Simkl");
     expect(simklLabel).toBeInTheDocument();
@@ -134,7 +136,7 @@ describe("DashboardPage", () => {
     expect(screen.getByText("Up 50%")).toBeInTheDocument();
     expect(screen.getByText("10 / 12")).toBeInTheDocument();
     expect(
-      screen.getByRole("img", { name: "Today: 1 syncs" })
+      screen.getByRole("img", { name: "Today: 1 sync" })
     ).toBeInTheDocument();
     expect(screen.getByText("Per Day")).toBeInTheDocument();
     expect(screen.getByText("1 today")).toBeInTheDocument();

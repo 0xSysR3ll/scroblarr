@@ -30,16 +30,6 @@ import {
 } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
 
-const DAY_NAMES = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
-
 const MEDIA_COLORS = {
   episode: "var(--chart-3)",
   series: "var(--chart-2)",
@@ -80,6 +70,22 @@ function formatMomentDate(dateString: string, locale: string): string {
     day: "numeric",
     year: "numeric",
   }).format(new Date(dateString));
+}
+
+function formatWeekday(dayIndex: number, locale: string): string {
+  if (!Number.isInteger(dayIndex) || dayIndex < 0 || dayIndex > 6) {
+    return "—";
+  }
+  // 2024-01-07 is a Sunday in UTC.
+  const date = new Date(Date.UTC(2024, 0, 7 + dayIndex));
+  return new Intl.DateTimeFormat(locale, {
+    weekday: "long",
+    timeZone: "UTC",
+  }).format(date);
+}
+
+function formatCount(value: number, locale: string): string {
+  return value.toLocaleString(locale);
 }
 
 function destinationNames(statistics: SyncStatistics): string[] {
@@ -277,7 +283,7 @@ function activityDayLabel(
 }
 
 function ActivityRhythmChart({ last7Days }: { last7Days: number[] }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const max = Math.max(...last7Days, 1);
   const chronological = last7Days
     .map((count, daysAgo) => ({ count, daysAgo }))
@@ -297,7 +303,7 @@ function ActivityRhythmChart({ last7Days }: { last7Days: number[] }) {
           const day = new Date();
           day.setUTCHours(0, 0, 0, 0);
           day.setUTCDate(day.getUTCDate() - daysAgo);
-          const weekday = day.toLocaleDateString(undefined, {
+          const weekday = day.toLocaleDateString(i18n.language, {
             weekday: "short",
             timeZone: "UTC",
           });
@@ -362,13 +368,13 @@ function ActivityRhythmChart({ last7Days }: { last7Days: number[] }) {
   );
 }
 
-function formatAverage(value: number): string {
+function formatAverage(value: number, locale: string): string {
   return value % 1 === 0
-    ? value.toLocaleString(undefined, {
+    ? value.toLocaleString(locale, {
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
       })
-    : value.toLocaleString(undefined, {
+    : value.toLocaleString(locale, {
         minimumFractionDigits: 1,
         maximumFractionDigits: 1,
       });
@@ -389,7 +395,7 @@ function AveragePaceCard({
   icon: ComponentType<{ className?: string }>;
   color: "blue" | "purple" | "green";
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const colorClasses = {
     blue: "bg-primary/15 text-primary",
     purple: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
@@ -414,7 +420,7 @@ function AveragePaceCard({
         </div>
       </div>
       <p className="text-xl font-bold leading-tight tracking-tight text-foreground sm:text-2xl">
-        {formatAverage(average)}
+        {formatAverage(average, i18n.language)}
       </p>
       <p className="mt-1 text-xs text-muted-foreground">
         {t("dashboard.stats.avgFromThisYear", {
@@ -527,7 +533,8 @@ export function DashboardPage() {
       )
     : undefined;
   const destinations = statistics ? destinationNames(statistics) : [];
-  const destinationList = formatConjunction(destinations, i18n.language);
+  const locale = i18n.language;
+  const destinationList = formatConjunction(destinations, locale);
   const trend = statistics
     ? monthTrend(statistics.byPeriod.thisMonth, statistics.byPeriod.lastMonth)
     : null;
@@ -592,7 +599,7 @@ export function DashboardPage() {
           {statistics?.lastSyncedAt && (
             <p
               className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground"
-              title={new Date(statistics.lastSyncedAt).toLocaleString()}
+              title={new Date(statistics.lastSyncedAt).toLocaleString(locale)}
             >
               <FaClock className="h-4 w-4 shrink-0" />
               <span className="truncate">
@@ -607,7 +614,7 @@ export function DashboardPage() {
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span
                 className="hidden sm:inline"
-                title={dataFetchedAt.toLocaleString()}
+                title={dataFetchedAt.toLocaleString(locale)}
               >
                 {t("dashboard.dataAsOf", {
                   defaultValue: "Data as of",
@@ -755,10 +762,7 @@ export function DashboardPage() {
                     defaultValue: "Last sync",
                   })}
                   title={formatRelativeTime(statistics.lastSyncedAt, t)}
-                  subtitle={formatMomentDate(
-                    statistics.lastSyncedAt,
-                    i18n.language
-                  )}
+                  subtitle={formatMomentDate(statistics.lastSyncedAt, locale)}
                 />
               ) : null}
               {showFirstSync && firstSync && (
@@ -767,7 +771,7 @@ export function DashboardPage() {
                     defaultValue: "First sync",
                   })}
                   title={formatMediaTitle(firstSync)}
-                  subtitle={formatMomentDate(firstSync.syncedAt, i18n.language)}
+                  subtitle={formatMomentDate(firstSync.syncedAt, locale)}
                   item={firstSync}
                 />
               )}
@@ -799,7 +803,7 @@ export function DashboardPage() {
                 title={t("dashboard.stats.successful", {
                   defaultValue: "Successful",
                 })}
-                value={`${statistics.successful.toLocaleString()} / ${statistics.total.toLocaleString()}`}
+                value={`${formatCount(statistics.successful, locale)} / ${formatCount(statistics.total, locale)}`}
                 icon={FaCheckCircle}
                 color="purple"
               />
@@ -827,7 +831,7 @@ export function DashboardPage() {
                   </div>
                 </div>
                 <p className="text-xl font-bold leading-tight tracking-tight text-foreground sm:text-2xl">
-                  {statistics.failed.toLocaleString()}
+                  {formatCount(statistics.failed, locale)}
                 </p>
                 {statistics.failed > 0 && (
                   <Link
@@ -846,7 +850,7 @@ export function DashboardPage() {
                 })}
                 value={
                   statistics.peakDay != null
-                    ? DAY_NAMES[statistics.peakDay]
+                    ? formatWeekday(statistics.peakDay, locale)
                     : "—"
                 }
                 icon={FaCalendarDay}
@@ -909,20 +913,20 @@ export function DashboardPage() {
                   })}
                 </span>
                 <span className="text-foreground/90">
-                  {statistics.last30Days.total.toLocaleString()}{" "}
+                  {formatCount(statistics.last30Days.total, locale)}{" "}
                   {t("dashboard.stats.synced", { defaultValue: "synced" })}
                   {statistics.last30Days.total > 0 && (
                     <>
                       {" · "}
                       <span className="text-green-600 dark:text-green-400">
-                        {statistics.last30Days.successful}{" "}
+                        {formatCount(statistics.last30Days.successful, locale)}{" "}
                         {t("dashboard.stats.ok", { defaultValue: "ok" })}
                       </span>
                       {statistics.last30Days.failed > 0 && (
                         <>
                           {" · "}
                           <span className="text-red-600 dark:text-red-400">
-                            {statistics.last30Days.failed}{" "}
+                            {formatCount(statistics.last30Days.failed, locale)}{" "}
                             {t("dashboard.stats.failedShort", {
                               defaultValue: "failed",
                             })}
@@ -977,10 +981,15 @@ export function DashboardPage() {
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">
                       {t("dashboard.stats.periodSummary", {
-                        today: statistics.byPeriod.today.toLocaleString(),
-                        thisWeek: statistics.byPeriod.thisWeek.toLocaleString(),
-                        thisMonth:
-                          statistics.byPeriod.thisMonth.toLocaleString(),
+                        today: formatCount(statistics.byPeriod.today, locale),
+                        thisWeek: formatCount(
+                          statistics.byPeriod.thisWeek,
+                          locale
+                        ),
+                        thisMonth: formatCount(
+                          statistics.byPeriod.thisMonth,
+                          locale
+                        ),
                         defaultValue:
                           "{{today}} today · {{thisWeek}} this week · {{thisMonth}} this month",
                       })}
@@ -1052,7 +1061,7 @@ export function DashboardPage() {
                   >
                     <div className="absolute inset-4 flex flex-col items-center justify-center rounded-full bg-card text-center">
                       <span className="text-lg font-bold text-foreground">
-                        {statistics.total.toLocaleString()}
+                        {formatCount(statistics.total, locale)}
                       </span>
                       <span className="text-[11px] text-muted-foreground">
                         {t("dashboard.stats.mediaMixTotal", {
@@ -1108,7 +1117,7 @@ export function DashboardPage() {
                               </span>
                             </div>
                             <span className="shrink-0 text-xs tabular-nums text-muted-foreground sm:text-sm">
-                              {percent}% · {row.value.toLocaleString()}
+                              {percent}% · {formatCount(row.value, locale)}
                             </span>
                           </div>
                           <PercentageBar
@@ -1148,7 +1157,7 @@ export function DashboardPage() {
                         </span>
                         <span className="shrink-0 text-xs tabular-nums text-muted-foreground sm:text-sm">
                           {percentOf(value, sourceTotal)}% ·{" "}
-                          {value.toLocaleString()}
+                          {formatCount(value, locale)}
                         </span>
                       </div>
                       <PercentageBar
@@ -1192,7 +1201,7 @@ export function DashboardPage() {
                         </span>
                         <span className="shrink-0 text-xs tabular-nums text-muted-foreground sm:text-sm">
                           {percentOf(value, destinationTotal)}% ·{" "}
-                          {value.toLocaleString()}
+                          {formatCount(value, locale)}
                         </span>
                       </div>
                       <PercentageBar
