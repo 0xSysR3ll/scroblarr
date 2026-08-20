@@ -8,7 +8,13 @@ import {
   type SyncStatistics,
 } from "@services/api/sync";
 import { formatMediaTitle, formatRelativeTime } from "@utils/syncHistory";
-import { useCallback, useEffect, useState, type ComponentType } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ComponentType,
+} from "react";
 import { useTranslation } from "react-i18next";
 import {
   FaArrowDown,
@@ -470,9 +476,18 @@ export function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [dataFetchedAt, setDataFetchedAt] = useState<Date | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const loadGenerationRef = useRef(0);
+  const loadedUserIdRef = useRef<string | undefined>(undefined);
+  const userId = user?.id;
 
   const loadDashboard = useCallback(
     async ({ isRefresh = false }: { isRefresh?: boolean } = {}) => {
+      const generation = ++loadGenerationRef.current;
+      const isCurrent = () => generation === loadGenerationRef.current;
+      if (loadedUserIdRef.current !== userId) {
+        loadedUserIdRef.current = userId;
+        setFirstSync(null);
+      }
       try {
         if (!statistics && !isRefresh) {
           setLoading(true);
@@ -495,14 +510,23 @@ export function DashboardPage() {
           getSyncStatistics(),
           getSyncHistory(1, 5, undefined, "syncedAt", "DESC"),
         ]);
+        if (!isCurrent()) {
+          return;
+        }
         setStatistics(stats);
         setRecentSyncs(historyRes.data);
         setDataFetchedAt(new Date());
         const firstResult = await firstHistoryRequest;
+        if (!isCurrent()) {
+          return;
+        }
         if (firstResult.ok) {
           setFirstSync(firstResult.data);
         }
       } catch (err) {
+        if (!isCurrent()) {
+          return;
+        }
         setError(
           err instanceof Error
             ? err.message
@@ -511,19 +535,24 @@ export function DashboardPage() {
               })
         );
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (isCurrent()) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- statistics intentionally omitted to avoid re-running effect after first load
-    [t]
+    [t, userId]
   );
 
   useEffect(() => {
-    if (user) {
-      loadDashboard();
+    if (userId) {
+      void loadDashboard();
     }
-  }, [user, loadDashboard]);
+    return () => {
+      loadGenerationRef.current += 1;
+    };
+  }, [userId, loadDashboard]);
 
   const lastSync = recentSyncs[0];
   const showFirstSync = Boolean(firstSync && firstSync.id !== lastSync?.id);

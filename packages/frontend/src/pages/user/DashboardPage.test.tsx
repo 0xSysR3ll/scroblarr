@@ -6,7 +6,7 @@ import {
   type SyncStatistics,
 } from "@services/api/sync";
 import { renderWithProviders } from "@test/render";
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DashboardPage } from "./DashboardPage";
@@ -188,6 +188,65 @@ describe("DashboardPage", () => {
       await screen.findByText("You've synced 12 titles.")
     ).toBeInTheDocument();
     expect(screen.queryByText("First sync")).not.toBeInTheDocument();
+  });
+
+  it("ignores earliest-sync results after the signed-in user changes", async () => {
+    let resolvePreviousFirst!: (value: SyncHistoryResponse) => void;
+    const previousFirst = new Promise<SyncHistoryResponse>((resolve) => {
+      resolvePreviousFirst = resolve;
+    });
+    let currentUserId = "user-1";
+
+    vi.mocked(getSyncHistory).mockImplementation(
+      async (_page, _size, _filters, _sortBy, sortOrder) => {
+        if (sortOrder === "ASC") {
+          if (currentUserId === "user-1") {
+            return previousFirst;
+          }
+          return historyResponse([
+            historyItem({
+              id: "current-first",
+              mediaTitle: "Current User First",
+              syncedAt: "2025-02-01T12:00:00.000Z",
+            }),
+          ]);
+        }
+        return historyResponse([]);
+      }
+    );
+
+    const { rerender } = renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(await screen.findByText("Issues")).toBeInTheDocument();
+
+    currentUserId = "user-2";
+    vi.mocked(useAuth).mockReturnValue({
+      user: { id: "user-2", username: "bob", isAdmin: false },
+      loading: false,
+      logout: vi.fn(),
+      checkAuth: vi.fn(),
+      setUserFromLogin: vi.fn(),
+      isAuthenticated: true,
+      isAdmin: false,
+    });
+    rerender(<DashboardPage />);
+
+    expect(await screen.findByText("Current User First")).toBeInTheDocument();
+
+    resolvePreviousFirst(
+      historyResponse([
+        historyItem({
+          id: "previous-first",
+          mediaTitle: "Previous User First",
+          syncedAt: "2025-01-01T12:00:00.000Z",
+        }),
+      ])
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText("Previous User First")).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("Current User First")).toBeInTheDocument();
   });
 
   it("renders the empty-state description without TVTime", async () => {
