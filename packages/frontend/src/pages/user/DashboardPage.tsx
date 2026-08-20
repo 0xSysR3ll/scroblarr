@@ -266,19 +266,22 @@ function activityDayLabel(
   if (daysAgo === 0) {
     return t("dashboard.sparklineToday", {
       count,
-      defaultValue: "Today: {{count}} syncs",
+      defaultValue_one: "Today: {{count}} sync",
+      defaultValue_other: "Today: {{count}} syncs",
     });
   }
   if (daysAgo === 1) {
     return t("dashboard.sparklineYesterday", {
       count,
-      defaultValue: "Yesterday: {{count}} syncs",
+      defaultValue_one: "Yesterday: {{count}} sync",
+      defaultValue_other: "Yesterday: {{count}} syncs",
     });
   }
   return t("dashboard.sparklineDaysAgo", {
     days: daysAgo,
     count,
-    defaultValue: "{{days}} days ago: {{count}} syncs",
+    defaultValue_one: "{{days}} days ago: {{count}} sync",
+    defaultValue_other: "{{days}} days ago: {{count}} syncs",
   });
 }
 
@@ -721,7 +724,6 @@ export function DashboardPage() {
                 <h2 className="text-2xl font-bold tracking-tight text-balance text-foreground sm:text-3xl lg:text-4xl">
                   {t("dashboard.hero.title", {
                     count: statistics.total,
-                    defaultValue: "You've synced {{count}} titles.",
                     defaultValue_one: "You've synced {{count}} title.",
                     defaultValue_other: "You've synced {{count}} titles.",
                   })}
@@ -731,8 +733,6 @@ export function DashboardPage() {
                     ? t("dashboard.hero.subtitleWithDestinations", {
                         count: statistics.successful,
                         destinations: destinationList,
-                        defaultValue:
-                          "That's {{count}} successful syncs to {{destinations}}.",
                         defaultValue_one:
                           "That's {{count}} successful sync to {{destinations}}.",
                         defaultValue_other:
@@ -740,7 +740,6 @@ export function DashboardPage() {
                       })
                     : t("dashboard.hero.subtitle", {
                         count: statistics.successful,
-                        defaultValue: "That's {{count}} successful syncs.",
                         defaultValue_one: "That's {{count}} successful sync.",
                         defaultValue_other:
                           "That's {{count}} successful syncs.",
@@ -785,11 +784,13 @@ export function DashboardPage() {
                     topThisMonth.mediaType === "episode"
                       ? t("dashboard.topThisMonthEpisodes", {
                           count: topThisMonth.count,
-                          defaultValue: "{{count}} episodes",
+                          defaultValue_one: "{{count}} episode",
+                          defaultValue_other: "{{count}} episodes",
                         })
                       : t("dashboard.topThisMonthMovies", {
                           count: topThisMonth.count,
-                          defaultValue: "{{count}} watch",
+                          defaultValue_one: "{{count}} watch",
+                          defaultValue_other: "{{count}} watches",
                         })
                   }
                   item={topThisMonthMatch}
@@ -1235,11 +1236,13 @@ export function DashboardPage() {
                           {item.mediaType === "episode"
                             ? t("dashboard.topThisMonthEpisodes", {
                                 count: item.count,
-                                defaultValue: "{{count}} episodes",
+                                defaultValue_one: "{{count}} episode",
+                                defaultValue_other: "{{count}} episodes",
                               })
                             : t("dashboard.topThisMonthMovies", {
                                 count: item.count,
-                                defaultValue: "{{count}} watch",
+                                defaultValue_one: "{{count}} watch",
+                                defaultValue_other: "{{count}} watches",
                               })}
                         </span>
                       </li>
@@ -1337,7 +1340,8 @@ export function DashboardPage() {
                   actual={statistics.byPeriod.today}
                   actualLabel={t("dashboard.stats.avgVsToday", {
                     count: statistics.byPeriod.today,
-                    defaultValue: "{{count}} today",
+                    defaultValue_one: "{{count}} today",
+                    defaultValue_other: "{{count}} today",
                   })}
                   icon={FaCalendarDay}
                   color="blue"
@@ -1350,7 +1354,8 @@ export function DashboardPage() {
                   actual={statistics.byPeriod.thisWeek}
                   actualLabel={t("dashboard.stats.avgVsWeek", {
                     count: statistics.byPeriod.thisWeek,
-                    defaultValue: "{{count}} this week",
+                    defaultValue_one: "{{count}} this week",
+                    defaultValue_other: "{{count}} this week",
                   })}
                   icon={FaCalendarWeek}
                   color="purple"
@@ -1363,7 +1368,8 @@ export function DashboardPage() {
                   actual={statistics.byPeriod.thisMonth}
                   actualLabel={t("dashboard.stats.avgVsMonth", {
                     count: statistics.byPeriod.thisMonth,
-                    defaultValue: "{{count}} this month",
+                    defaultValue_one: "{{count}} this month",
+                    defaultValue_other: "{{count}} this month",
                   })}
                   icon={FaCalendarAlt}
                   color="green"
