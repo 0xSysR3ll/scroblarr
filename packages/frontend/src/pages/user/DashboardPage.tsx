@@ -139,19 +139,18 @@ function conicGradient(
   segments: Array<{ color: string; value: number }>,
   total: number
 ): string {
-  if (total <= 0) {
-    return "var(--muted)";
-  }
-  let acc = 0;
   const stops: string[] = [];
-  for (const segment of segments) {
-    if (segment.value <= 0) {
-      continue;
+  if (total > 0) {
+    let acc = 0;
+    for (const segment of segments) {
+      if (segment.value <= 0) {
+        continue;
+      }
+      const start = (acc / total) * 100;
+      acc += segment.value;
+      const end = (acc / total) * 100;
+      stops.push(`${segment.color} ${start}% ${end}%`);
     }
-    const start = (acc / total) * 100;
-    acc += segment.value;
-    const end = (acc / total) * 100;
-    stops.push(`${segment.color} ${start}% ${end}%`);
   }
   return stops.length > 0
     ? `conic-gradient(${stops.join(", ")})`

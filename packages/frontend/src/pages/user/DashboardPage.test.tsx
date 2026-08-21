@@ -351,7 +351,369 @@ describe("DashboardPage", () => {
     expect(screen.getByText("Current User First")).toBeInTheDocument();
   });
 
+  it("shows a healthy badge when the last 30 days have no failures", async () => {
+    vi.mocked(getSyncStatistics).mockResolvedValue({
+      ...statisticsFixture(),
+      last30Days: { total: 12, successful: 12, failed: 0 },
+    });
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(await screen.findByText("Healthy")).toBeInTheDocument();
+  });
+
+  it("shows no recent activity when this week is empty", async () => {
+    vi.mocked(getSyncStatistics).mockResolvedValue({
+      ...statisticsFixture(),
+      byPeriod: { today: 0, thisWeek: 0, thisMonth: 12, lastMonth: 8 },
+      last30Days: { total: 12, successful: 12, failed: 0 },
+    });
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(await screen.findByText("No recent activity")).toBeInTheDocument();
+  });
+
+  it.each([
+    [{ thisMonth: 4, lastMonth: 8 }, "Down 50%"],
+    [{ thisMonth: 12, lastMonth: 0 }, "New this month"],
+    [{ thisMonth: 8, lastMonth: 8 }, "No change"],
+    [{ thisMonth: 0, lastMonth: 0 }, "No change"],
+  ] as const)("renders the %# activity trend", async (period, label) => {
+    vi.mocked(getSyncStatistics).mockResolvedValue({
+      ...statisticsFixture(),
+      byPeriod: { today: 1, thisWeek: 4, ...period },
+    });
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(await screen.findByText(label)).toBeInTheDocument();
+  });
+
+  it("renders the hero without destination names", async () => {
+    vi.mocked(getSyncStatistics).mockResolvedValue({
+      ...statisticsFixture(),
+      byDestination: { trakt: 0, simkl: 0, tvtime: 0 },
+    });
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(
+      await screen.findByText("That's 10 successful syncs.")
+    ).toBeInTheDocument();
+  });
+
+  it("falls back to lastSyncedAt when recent history is empty", async () => {
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(await screen.findByText("Last sync")).toBeInTheDocument();
+    expect(screen.getByText("Jun 1, 2026")).toBeInTheDocument();
+  });
+
+  it("shows an em dash when the peak day is invalid", async () => {
+    vi.mocked(getSyncStatistics).mockResolvedValue({
+      ...statisticsFixture(),
+      peakDay: 9,
+    });
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    const heading = await screen.findByText("Most Active Day");
+    expect(heading.parentElement?.parentElement).toHaveTextContent("—");
+  });
+
+  it("shows an em dash when the peak day is missing", async () => {
+    vi.mocked(getSyncStatistics).mockResolvedValue({
+      ...statisticsFixture(),
+      peakDay: null,
+    });
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    const heading = await screen.findByText("Most Active Day");
+    expect(heading.parentElement?.parentElement).toHaveTextContent("—");
+  });
+
+  it("omits the last-sync card when no timestamp is available", async () => {
+    vi.mocked(getSyncStatistics).mockResolvedValue({
+      ...statisticsFixture(),
+      lastSyncedAt: null,
+    });
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(
+      await screen.findByText("You've synced 12 titles.")
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Last sync")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    [96, "96%"],
+    [70, "70%"],
+  ] as const)("renders a %s success rate", async (successRate, label) => {
+    vi.mocked(getSyncStatistics).mockResolvedValue({
+      ...statisticsFixture(),
+      successRate,
+    });
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(await screen.findByText(label)).toBeInTheDocument();
+  });
+
+  it("links the last failure", async () => {
+    vi.mocked(getSyncStatistics).mockResolvedValue({
+      ...statisticsFixture(),
+      lastFailure: {
+        mediaTitle: "Broken Show",
+        syncedAt: "2026-05-30T12:00:00.000Z",
+      },
+    });
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    const link = await screen.findByRole("link", { name: "Broken Show" });
+    expect(link).toHaveAttribute("href", "/sync?filter=failed");
+  });
+
+  it("refreshes dashboard data from the toolbar", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(
+      await screen.findByText("You've synced 12 titles.")
+    ).toBeInTheDocument();
+    expect(getSyncStatistics).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+
+    await waitFor(() => {
+      expect(getSyncStatistics).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it("uses the translated fallback when load fails with a non-Error", async () => {
+    vi.mocked(getSyncStatistics).mockRejectedValueOnce("nope");
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(
+      await screen.findByText("Failed to load statistics")
+    ).toBeInTheDocument();
+  });
+
+  it("ignores a stale statistics response after the signed-in user changes", async () => {
+    let resolvePreviousStats!: (value: SyncStatistics) => void;
+    const previousStats = new Promise<SyncStatistics>((resolve) => {
+      resolvePreviousStats = resolve;
+    });
+    let currentUserId = "user-1";
+
+    vi.mocked(getSyncStatistics).mockImplementation(async () => {
+      if (currentUserId === "user-1") {
+        return previousStats;
+      }
+      return {
+        ...statisticsFixture(),
+        total: 3,
+        successful: 3,
+        failed: 0,
+        successRate: 100,
+      };
+    });
+
+    const { rerender } = renderWithProviders(<DashboardPage />, { route: "/" });
+
+    currentUserId = "user-2";
+    vi.mocked(useAuth).mockReturnValue({
+      user: { id: "user-2", username: "bob", isAdmin: false },
+      loading: false,
+      logout: vi.fn(),
+      checkAuth: vi.fn(),
+      setUserFromLogin: vi.fn(),
+      isAuthenticated: true,
+      isAdmin: false,
+    });
+    rerender(<DashboardPage />);
+
+    expect(
+      await screen.findByText("You've synced 3 titles.")
+    ).toBeInTheDocument();
+
+    resolvePreviousStats(statisticsFixture());
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText("You've synced 12 titles.")
+      ).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("You've synced 3 titles.")).toBeInTheDocument();
+  });
+
+  it("ignores a stale load error after the signed-in user changes", async () => {
+    let rejectPreviousStats!: (reason: unknown) => void;
+    const previousStats = new Promise<SyncStatistics>((_resolve, reject) => {
+      rejectPreviousStats = reject;
+    });
+    let currentUserId = "user-1";
+
+    vi.mocked(getSyncStatistics).mockImplementation(async () => {
+      if (currentUserId === "user-1") {
+        return previousStats;
+      }
+      return {
+        ...statisticsFixture(),
+        total: 3,
+        successful: 3,
+      };
+    });
+
+    const { rerender } = renderWithProviders(<DashboardPage />, { route: "/" });
+
+    currentUserId = "user-2";
+    vi.mocked(useAuth).mockReturnValue({
+      user: { id: "user-2", username: "bob", isAdmin: false },
+      loading: false,
+      logout: vi.fn(),
+      checkAuth: vi.fn(),
+      setUserFromLogin: vi.fn(),
+      isAuthenticated: true,
+      isAdmin: false,
+    });
+    rerender(<DashboardPage />);
+
+    expect(
+      await screen.findByText("You've synced 3 titles.")
+    ).toBeInTheDocument();
+
+    rejectPreviousStats(new Error("stale failure"));
+
+    await waitFor(() => {
+      expect(screen.queryByText("stale failure")).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("You've synced 3 titles.")).toBeInTheDocument();
+  });
+
+  it("matches top-this-month artwork from recent history", async () => {
+    vi.mocked(getSyncStatistics).mockResolvedValue({
+      ...statisticsFixture(),
+      topThisMonth: [{ mediaTitle: "Arrival", mediaType: "movie", count: 4 }],
+    });
+    vi.mocked(getSyncHistory).mockImplementation(
+      async (_page, _size, _filters, _sortBy, sortOrder) => {
+        if (sortOrder === "ASC") {
+          return historyResponse([]);
+        }
+        return historyResponse([
+          historyItem({ mediaTitle: "Arrival", mediaType: "movie" }),
+        ]);
+      }
+    );
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(await screen.findAllByText("Arrival")).not.toHaveLength(0);
+    expect(screen.getAllByText("4 watches").length).toBeGreaterThan(0);
+  });
+
+  it("shows a negative pace delta when behind the average", async () => {
+    vi.mocked(getSyncStatistics).mockResolvedValue({
+      ...statisticsFixture(),
+      byPeriod: { today: 1, thisWeek: 4, thisMonth: 12, lastMonth: 8 },
+      averages: { perDay: 10, perWeek: 3, perMonth: 12 },
+    });
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(await screen.findByText("−90%")).toBeInTheDocument();
+  });
+
+  it("shows the empty activity chart when the week series is incomplete", async () => {
+    vi.mocked(getSyncStatistics).mockResolvedValue({
+      ...statisticsFixture(),
+      last7Days: [1, 2, 3],
+    });
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(
+      await screen.findAllByText("No recent syncs to show")
+    ).not.toHaveLength(0);
+  });
+
+  it("marks unsuccessful recent syncs", async () => {
+    vi.mocked(getSyncHistory).mockImplementation(
+      async (_page, _size, _filters, _sortBy, sortOrder) => {
+        if (sortOrder === "ASC") {
+          return historyResponse([]);
+        }
+        return historyResponse([
+          historyItem({ success: false, mediaTitle: "Failed Watch" }),
+        ]);
+      }
+    );
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(await screen.findAllByText("Failed Watch")).not.toHaveLength(0);
+  });
+
+  it("renders zero-width mix bars when media totals are empty", async () => {
+    vi.mocked(getSyncStatistics).mockResolvedValue({
+      ...statisticsFixture(),
+      byMediaType: { episode: 0, movie: 0, series: 0 },
+    });
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    const totalLabel = await screen.findByText("total");
+    expect(totalLabel.previousElementSibling).toHaveTextContent("0");
+  });
+
+  it("fills pace bars when the yearly average is zero", async () => {
+    vi.mocked(getSyncStatistics).mockResolvedValue({
+      ...statisticsFixture(),
+      byPeriod: { today: 1, thisWeek: 0, thisMonth: 0, lastMonth: 0 },
+      averages: { perDay: 0, perWeek: 0, perMonth: 0 },
+    });
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(await screen.findByText("1 today")).toBeInTheDocument();
+    expect(screen.getByText("0 this week")).toBeInTheDocument();
+  });
+
+  it("renders the page chrome when statistics are missing", async () => {
+    vi.mocked(getSyncStatistics).mockResolvedValue(
+      null as unknown as SyncStatistics
+    );
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(
+      await screen.findByRole("heading", { name: "Dashboard" })
+    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(document.querySelector(".animate-pulse")).toBeNull();
+    });
+    expect(screen.queryByText("No sync data yet")).not.toBeInTheDocument();
+  });
+
+  it("navigates from populated dashboard actions", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(
+      await screen.findByText("You've synced 12 titles.")
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "View Sync History" }));
+    await user.click(screen.getByRole("button", { name: "Profile" }));
+  });
+
   it("renders the empty-state description without TVTime", async () => {
+    const user = userEvent.setup();
     vi.mocked(getSyncStatistics).mockResolvedValue(emptyStatisticsFixture());
 
     renderWithProviders(<DashboardPage />, { route: "/" });
@@ -362,5 +724,10 @@ describe("DashboardPage", () => {
       )
     ).toBeInTheDocument();
     expect(screen.queryByText("By Destination")).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: "Check profile & links" })
+    );
+    await user.click(screen.getByRole("button", { name: "View Sync History" }));
   });
 });
