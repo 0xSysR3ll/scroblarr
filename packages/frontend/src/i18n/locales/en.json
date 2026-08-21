@@ -59,9 +59,6 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "errors": {
-      "loadFailed": "Failed to load statistics"
-    },
     "health": {
       "issuesHint": "Some syncs failed in the last 30 days",
       "noActivityHint": "No syncs this week yet",
@@ -110,37 +107,37 @@
       "trendFlat": "No change",
       "periodSummary": "{{today}} today · {{thisWeek}} this week · {{thisMonth}} this month",
       "mediaMixTotal": "total",
-      "avgVsToday_one": "{{count}} today",
-      "avgVsToday_other": "{{count}} today",
-      "avgVsWeek_one": "{{count}} this week",
-      "avgVsWeek_other": "{{count}} this week",
-      "avgVsMonth_one": "{{count}} this month",
-      "avgVsMonth_other": "{{count}} this month"
+      "avgVsToday_one": "{{formattedCount}} today",
+      "avgVsToday_other": "{{formattedCount}} today",
+      "avgVsWeek_one": "{{formattedCount}} this week",
+      "avgVsWeek_other": "{{formattedCount}} this week",
+      "avgVsMonth_one": "{{formattedCount}} this month",
+      "avgVsMonth_other": "{{formattedCount}} this month"
     },
     "viewFailedSyncs": "View failed syncs",
     "lastFailure": "Last failure",
     "last7Days": "Last 7 days",
-    "sparklineToday_one": "Today: {{count}} sync",
-    "sparklineToday_other": "Today: {{count}} syncs",
-    "sparklineYesterday_one": "Yesterday: {{count}} sync",
-    "sparklineYesterday_other": "Yesterday: {{count}} syncs",
-    "sparklineDaysAgo_one": "{{days}} days ago: {{count}} sync",
-    "sparklineDaysAgo_other": "{{days}} days ago: {{count}} syncs",
+    "sparklineToday_one": "Today: {{formattedCount}} sync",
+    "sparklineToday_other": "Today: {{formattedCount}} syncs",
+    "sparklineYesterday_one": "Yesterday: {{formattedCount}} sync",
+    "sparklineYesterday_other": "Yesterday: {{formattedCount}} syncs",
+    "sparklineDaysAgo_one": "{{days}} days ago: {{formattedCount}} sync",
+    "sparklineDaysAgo_other": "{{days}} days ago: {{formattedCount}} syncs",
     "topThisMonth": "Most synced this month",
-    "topThisMonthEpisodes_one": "{{count}} episode",
-    "topThisMonthEpisodes_other": "{{count}} episodes",
-    "topThisMonthMovies_one": "{{count}} watch",
-    "topThisMonthMovies_other": "{{count}} watches",
+    "topThisMonthEpisodes_one": "{{formattedCount}} episode",
+    "topThisMonthEpisodes_other": "{{formattedCount}} episodes",
+    "topThisMonthMovies_one": "{{formattedCount}} watch",
+    "topThisMonthMovies_other": "{{formattedCount}} watches",
     "recentSyncs": "Recent syncs",
     "viewAll": "View all",
     "profile": "Profile",
     "hero": {
-      "title_one": "You've synced {{count}} title.",
-      "title_other": "You've synced {{count}} titles.",
-      "subtitleWithDestinations_one": "That's {{count}} successful sync to {{destinations}}.",
-      "subtitleWithDestinations_other": "That's {{count}} successful syncs to {{destinations}}.",
-      "subtitle_one": "That's {{count}} successful sync.",
-      "subtitle_other": "That's {{count}} successful syncs."
+      "title_one": "You've synced {{formattedCount}} title.",
+      "title_other": "You've synced {{formattedCount}} titles.",
+      "subtitleWithDestinations_one": "That's {{formattedCount}} successful sync to {{destinations}}.",
+      "subtitleWithDestinations_other": "That's {{formattedCount}} successful syncs to {{destinations}}.",
+      "subtitle_one": "That's {{formattedCount}} successful sync.",
+      "subtitle_other": "That's {{formattedCount}} successful syncs."
     },
     "moments": {
       "lastSync": "Last sync",
@@ -152,7 +149,9 @@
       "low": "Low",
       "high": "High"
     },
-    "summary": "Summary"
+    "summary": "Summary",
+    "topThisMonthSeries_one": "{{formattedCount}} series",
+    "topThisMonthSeries_other": "{{formattedCount}} series"
   },
   "nav": {
     "sync": "Sync",

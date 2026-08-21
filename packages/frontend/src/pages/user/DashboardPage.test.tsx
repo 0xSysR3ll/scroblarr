@@ -6,8 +6,11 @@ import {
   type SyncStatistics,
 } from "@services/api/sync";
 import { renderWithProviders } from "@test/render";
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import i18n from "../../i18n/config";
 
 import { DashboardPage } from "./DashboardPage";
 
@@ -88,7 +91,7 @@ function historyResponse(data: SyncHistoryItem[]): SyncHistoryResponse {
 }
 
 describe("DashboardPage", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     vi.mocked(useAuth).mockReturnValue({
       user: { id: "user-1", username: "alice", isAdmin: false },
@@ -101,6 +104,9 @@ describe("DashboardPage", () => {
     });
     vi.mocked(getSyncStatistics).mockResolvedValue(statisticsFixture());
     vi.mocked(getSyncHistory).mockResolvedValue(historyResponse([]));
+    if (i18n.language !== "en") {
+      await i18n.changeLanguage("en");
+    }
   });
 
   it("renders destination statistics including Simkl", async () => {
@@ -140,6 +146,82 @@ describe("DashboardPage", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Per Day")).toBeInTheDocument();
     expect(screen.getByText("1 today")).toBeInTheDocument();
+  });
+
+  it("localizes decimal trend and pace deltas", async () => {
+    vi.mocked(getSyncStatistics).mockResolvedValue({
+      ...statisticsFixture(),
+      byPeriod: { today: 1, thisWeek: 4, thisMonth: 13, lastMonth: 8 },
+      averages: { perDay: 0.3, perWeek: 3, perMonth: 12 },
+    });
+    await i18n.changeLanguage("de");
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(await screen.findByText("Up 62,5%")).toBeInTheDocument();
+    expect(screen.getByText("+233,3%")).toBeInTheDocument();
+  });
+
+  it("labels series entries separately from movies in top-this-month", async () => {
+    vi.mocked(getSyncStatistics).mockResolvedValue({
+      ...statisticsFixture(),
+      topThisMonth: [
+        { mediaTitle: "The Expanse", mediaType: "series", count: 3 },
+        { mediaTitle: "Arrival", mediaType: "movie", count: 2 },
+        { mediaTitle: "Pilot", mediaType: "episode", count: 1 },
+      ],
+    });
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(await screen.findAllByText("The Expanse")).not.toHaveLength(0);
+    expect(screen.getAllByText("3 series").length).toBeGreaterThan(0);
+    expect(screen.getByText("2 watches")).toBeInTheDocument();
+    expect(screen.getByText("1 episode")).toBeInTheDocument();
+  });
+
+  it("centers the media mix chart on mediaTotal", async () => {
+    vi.mocked(getSyncStatistics).mockResolvedValue({
+      ...statisticsFixture(),
+      total: 99,
+      byMediaType: { episode: 8, movie: 4, series: 0 },
+    });
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    const totalLabel = await screen.findByText("total");
+    expect(totalLabel.previousElementSibling).toHaveTextContent("12");
+    expect(totalLabel.previousElementSibling).not.toHaveTextContent("99");
+  });
+
+  it("retries loading after an initial failure", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getSyncStatistics)
+      .mockRejectedValueOnce(new Error("network down"))
+      .mockResolvedValue(statisticsFixture());
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(await screen.findByText("network down")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /try again/i }));
+    expect(
+      await screen.findByText("You've synced 12 titles.")
+    ).toBeInTheDocument();
+  });
+
+  it("does not reload when the language changes", async () => {
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(
+      await screen.findByText("You've synced 12 titles.")
+    ).toBeInTheDocument();
+    expect(getSyncStatistics).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await i18n.changeLanguage("de");
+    });
+
+    expect(getSyncStatistics).toHaveBeenCalledTimes(1);
   });
 
   it("renders first and last sync moment cards", async () => {

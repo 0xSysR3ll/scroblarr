@@ -49,24 +49,33 @@ function percentOf(part: number, whole: number): number {
   return Math.round((part / whole) * 100);
 }
 
-function formatTrendPercent(change: number): string {
+function formatTrendPercent(change: number, locale: string): string {
   const rounded = Math.round(Math.abs(change) * 10) / 10;
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+  return rounded.toLocaleString(locale, {
+    minimumFractionDigits: Number.isInteger(rounded) ? 0 : 1,
+    maximumFractionDigits: 1,
+  });
 }
 
-function monthTrend(thisMonth: number, lastMonth: number) {
+function monthTrend(thisMonth: number, lastMonth: number, locale: string) {
   if (lastMonth <= 0) {
     return thisMonth > 0
-      ? ({ direction: "new", percent: "0" } as const)
-      : ({ direction: "flat", percent: "0" } as const);
+      ? ({ direction: "new", percent: formatTrendPercent(0, locale) } as const)
+      : ({
+          direction: "flat",
+          percent: formatTrendPercent(0, locale),
+        } as const);
   }
   const change = ((thisMonth - lastMonth) / lastMonth) * 100;
   if (Math.abs(change) < 0.05) {
-    return { direction: "flat" as const, percent: "0" };
+    return {
+      direction: "flat" as const,
+      percent: formatTrendPercent(0, locale),
+    };
   }
   return {
     direction: (change > 0 ? "up" : "down") as "up" | "down",
-    percent: formatTrendPercent(change),
+    percent: formatTrendPercent(change, locale),
   };
 }
 
@@ -264,30 +273,65 @@ function MomentCard({
   );
 }
 
+function topThisMonthSubtitle(
+  mediaType: string,
+  count: number,
+  formattedCount: string,
+  t: ReturnType<typeof useTranslation>["t"]
+): string {
+  if (mediaType === "episode") {
+    return t("dashboard.topThisMonthEpisodes", {
+      count,
+      formattedCount,
+      defaultValue_one: "{{formattedCount}} episode",
+      defaultValue_other: "{{formattedCount}} episodes",
+    });
+  }
+  if (mediaType === "series") {
+    return t("dashboard.topThisMonthSeries", {
+      count,
+      formattedCount,
+      defaultValue_one: "{{formattedCount}} series",
+      defaultValue_other: "{{formattedCount}} series",
+    });
+  }
+  return t("dashboard.topThisMonthMovies", {
+    count,
+    formattedCount,
+    defaultValue_one: "{{formattedCount}} watch",
+    defaultValue_other: "{{formattedCount}} watches",
+  });
+}
+
 function activityDayLabel(
   daysAgo: number,
   count: number,
+  locale: string,
   t: ReturnType<typeof useTranslation>["t"]
 ): string {
+  const formattedCount = formatCount(count, locale);
   if (daysAgo === 0) {
     return t("dashboard.sparklineToday", {
       count,
-      defaultValue_one: "Today: {{count}} sync",
-      defaultValue_other: "Today: {{count}} syncs",
+      formattedCount,
+      defaultValue_one: "Today: {{formattedCount}} sync",
+      defaultValue_other: "Today: {{formattedCount}} syncs",
     });
   }
   if (daysAgo === 1) {
     return t("dashboard.sparklineYesterday", {
       count,
-      defaultValue_one: "Yesterday: {{count}} sync",
-      defaultValue_other: "Yesterday: {{count}} syncs",
+      formattedCount,
+      defaultValue_one: "Yesterday: {{formattedCount}} sync",
+      defaultValue_other: "Yesterday: {{formattedCount}} syncs",
     });
   }
   return t("dashboard.sparklineDaysAgo", {
     days: daysAgo,
     count,
-    defaultValue_one: "{{days}} days ago: {{count}} sync",
-    defaultValue_other: "{{days}} days ago: {{count}} syncs",
+    formattedCount,
+    defaultValue_one: "{{days}} days ago: {{formattedCount}} sync",
+    defaultValue_other: "{{days}} days ago: {{formattedCount}} syncs",
   });
 }
 
@@ -316,7 +360,7 @@ function ActivityRhythmChart({ last7Days }: { last7Days: number[] }) {
             weekday: "short",
             timeZone: "UTC",
           });
-          const label = activityDayLabel(daysAgo, count, t);
+          const label = activityDayLabel(daysAgo, count, i18n.language, t);
           const isToday = daysAgo === 0;
 
           return (
@@ -396,6 +440,7 @@ function AveragePaceCard({
   actualLabel,
   icon: Icon,
   color,
+  locale,
 }: {
   title: string;
   average: number;
@@ -403,8 +448,9 @@ function AveragePaceCard({
   actualLabel: string;
   icon: ComponentType<{ className?: string }>;
   color: "blue" | "purple" | "green";
+  locale: string;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const colorClasses = {
     blue: "bg-primary/15 text-primary",
     purple: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
@@ -429,7 +475,7 @@ function AveragePaceCard({
         </div>
       </div>
       <p className="text-xl font-bold leading-tight tracking-tight text-foreground sm:text-2xl">
-        {formatAverage(average, i18n.language)}
+        {formatAverage(average, locale)}
       </p>
       <p className="mt-1 text-xs text-muted-foreground">
         {t("dashboard.stats.avgFromThisYear", {
@@ -448,7 +494,7 @@ function AveragePaceCard({
               }`}
             >
               {ahead ? "+" : "−"}
-              {formatTrendPercent(deltaPct)}%
+              {formatTrendPercent(deltaPct, locale)}%
             </span>
           )}
         </div>
@@ -478,6 +524,10 @@ export function DashboardPage() {
   const [refreshing, setRefreshing] = useState(false);
   const loadGenerationRef = useRef(0);
   const loadedUserIdRef = useRef<string | undefined>(undefined);
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
   const userId = user?.id;
 
   const loadDashboard = useCallback(
@@ -533,7 +583,7 @@ export function DashboardPage() {
         setError(
           err instanceof Error
             ? err.message
-            : t("dashboard.errors.loadFailed", {
+            : tRef.current("dashboard.errors.loadFailed", {
                 defaultValue: "Failed to load statistics",
               })
         );
@@ -545,7 +595,7 @@ export function DashboardPage() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- statistics intentionally omitted to avoid re-running effect after first load
-    [t, userId]
+    [userId]
   );
 
   useEffect(() => {
@@ -570,8 +620,30 @@ export function DashboardPage() {
   const destinations = statistics ? destinationNames(statistics) : [];
   const locale = i18n.language;
   const destinationList = formatConjunction(destinations, locale);
+  const formattedTotal = statistics
+    ? formatCount(statistics.total, locale)
+    : "";
+  const formattedSuccessful = statistics
+    ? formatCount(statistics.successful, locale)
+    : "";
+  const formattedTopThisMonth = topThisMonth
+    ? formatCount(topThisMonth.count, locale)
+    : "";
+  const formattedToday = statistics
+    ? formatCount(statistics.byPeriod.today, locale)
+    : "";
+  const formattedWeek = statistics
+    ? formatCount(statistics.byPeriod.thisWeek, locale)
+    : "";
+  const formattedMonth = statistics
+    ? formatCount(statistics.byPeriod.thisMonth, locale)
+    : "";
   const trend = statistics
-    ? monthTrend(statistics.byPeriod.thisMonth, statistics.byPeriod.lastMonth)
+    ? monthTrend(
+        statistics.byPeriod.thisMonth,
+        statistics.byPeriod.lastMonth,
+        locale
+      )
     : null;
   const mediaTotal = statistics
     ? statistics.byMediaType.episode +
@@ -701,6 +773,13 @@ export function DashboardPage() {
       ) : error ? (
         <div className={cardClass("p-4 sm:p-6")}>
           <p className="text-red-600 dark:text-red-400">{error}</p>
+          <button
+            type="button"
+            onClick={() => loadDashboard()}
+            className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            {t("errors.tryAgain", { defaultValue: "Try again" })}
+          </button>
         </div>
       ) : statistics ? (
         statistics.total === 0 ? (
@@ -756,25 +835,30 @@ export function DashboardPage() {
                 <h2 className="text-2xl font-bold tracking-tight text-balance text-foreground sm:text-3xl lg:text-4xl">
                   {t("dashboard.hero.title", {
                     count: statistics.total,
-                    defaultValue_one: "You've synced {{count}} title.",
-                    defaultValue_other: "You've synced {{count}} titles.",
+                    formattedCount: formattedTotal,
+                    defaultValue_one: "You've synced {{formattedCount}} title.",
+                    defaultValue_other:
+                      "You've synced {{formattedCount}} titles.",
                   })}
                 </h2>
                 <p className="mt-2 text-sm text-muted-foreground sm:text-base">
                   {destinations.length > 0
                     ? t("dashboard.hero.subtitleWithDestinations", {
                         count: statistics.successful,
+                        formattedCount: formattedSuccessful,
                         destinations: destinationList,
                         defaultValue_one:
-                          "That's {{count}} successful sync to {{destinations}}.",
+                          "That's {{formattedCount}} successful sync to {{destinations}}.",
                         defaultValue_other:
-                          "That's {{count}} successful syncs to {{destinations}}.",
+                          "That's {{formattedCount}} successful syncs to {{destinations}}.",
                       })
                     : t("dashboard.hero.subtitle", {
                         count: statistics.successful,
-                        defaultValue_one: "That's {{count}} successful sync.",
+                        formattedCount: formattedSuccessful,
+                        defaultValue_one:
+                          "That's {{formattedCount}} successful sync.",
                         defaultValue_other:
-                          "That's {{count}} successful syncs.",
+                          "That's {{formattedCount}} successful syncs.",
                       })}
                 </p>
               </div>
@@ -812,19 +896,12 @@ export function DashboardPage() {
                     defaultValue: "Most synced",
                   })}
                   title={topThisMonth.mediaTitle}
-                  subtitle={
-                    topThisMonth.mediaType === "episode"
-                      ? t("dashboard.topThisMonthEpisodes", {
-                          count: topThisMonth.count,
-                          defaultValue_one: "{{count}} episode",
-                          defaultValue_other: "{{count}} episodes",
-                        })
-                      : t("dashboard.topThisMonthMovies", {
-                          count: topThisMonth.count,
-                          defaultValue_one: "{{count}} watch",
-                          defaultValue_other: "{{count}} watches",
-                        })
-                  }
+                  subtitle={topThisMonthSubtitle(
+                    topThisMonth.mediaType,
+                    topThisMonth.count,
+                    formattedTopThisMonth,
+                    t
+                  )}
                   item={topThisMonthMatch}
                 />
               )}
@@ -1094,7 +1171,7 @@ export function DashboardPage() {
                   >
                     <div className="absolute inset-4 flex flex-col items-center justify-center rounded-full bg-card text-center">
                       <span className="text-lg font-bold text-foreground">
-                        {formatCount(statistics.total, locale)}
+                        {formatCount(mediaTotal, locale)}
                       </span>
                       <span className="text-[11px] text-muted-foreground">
                         {t("dashboard.stats.mediaMixTotal", {
@@ -1256,29 +1333,27 @@ export function DashboardPage() {
                     })}
                   </h3>
                   <ul className="space-y-2">
-                    {statistics.topThisMonth.map((item, index) => (
-                      <li
-                        key={`${item.mediaTitle}-${item.mediaType}-${index}`}
-                        className="flex min-w-0 items-center justify-between gap-2 border-b border-border/60 py-2 last:border-0"
-                      >
-                        <span className="min-w-0 truncate font-medium text-foreground">
-                          {item.mediaTitle}
-                        </span>
-                        <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">
-                          {item.mediaType === "episode"
-                            ? t("dashboard.topThisMonthEpisodes", {
-                                count: item.count,
-                                defaultValue_one: "{{count}} episode",
-                                defaultValue_other: "{{count}} episodes",
-                              })
-                            : t("dashboard.topThisMonthMovies", {
-                                count: item.count,
-                                defaultValue_one: "{{count}} watch",
-                                defaultValue_other: "{{count}} watches",
-                              })}
-                        </span>
-                      </li>
-                    ))}
+                    {statistics.topThisMonth.map((item, index) => {
+                      const formattedCount = formatCount(item.count, locale);
+                      return (
+                        <li
+                          key={`${item.mediaTitle}-${item.mediaType}-${index}`}
+                          className="flex min-w-0 items-center justify-between gap-2 border-b border-border/60 py-2 last:border-0"
+                        >
+                          <span className="min-w-0 truncate font-medium text-foreground">
+                            {item.mediaTitle}
+                          </span>
+                          <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">
+                            {topThisMonthSubtitle(
+                              item.mediaType,
+                              item.count,
+                              formattedCount,
+                              t
+                            )}
+                          </span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               ) : (
@@ -1372,11 +1447,13 @@ export function DashboardPage() {
                   actual={statistics.byPeriod.today}
                   actualLabel={t("dashboard.stats.avgVsToday", {
                     count: statistics.byPeriod.today,
-                    defaultValue_one: "{{count}} today",
-                    defaultValue_other: "{{count}} today",
+                    formattedCount: formattedToday,
+                    defaultValue_one: "{{formattedCount}} today",
+                    defaultValue_other: "{{formattedCount}} today",
                   })}
                   icon={FaCalendarDay}
                   color="blue"
+                  locale={locale}
                 />
                 <AveragePaceCard
                   title={t("dashboard.stats.avgPerWeek", {
@@ -1386,11 +1463,13 @@ export function DashboardPage() {
                   actual={statistics.byPeriod.thisWeek}
                   actualLabel={t("dashboard.stats.avgVsWeek", {
                     count: statistics.byPeriod.thisWeek,
-                    defaultValue_one: "{{count}} this week",
-                    defaultValue_other: "{{count}} this week",
+                    formattedCount: formattedWeek,
+                    defaultValue_one: "{{formattedCount}} this week",
+                    defaultValue_other: "{{formattedCount}} this week",
                   })}
                   icon={FaCalendarWeek}
                   color="purple"
+                  locale={locale}
                 />
                 <AveragePaceCard
                   title={t("dashboard.stats.avgPerMonth", {
@@ -1400,11 +1479,13 @@ export function DashboardPage() {
                   actual={statistics.byPeriod.thisMonth}
                   actualLabel={t("dashboard.stats.avgVsMonth", {
                     count: statistics.byPeriod.thisMonth,
-                    defaultValue_one: "{{count}} this month",
-                    defaultValue_other: "{{count}} this month",
+                    formattedCount: formattedMonth,
+                    defaultValue_one: "{{formattedCount}} this month",
+                    defaultValue_other: "{{formattedCount}} this month",
                   })}
                   icon={FaCalendarAlt}
                   color="green"
+                  locale={locale}
                 />
               </div>
             </div>
