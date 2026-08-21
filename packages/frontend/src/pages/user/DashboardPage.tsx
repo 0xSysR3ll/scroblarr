@@ -486,7 +486,12 @@ export function DashboardPage() {
       const isCurrent = () => generation === loadGenerationRef.current;
       if (loadedUserIdRef.current !== userId) {
         loadedUserIdRef.current = userId;
+        setStatistics(null);
+        setRecentSyncs([]);
         setFirstSync(null);
+        setDataFetchedAt(null);
+        setError(null);
+        setLoading(true);
       }
       try {
         if (!statistics && !isRefresh) {
@@ -516,13 +521,11 @@ export function DashboardPage() {
         setStatistics(stats);
         setRecentSyncs(historyRes.data);
         setDataFetchedAt(new Date());
-        const firstResult = await firstHistoryRequest;
-        if (!isCurrent()) {
-          return;
-        }
-        if (firstResult.ok) {
-          setFirstSync(firstResult.data);
-        }
+        void firstHistoryRequest.then((firstResult) => {
+          if (isCurrent() && firstResult.ok) {
+            setFirstSync(firstResult.data);
+          }
+        });
       } catch (err) {
         if (!isCurrent()) {
           return;

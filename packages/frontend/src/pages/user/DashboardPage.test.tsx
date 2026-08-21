@@ -190,6 +190,24 @@ describe("DashboardPage", () => {
     expect(screen.queryByText("First sync")).not.toBeInTheDocument();
   });
 
+  it("renders the dashboard while the earliest-sync request is pending", async () => {
+    vi.mocked(getSyncHistory).mockImplementation(
+      async (_page, _size, _filters, _sortBy, sortOrder) => {
+        if (sortOrder === "ASC") {
+          return new Promise(() => undefined);
+        }
+        return historyResponse([]);
+      }
+    );
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(
+      await screen.findByText("You've synced 12 titles.")
+    ).toBeInTheDocument();
+    expect(screen.queryByText("First sync")).not.toBeInTheDocument();
+  });
+
   it("ignores earliest-sync results after the signed-in user changes", async () => {
     let resolvePreviousFirst!: (value: SyncHistoryResponse) => void;
     const previousFirst = new Promise<SyncHistoryResponse>((resolve) => {
@@ -217,7 +235,9 @@ describe("DashboardPage", () => {
 
     const { rerender } = renderWithProviders(<DashboardPage />, { route: "/" });
 
-    expect(await screen.findByText("Issues")).toBeInTheDocument();
+    expect(
+      await screen.findByText("You've synced 12 titles.")
+    ).toBeInTheDocument();
 
     currentUserId = "user-2";
     vi.mocked(useAuth).mockReturnValue({
