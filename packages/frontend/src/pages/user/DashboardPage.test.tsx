@@ -167,9 +167,9 @@ describe("DashboardPage", () => {
     renderWithProviders(<DashboardPage />, { route: "/" });
 
     expect(await screen.findByText("Last sync")).toBeInTheDocument();
-    expect(screen.getByText("First sync")).toBeInTheDocument();
+    expect(await screen.findByText("First sync")).toBeInTheDocument();
     expect(screen.getAllByText("The Latest Watch").length).toBeGreaterThan(0);
-    expect(screen.getByText("The First Watch")).toBeInTheDocument();
+    expect(await screen.findByText("The First Watch")).toBeInTheDocument();
   });
 
   it("still renders when the earliest-sync request fails", async () => {
