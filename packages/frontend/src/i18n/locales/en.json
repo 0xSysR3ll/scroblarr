@@ -59,6 +59,9 @@
   },
   "dashboard": {
     "title": "Dashboard",
+    "errors": {
+      "loadFailed": "Failed to load statistics"
+    },
     "health": {
       "issuesHint": "Some syncs failed in the last 30 days",
       "noActivityHint": "No syncs this week yet",

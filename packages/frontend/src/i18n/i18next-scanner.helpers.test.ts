@@ -44,6 +44,40 @@ describe("i18next-scanner helpers", () => {
     );
   });
 
+  it("extracts option objects when defaults use template literals", () => {
+    const source = 't("item", { defaultValue_one: `Hello {name}`, extra: 1 })';
+    const openIndex = source.indexOf("{");
+    expect(extractBalancedObject(source, openIndex)).toBe(
+      "{ defaultValue_one: `Hello {name}`, extra: 1 }"
+    );
+    expect(quotedOption(source.slice(openIndex), "defaultValue_one")).toBe(
+      "Hello {name}"
+    );
+  });
+
+  it("ignores braces inside template interpolations when extracting option objects", () => {
+    const source =
+      't("item", { defaultValue_one: `Hello ${foo({ x: 1 })}`, extra: 1 })';
+    const openIndex = source.indexOf("{");
+    expect(extractBalancedObject(source, openIndex)).toBe(
+      "{ defaultValue_one: `Hello ${foo({ x: 1 })}`, extra: 1 }"
+    );
+  });
+
+  it("does not treat identifiers ending in t as translation calls", () => {
+    const content = `
+      format("greeting", { defaultValue_one: "Nope", defaultValue_other: "Nopes" });
+      t("greeting", { defaultValue_one: "Yes", defaultValue_other: "Yeses" });
+    `;
+
+    expect(
+      pluralDefaultsFromSource(content, "greeting", "translation")
+    ).toEqual({
+      defaultValue_one: "Yes",
+      defaultValue_other: "Yeses",
+    });
+  });
+
   it("reads single-quoted values and JavaScript hexadecimal escapes", () => {
     const body = `{ ns: 'other', defaultValue_one: 'It\\x27s {{count}}' }`;
     expect(quotedOption(body, "ns")).toBe("other");

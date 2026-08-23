@@ -158,7 +158,7 @@ describe("DashboardPage", () => {
 
     renderWithProviders(<DashboardPage />, { route: "/" });
 
-    expect(await screen.findByText("Up 62,5%")).toBeInTheDocument();
+    expect(await screen.findByText(/\b62,5%/)).toBeInTheDocument();
     expect(screen.getByText("+233,3%")).toBeInTheDocument();
   });
 

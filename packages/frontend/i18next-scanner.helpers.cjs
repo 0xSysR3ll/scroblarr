@@ -125,10 +125,93 @@ function decodeJsEscapes(inner) {
   return out;
 }
 
+function skipInterpolation(source, i, end = source.length) {
+  let depth = 1;
+  while (i < end && depth > 0) {
+    const ch = source[i];
+    if (ch === '"' || ch === "'" || ch === "`") {
+      i = skipQuoted(source, i, end);
+      continue;
+    }
+    if (ch === "{") {
+      depth += 1;
+    } else if (ch === "}") {
+      depth -= 1;
+    }
+    i += 1;
+  }
+  return i;
+}
+
+function skipTemplateBody(source, i, end = source.length) {
+  while (i < end) {
+    const ch = source[i];
+    if (ch === "\\") {
+      i += 2;
+      continue;
+    }
+    if (ch === "`") {
+      return i + 1;
+    }
+    if (ch === "$" && i + 1 < end && source[i + 1] === "{") {
+      i = skipInterpolation(source, i + 2, end);
+      continue;
+    }
+    i += 1;
+  }
+  return Math.min(i, end);
+}
+
+function skipQuoted(source, i, end = source.length) {
+  const quote = source[i];
+  i += 1;
+  if (quote === "`") {
+    return skipTemplateBody(source, i, end);
+  }
+  while (i < end) {
+    if (source[i] === "\\") {
+      i += 2;
+      continue;
+    }
+    if (source[i] === quote) {
+      return i + 1;
+    }
+    i += 1;
+  }
+  return Math.min(i, end);
+}
+
 function readStringLiteral(source, start) {
   const quote = source[start];
   let i = start + 1;
   let inner = "";
+  if (quote === "`") {
+    while (i < source.length) {
+      const ch = source[i];
+      if (ch === "\\") {
+        inner += ch;
+        if (i + 1 < source.length) {
+          inner += source[i + 1];
+          i += 2;
+          continue;
+        }
+        i += 1;
+        continue;
+      }
+      if (ch === "`") {
+        return { value: decodeJsEscapes(inner), end: i + 1 };
+      }
+      if (ch === "$" && source[i + 1] === "{") {
+        const interpEnd = skipInterpolation(source, i + 2);
+        inner += source.slice(i, interpEnd);
+        i = interpEnd;
+        continue;
+      }
+      inner += ch;
+      i += 1;
+    }
+    return { value: decodeJsEscapes(inner), end: i };
+  }
   while (i < source.length) {
     const ch = source[i];
     if (ch === "\\") {
@@ -156,23 +239,10 @@ function extractBalancedObject(source, openIndex) {
   }
   let i = openIndex;
   let depth = 0;
-  let quote = null;
   while (i < source.length) {
     const ch = source[i];
-    if (quote) {
-      if (ch === "\\") {
-        i += 2;
-        continue;
-      }
-      if (ch === quote) {
-        quote = null;
-      }
-      i += 1;
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      quote = ch;
-      i += 1;
+    if (ch === '"' || ch === "'" || ch === "`") {
+      i = skipQuoted(source, i);
       continue;
     }
     if (ch === "{") {
@@ -191,23 +261,10 @@ function extractBalancedObject(source, openIndex) {
 function skipObjectValue(source, start, end) {
   let i = start;
   let depth = 0;
-  let quote = null;
   while (i < end) {
     const ch = source[i];
-    if (quote) {
-      if (ch === "\\") {
-        i += 2;
-        continue;
-      }
-      if (ch === quote) {
-        quote = null;
-      }
-      i += 1;
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      quote = ch;
-      i += 1;
+    if (ch === '"' || ch === "'" || ch === "`") {
+      i = skipQuoted(source, i, end);
       continue;
     }
     if (ch === "{" || ch === "(" || ch === "[") {
@@ -253,7 +310,7 @@ function parseObjectStringLiterals(body) {
     }
 
     let key;
-    if (body[i] === '"' || body[i] === "'") {
+    if (body[i] === '"' || body[i] === "'" || body[i] === "`") {
       const literal = readStringLiteral(body, i);
       key = literal.value;
       i = literal.end;
@@ -273,7 +330,7 @@ function parseObjectStringLiterals(body) {
     i += 1;
     skipWs();
 
-    if (body[i] === '"' || body[i] === "'") {
+    if (body[i] === '"' || body[i] === "'" || body[i] === "`") {
       const literal = readStringLiteral(body, i);
       result[key] = literal.value;
       i = literal.end;
@@ -294,7 +351,7 @@ function quotedOption(body, name) {
 function pluralDefaultsFromSource(content, key, ns, defaultNs = ns) {
   const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const callRe = new RegExp(
-    String.raw`t\(\s*["']${escapedKey}["']\s*,\s*\{`,
+    String.raw`(?<![\w$])t\(\s*["']${escapedKey}["']\s*,\s*\{`,
     "g"
   );
   const result = {};
