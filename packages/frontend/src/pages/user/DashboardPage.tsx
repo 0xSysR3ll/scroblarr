@@ -1,41 +1,169 @@
+import { SyncHistoryPoster } from "@components/sync/SyncHistoryPoster";
 import { Skeleton } from "@components/ui/skeleton";
 import { useAuth } from "@contexts/AuthContext";
 import {
-  getSyncStatistics,
   getSyncHistory,
-  SyncStatistics,
+  getSyncStatistics,
   type SyncHistoryItem,
+  type SyncStatistics,
 } from "@services/api/sync";
 import { formatMediaTitle, formatRelativeTime } from "@utils/syncHistory";
-import { useCallback, useEffect, useState, type ComponentType } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ComponentType,
+} from "react";
 import { useTranslation } from "react-i18next";
 import {
-  FaCheckCircle,
-  FaTimesCircle,
-  FaFilm,
-  FaTv,
-  FaListUl,
+  FaArrowDown,
+  FaArrowUp,
   FaCalendarDay,
   FaCalendarWeek,
   FaCalendarAlt,
-  FaDatabase,
+  FaChartBar,
+  FaCheckCircle,
   FaClock,
+  FaDatabase,
   FaExternalLinkAlt,
+  FaFilm,
+  FaListUl,
+  FaMinus,
   FaSync,
-  FaChevronDown,
-  FaChevronRight,
+  FaTimesCircle,
+  FaTv,
 } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
 
-const DAY_NAMES = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
+const MEDIA_COLORS = {
+  episode: "var(--chart-3)",
+  series: "var(--chart-2)",
+  movie: "var(--chart-1)",
+} as const;
+
+function percentOf(part: number, whole: number): number {
+  if (whole <= 0) {
+    return 0;
+  }
+  return Math.round((part / whole) * 100);
+}
+
+function formatTrendPercent(change: number, locale: string): string {
+  const rounded = Math.round(Math.abs(change) * 10) / 10;
+  return rounded.toLocaleString(locale, {
+    minimumFractionDigits: Number.isInteger(rounded) ? 0 : 1,
+    maximumFractionDigits: 1,
+  });
+}
+
+function monthTrend(thisMonth: number, lastMonth: number, locale: string) {
+  if (lastMonth <= 0) {
+    return thisMonth > 0
+      ? ({ direction: "new", percent: formatTrendPercent(0, locale) } as const)
+      : ({
+          direction: "flat",
+          percent: formatTrendPercent(0, locale),
+        } as const);
+  }
+  const change = ((thisMonth - lastMonth) / lastMonth) * 100;
+  if (Math.abs(change) < 0.05) {
+    return {
+      direction: "flat" as const,
+      percent: formatTrendPercent(0, locale),
+    };
+  }
+  return {
+    direction: (change > 0 ? "up" : "down") as "up" | "down",
+    percent: formatTrendPercent(change, locale),
+  };
+}
+
+function formatMomentDate(dateString: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(dateString));
+}
+
+function formatWeekday(dayIndex: number, locale: string): string {
+  if (!Number.isInteger(dayIndex) || dayIndex < 0 || dayIndex > 6) {
+    return "—";
+  }
+  // 2024-01-07 is a Sunday in UTC.
+  const date = new Date(Date.UTC(2024, 0, 7 + dayIndex));
+  return new Intl.DateTimeFormat(locale, {
+    weekday: "long",
+    timeZone: "UTC",
+  }).format(date);
+}
+
+function formatCount(value: number, locale: string): string {
+  return value.toLocaleString(locale);
+}
+
+function destinationNames(statistics: SyncStatistics): string[] {
+  const names: string[] = [];
+  if (statistics.byDestination.trakt > 0) {
+    names.push("Trakt");
+  }
+  if (statistics.byDestination.simkl > 0) {
+    names.push("Simkl");
+  }
+  if (statistics.byDestination.tvtime > 0) {
+    names.push("TVTime");
+  }
+  return names;
+}
+
+function formatConjunction(items: string[], locale: string): string {
+  if (items.length === 0) {
+    return "";
+  }
+  const ListFormat = (
+    Intl as typeof Intl & {
+      ListFormat: new (
+        locales?: string | string[],
+        options?: { style?: string; type?: string }
+      ) => { format(value: Iterable<string>): string };
+    }
+  ).ListFormat;
+  return new ListFormat(locale, {
+    style: "long",
+    type: "conjunction",
+  }).format(items);
+}
+
+function conicGradient(
+  segments: Array<{ color: string; value: number }>,
+  total: number
+): string {
+  const stops: string[] = [];
+  if (total > 0) {
+    let acc = 0;
+    for (const segment of segments) {
+      if (segment.value <= 0) {
+        continue;
+      }
+      const start = (acc / total) * 100;
+      acc += segment.value;
+      const end = (acc / total) * 100;
+      stops.push(`${segment.color} ${start}% ${end}%`);
+    }
+  }
+  return stops.length > 0
+    ? `conic-gradient(${stops.join(", ")})`
+    : "var(--muted)";
+}
+
+function cardClass(extra = "") {
+  return `min-w-0 rounded-xl border border-border/60 bg-card text-card-foreground shadow-sm ${extra}`;
+}
+
+const dashboardAlignGrid =
+  "grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5";
+const dashboardHeroSpan = "sm:col-span-2 md:col-span-3 xl:col-span-2";
 
 function StatCard({
   title,
@@ -43,14 +171,12 @@ function StatCard({
   icon: Icon,
   color = "blue",
   subtitle,
-  primary = false,
 }: {
   title: string;
   value: string | number;
   icon: ComponentType<{ className?: string }>;
-  color?: "blue" | "green" | "red" | "purple" | "yellow";
+  color?: "blue" | "green" | "red" | "purple" | "yellow" | "muted";
   subtitle?: string;
-  primary?: boolean;
 }) {
   const colorClasses = {
     blue: "bg-primary/15 text-primary",
@@ -58,31 +184,28 @@ function StatCard({
     red: "bg-destructive/15 text-destructive",
     purple: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
     yellow: "bg-amber-500/15 text-amber-800 dark:text-amber-300",
+    muted: "bg-muted text-muted-foreground",
   };
 
   return (
-    <div
-      className={`rounded-xl border border-border/60 bg-card text-card-foreground shadow-sm p-6 ${
-        primary ? "ring-2 ring-primary/25 border-primary/30" : ""
-      }`}
-    >
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
-        <div className={`p-2 rounded-lg ${colorClasses[color]}`}>
-          <Icon className="w-5 h-5" />
+    <div className={cardClass("flex h-full flex-col p-3 sm:p-4")}>
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <h3 className="min-w-0 text-xs font-medium leading-tight text-muted-foreground sm:text-sm">
+          {title}
+        </h3>
+        <div
+          className={`shrink-0 rounded-lg p-1.5 sm:p-2 ${colorClasses[color]}`}
+        >
+          <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
         </div>
       </div>
-      <p
-        className={
-          primary
-            ? "text-4xl font-bold text-foreground tracking-tight"
-            : "text-3xl font-bold text-foreground"
-        }
-      >
+      <p className="text-xl font-bold leading-tight tracking-tight break-words text-foreground sm:text-2xl">
         {value}
       </p>
       {subtitle && (
-        <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
+        <p className="mt-1 text-xs leading-snug text-muted-foreground">
+          {subtitle}
+        </p>
       )}
     </div>
   );
@@ -90,32 +213,335 @@ function StatCard({
 
 function StatCardSkeleton() {
   return (
-    <div className="rounded-xl border border-border/60 bg-card p-6 text-card-foreground shadow-sm">
+    <div className={cardClass("flex h-full flex-col p-3 sm:p-4")}>
       <div className="mb-2 flex items-center justify-between">
         <Skeleton className="h-4 w-24" />
-        <Skeleton className="h-9 w-9 rounded-lg" />
+        <Skeleton className="h-8 w-8 rounded-lg" />
       </div>
-      <Skeleton className="mt-2 h-9 w-20" />
+      <Skeleton className="mt-2 h-8 w-16" />
+    </div>
+  );
+}
+
+function PercentageBar({ percent, color }: { percent: number; color: string }) {
+  return (
+    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+      <div
+        className="h-full rounded-full"
+        style={{
+          width: `${Math.min(100, Math.max(0, percent))}%`,
+          backgroundColor: color,
+        }}
+      />
+    </div>
+  );
+}
+
+function MomentCard({
+  label,
+  title,
+  subtitle,
+  item,
+}: {
+  label: string;
+  title: string;
+  subtitle?: string;
+  item?: SyncHistoryItem;
+}) {
+  return (
+    <div className={cardClass("flex h-full items-center gap-3 p-3")}>
+      {item ? (
+        <SyncHistoryPoster item={item} size="compact" />
+      ) : (
+        <div className="flex h-16 w-12 shrink-0 items-center justify-center rounded border border-border/60 bg-muted text-muted-foreground">
+          <FaDatabase className="h-4 w-4 opacity-50" aria-hidden />
+        </div>
+      )}
+      <div className="min-w-0">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {label}
+        </p>
+        <p className="truncate font-semibold text-foreground" title={title}>
+          {title}
+        </p>
+        {subtitle && (
+          <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function topThisMonthSubtitle(
+  mediaType: string,
+  count: number,
+  formattedCount: string,
+  t: ReturnType<typeof useTranslation>["t"]
+): string {
+  if (mediaType === "episode") {
+    return t("dashboard.topThisMonthEpisodes", {
+      count,
+      formattedCount,
+      defaultValue_one: "{{formattedCount}} episode",
+      defaultValue_other: "{{formattedCount}} episodes",
+    });
+  }
+  if (mediaType === "series") {
+    return t("dashboard.topThisMonthSeries", {
+      count,
+      formattedCount,
+      defaultValue_one: "{{formattedCount}} series",
+      defaultValue_other: "{{formattedCount}} series",
+    });
+  }
+  return t("dashboard.topThisMonthMovies", {
+    count,
+    formattedCount,
+    defaultValue_one: "{{formattedCount}} watch",
+    defaultValue_other: "{{formattedCount}} watches",
+  });
+}
+
+function activityDayLabel(
+  daysAgo: number,
+  count: number,
+  locale: string,
+  t: ReturnType<typeof useTranslation>["t"]
+): string {
+  const formattedCount = formatCount(count, locale);
+  if (daysAgo === 0) {
+    return t("dashboard.sparklineToday", {
+      count,
+      formattedCount,
+      defaultValue_one: "Today: {{formattedCount}} sync",
+      defaultValue_other: "Today: {{formattedCount}} syncs",
+    });
+  }
+  if (daysAgo === 1) {
+    return t("dashboard.sparklineYesterday", {
+      count,
+      formattedCount,
+      defaultValue_one: "Yesterday: {{formattedCount}} sync",
+      defaultValue_other: "Yesterday: {{formattedCount}} syncs",
+    });
+  }
+  return t("dashboard.sparklineDaysAgo", {
+    days: daysAgo,
+    count,
+    formattedCount,
+    defaultValue_one: "{{days}} days ago: {{formattedCount}} sync",
+    defaultValue_other: "{{days}} days ago: {{formattedCount}} syncs",
+  });
+}
+
+function ActivityRhythmChart({ last7Days }: { last7Days: number[] }) {
+  const { t, i18n } = useTranslation();
+  const max = Math.max(...last7Days, 1);
+  const chronological = last7Days
+    .map((count, daysAgo) => ({ count, daysAgo }))
+    .reverse();
+
+  return (
+    <div>
+      <div
+        className="flex min-w-0 items-end gap-1 sm:gap-2.5"
+        aria-label={t("dashboard.last7Days", {
+          defaultValue: "Last 7 days",
+        })}
+      >
+        {chronological.map(({ count, daysAgo }) => {
+          const intensity = count / max;
+          const heightPct = count <= 0 ? 0 : Math.max(14, intensity * 100);
+          const day = new Date();
+          day.setUTCHours(0, 0, 0, 0);
+          day.setUTCDate(day.getUTCDate() - daysAgo);
+          const weekday = day.toLocaleDateString(i18n.language, {
+            weekday: "short",
+            timeZone: "UTC",
+          });
+          const label = activityDayLabel(daysAgo, count, i18n.language, t);
+          const isToday = daysAgo === 0;
+
+          return (
+            <div
+              key={daysAgo}
+              className="group relative flex min-w-0 flex-1 flex-col items-center gap-2"
+            >
+              <div
+                className="relative h-24 w-full sm:h-32"
+                title={label}
+                role="img"
+                aria-label={label}
+              >
+                <div
+                  className={`absolute bottom-0 left-1/2 h-full w-2.5 -translate-x-1/2 rounded-full sm:w-3.5 ${
+                    isToday ? "bg-primary/15" : "bg-muted/70"
+                  }`}
+                />
+                {count > 0 && (
+                  <div
+                    className="absolute inset-x-0 bottom-0 flex flex-col items-center"
+                    style={{ height: `${heightPct}%` }}
+                  >
+                    <div
+                      className={`z-10 size-2.5 shrink-0 rounded-full bg-primary shadow-sm sm:size-3 ${
+                        isToday
+                          ? "ring-1 ring-primary/50 ring-offset-1 ring-offset-card sm:ring-2 sm:ring-offset-2"
+                          : ""
+                      }`}
+                    />
+                    <div
+                      className="-mt-1 w-2.5 flex-1 rounded-full bg-primary sm:w-3.5"
+                      style={{ opacity: 0.45 + intensity * 0.55 }}
+                    />
+                  </div>
+                )}
+                <span
+                  className="pointer-events-none absolute -top-0.5 left-1/2 z-10 -translate-x-1/2 rounded-md bg-foreground px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap text-background opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
+                  aria-hidden
+                >
+                  {count}
+                </span>
+              </div>
+              <span
+                className={`w-full truncate text-center text-[10px] sm:text-xs ${
+                  isToday
+                    ? "font-semibold text-foreground"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {weekday}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function formatAverage(value: number, locale: string): string {
+  return value % 1 === 0
+    ? value.toLocaleString(locale, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      })
+    : value.toLocaleString(locale, {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+      });
+}
+
+function AveragePaceCard({
+  title,
+  average,
+  actual,
+  actualLabel,
+  icon: Icon,
+  color,
+  locale,
+}: {
+  title: string;
+  average: number;
+  actual: number;
+  actualLabel: string;
+  icon: ComponentType<{ className?: string }>;
+  color: "blue" | "purple" | "green";
+  locale: string;
+}) {
+  const { t } = useTranslation();
+  const colorClasses = {
+    blue: "bg-primary/15 text-primary",
+    purple: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
+    green: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  };
+  const ratio = average > 0 ? actual / average : actual > 0 ? 1 : 0;
+  const fillPct = Math.min(100, Math.max(0, ratio * 100));
+  const deltaPct = average > 0 ? ((actual - average) / average) * 100 : 0;
+  const showDelta = average > 0 && Math.abs(deltaPct) >= 5;
+  const ahead = deltaPct > 0;
+
+  return (
+    <div className={cardClass("flex h-full flex-col p-3 sm:p-4")}>
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <h3 className="min-w-0 text-xs font-medium leading-tight text-muted-foreground sm:text-sm">
+          {title}
+        </h3>
+        <div
+          className={`shrink-0 rounded-lg p-1.5 sm:p-2 ${colorClasses[color]}`}
+        >
+          <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+        </div>
+      </div>
+      <p className="text-xl font-bold leading-tight tracking-tight text-foreground sm:text-2xl">
+        {formatAverage(average, locale)}
+      </p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {t("dashboard.stats.avgFromThisYear", {
+          defaultValue: "Yearly average",
+        })}
+      </p>
+      <div className="mt-auto pt-3">
+        <div className="mb-1.5 flex items-center justify-between gap-2 text-xs">
+          <span className="truncate text-muted-foreground">{actualLabel}</span>
+          {showDelta && (
+            <span
+              className={`shrink-0 tabular-nums ${
+                ahead
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-muted-foreground"
+              }`}
+            >
+              {ahead ? "+" : "−"}
+              {formatTrendPercent(deltaPct, locale)}%
+            </span>
+          )}
+        </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+          <div
+            className={`h-full rounded-full ${
+              ahead ? "bg-emerald-500" : "bg-primary"
+            }`}
+            style={{ width: `${fillPct}%` }}
+          />
+        </div>
+      </div>
     </div>
   );
 }
 
 export function DashboardPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [statistics, setStatistics] = useState<SyncStatistics | null>(null);
   const [recentSyncs, setRecentSyncs] = useState<SyncHistoryItem[]>([]);
+  const [firstSync, setFirstSync] = useState<SyncHistoryItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dataFetchedAt, setDataFetchedAt] = useState<Date | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [breakdownOpen, setBreakdownOpen] = useState(true);
-  const [activityOpen, setActivityOpen] = useState(true);
-  const [averagesOpen, setAveragesOpen] = useState(true);
+  const loadGenerationRef = useRef(0);
+  const loadedUserIdRef = useRef<string | undefined>(undefined);
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
+  const userId = user?.id;
 
   const loadDashboard = useCallback(
     async ({ isRefresh = false }: { isRefresh?: boolean } = {}) => {
+      const generation = ++loadGenerationRef.current;
+      const isCurrent = () => generation === loadGenerationRef.current;
+      if (loadedUserIdRef.current !== userId) {
+        loadedUserIdRef.current = userId;
+        setStatistics(null);
+        setRecentSyncs([]);
+        setFirstSync(null);
+        setDataFetchedAt(null);
+        setError(null);
+        setLoading(true);
+      }
       try {
         if (!statistics && !isRefresh) {
           setLoading(true);
@@ -124,182 +550,952 @@ export function DashboardPage() {
           setRefreshing(true);
         }
         setError(null);
+        const firstHistoryRequest = getSyncHistory(
+          1,
+          1,
+          undefined,
+          "syncedAt",
+          "ASC"
+        ).then(
+          (res) => ({ ok: true as const, data: res.data[0] ?? null }),
+          () => ({ ok: false as const })
+        );
         const [stats, historyRes] = await Promise.all([
           getSyncStatistics(),
           getSyncHistory(1, 5, undefined, "syncedAt", "DESC"),
         ]);
+        if (!isCurrent()) {
+          return;
+        }
         setStatistics(stats);
         setRecentSyncs(historyRes.data);
         setDataFetchedAt(new Date());
+        void firstHistoryRequest.then((firstResult) => {
+          if (isCurrent() && firstResult.ok) {
+            setFirstSync(firstResult.data);
+          }
+        });
       } catch (err) {
+        if (!isCurrent()) {
+          return;
+        }
         setError(
           err instanceof Error
             ? err.message
-            : t("dashboard.errors.loadFailed", {
+            : tRef.current("dashboard.errors.loadFailed", {
                 defaultValue: "Failed to load statistics",
               })
         );
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (isCurrent()) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- statistics intentionally omitted to avoid re-running effect after first load
-    [t]
+    [userId]
   );
 
   useEffect(() => {
-    if (user) {
-      loadDashboard();
+    if (userId) {
+      void loadDashboard();
     }
-  }, [user, loadDashboard]);
+    return () => {
+      loadGenerationRef.current += 1;
+    };
+  }, [userId, loadDashboard]);
+
+  const lastSync = recentSyncs[0];
+  const showFirstSync = Boolean(firstSync && firstSync.id !== lastSync?.id);
+  const topThisMonth = statistics?.topThisMonth[0];
+  const topThisMonthMatch = topThisMonth
+    ? recentSyncs.find(
+        (item) =>
+          item.mediaTitle === topThisMonth.mediaTitle &&
+          item.mediaType === topThisMonth.mediaType
+      )
+    : undefined;
+  const destinations = statistics ? destinationNames(statistics) : [];
+  const locale = i18n.language;
+  const destinationList = formatConjunction(destinations, locale);
+  const formattedTotal = statistics
+    ? formatCount(statistics.total, locale)
+    : "";
+  const formattedSuccessful = statistics
+    ? formatCount(statistics.successful, locale)
+    : "";
+  const formattedTopThisMonth = topThisMonth
+    ? formatCount(topThisMonth.count, locale)
+    : "";
+  const formattedToday = statistics
+    ? formatCount(statistics.byPeriod.today, locale)
+    : "";
+  const formattedWeek = statistics
+    ? formatCount(statistics.byPeriod.thisWeek, locale)
+    : "";
+  const formattedMonth = statistics
+    ? formatCount(statistics.byPeriod.thisMonth, locale)
+    : "";
+  const trend = statistics
+    ? monthTrend(
+        statistics.byPeriod.thisMonth,
+        statistics.byPeriod.lastMonth,
+        locale
+      )
+    : null;
+  const mediaTotal = statistics
+    ? statistics.byMediaType.episode +
+      statistics.byMediaType.series +
+      statistics.byMediaType.movie
+    : 0;
+  const sourceTotal = statistics
+    ? statistics.bySource.plex + statistics.bySource.jellyfin
+    : 0;
+  const destinationTotal = statistics
+    ? statistics.byDestination.trakt +
+      statistics.byDestination.simkl +
+      statistics.byDestination.tvtime
+    : 0;
+
+  const healthBadge =
+    statistics && statistics.total > 0 ? (
+      <span
+        className={`inline-flex shrink-0 items-center rounded-full px-3 py-1 text-sm font-medium ${
+          statistics.last30Days.failed > 0
+            ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+            : statistics.byPeriod.thisWeek === 0
+              ? "bg-muted text-muted-foreground"
+              : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
+        }`}
+        title={
+          statistics.last30Days.failed > 0
+            ? t("dashboard.health.issuesHint", {
+                defaultValue: "Some syncs failed in the last 30 days",
+              })
+            : statistics.byPeriod.thisWeek === 0
+              ? t("dashboard.health.noActivityHint", {
+                  defaultValue: "No syncs this week yet",
+                })
+              : t("dashboard.health.healthyHint", {
+                  defaultValue: "Syncs are going through",
+                })
+        }
+      >
+        {statistics.last30Days.failed > 0
+          ? t("dashboard.health.issues", { defaultValue: "Issues" })
+          : statistics.byPeriod.thisWeek === 0
+            ? t("dashboard.health.noActivity", {
+                defaultValue: "No recent activity",
+              })
+            : t("dashboard.health.healthy", {
+                defaultValue: "Healthy",
+              })}
+      </span>
+    ) : null;
 
   return (
-    <div className="container mx-auto px-4 py-4 sm:py-8">
-      <div>
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
-            {t("dashboard.title", { defaultValue: "Dashboard" })}
-          </h1>
-        </div>
-
-        {/* Welcome Card */}
-        <div className="rounded-xl border border-border/60 bg-card text-card-foreground shadow-sm p-6 mb-6">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-xl font-semibold mb-2 text-foreground">
-                {t("dashboard.welcome", { defaultValue: "Welcome" })}
-              </h2>
-              <p className="text-muted-foreground">
-                {t("dashboard.welcomeMessage", {
-                  username: user?.displayName || user?.username || "User",
-                  defaultValue: "Welcome to Scroblarr, {{username}}!",
+    <div className="container mx-auto min-w-0 px-4 py-4 sm:py-8">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
+          {t("dashboard.title", { defaultValue: "Dashboard" })}
+        </h1>
+        <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end sm:gap-3">
+          {healthBadge}
+          {statistics?.lastSyncedAt && (
+            <p
+              className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground"
+              title={new Date(statistics.lastSyncedAt).toLocaleString(locale)}
+            >
+              <FaClock className="h-4 w-4 shrink-0" />
+              <span className="truncate">
+                {t("dashboard.lastSynced", {
+                  defaultValue: "Last synced",
+                })}{" "}
+                {formatRelativeTime(statistics.lastSyncedAt, t)}
+              </span>
+            </p>
+          )}
+          {dataFetchedAt && statistics && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span
+                className="hidden sm:inline"
+                title={dataFetchedAt.toLocaleString(locale)}
+              >
+                {t("dashboard.dataAsOf", {
+                  defaultValue: "Data as of",
+                })}{" "}
+                {formatRelativeTime(dataFetchedAt.toISOString(), t)}
+              </span>
+              <button
+                type="button"
+                onClick={() => loadDashboard({ isRefresh: true })}
+                disabled={refreshing || loading}
+                className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                title={t("dashboard.refresh", { defaultValue: "Refresh" })}
+                aria-label={t("dashboard.refresh", {
+                  defaultValue: "Refresh",
                 })}
-              </p>
+              >
+                <FaSync
+                  className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+                />
+              </button>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              {statistics && statistics.total > 0 && (
-                <span
-                  className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                    statistics.last30Days.failed > 0
-                      ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
-                      : statistics.byPeriod.thisWeek === 0
-                        ? "bg-muted text-muted-foreground"
-                        : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
-                  }`}
-                  title={
-                    statistics.last30Days.failed > 0
-                      ? t("dashboard.health.issuesHint", {
-                          defaultValue: "Some syncs failed in the last 30 days",
-                        })
-                      : statistics.byPeriod.thisWeek === 0
-                        ? t("dashboard.health.noActivityHint", {
-                            defaultValue: "No syncs this week yet",
-                          })
-                        : t("dashboard.health.healthyHint", {
-                            defaultValue: "Syncs are going through",
-                          })
-                  }
-                >
-                  {statistics.last30Days.failed > 0
-                    ? t("dashboard.health.issues", { defaultValue: "Issues" })
-                    : statistics.byPeriod.thisWeek === 0
-                      ? t("dashboard.health.noActivity", {
-                          defaultValue: "No recent activity",
-                        })
-                      : t("dashboard.health.healthy", {
-                          defaultValue: "Healthy",
-                        })}
-                </span>
-              )}
-              {statistics?.lastSyncedAt && (
-                <p
-                  className="flex items-center gap-2 text-sm text-muted-foreground"
-                  title={new Date(statistics.lastSyncedAt).toLocaleString()}
-                >
-                  <FaClock className="w-4 h-4 shrink-0" />
-                  {t("dashboard.lastSynced", {
-                    defaultValue: "Last synced",
-                  })}{" "}
-                  {formatRelativeTime(statistics.lastSyncedAt, t)}
-                </p>
-              )}
-              {dataFetchedAt && statistics && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span title={dataFetchedAt.toLocaleString()}>
-                    {t("dashboard.dataAsOf", {
-                      defaultValue: "Data as of",
-                    })}{" "}
-                    {formatRelativeTime(dataFetchedAt.toISOString(), t)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => loadDashboard({ isRefresh: true })}
-                    disabled={refreshing || loading}
-                    className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                    title={t("dashboard.refresh", { defaultValue: "Refresh" })}
-                    aria-label={t("dashboard.refresh", {
-                      defaultValue: "Refresh",
-                    })}
-                  >
-                    <FaSync
-                      className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`}
-                    />
-                  </button>
-                </div>
-              )}
+          )}
+        </div>
+      </div>
+
+      {loading ? (
+        <div>
+          <div>
+            <div className={`mb-3 grid-cols-1 ${dashboardAlignGrid}`}>
+              <div className={cardClass(`p-4 sm:p-6 ${dashboardHeroSpan}`)}>
+                <Skeleton className="h-10 w-3/4" />
+                <Skeleton className="mt-3 h-4 w-1/2" />
+              </div>
+              <Skeleton className="h-24 rounded-xl" />
+              <Skeleton className="h-24 rounded-xl" />
+              <Skeleton className="h-24 rounded-xl" />
+            </div>
+            <div
+              className={`mb-6 grid-cols-2 ${dashboardAlignGrid} [&>:last-child]:col-span-2 md:[&>:last-child]:col-span-1`}
+            >
+              <StatCardSkeleton />
+              <StatCardSkeleton />
+              <StatCardSkeleton />
+              <StatCardSkeleton />
+              <StatCardSkeleton />
             </div>
           </div>
         </div>
-
-        {/* Statistics Section */}
-        {loading ? (
-          <div className="mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCardSkeleton />
-              <StatCardSkeleton />
-              <StatCardSkeleton />
-              <StatCardSkeleton />
-            </div>
-            <Skeleton className="mt-4 h-4 w-48" />
-          </div>
-        ) : error ? (
-          <div className="rounded-lg border border-border/60 bg-card text-card-foreground shadow-sm p-6">
-            <p className="text-red-600 dark:text-red-400">{error}</p>
-          </div>
-        ) : statistics ? (
-          statistics.total === 0 ? (
-            <>
-              <div className="rounded-lg border border-border/60 bg-card text-card-foreground shadow-sm p-8 mb-6 text-center">
-                <div className="max-w-md mx-auto">
-                  <FaDatabase className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
-                  <h3 className="text-lg font-semibold text-foreground mb-2">
-                    {t("dashboard.empty.title", {
-                      defaultValue: "No sync data yet",
-                    })}
-                  </h3>
-                  <p className="text-muted-foreground mb-6">
-                    {t("dashboard.empty.description", {
-                      defaultValue:
-                        "Watch something on Plex or Jellyfin and it will appear here. Make sure webhooks are configured and your Trakt or Simkl account is linked in your profile.",
-                    })}
-                  </p>
-                  <button
-                    onClick={() => navigate("/profile")}
-                    className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                  >
-                    {t("dashboard.empty.checkProfile", {
-                      defaultValue: "Check profile & links",
-                    })}
-                  </button>
-                </div>
-              </div>
-              <div className="rounded-lg border border-border/60 bg-card text-card-foreground shadow-sm p-6">
-                <h3 className="text-lg font-semibold mb-4 text-foreground">
-                  {t("dashboard.quickActions", {
-                    defaultValue: "Quick Actions",
+      ) : error ? (
+        <div className={cardClass("p-4 sm:p-6")}>
+          <p className="text-red-600 dark:text-red-400">{error}</p>
+          <button
+            type="button"
+            onClick={() => loadDashboard()}
+            className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            {t("errors.tryAgain", { defaultValue: "Try again" })}
+          </button>
+        </div>
+      ) : statistics ? (
+        statistics.total === 0 ? (
+          <>
+            <div className={cardClass("mb-6 p-6 text-center sm:p-8")}>
+              <div className="mx-auto max-w-md">
+                <FaDatabase className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
+                <h3 className="mb-2 text-base font-semibold text-foreground sm:text-lg">
+                  {t("dashboard.empty.title", {
+                    defaultValue: "No sync data yet",
                   })}
                 </h3>
+                <p className="mb-6 text-muted-foreground">
+                  {t("dashboard.empty.description", {
+                    defaultValue:
+                      "Watch something on Plex or Jellyfin and it will appear here. Make sure webhooks are configured and your Trakt or Simkl account is linked in your profile.",
+                  })}
+                </p>
+                <button
+                  onClick={() => navigate("/profile")}
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                >
+                  {t("dashboard.empty.checkProfile", {
+                    defaultValue: "Check profile & links",
+                  })}
+                </button>
+              </div>
+            </div>
+            <div className={cardClass("p-4 sm:p-6")}>
+              <h3 className="mb-4 text-base font-semibold text-foreground sm:text-lg">
+                {t("dashboard.quickActions", {
+                  defaultValue: "Quick Actions",
+                })}
+              </h3>
+              <button
+                onClick={() => navigate("/sync")}
+                className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                {t("dashboard.viewSyncHistory", {
+                  defaultValue: "View Sync History",
+                })}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className={`mb-3 grid-cols-1 ${dashboardAlignGrid}`}>
+              <div
+                className={cardClass(
+                  `flex flex-col justify-center p-4 sm:p-6 ${dashboardHeroSpan}`
+                )}
+              >
+                <h2 className="text-2xl font-bold tracking-tight text-balance text-foreground sm:text-3xl lg:text-4xl">
+                  {t("dashboard.hero.title", {
+                    count: statistics.total,
+                    formattedCount: formattedTotal,
+                    defaultValue_one: "You've synced {{formattedCount}} title.",
+                    defaultValue_other:
+                      "You've synced {{formattedCount}} titles.",
+                  })}
+                </h2>
+                <p className="mt-2 text-sm text-muted-foreground sm:text-base">
+                  {destinations.length > 0
+                    ? t("dashboard.hero.subtitleWithDestinations", {
+                        count: statistics.successful,
+                        formattedCount: formattedSuccessful,
+                        destinations: destinationList,
+                        defaultValue_one:
+                          "That's {{formattedCount}} successful sync to {{destinations}}.",
+                        defaultValue_other:
+                          "That's {{formattedCount}} successful syncs to {{destinations}}.",
+                      })
+                    : t("dashboard.hero.subtitle", {
+                        count: statistics.successful,
+                        formattedCount: formattedSuccessful,
+                        defaultValue_one:
+                          "That's {{formattedCount}} successful sync.",
+                        defaultValue_other:
+                          "That's {{formattedCount}} successful syncs.",
+                      })}
+                </p>
+              </div>
+              {lastSync ? (
+                <MomentCard
+                  label={t("dashboard.moments.lastSync", {
+                    defaultValue: "Last sync",
+                  })}
+                  title={formatMediaTitle(lastSync)}
+                  subtitle={formatRelativeTime(lastSync.syncedAt, t)}
+                  item={lastSync}
+                />
+              ) : statistics.lastSyncedAt ? (
+                <MomentCard
+                  label={t("dashboard.moments.lastSync", {
+                    defaultValue: "Last sync",
+                  })}
+                  title={formatRelativeTime(statistics.lastSyncedAt, t)}
+                  subtitle={formatMomentDate(statistics.lastSyncedAt, locale)}
+                />
+              ) : null}
+              {showFirstSync && firstSync && (
+                <MomentCard
+                  label={t("dashboard.moments.firstSync", {
+                    defaultValue: "First sync",
+                  })}
+                  title={formatMediaTitle(firstSync)}
+                  subtitle={formatMomentDate(firstSync.syncedAt, locale)}
+                  item={firstSync}
+                />
+              )}
+              {topThisMonth && (
+                <MomentCard
+                  label={t("dashboard.moments.topThisMonth", {
+                    defaultValue: "Most synced",
+                  })}
+                  title={topThisMonth.mediaTitle}
+                  subtitle={topThisMonthSubtitle(
+                    topThisMonth.mediaType,
+                    topThisMonth.count,
+                    formattedTopThisMonth,
+                    t
+                  )}
+                  item={topThisMonthMatch}
+                />
+              )}
+            </div>
+            <div
+              className={`mb-6 grid-cols-2 ${dashboardAlignGrid} [&>:last-child]:col-span-2 md:[&>:last-child]:col-span-1`}
+            >
+              <StatCard
+                title={t("dashboard.stats.successful", {
+                  defaultValue: "Successful",
+                })}
+                value={`${formatCount(statistics.successful, locale)} / ${formatCount(statistics.total, locale)}`}
+                icon={FaCheckCircle}
+                color="purple"
+              />
+              <StatCard
+                title={t("dashboard.stats.successRate", {
+                  defaultValue: "Success Rate",
+                })}
+                value={`${statistics.successRate}%`}
+                icon={FaCheckCircle}
+                color={
+                  statistics.successRate >= 95
+                    ? "green"
+                    : statistics.successRate >= 80
+                      ? "yellow"
+                      : "red"
+                }
+              />
+              <div className={cardClass("flex h-full flex-col p-3 sm:p-4")}>
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <h3 className="min-w-0 text-xs font-medium leading-tight text-muted-foreground sm:text-sm">
+                    {t("dashboard.stats.failed", { defaultValue: "Failed" })}
+                  </h3>
+                  <div className="shrink-0 rounded-lg bg-red-100 p-1.5 text-red-600 sm:p-2 dark:bg-red-900/30 dark:text-red-400">
+                    <FaTimesCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  </div>
+                </div>
+                <p className="text-xl font-bold leading-tight tracking-tight text-foreground sm:text-2xl">
+                  {formatCount(statistics.failed, locale)}
+                </p>
+                {statistics.failed > 0 && (
+                  <Link
+                    to="/sync?filter=failed"
+                    className="mt-1 inline-block text-xs font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                  >
+                    {t("dashboard.viewFailedSyncs", {
+                      defaultValue: "View failed syncs",
+                    })}
+                  </Link>
+                )}
+              </div>
+              <StatCard
+                title={t("dashboard.stats.mostActiveDay", {
+                  defaultValue: "Most Active Day",
+                })}
+                value={
+                  statistics.peakDay != null
+                    ? formatWeekday(statistics.peakDay, locale)
+                    : "—"
+                }
+                icon={FaCalendarDay}
+                color="green"
+              />
+              {trend && (
+                <StatCard
+                  title={t("dashboard.stats.activityTrend", {
+                    defaultValue: "Activity Trend",
+                  })}
+                  value={
+                    trend.direction === "up"
+                      ? t("dashboard.stats.trendUpShort", {
+                          percent: trend.percent,
+                          defaultValue: "Up {{percent}}%",
+                        })
+                      : trend.direction === "down"
+                        ? t("dashboard.stats.trendDownShort", {
+                            percent: trend.percent,
+                            defaultValue: "Down {{percent}}%",
+                          })
+                        : trend.direction === "new"
+                          ? t("dashboard.stats.trendNew", {
+                              defaultValue: "New this month",
+                            })
+                          : t("dashboard.stats.trendFlat", {
+                              defaultValue: "No change",
+                            })
+                  }
+                  icon={
+                    trend.direction === "up"
+                      ? FaArrowUp
+                      : trend.direction === "down"
+                        ? FaArrowDown
+                        : FaMinus
+                  }
+                  color={
+                    trend.direction === "up"
+                      ? "green"
+                      : trend.direction === "down"
+                        ? "red"
+                        : "muted"
+                  }
+                  subtitle={t("dashboard.stats.vsLastMonth", {
+                    defaultValue: "vs last month",
+                  })}
+                />
+              )}
+            </div>
+
+            <div
+              className="mb-6 space-y-1 px-1 text-sm"
+              role="region"
+              aria-label={t("dashboard.summary", { defaultValue: "Summary" })}
+            >
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span className="font-medium text-muted-foreground">
+                  {t("dashboard.stats.last30Days", {
+                    defaultValue: "Last 30 days",
+                  })}
+                </span>
+                <span className="text-foreground/90">
+                  {formatCount(statistics.last30Days.total, locale)}{" "}
+                  {t("dashboard.stats.synced", { defaultValue: "synced" })}
+                  {statistics.last30Days.total > 0 && (
+                    <>
+                      {" · "}
+                      <span className="text-green-600 dark:text-green-400">
+                        {formatCount(statistics.last30Days.successful, locale)}{" "}
+                        {t("dashboard.stats.ok", { defaultValue: "ok" })}
+                      </span>
+                      {statistics.last30Days.failed > 0 && (
+                        <>
+                          {" · "}
+                          <span className="text-red-600 dark:text-red-400">
+                            {formatCount(statistics.last30Days.failed, locale)}{" "}
+                            {t("dashboard.stats.failedShort", {
+                              defaultValue: "failed",
+                            })}
+                          </span>
+                        </>
+                      )}
+                    </>
+                  )}
+                </span>
+                {statistics.last30Days.total > 0 && (
+                  <Link
+                    to="/sync"
+                    className="font-medium text-primary hover:text-primary/80"
+                  >
+                    {t("dashboard.viewSyncHistory", {
+                      defaultValue: "View Sync History",
+                    })}
+                  </Link>
+                )}
+              </div>
+              {statistics.lastFailure && (
+                <div className="flex min-w-0 flex-wrap items-center gap-x-2">
+                  <span className="shrink-0 text-muted-foreground">
+                    {t("dashboard.lastFailure", {
+                      defaultValue: "Last failure",
+                    })}
+                  </span>
+                  <Link
+                    to="/sync?filter=failed"
+                    className="min-w-0 truncate font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                  >
+                    {statistics.lastFailure.mediaTitle}
+                  </Link>
+                  <span className="shrink-0 text-muted-foreground">
+                    · {formatRelativeTime(statistics.lastFailure.syncedAt, t)}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <div className={cardClass("overflow-x-clip p-4 sm:p-6")}>
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <FaChartBar className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <h3 className="text-base font-semibold text-foreground sm:text-lg">
+                        {t("dashboard.activityRhythm", {
+                          defaultValue: "Activity",
+                        })}
+                      </h3>
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {t("dashboard.stats.periodSummary", {
+                        today: formatCount(statistics.byPeriod.today, locale),
+                        thisWeek: formatCount(
+                          statistics.byPeriod.thisWeek,
+                          locale
+                        ),
+                        thisMonth: formatCount(
+                          statistics.byPeriod.thisMonth,
+                          locale
+                        ),
+                        defaultValue:
+                          "{{today}} today · {{thisWeek}} this week · {{thisMonth}} this month",
+                      })}
+                    </p>
+                  </div>
+                  <div
+                    className="flex min-w-0 flex-wrap items-center gap-1 pt-1 text-[10px] text-muted-foreground sm:text-[11px]"
+                    aria-hidden
+                  >
+                    <span>
+                      {t("dashboard.activity.low", { defaultValue: "Low" })}
+                    </span>
+                    {[0.25, 0.45, 0.7, 1].map((level) => (
+                      <span
+                        key={level}
+                        className="rounded-full bg-primary"
+                        style={{
+                          opacity: level,
+                          width: `${6 + level * 6}px`,
+                          height: `${6 + level * 6}px`,
+                        }}
+                      />
+                    ))}
+                    <span>
+                      {t("dashboard.activity.high", { defaultValue: "High" })}
+                    </span>
+                  </div>
+                </div>
+                {statistics.last7Days && statistics.last7Days.length === 7 ? (
+                  <ActivityRhythmChart last7Days={statistics.last7Days} />
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    {t("dashboard.empty.recentSyncs", {
+                      defaultValue: "No recent syncs to show",
+                    })}
+                  </p>
+                )}
+              </div>
+
+              <div className={cardClass("p-4 sm:p-6")}>
+                <h3 className="mb-4 text-base font-semibold text-foreground sm:text-lg">
+                  {t("dashboard.stats.byMediaType", {
+                    defaultValue: "By Media Type",
+                  })}
+                </h3>
+                <div className="flex flex-col items-center gap-6 lg:flex-row">
+                  <div
+                    className="relative h-32 w-32 shrink-0 rounded-full sm:h-36 sm:w-36"
+                    style={{
+                      background: conicGradient(
+                        [
+                          {
+                            color: MEDIA_COLORS.episode,
+                            value: statistics.byMediaType.episode,
+                          },
+                          {
+                            color: MEDIA_COLORS.series,
+                            value: statistics.byMediaType.series,
+                          },
+                          {
+                            color: MEDIA_COLORS.movie,
+                            value: statistics.byMediaType.movie,
+                          },
+                        ],
+                        mediaTotal
+                      ),
+                    }}
+                    aria-hidden
+                  >
+                    <div className="absolute inset-4 flex flex-col items-center justify-center rounded-full bg-card text-center">
+                      <span className="text-lg font-bold text-foreground">
+                        {formatCount(mediaTotal, locale)}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {t("dashboard.stats.mediaMixTotal", {
+                          defaultValue: "total",
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="min-w-0 w-full flex-1 space-y-3">
+                    {(
+                      [
+                        {
+                          key: "episode" as const,
+                          icon: FaTv,
+                          label: t("dashboard.stats.episodes", {
+                            defaultValue: "Episodes",
+                          }),
+                          value: statistics.byMediaType.episode,
+                        },
+                        {
+                          key: "series" as const,
+                          icon: FaListUl,
+                          label: t("dashboard.stats.series", {
+                            defaultValue: "Series",
+                          }),
+                          value: statistics.byMediaType.series,
+                        },
+                        {
+                          key: "movie" as const,
+                          icon: FaFilm,
+                          label: t("dashboard.stats.movies", {
+                            defaultValue: "Movies",
+                          }),
+                          value: statistics.byMediaType.movie,
+                        },
+                      ] as const
+                    ).map((row) => {
+                      const Icon = row.icon;
+                      const percent = percentOf(row.value, mediaTotal);
+                      return (
+                        <div key={row.key} className="min-w-0">
+                          <div className="mb-1 flex items-center justify-between gap-2">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span
+                                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                style={{
+                                  backgroundColor: MEDIA_COLORS[row.key],
+                                }}
+                              />
+                              <Icon className="hidden h-3.5 w-3.5 shrink-0 text-muted-foreground sm:block" />
+                              <span className="truncate text-sm text-foreground/90">
+                                {row.label}
+                              </span>
+                            </div>
+                            <span className="shrink-0 text-xs tabular-nums text-muted-foreground sm:text-sm">
+                              {percent}% · {formatCount(row.value, locale)}
+                            </span>
+                          </div>
+                          <PercentageBar
+                            percent={percent}
+                            color={MEDIA_COLORS[row.key]}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className={cardClass("p-4 sm:p-6")}>
+                <h3 className="mb-4 text-base font-semibold text-foreground sm:text-lg">
+                  {t("dashboard.stats.bySource", {
+                    defaultValue: "By Source",
+                  })}
+                </h3>
+                <div className="space-y-4">
+                  {(
+                    [
+                      ["Plex", statistics.bySource.plex, "var(--chart-1)"],
+                      [
+                        "Jellyfin",
+                        statistics.bySource.jellyfin,
+                        "var(--chart-4)",
+                      ],
+                    ] as const
+                  ).map(([label, value, color]) => (
+                    <div key={label} className="min-w-0">
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="truncate text-foreground/90">
+                          {label}
+                        </span>
+                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground sm:text-sm">
+                          {percentOf(value, sourceTotal)}% ·{" "}
+                          {formatCount(value, locale)}
+                        </span>
+                      </div>
+                      <PercentageBar
+                        percent={percentOf(value, sourceTotal)}
+                        color={color}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className={cardClass("p-4 sm:p-6")}>
+                <h3 className="mb-4 text-base font-semibold text-foreground sm:text-lg">
+                  {t("dashboard.stats.byDestination", {
+                    defaultValue: "By Destination",
+                  })}
+                </h3>
+                <div className="space-y-4">
+                  {(
+                    [
+                      [
+                        "Trakt",
+                        statistics.byDestination.trakt,
+                        "var(--chart-1)",
+                      ],
+                      [
+                        "TVTime",
+                        statistics.byDestination.tvtime,
+                        "var(--chart-5)",
+                      ],
+                      [
+                        "Simkl",
+                        statistics.byDestination.simkl,
+                        "var(--chart-2)",
+                      ],
+                    ] as const
+                  ).map(([label, value, color]) => (
+                    <div key={label} className="min-w-0">
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="truncate text-foreground/90">
+                          {label}
+                        </span>
+                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground sm:text-sm">
+                          {percentOf(value, destinationTotal)}% ·{" "}
+                          {formatCount(value, locale)}
+                        </span>
+                      </div>
+                      <PercentageBar
+                        percent={percentOf(value, destinationTotal)}
+                        color={color}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {statistics.topThisMonth.length > 0 ? (
+                <div className={cardClass("p-4 sm:p-6")}>
+                  <h3 className="mb-4 text-base font-semibold text-foreground sm:text-lg">
+                    {t("dashboard.topThisMonth", {
+                      defaultValue: "Most synced this month",
+                    })}
+                  </h3>
+                  <ul className="space-y-2">
+                    {statistics.topThisMonth.map((item, index) => {
+                      const formattedCount = formatCount(item.count, locale);
+                      return (
+                        <li
+                          key={`${item.mediaTitle}-${item.mediaType}-${index}`}
+                          className="flex min-w-0 items-center justify-between gap-2 border-b border-border/60 py-2 last:border-0"
+                        >
+                          <span className="min-w-0 truncate font-medium text-foreground">
+                            {item.mediaTitle}
+                          </span>
+                          <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">
+                            {topThisMonthSubtitle(
+                              item.mediaType,
+                              item.count,
+                              formattedCount,
+                              t
+                            )}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : (
+                <div className={cardClass("p-4 sm:p-6")}>
+                  <h3 className="mb-2 text-base font-semibold text-foreground sm:text-lg">
+                    {t("dashboard.topThisMonth", {
+                      defaultValue: "Most synced this month",
+                    })}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {t("dashboard.empty.topThisMonth", {
+                      defaultValue: "No syncs this month yet",
+                    })}
+                  </p>
+                </div>
+              )}
+
+              {recentSyncs.length > 0 ? (
+                <div className={cardClass("p-4 sm:p-6")}>
+                  <div className="mb-4 flex min-w-0 items-center justify-between gap-2">
+                    <h3 className="min-w-0 truncate text-base font-semibold text-foreground sm:text-lg">
+                      {t("dashboard.recentSyncs", {
+                        defaultValue: "Recent syncs",
+                      })}
+                    </h3>
+                    <Link
+                      to="/sync"
+                      className="flex shrink-0 items-center gap-1 text-sm font-medium text-primary hover:text-primary/80"
+                    >
+                      {t("dashboard.viewAll", { defaultValue: "View all" })}
+                      <FaExternalLinkAlt className="h-3 w-3" />
+                    </Link>
+                  </div>
+                  <ul className="space-y-2">
+                    {recentSyncs.map((item) => (
+                      <li
+                        key={item.id}
+                        className="flex min-w-0 items-center gap-3 border-b border-border/60 py-2 last:border-0"
+                      >
+                        <SyncHistoryPoster item={item} size="compact" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-foreground">
+                            {formatMediaTitle(item)}
+                          </p>
+                          <p className="text-xs text-muted-foreground sm:hidden">
+                            {formatRelativeTime(item.syncedAt, t)}
+                          </p>
+                        </div>
+                        <span className="flex shrink-0 items-center gap-2">
+                          {item.success ? (
+                            <FaCheckCircle className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <FaTimesCircle className="h-4 w-4 text-red-500" />
+                          )}
+                          <span className="hidden text-xs text-muted-foreground sm:inline">
+                            {formatRelativeTime(item.syncedAt, t)}
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <div className={cardClass("p-4 sm:p-6")}>
+                  <h3 className="mb-2 text-base font-semibold text-foreground sm:text-lg">
+                    {t("dashboard.recentSyncs", {
+                      defaultValue: "Recent syncs",
+                    })}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {t("dashboard.empty.recentSyncs", {
+                      defaultValue: "No recent syncs to show",
+                    })}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="mb-6">
+              <h3 className="mb-3 text-base font-semibold text-foreground sm:text-lg">
+                {t("dashboard.stats.averages", {
+                  defaultValue: "Averages",
+                })}
+              </h3>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <AveragePaceCard
+                  title={t("dashboard.stats.avgPerDay", {
+                    defaultValue: "Per Day",
+                  })}
+                  average={statistics.averages.perDay}
+                  actual={statistics.byPeriod.today}
+                  actualLabel={t("dashboard.stats.avgVsToday", {
+                    count: statistics.byPeriod.today,
+                    formattedCount: formattedToday,
+                    defaultValue_one: "{{formattedCount}} today",
+                    defaultValue_other: "{{formattedCount}} today",
+                  })}
+                  icon={FaCalendarDay}
+                  color="blue"
+                  locale={locale}
+                />
+                <AveragePaceCard
+                  title={t("dashboard.stats.avgPerWeek", {
+                    defaultValue: "Per Week",
+                  })}
+                  average={statistics.averages.perWeek}
+                  actual={statistics.byPeriod.thisWeek}
+                  actualLabel={t("dashboard.stats.avgVsWeek", {
+                    count: statistics.byPeriod.thisWeek,
+                    formattedCount: formattedWeek,
+                    defaultValue_one: "{{formattedCount}} this week",
+                    defaultValue_other: "{{formattedCount}} this week",
+                  })}
+                  icon={FaCalendarWeek}
+                  color="purple"
+                  locale={locale}
+                />
+                <AveragePaceCard
+                  title={t("dashboard.stats.avgPerMonth", {
+                    defaultValue: "Per Month",
+                  })}
+                  average={statistics.averages.perMonth}
+                  actual={statistics.byPeriod.thisMonth}
+                  actualLabel={t("dashboard.stats.avgVsMonth", {
+                    count: statistics.byPeriod.thisMonth,
+                    formattedCount: formattedMonth,
+                    defaultValue_one: "{{formattedCount}} this month",
+                    defaultValue_other: "{{formattedCount}} this month",
+                  })}
+                  icon={FaCalendarAlt}
+                  color="green"
+                  locale={locale}
+                />
+              </div>
+            </div>
+
+            <div className={cardClass("p-4 sm:p-6")}>
+              <h3 className="mb-4 text-base font-semibold text-foreground sm:text-lg">
+                {t("dashboard.quickActions", {
+                  defaultValue: "Quick Actions",
+                })}
+              </h3>
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <button
                   onClick={() => navigate("/sync")}
                   className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
@@ -308,699 +1504,19 @@ export function DashboardPage() {
                     defaultValue: "View Sync History",
                   })}
                 </button>
-              </div>
-            </>
-          ) : (
-            <>
-              {/* Main KPIs */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                <StatCard
-                  title={t("dashboard.stats.total", {
-                    defaultValue: "Total Synced",
+                <button
+                  onClick={() => navigate("/profile")}
+                  className="rounded-lg bg-muted px-3 py-2 text-sm font-medium text-foreground/90 transition-colors hover:bg-muted/80"
+                >
+                  {t("dashboard.profile", {
+                    defaultValue: "Profile",
                   })}
-                  value={statistics.total.toLocaleString()}
-                  icon={FaDatabase}
-                  color="blue"
-                  primary
-                />
-                <StatCard
-                  title={t("dashboard.stats.successful", {
-                    defaultValue: "Successful",
-                  })}
-                  value={statistics.successful.toLocaleString()}
-                  icon={FaCheckCircle}
-                  color="green"
-                />
-                <div className="rounded-xl border border-border/60 bg-card text-card-foreground shadow-sm p-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-medium text-muted-foreground">
-                      {t("dashboard.stats.failed", { defaultValue: "Failed" })}
-                    </h3>
-                    <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
-                      <FaTimesCircle className="w-5 h-5" />
-                    </div>
-                  </div>
-                  <p className="text-3xl font-bold text-foreground">
-                    {statistics.failed.toLocaleString()}
-                  </p>
-                  {statistics.failed > 0 && (
-                    <Link
-                      to="/sync?filter=failed"
-                      className="text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium mt-1 inline-block"
-                    >
-                      {t("dashboard.viewFailedSyncs", {
-                        defaultValue: "View failed syncs",
-                      })}
-                    </Link>
-                  )}
-                </div>
-                <StatCard
-                  title={t("dashboard.stats.successRate", {
-                    defaultValue: "Success Rate",
-                  })}
-                  value={`${statistics.successRate}%`}
-                  icon={FaCheckCircle}
-                  color={
-                    statistics.successRate >= 95
-                      ? "green"
-                      : statistics.successRate >= 80
-                        ? "yellow"
-                        : "red"
-                  }
-                  primary
-                />
+                </button>
               </div>
-
-              {/* Last 30 days + This month vs last month */}
-              <div className="space-y-2 mb-6 px-1" aria-label="Summary">
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <span className="text-sm font-medium text-muted-foreground">
-                    {t("dashboard.stats.last30Days", {
-                      defaultValue: "Last 30 days",
-                    })}
-                  </span>
-                  <span className="text-sm text-foreground/90">
-                    {statistics.last30Days.total.toLocaleString()}{" "}
-                    {t("dashboard.stats.synced", { defaultValue: "synced" })}
-                    {statistics.last30Days.total > 0 && (
-                      <>
-                        {" · "}
-                        <span className="text-green-600 dark:text-green-400">
-                          {statistics.last30Days.successful}{" "}
-                          {t("dashboard.stats.ok", { defaultValue: "ok" })}
-                        </span>
-                        {statistics.last30Days.failed > 0 && (
-                          <>
-                            {" · "}
-                            <span className="text-red-600 dark:text-red-400">
-                              {statistics.last30Days.failed}{" "}
-                              {t("dashboard.stats.failedShort", {
-                                defaultValue: "failed",
-                              })}
-                            </span>
-                          </>
-                        )}
-                      </>
-                    )}
-                  </span>
-                  {statistics.last30Days.total > 0 && (
-                    <Link
-                      to="/sync"
-                      className="text-sm font-medium text-primary hover:text-primary/80"
-                    >
-                      {t("dashboard.viewSyncHistory", {
-                        defaultValue: "View Sync History",
-                      })}
-                    </Link>
-                  )}
-                </div>
-                <div className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
-                  <span className="font-medium">
-                    {t("dashboard.stats.thisMonth", {
-                      defaultValue: "This month",
-                    })}
-                  </span>
-                  <span>
-                    {statistics.byPeriod.thisMonth.toLocaleString()}{" "}
-                    {t("dashboard.stats.syncs", { defaultValue: "syncs" })}
-                    {statistics.byPeriod.thisMonth >
-                      statistics.byPeriod.lastMonth && (
-                      <span className="ml-1 text-emerald-600 dark:text-emerald-400">
-                        {" "}
-                        (+
-                        {(
-                          statistics.byPeriod.thisMonth -
-                          statistics.byPeriod.lastMonth
-                        ).toLocaleString()}{" "}
-                        {t("dashboard.stats.vsLastMonth", {
-                          defaultValue: "vs last month",
-                        })}
-                        )
-                      </span>
-                    )}
-                    {statistics.byPeriod.thisMonth <
-                      statistics.byPeriod.lastMonth && (
-                      <span className="ml-1 text-amber-600 dark:text-amber-400">
-                        {" "}
-                        (
-                        {(
-                          statistics.byPeriod.thisMonth -
-                          statistics.byPeriod.lastMonth
-                        ).toLocaleString()}{" "}
-                        {t("dashboard.stats.vsLastMonth", {
-                          defaultValue: "vs last month",
-                        })}
-                        )
-                      </span>
-                    )}
-                    {statistics.byPeriod.thisMonth ===
-                      statistics.byPeriod.lastMonth &&
-                      statistics.byPeriod.lastMonth > 0 && (
-                        <span className="ml-1 text-muted-foreground">
-                          (
-                          {t("dashboard.stats.sameAsLastMonth", {
-                            defaultValue: "same as last month",
-                          })}
-                          )
-                        </span>
-                      )}
-                  </span>
-                </div>
-                {statistics.lastFailure && (
-                  <div className="flex flex-wrap items-center gap-x-2 text-sm">
-                    <span className="text-muted-foreground">
-                      {t("dashboard.lastFailure", {
-                        defaultValue: "Last failure",
-                      })}
-                    </span>
-                    <Link
-                      to="/sync?filter=failed"
-                      className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium"
-                    >
-                      {statistics.lastFailure.mediaTitle}
-                    </Link>
-                    <span className="text-muted-foreground">
-                      · {formatRelativeTime(statistics.lastFailure.syncedAt, t)}
-                    </span>
-                  </div>
-                )}
-                {statistics.peakDay != null && statistics.total > 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    {t("dashboard.peakDay", {
-                      day: DAY_NAMES[statistics.peakDay],
-                      defaultValue: "You sync most on {{day}}s",
-                    })}
-                  </p>
-                )}
-                {statistics.last7Days && statistics.last7Days.length === 7 && (
-                  <div className="mt-2">
-                    <p className="text-xs text-muted-foreground mb-1">
-                      {t("dashboard.last7Days", {
-                        defaultValue: "Last 7 days (today → 6 days ago)",
-                      })}
-                    </p>
-                    <div
-                      className="flex items-end gap-0.5 h-8"
-                      aria-label={t("dashboard.last7Days", {
-                        defaultValue: "Last 7 days (today → 6 days ago)",
-                      })}
-                    >
-                      {statistics.last7Days.map((count, i) => {
-                        const max = Math.max(...statistics.last7Days!, 1);
-                        const h = max > 0 ? (count / max) * 100 : 0;
-                        const dayLabel =
-                          i === 0
-                            ? t("dashboard.sparklineToday", {
-                                count,
-                                defaultValue: "Today: {{count}} syncs",
-                              })
-                            : i === 1
-                              ? t("dashboard.sparklineYesterday", {
-                                  count,
-                                  defaultValue: "Yesterday: {{count}} syncs",
-                                })
-                              : t("dashboard.sparklineDaysAgo", {
-                                  days: i,
-                                  count,
-                                  defaultValue:
-                                    "{{days}} days ago: {{count}} syncs",
-                                });
-                        return (
-                          <div
-                            key={i}
-                            className="min-w-0 flex-1 rounded-t bg-primary/25 dark:bg-primary/40"
-                            style={{ height: `${Math.max(h, 4)}%` }}
-                            title={dayLabel}
-                            role="img"
-                            aria-label={dayLabel}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Breakdown: Media Type + Recent Activity */}
-              <button
-                type="button"
-                onClick={() => setBreakdownOpen((o) => !o)}
-                className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-1 hover:text-foreground w-full text-left"
-                aria-expanded={breakdownOpen}
-              >
-                {breakdownOpen ? (
-                  <FaChevronDown className="w-4 h-4" />
-                ) : (
-                  <FaChevronRight className="w-4 h-4" />
-                )}
-                {t("dashboard.sections.breakdown", {
-                  defaultValue: "Breakdown",
-                })}
-              </button>
-              {breakdownOpen && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                  <div className="rounded-xl border border-border/60 bg-card text-card-foreground shadow-sm p-6">
-                    <h3 className="text-lg font-semibold mb-4 text-foreground">
-                      {t("dashboard.stats.byMediaType", {
-                        defaultValue: "By Media Type",
-                      })}
-                    </h3>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="rounded-lg bg-purple-500/15 p-2 text-purple-700 dark:text-purple-300">
-                            <FaTv className="w-5 h-5" />
-                          </div>
-                          <span className="text-foreground/90">
-                            {t("dashboard.stats.episodes", {
-                              defaultValue: "Episodes",
-                            })}
-                          </span>
-                        </div>
-                        <span className="text-2xl font-bold text-foreground">
-                          {statistics.byMediaType.episode.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="rounded-lg bg-indigo-500/15 p-2 text-indigo-700 dark:text-indigo-300">
-                            <FaListUl className="w-5 h-5" />
-                          </div>
-                          <span className="text-foreground/90">
-                            {t("dashboard.stats.series", {
-                              defaultValue: "Series",
-                            })}
-                          </span>
-                        </div>
-                        <span className="text-2xl font-bold text-foreground">
-                          {statistics.byMediaType.series.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="rounded-lg bg-primary/15 p-2 text-primary">
-                            <FaFilm className="w-5 h-5" />
-                          </div>
-                          <span className="text-foreground/90">
-                            {t("dashboard.stats.movies", {
-                              defaultValue: "Movies",
-                            })}
-                          </span>
-                        </div>
-                        <span className="text-2xl font-bold text-foreground">
-                          {statistics.byMediaType.movie.toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Recent Activity */}
-                  <div className="rounded-xl border border-border/60 bg-card text-card-foreground shadow-sm p-6">
-                    <h3 className="text-lg font-semibold mb-4 text-foreground">
-                      {t("dashboard.stats.recentActivity", {
-                        defaultValue: "Recent Activity",
-                      })}
-                    </h3>
-                    <p className="text-xs text-muted-foreground mb-3">
-                      {t("dashboard.stats.periodsUtc", {
-                        defaultValue: "Today / This week / This month use UTC.",
-                      })}
-                    </p>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="rounded-lg bg-amber-500/15 p-2 text-amber-800 dark:text-amber-300">
-                            <FaCalendarDay className="w-5 h-5" />
-                          </div>
-                          <span className="text-foreground/90">
-                            {t("dashboard.stats.today", {
-                              defaultValue: "Today",
-                            })}
-                          </span>
-                        </div>
-                        <span className="text-2xl font-bold text-foreground">
-                          {statistics.byPeriod.today.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="rounded-lg bg-emerald-500/15 p-2 text-emerald-700 dark:text-emerald-400">
-                            <FaCalendarWeek className="w-5 h-5" />
-                          </div>
-                          <span className="text-foreground/90">
-                            {t("dashboard.stats.thisWeek", {
-                              defaultValue: "This Week",
-                            })}
-                          </span>
-                        </div>
-                        <span className="text-2xl font-bold text-foreground">
-                          {statistics.byPeriod.thisWeek.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="rounded-lg bg-primary/15 p-2 text-primary">
-                            <FaCalendarAlt className="w-5 h-5" />
-                          </div>
-                          <span className="text-foreground/90">
-                            {t("dashboard.stats.thisMonth", {
-                              defaultValue: "This Month",
-                            })}
-                          </span>
-                        </div>
-                        <span className="text-2xl font-bold text-foreground">
-                          {statistics.byPeriod.thisMonth.toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* By Source & By Destination */}
-              {breakdownOpen && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                  <div className="rounded-xl border border-border/60 bg-card text-card-foreground shadow-sm p-6">
-                    <h3 className="text-lg font-semibold mb-4 text-foreground">
-                      {t("dashboard.stats.bySource", {
-                        defaultValue: "By Source",
-                      })}
-                    </h3>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-foreground/90">Plex</span>
-                        <span className="text-2xl font-bold text-foreground">
-                          {statistics.bySource.plex.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-foreground/90">Jellyfin</span>
-                        <span className="text-2xl font-bold text-foreground">
-                          {statistics.bySource.jellyfin.toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-border/60 bg-card text-card-foreground shadow-sm p-6">
-                    <h3 className="text-lg font-semibold mb-4 text-foreground">
-                      {t("dashboard.stats.byDestination", {
-                        defaultValue: "By Destination",
-                      })}
-                    </h3>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-foreground/90">Trakt</span>
-                        <span className="text-2xl font-bold text-foreground">
-                          {statistics.byDestination.trakt.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-foreground/90">TVTime</span>
-                        <span className="text-2xl font-bold text-foreground">
-                          {statistics.byDestination.tvtime.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-foreground/90">Simkl</span>
-                        <span className="text-2xl font-bold text-foreground">
-                          {statistics.byDestination.simkl.toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Activity: Top 3 + Recent syncs */}
-              <button
-                type="button"
-                onClick={() => setActivityOpen((o) => !o)}
-                className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-1 hover:text-foreground w-full text-left"
-                aria-expanded={activityOpen}
-              >
-                {activityOpen ? (
-                  <FaChevronDown className="w-4 h-4" />
-                ) : (
-                  <FaChevronRight className="w-4 h-4" />
-                )}
-                {t("dashboard.sections.activity", {
-                  defaultValue: "Activity",
-                })}
-              </button>
-              {activityOpen && (
-                <>
-                  {statistics.topThisMonth.length > 0 ? (
-                    <div className="rounded-xl border border-border/60 bg-card text-card-foreground shadow-sm p-6 mb-8">
-                      <h3 className="text-lg font-semibold mb-4 text-foreground">
-                        {t("dashboard.topThisMonth", {
-                          defaultValue: "Most synced this month",
-                        })}
-                      </h3>
-                      <ul className="space-y-2">
-                        {statistics.topThisMonth.map((item, index) => (
-                          <li
-                            key={`${item.mediaTitle}-${item.mediaType}-${index}`}
-                            className="flex items-center justify-between gap-2 py-2 border-b border-border/60 last:border-0"
-                          >
-                            <span className="text-foreground font-medium truncate">
-                              {item.mediaTitle}
-                            </span>
-                            <span className="text-sm text-muted-foreground shrink-0">
-                              {item.mediaType === "episode"
-                                ? t("dashboard.topThisMonthEpisodes", {
-                                    count: item.count,
-                                    defaultValue: "{{count}} episodes",
-                                  })
-                                : t("dashboard.topThisMonthMovies", {
-                                    count: item.count,
-                                    defaultValue: "{{count}} watch",
-                                  })}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-border/60 bg-card text-card-foreground shadow-sm p-6 mb-8">
-                      <h3 className="text-lg font-semibold mb-2 text-foreground">
-                        {t("dashboard.topThisMonth", {
-                          defaultValue: "Most synced this month",
-                        })}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        {t("dashboard.empty.topThisMonth", {
-                          defaultValue: "No syncs this month yet",
-                        })}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Recent syncs (full width) */}
-                  {recentSyncs.length > 0 ? (
-                    <div className="rounded-xl border border-border/60 bg-card text-card-foreground shadow-sm p-6 mb-8">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-foreground">
-                          {t("dashboard.recentSyncs", {
-                            defaultValue: "Recent syncs",
-                          })}
-                        </h3>
-                        <Link
-                          to="/sync"
-                          className="text-sm font-medium text-primary hover:text-primary/80 flex items-center gap-1"
-                        >
-                          {t("dashboard.viewAll", { defaultValue: "View all" })}
-                          <FaExternalLinkAlt className="w-3 h-3" />
-                        </Link>
-                      </div>
-                      <ul className="space-y-2">
-                        {recentSyncs.map((item) => (
-                          <li
-                            key={item.id}
-                            className="flex items-center justify-between gap-2 py-2 border-b border-border/60 last:border-0"
-                          >
-                            <span className="text-foreground truncate">
-                              {formatMediaTitle(item)}
-                            </span>
-                            <span className="flex items-center gap-2 shrink-0">
-                              {item.success ? (
-                                <FaCheckCircle className="w-4 h-4 text-green-500" />
-                              ) : (
-                                <FaTimesCircle className="w-4 h-4 text-red-500" />
-                              )}
-                              <span className="text-xs text-muted-foreground">
-                                {formatRelativeTime(item.syncedAt, t)}
-                              </span>
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-border/60 bg-card text-card-foreground shadow-sm p-6 mb-8">
-                      <h3 className="text-lg font-semibold mb-2 text-foreground">
-                        {t("dashboard.recentSyncs", {
-                          defaultValue: "Recent syncs",
-                        })}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        {t("dashboard.empty.recentSyncs", {
-                          defaultValue: "No recent syncs to show",
-                        })}
-                      </p>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* Averages */}
-              <button
-                type="button"
-                onClick={() => setAveragesOpen((o) => !o)}
-                className="flex items-center gap-2 text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-1 hover:text-foreground w-full text-left"
-                aria-expanded={averagesOpen}
-              >
-                {averagesOpen ? (
-                  <FaChevronDown className="w-4 h-4" />
-                ) : (
-                  <FaChevronRight className="w-4 h-4" />
-                )}
-                {t("dashboard.stats.averages", {
-                  defaultValue: "Average syncs per day / week / month",
-                })}
-              </button>
-              {averagesOpen && (
-                <div className="rounded-xl border border-border/60 bg-card text-card-foreground shadow-sm p-6 mb-8">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="rounded-lg bg-muted/40 p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-muted-foreground">
-                          {t("dashboard.stats.avgPerDay", {
-                            defaultValue: "Per Day",
-                          })}
-                        </span>
-                        <FaCalendarDay className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <p className="text-2xl font-bold text-foreground">
-                        {statistics.averages.perDay % 1 === 0
-                          ? statistics.averages.perDay.toLocaleString(
-                              undefined,
-                              {
-                                minimumFractionDigits: 0,
-                                maximumFractionDigits: 0,
-                              }
-                            )
-                          : statistics.averages.perDay.toLocaleString(
-                              undefined,
-                              {
-                                minimumFractionDigits: 1,
-                                maximumFractionDigits: 1,
-                              }
-                            )}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {t("dashboard.stats.avgPerDayDesc", {
-                          defaultValue: "Avg. from this year",
-                        })}
-                      </p>
-                    </div>
-                    <div className="rounded-lg bg-muted/40 p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-muted-foreground">
-                          {t("dashboard.stats.avgPerWeek", {
-                            defaultValue: "Per Week",
-                          })}
-                        </span>
-                        <FaCalendarWeek className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <p className="text-2xl font-bold text-foreground">
-                        {statistics.averages.perWeek % 1 === 0
-                          ? statistics.averages.perWeek.toLocaleString(
-                              undefined,
-                              {
-                                minimumFractionDigits: 0,
-                                maximumFractionDigits: 0,
-                              }
-                            )
-                          : statistics.averages.perWeek.toLocaleString(
-                              undefined,
-                              {
-                                minimumFractionDigits: 1,
-                                maximumFractionDigits: 1,
-                              }
-                            )}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {t("dashboard.stats.avgPerWeekDesc", {
-                          defaultValue: "Projected from yearly avg.",
-                        })}
-                      </p>
-                    </div>
-                    <div className="rounded-lg bg-muted/40 p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-muted-foreground">
-                          {t("dashboard.stats.avgPerMonth", {
-                            defaultValue: "Per Month",
-                          })}
-                        </span>
-                        <FaCalendarAlt className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <p className="text-2xl font-bold text-foreground">
-                        {statistics.averages.perMonth % 1 === 0
-                          ? statistics.averages.perMonth.toLocaleString(
-                              undefined,
-                              {
-                                minimumFractionDigits: 0,
-                                maximumFractionDigits: 0,
-                              }
-                            )
-                          : statistics.averages.perMonth.toLocaleString(
-                              undefined,
-                              {
-                                minimumFractionDigits: 1,
-                                maximumFractionDigits: 1,
-                              }
-                            )}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {t("dashboard.stats.avgPerMonthDesc", {
-                          defaultValue: "Projected from yearly avg.",
-                        })}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Quick Actions */}
-              <div className="rounded-xl border border-border/60 bg-card text-card-foreground shadow-sm p-6">
-                <h3 className="text-lg font-semibold mb-4 text-foreground">
-                  {t("dashboard.quickActions", {
-                    defaultValue: "Quick Actions",
-                  })}
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => navigate("/sync")}
-                    className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                  >
-                    {t("dashboard.viewSyncHistory", {
-                      defaultValue: "View Sync History",
-                    })}
-                  </button>
-                  <button
-                    onClick={() => navigate("/profile")}
-                    className="rounded-lg bg-muted px-3 py-2 text-sm font-medium text-foreground/90 transition-colors hover:bg-muted/80"
-                  >
-                    {t("dashboard.profile", {
-                      defaultValue: "Profile",
-                    })}
-                  </button>
-                </div>
-              </div>
-            </>
-          )
-        ) : null}
-      </div>
+            </div>
+          </>
+        )
+      ) : null}
     </div>
   );
 }
