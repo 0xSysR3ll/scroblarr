@@ -524,4 +524,72 @@ describe("webhook security", () => {
     expect(response.status).toBe(500);
     expect(response.body).toEqual({ error: "Internal server error" });
   });
+
+  it("logs an empty Tautulli contentType when the header is missing on sync failure", async () => {
+    syncServiceMocks.syncEvent.mockRejectedValue(new Error("sync failed"));
+
+    const app = express();
+    app.use(express.json());
+    app.use((req, _res, next) => {
+      delete req.headers["content-type"];
+      next();
+    });
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/tautulli")
+      .set("x-api-key", "expected-webhook-key")
+      .send({
+        action: "play",
+        username: "plex-user",
+        media_type: "movie",
+        title: "Example Movie",
+      });
+
+    expect(response.status).toBe(500);
+    const metadata = vi.mocked(logger.webhook.error).mock.calls[0][0] as Record<
+      string,
+      unknown
+    >;
+    expect(metadata.contentType).toBe("");
+    expect(metadata).not.toHaveProperty("payload");
+  });
+
+  it("does not log Tautulli apiKey when a text/plain sync fails", async () => {
+    syncServiceMocks.syncEvent.mockRejectedValue(new Error("sync failed"));
+
+    const app = express();
+    app.use(express.text({ type: "*/*" }));
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/tautulli")
+      .set("Content-Type", "text/plain")
+      .send(
+        JSON.stringify({
+          action: "play",
+          username: "plex-user",
+          media_type: "movie",
+          title: "Example Movie",
+          apiKey: "expected-webhook-key",
+        })
+      );
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: "Internal server error" });
+    expect(logger.webhook.error).toHaveBeenCalled();
+    const metadata = vi.mocked(logger.webhook.error).mock.calls[0][0] as Record<
+      string,
+      unknown
+    >;
+    expect(metadata).not.toHaveProperty("payload");
+    expect(metadata).not.toHaveProperty("body");
+    expect(JSON.stringify(metadata)).not.toContain("expected-webhook-key");
+    expect(metadata).toEqual(
+      expect.objectContaining({
+        contentType: expect.any(String),
+        bodyLength: expect.any(Number),
+      })
+    );
+  });
 });

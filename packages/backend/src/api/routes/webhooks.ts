@@ -364,7 +364,11 @@ router.post("/tautulli", async (req: Request, res: Response) => {
     return res.status(200).json({ success: true });
   } catch (error) {
     logger.webhook.error(
-      { error, payload: req.body },
+      {
+        error,
+        contentType: req.headers["content-type"] || "",
+        bodyLength: typeof req.body === "string" ? req.body.length : undefined,
+      },
       "Tautulli webhook error"
     );
     return res.status(500).json({ error: "Internal server error" });
