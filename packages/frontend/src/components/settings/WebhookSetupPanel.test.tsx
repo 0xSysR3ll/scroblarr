@@ -201,4 +201,19 @@ describe("WebhookSetupPanel", () => {
       expect(writeText).toHaveBeenCalledWith(TAUTULLI_WEBHOOK_TEMPLATE);
     });
   });
+
+  it("shows placeholder Tautulli JSON headers when no API key is saved", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<WebhookSetupPanel source="tautulli" />);
+    await user.click(
+      screen.getByRole("button", { name: /Tautulli notifications/i })
+    );
+
+    expect(screen.getByLabelText("JSON headers")).toHaveValue(
+      buildTautulliWebhookHeaders("YOUR_WEBHOOK_API_KEY")
+    );
+    expect(
+      screen.getByRole("button", { name: "Copy JSON headers" })
+    ).toBeDisabled();
+  });
 });

@@ -34,6 +34,17 @@ function rejectMissingWebhookKey(res: Response): Response {
   return res.status(503).json({ error: "Webhook authentication not ready" });
 }
 
+function isNonEmptyObjectPayload(
+  payload: unknown
+): payload is Record<string, unknown> {
+  return (
+    payload !== null &&
+    typeof payload === "object" &&
+    !Array.isArray(payload) &&
+    Object.keys(payload).length > 0
+  );
+}
+
 function rejectInvalidWebhookKey(
   res: Response,
   provided: boolean,
@@ -244,16 +255,15 @@ router.post("/tautulli", async (req: Request, res: Response) => {
       }
     }
 
-    if (
-      !payload ||
-      typeof payload !== "object" ||
-      Object.keys(payload).length === 0
-    ) {
+    if (!isNonEmptyObjectPayload(payload)) {
       const rawBody =
         (req as Request & { rawBody?: string }).rawBody || req.body;
       if (rawBody && typeof rawBody === "string" && rawBody.trim()) {
         try {
           payload = JSON.parse(rawBody) as TautulliWebhookPayload;
+          if (!isNonEmptyObjectPayload(payload)) {
+            return res.status(400).json({ error: "Empty or invalid payload" });
+          }
         } catch (parseError) {
           logger.webhook.error(
             {

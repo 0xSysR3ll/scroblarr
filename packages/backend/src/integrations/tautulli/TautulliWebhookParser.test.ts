@@ -149,4 +149,117 @@ describe("TautulliWebhookParser", () => {
       },
     });
   });
+
+  it("reads the Plex server machine ID from the payload", () => {
+    expect(
+      TautulliWebhookParser.getServerMachineId({
+        server_machine_id: " machine-1 ",
+      })
+    ).toBe("machine-1");
+    expect(TautulliWebhookParser.getServerMachineId({})).toBeUndefined();
+  });
+
+  it("builds poster URLs from thumbs and ignores invalid values", () => {
+    expect(
+      TautulliWebhookParser.parse({
+        action: "watched",
+        username: "plex-user",
+        media_type: "movie",
+        title: "Example Movie",
+        thumb: "https://tautulli.local/thumb.jpg",
+      })?.media.posterUrl
+    ).toBe("https://tautulli.local/thumb.jpg");
+
+    expect(
+      TautulliWebhookParser.parse(
+        {
+          action: "watched",
+          username: "plex-user",
+          media_type: "movie",
+          title: "Example Movie",
+          thumb: "library/metadata/1/thumb",
+        },
+        "https://plex.local:32400/plex"
+      )?.media.posterUrl
+    ).toBe("https://plex.local:32400/plex/library/metadata/1/thumb");
+
+    expect(
+      TautulliWebhookParser.parse({
+        action: "watched",
+        username: "plex-user",
+        media_type: "movie",
+        title: "Example Movie",
+        thumb: "/library/metadata/1/thumb",
+      })?.media.posterUrl
+    ).toBeUndefined();
+
+    expect(
+      TautulliWebhookParser.parse(
+        {
+          action: "watched",
+          username: "plex-user",
+          media_type: "movie",
+          title: "Example Movie",
+          thumb: "/library/metadata/1/thumb",
+        },
+        "not-a-url"
+      )?.media.posterUrl
+    ).toBeUndefined();
+
+    expect(
+      TautulliWebhookParser.parse({
+        action: "watched",
+        username: "plex-user",
+        media_type: "movie",
+        title: "Example Movie",
+        poster_url: "not-a-url",
+      })?.media.posterUrl
+    ).toBeUndefined();
+  });
+
+  it("ignores placeholder and invalid identifier values", () => {
+    expect(
+      TautulliWebhookParser.parse({
+        action: "watched",
+        username: "{username}",
+        user: "friendly",
+        media_type: "movie",
+        title: "",
+        imdb_id: "not-an-id",
+        duration_ms: "abc",
+        year: "2024a",
+      })
+    ).toMatchObject({
+      userId: "friendly",
+      media: {
+        title: "Unknown",
+        imdbMovieId: undefined,
+        duration: undefined,
+        year: undefined,
+      },
+    });
+
+    expect(
+      TautulliWebhookParser.parse({
+        action: "",
+        username: "plex-user",
+        media_type: "movie",
+        title: "Example Movie",
+      })
+    ).toBeNull();
+
+    expect(
+      TautulliWebhookParser.parse({
+        action: "watched",
+        username: "plex-user",
+        media_type: "episode",
+        year: "2011",
+      })
+    ).toMatchObject({
+      media: {
+        title: "Unknown",
+        year: 2011,
+      },
+    });
+  });
 });
