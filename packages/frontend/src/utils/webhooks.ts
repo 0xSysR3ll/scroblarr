@@ -34,3 +34,42 @@ export function buildJellyfinWebhookUrl(origin?: string): string {
   const base = getScroblarrOrigin(origin);
   return `${base}/api/v1/webhooks/jellyfin`;
 }
+
+/** JSON body Tautulli substitutes and POSTs to Scroblarr's Tautulli webhook. */
+export const TAUTULLI_WEBHOOK_TEMPLATE = `{
+  "action": "{action}",
+  "user": "{user}",
+  "username": "{username}",
+  "media_type": "{media_type}",
+  "title": "{title}",
+  "year": "{year}",
+  "show_name": "{show_name}",
+  "show_year": "{show_year}",
+  "episode_name": "{episode_name}",
+  "season_num": "{season_num}",
+  "episode_num": "{episode_num}",
+  "imdb_id": "{imdb_id}",
+  "thetvdb_id": "{thetvdb_id}",
+  "themoviedb_id": "{themoviedb_id}",
+  "duration_ms": "{duration_ms}",
+  "view_offset": "{view_offset}",
+  "poster_url": "{poster_url}",
+  "thumb": "{thumb}",
+  "server_machine_id": "{server_machine_id}"
+}`;
+
+export function buildTautulliWebhookUrl(origin?: string): string {
+  const base = getScroblarrOrigin(origin);
+  return `${base}/api/v1/webhooks/tautulli`;
+}
+
+export function buildTautulliWebhookHeaders(apiKey: string): string {
+  return JSON.stringify(
+    {
+      "Content-Type": "application/json",
+      "X-API-Key": apiKey,
+    },
+    null,
+    2
+  );
+}

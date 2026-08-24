@@ -5,7 +5,10 @@ import { showError, showSuccess } from "@utils/toast";
 import {
   buildJellyfinWebhookUrl,
   buildPlexWebhookUrl,
+  buildTautulliWebhookHeaders,
+  buildTautulliWebhookUrl,
   JELLYFIN_WEBHOOK_TEMPLATE,
+  TAUTULLI_WEBHOOK_TEMPLATE,
 } from "@utils/webhooks";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -158,5 +161,59 @@ describe("WebhookSetupPanel", () => {
     ).toBeInTheDocument();
     expect(screen.getByLabelText("X-API-Key header value")).toHaveValue("");
     expect(screen.getByRole("button", { name: "Copy API key" })).toBeDisabled();
+  });
+
+  it("shows Tautulli URL, JSON headers, and JSON data copy fields", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    renderWithProviders(
+      <WebhookSetupPanel source="tautulli" webhookApiKey="sk_tautulli" />
+    );
+    await user.click(
+      screen.getByRole("button", { name: /Tautulli notifications/i })
+    );
+
+    expect(
+      document.querySelector('img[src="/logos/tautulli.png"]')
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Webhook URL")).toHaveValue(
+      buildTautulliWebhookUrl()
+    );
+    expect(screen.getByLabelText("JSON headers")).toHaveValue(
+      buildTautulliWebhookHeaders("sk_tautulli")
+    );
+    expect(screen.getByLabelText("JSON data")).toHaveValue(
+      TAUTULLI_WEBHOOK_TEMPLATE
+    );
+    expect(screen.getByRole("link", { name: "Setup docs" })).toHaveAttribute(
+      "href",
+      "https://0xsysr3ll.github.io/scroblarr/docs/configuration/plex#tautulli-no-plex-pass"
+    );
+
+    await user.click(screen.getByRole("button", { name: "Copy JSON data" }));
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith(TAUTULLI_WEBHOOK_TEMPLATE);
+    });
+  });
+
+  it("shows placeholder Tautulli JSON headers when no API key is saved", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<WebhookSetupPanel source="tautulli" />);
+    await user.click(
+      screen.getByRole("button", { name: /Tautulli notifications/i })
+    );
+
+    expect(screen.getByLabelText("JSON headers")).toHaveValue(
+      buildTautulliWebhookHeaders("YOUR_WEBHOOK_API_KEY")
+    );
+    expect(
+      screen.getByRole("button", { name: "Copy JSON headers" })
+    ).toBeDisabled();
   });
 });

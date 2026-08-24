@@ -59,9 +59,6 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "errors": {
-      "loadFailed": "Failed to load statistics"
-    },
     "health": {
       "issuesHint": "Some syncs failed in the last 30 days",
       "noActivityHint": "No syncs this week yet",
@@ -300,10 +297,10 @@
     },
     "webhook": {
       "copied": "Copied to clipboard",
-      "plexDescription": "Copy this URL into Plex so completed watches sync to Scroblarr.",
+      "plexDescription": "Copy this URL into Plex so completed watches sync to Scroblarr. Requires Plex Pass.",
       "jellyfinDescription": "Configure a Generic webhook destination in Jellyfin with these values.",
       "plexChecklist": {
-        "pass": "Plex Pass is required for webhooks",
+        "pass": "Plex Pass is required for Plex webhooks (or use Tautulli below)",
         "paste": "Paste the URL in Plex → Settings → Webhooks → Add Webhook",
         "save": "Save the Plex server above so Server.uuid matches webhooks"
       },
@@ -324,7 +321,19 @@
       "copyTemplate": "Copy payload template",
       "checklist": "Checklist",
       "urlHint": "If your media server cannot reach this host (Docker, reverse proxy), replace the origin with a URL it can access.",
-      "copyFailed": "Failed to copy to clipboard"
+      "copyFailed": "Failed to copy to clipboard",
+      "tautulliTitle": "Tautulli notifications",
+      "tautulliDescription": "Use Tautulli notification agents if you don't have Plex Pass.",
+      "tautulliChecklist": {
+        "agent": "In Tautulli, add a Webhook notification agent (Settings → Notification Agents)",
+        "trigger": "Enable the Watched trigger (Playback Start/Stop optional)",
+        "headers": "Paste the JSON headers (includes X-API-Key) on the Data tab",
+        "template": "Paste the JSON data template into each enabled trigger"
+      },
+      "jsonHeaders": "JSON headers",
+      "copyJsonHeaders": "Copy JSON headers",
+      "jsonData": "JSON data",
+      "copyJsonData": "Copy JSON data"
     },
     "hideApiKey": "Hide API key",
     "showApiKey": "Show API key"

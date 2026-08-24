@@ -46,6 +46,17 @@ All users from your configured media servers can use Scroblarr. Each user's watc
     <img src="img/logos/jellyfin.svg" alt="Jellyfin" style={{ width: '24px', height: '24px' }} />
     <span><strong>Jellyfin</strong> (webhooks)</span>
   </div>
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    padding: '0.5rem 1rem',
+    backgroundColor: 'var(--ifm-color-emphasis-100)',
+    borderRadius: '8px',
+  }}>
+    <img src="img/logos/tautulli.png" alt="Tautulli" style={{ height: '24px', width: 'auto', backgroundColor: '#0a0a0a', borderRadius: '4px', padding: '2px 4px' }} />
+    <span><strong>Tautulli</strong> (Plex, no Plex Pass)</span>
+  </div>
 </div>
 
 **Destinations:**

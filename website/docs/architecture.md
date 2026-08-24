@@ -12,7 +12,7 @@ Scroblarr is built as a monorepo using pnpm workspaces. This keeps everything or
 
 The backend is an Express.js API server that handles:
 
-- **Webhook endpoints**: Receives events from Plex and Jellyfin
+- **Webhook endpoints**: Receives events from Plex and Jellyfin, and from Tautulli as a webhook source for Plex playback
 - **Sync service**: Processes watch events and syncs to Trakt and Simkl
 - **User management**: Handles authentication and user operations
 - **Settings management**: Stores and retrieves configuration
@@ -53,7 +53,7 @@ This ensures type safety between frontend and backend.
 
 ## Data flow
 
-1. **Media server** (Plex/Jellyfin) sends webhook to **Backend webhook endpoint**
+1. **Media server** (Plex or Jellyfin) sends a webhook to the **backend webhook endpoint**. Tautulli can forward Plex playback events to the same pipeline.
 2. **Webhook parser** extracts watch event data
 3. **Sync service** matches event to user and destination accounts
 4. **Integration clients** (Trakt/Simkl) sync the watch data
@@ -64,7 +64,7 @@ This ensures type safety between frontend and backend.
 
 The backend exposes a REST API at `/api/v1/`:
 
-- `/api/v1/webhooks/*` - Plex and Jellyfin webhooks (no session; **require** the webhook API key from Settings → General, per [Configuration](/docs/configuration))
+- `/api/v1/webhooks/*` - Plex, Tautulli, and Jellyfin webhooks (no session; **require** the webhook API key from Settings → General, per [Configuration](/docs/configuration))
 - `/api/v1/auth/*` - Sign-in, registration, OAuth callbacks, session checks
 - `/api/v1/logout` - End the current session
 - `/api/v1/users/*` - User management (admin)
