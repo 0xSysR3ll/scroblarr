@@ -138,6 +138,7 @@ describe("PlexSettingsTab", () => {
     await expandPlex(user);
 
     expect(await screen.findByText("Webhooks")).toBeInTheDocument();
+    expect(screen.getByText("Tautulli notifications")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Webhooks/i })).toHaveAttribute(
       "aria-expanded",
       "false"

@@ -49,7 +49,7 @@ components:
       type: apiKey
       in: header
       name: X-API-Key
-      description: Dedicated webhook API key (Jellyfin X-API-Key header)
+      description: Dedicated webhook API key (Jellyfin/Tautulli X-API-Key header)
     webhookQueryApiKeyAuth:
       type: apiKey
       in: query
@@ -1753,6 +1753,39 @@ paths:
                 $ref: '#/components/schemas/Success'
         '400':
           description: Bad request
+        '500':
+          description: Internal server error
+
+  /api/v1/webhooks/tautulli:
+    post:
+      summary: Tautulli webhook endpoint
+      description: |
+        Accepts Tautulli notification-agent webhooks as a Plex Pass alternative.
+        Authenticate with the webhook API key via the `X-API-Key` header
+        (recommended), `apiKey` query parameter, or `apiKey` JSON field.
+      tags: [Webhooks]
+      security:
+        - webhookApiKeyAuth: []
+        - webhookQueryApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Webhook processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          description: Bad request
+        '401':
+          description: Invalid API key or server identity
+        '503':
+          description: Webhook authentication not ready
         '500':
           description: Internal server error
 

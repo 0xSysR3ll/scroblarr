@@ -1,8 +1,11 @@
 import {
   buildJellyfinWebhookUrl,
   buildPlexWebhookUrl,
+  buildTautulliWebhookHeaders,
+  buildTautulliWebhookUrl,
   getScroblarrOrigin,
   JELLYFIN_WEBHOOK_TEMPLATE,
+  TAUTULLI_WEBHOOK_TEMPLATE,
 } from "@utils/webhooks";
 import { describe, expect, it, vi } from "vitest";
 
@@ -35,6 +38,32 @@ describe("webhooks utils", () => {
       '"playedToCompletion": "{{PlayedToCompletion}}"'
     );
     expect(JELLYFIN_WEBHOOK_TEMPLATE).toContain("{{{Name}}}");
+  });
+
+  it("builds a Tautulli webhook URL without a query key", () => {
+    expect(buildTautulliWebhookUrl("https://scroblarr.example.com/")).toBe(
+      "https://scroblarr.example.com/api/v1/webhooks/tautulli"
+    );
+  });
+
+  it("builds Tautulli JSON headers with the webhook API key", () => {
+    expect(buildTautulliWebhookHeaders("sk_test+key")).toContain(
+      '"X-API-Key": "sk_test+key"'
+    );
+    expect(buildTautulliWebhookHeaders("sk_test+key")).toContain(
+      '"Content-Type": "application/json"'
+    );
+  });
+
+  it("exposes the Tautulli JSON data fields Scroblarr expects", () => {
+    expect(TAUTULLI_WEBHOOK_TEMPLATE).toContain('"action": "{action}"');
+    expect(TAUTULLI_WEBHOOK_TEMPLATE).toContain('"username": "{username}"');
+    expect(TAUTULLI_WEBHOOK_TEMPLATE).toContain(
+      '"server_machine_id": "{server_machine_id}"'
+    );
+    expect(TAUTULLI_WEBHOOK_TEMPLATE).toContain(
+      '"themoviedb_id": "{themoviedb_id}"'
+    );
   });
 
   it("falls back to an empty origin when none is provided and window is unavailable", () => {

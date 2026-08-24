@@ -493,7 +493,13 @@ export function PlexSettingsTab({
         </div>
 
         {!!savedServerUrl && (
-          <WebhookSetupPanel source="plex" webhookApiKey={webhookApiKey} />
+          <div className="space-y-4">
+            <WebhookSetupPanel source="plex" webhookApiKey={webhookApiKey} />
+            <WebhookSetupPanel
+              source="tautulli"
+              webhookApiKey={webhookApiKey}
+            />
+          </div>
         )}
       </CollapsibleSettingsCard>
 

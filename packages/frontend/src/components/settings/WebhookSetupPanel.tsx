@@ -2,7 +2,10 @@ import { showError, showSuccess } from "@utils/toast";
 import {
   buildJellyfinWebhookUrl,
   buildPlexWebhookUrl,
+  buildTautulliWebhookHeaders,
+  buildTautulliWebhookUrl,
   JELLYFIN_WEBHOOK_TEMPLATE,
+  TAUTULLI_WEBHOOK_TEMPLATE,
 } from "@utils/webhooks";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -17,7 +20,7 @@ const DOCS_URL =
   (import.meta as { env?: { VITE_DOCS_URL?: string } }).env?.VITE_DOCS_URL ||
   "https://0xsysr3ll.github.io/scroblarr/docs";
 
-export type WebhookSource = "plex" | "jellyfin";
+export type WebhookSource = "plex" | "jellyfin" | "tautulli";
 
 interface WebhookSetupPanelProps {
   source: WebhookSource;
@@ -118,33 +121,50 @@ export function WebhookSetupPanel({
   const [open, setOpen] = useState(false);
   const hasApiKey = !!webhookApiKey?.trim();
   const docsHref =
-    source === "plex"
-      ? `${DOCS_URL}/configuration/plex`
-      : `${DOCS_URL}/configuration/jellyfin`;
+    source === "jellyfin"
+      ? `${DOCS_URL}/configuration/jellyfin`
+      : source === "tautulli"
+        ? `${DOCS_URL}/configuration/plex#tautulli-no-plex-pass`
+        : `${DOCS_URL}/configuration/plex`;
 
   const webhookUrl =
     source === "plex"
       ? hasApiKey
         ? buildPlexWebhookUrl(webhookApiKey!.trim())
         : buildPlexWebhookUrl("YOUR_WEBHOOK_API_KEY")
-      : buildJellyfinWebhookUrl();
+      : source === "tautulli"
+        ? buildTautulliWebhookUrl()
+        : buildJellyfinWebhookUrl();
+
+  const title =
+    source === "tautulli"
+      ? t("settings.webhook.tautulliTitle", {
+          defaultValue: "Tautulli notifications",
+        })
+      : t("settings.webhook.title", { defaultValue: "Webhooks" });
 
   const description =
     source === "plex"
       ? t("settings.webhook.plexDescription", {
           defaultValue:
-            "Copy this URL into Plex so completed watches sync to Scroblarr.",
+            "Copy this URL into Plex so completed watches sync to Scroblarr. Requires Plex Pass.",
         })
-      : t("settings.webhook.jellyfinDescription", {
-          defaultValue:
-            "Configure a Generic webhook destination in Jellyfin with these values.",
-        });
+      : source === "tautulli"
+        ? t("settings.webhook.tautulliDescription", {
+            defaultValue:
+              "Use Tautulli notification agents if you don't have Plex Pass.",
+          })
+        : t("settings.webhook.jellyfinDescription", {
+            defaultValue:
+              "Configure a Generic webhook destination in Jellyfin with these values.",
+          });
 
   const checklist =
     source === "plex"
       ? [
           t("settings.webhook.plexChecklist.pass", {
-            defaultValue: "Plex Pass is required for webhooks",
+            defaultValue:
+              "Plex Pass is required for Plex webhooks (or use Tautulli below)",
           }),
           t("settings.webhook.plexChecklist.paste", {
             defaultValue:
@@ -155,22 +175,42 @@ export function WebhookSetupPanel({
               "Save the Plex server above so Server.uuid matches webhooks",
           }),
         ]
-      : [
-          t("settings.webhook.jellyfinChecklist.plugin", {
-            defaultValue: "Install the Jellyfin Webhooks plugin and restart",
-          }),
-          t("settings.webhook.jellyfinChecklist.events", {
-            defaultValue: "Enable Playback Start/Stop and Movies/Episodes only",
-          }),
-          t("settings.webhook.jellyfinChecklist.template", {
-            defaultValue:
-              "Paste the template (leave Send All Properties unchecked)",
-          }),
-          t("settings.webhook.jellyfinChecklist.headers", {
-            defaultValue:
-              "Add Content-Type: application/json and X-API-Key headers",
-          }),
-        ];
+      : source === "tautulli"
+        ? [
+            t("settings.webhook.tautulliChecklist.agent", {
+              defaultValue:
+                "In Tautulli, add a Webhook notification agent (Settings → Notification Agents)",
+            }),
+            t("settings.webhook.tautulliChecklist.trigger", {
+              defaultValue:
+                "Enable the Watched trigger (Playback Start/Stop optional)",
+            }),
+            t("settings.webhook.tautulliChecklist.headers", {
+              defaultValue:
+                "Paste the JSON headers (includes X-API-Key) on the Data tab",
+            }),
+            t("settings.webhook.tautulliChecklist.template", {
+              defaultValue:
+                "Paste the JSON data template into each enabled trigger",
+            }),
+          ]
+        : [
+            t("settings.webhook.jellyfinChecklist.plugin", {
+              defaultValue: "Install the Jellyfin Webhooks plugin and restart",
+            }),
+            t("settings.webhook.jellyfinChecklist.events", {
+              defaultValue:
+                "Enable Playback Start/Stop and Movies/Episodes only",
+            }),
+            t("settings.webhook.jellyfinChecklist.template", {
+              defaultValue:
+                "Paste the template (leave Send All Properties unchecked)",
+            }),
+            t("settings.webhook.jellyfinChecklist.headers", {
+              defaultValue:
+                "Add Content-Type: application/json and X-API-Key headers",
+            }),
+          ];
 
   return (
     <div className="rounded-lg border border-border bg-card">
@@ -188,8 +228,15 @@ export function WebhookSetupPanel({
           aria-hidden
         />
         <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold text-foreground sm:text-base">
-            {t("settings.webhook.title", { defaultValue: "Webhooks" })}
+          <span className="flex items-center gap-2 text-sm font-semibold text-foreground sm:text-base">
+            {source === "tautulli" && (
+              <img
+                src="/logos/tautulli.png"
+                alt=""
+                className="h-6 w-auto max-w-[9rem] shrink-0 rounded-sm bg-neutral-950 object-contain p-0.5"
+              />
+            )}
+            {title}
           </span>
           <span className="mt-0.5 block text-xs text-muted-foreground sm:text-sm">
             {description}
@@ -258,6 +305,38 @@ export function WebhookSetupPanel({
                 multiline
                 copyLabel={t("settings.webhook.copyTemplate", {
                   defaultValue: "Copy payload template",
+                })}
+              />
+            </>
+          )}
+
+          {source === "tautulli" && (
+            <>
+              <CopyField
+                id="tautulli-webhook-headers"
+                label={t("settings.webhook.jsonHeaders", {
+                  defaultValue: "JSON headers",
+                })}
+                value={
+                  hasApiKey
+                    ? buildTautulliWebhookHeaders(webhookApiKey!.trim())
+                    : buildTautulliWebhookHeaders("YOUR_WEBHOOK_API_KEY")
+                }
+                multiline
+                disabled={!hasApiKey}
+                copyLabel={t("settings.webhook.copyJsonHeaders", {
+                  defaultValue: "Copy JSON headers",
+                })}
+              />
+              <CopyField
+                id="tautulli-webhook-template"
+                label={t("settings.webhook.jsonData", {
+                  defaultValue: "JSON data",
+                })}
+                value={TAUTULLI_WEBHOOK_TEMPLATE}
+                multiline
+                copyLabel={t("settings.webhook.copyJsonData", {
+                  defaultValue: "Copy JSON data",
                 })}
               />
             </>

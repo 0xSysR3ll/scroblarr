@@ -20,7 +20,7 @@ All of this happens in the background—no manual logging or button clicking req
 
 ### Plex
 
-Scroblarr listens for Plex webhook events. When you watch a movie or episode, Plex sends a notification to Scroblarr with details about what you watched, when, and which user account.
+Scroblarr listens for Plex webhook events. When you watch a movie or episode, Plex sends a notification to Scroblarr with details about what you watched, when, and which user account. Plex webhooks require **Plex Pass**. Without it, you can send the same events from [Tautulli](/docs/configuration/plex#tautulli-no-plex-pass); Scroblarr still stores them as Plex watches.
 
 ### Jellyfin
 
