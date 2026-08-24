@@ -14,6 +14,9 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    env: {
+      LOG_TO_FILE: "false",
+    },
     include: ["src/**/*.test.ts", "../shared/src/**/*.test.ts"],
     globals: true,
     clearMocks: true,

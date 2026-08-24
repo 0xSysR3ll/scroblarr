@@ -150,9 +150,13 @@ const prettyConsoleFormat = winston.format.combine(
   })
 );
 
+export function resolveLogToFile(value: string | undefined): boolean {
+  const normalized = value?.trim().toLowerCase();
+  return normalized !== "false" && normalized !== "0" && normalized !== "no";
+}
+
 const transports: winston.transport[] = [];
-const isFileLoggingEnabled =
-  process.env.LOG_TO_FILE === "true" || process.env.LOG_TO_FILE === "1";
+const isFileLoggingEnabled = resolveLogToFile(process.env.LOG_TO_FILE);
 
 if (isFileLoggingEnabled) {
   try {

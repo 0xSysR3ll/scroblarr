@@ -10,6 +10,7 @@ describe("logger LOG_LEVEL", () => {
   it("accepts case-insensitive LOG_LEVEL values", async () => {
     vi.stubEnv("LOG_LEVEL", " DEBUG ");
     vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("LOG_TO_FILE", "false");
     vi.resetModules();
 
     const consoleStdout = (
@@ -40,5 +41,34 @@ describe("logger LOG_LEVEL", () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     expect(writes.join("\n")).toContain("debug-enabled");
+  });
+});
+
+describe("resolveLogToFile", () => {
+  afterEach(() => {
+    vi.resetModules();
+    vi.unstubAllEnvs();
+  });
+
+  async function loadResolver() {
+    vi.stubEnv("LOG_TO_FILE", "false");
+    vi.resetModules();
+    return import("./logger");
+  }
+
+  it("enables file logging when LOG_TO_FILE is unset or truthy", async () => {
+    const { resolveLogToFile } = await loadResolver();
+    expect(resolveLogToFile(undefined)).toBe(true);
+    expect(resolveLogToFile("")).toBe(true);
+    expect(resolveLogToFile("true")).toBe(true);
+    expect(resolveLogToFile("1")).toBe(true);
+  });
+
+  it("disables file logging for false, 0, and no", async () => {
+    const { resolveLogToFile } = await loadResolver();
+    expect(resolveLogToFile("false")).toBe(false);
+    expect(resolveLogToFile("FALSE")).toBe(false);
+    expect(resolveLogToFile(" 0 ")).toBe(false);
+    expect(resolveLogToFile("no")).toBe(false);
   });
 });
