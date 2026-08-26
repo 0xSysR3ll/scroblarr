@@ -4,10 +4,10 @@ sidebar_position: 6
 
 # Bingers Configuration
 
-Link your Bingers account so Scroblarr can sync watch history. Each user on your media server needs to link their own Bingers account.
+Link your Bingers account and keep the session alive. Each user on your media server needs to link their own Bingers account. This page covers account linking only.
 
 :::note
-Watch-history sync to Bingers lands in a follow-up change. This page covers linking and session keep-alive.
+Watch-history sync to Bingers lands in a follow-up change.
 :::
 
 ## Sign in with Bingers

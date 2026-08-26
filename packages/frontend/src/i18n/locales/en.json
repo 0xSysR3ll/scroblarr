@@ -72,7 +72,7 @@
     "refresh": "Refresh",
     "empty": {
       "title": "No sync data yet",
-      "description": "Watch something on Plex or Jellyfin and it will appear here. Make sure webhooks are configured and your Trakt, Simkl, or Bingers account is linked in your profile.",
+      "description": "Watch something on Plex or Jellyfin and it will appear here. Make sure webhooks are configured and your Trakt or Simkl account is linked in your profile.",
       "checkProfile": "Check profile & links",
       "topThisMonth": "No syncs this month yet",
       "recentSyncs": "No recent syncs to show"
@@ -625,7 +625,7 @@
     "linkFailed": "Failed to link Bingers account",
     "unlinked": "Bingers account unlinked successfully",
     "unlinkFailed": "Failed to unlink Bingers account",
-    "description": "Sync your watched movies and episodes to Bingers. Uses magic-link email sign-in for secure authentication.",
+    "description": "Link your Bingers account with magic-link email sign-in. Scroblarr keeps the session alive in the background.",
     "profile": {
       "username": "Username"
     },

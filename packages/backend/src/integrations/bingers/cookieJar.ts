@@ -85,25 +85,26 @@ export function mergeSetCookieHeaders(
 }
 
 function splitSetCookieHeader(header: string): string[] {
-  // fetch may join multiple Set-Cookie with ", " — split carefully on
-  // commas that precede a new cookie name=value pair.
+  // fetch may join multiple Set-Cookie values with ", ". Keep commas inside
+  // Expires dates (Expires=Thu, 01 Jan …) while splitting before the next
+  // cookie-pair, including when the prior cookie ends with Path=/.
   const parts: string[] = [];
   let current = "";
-  for (const segment of header.split(/,(?=\s*[^;=]+=[^;]*)/)) {
+  for (const segment of header.split(",")) {
     if (!current) {
-      current = segment.trim();
+      current = segment;
       continue;
     }
-    // If prior segment looks incomplete (Expires=Thu, 01-Jan...), append.
-    if (/Expires=/i.test(current) && !/;\s*$/.test(current)) {
+    // Expires=Wdy, DD Mon YYYY HH:MM:SS GMT — weekday is before the comma.
+    if (/Expires=\s*[A-Za-z]{3}\s*$/i.test(current)) {
       current = `${current},${segment}`;
-    } else {
-      parts.push(current);
-      current = segment.trim();
+      continue;
     }
+    parts.push(current.trim());
+    current = segment;
   }
-  if (current) {
-    parts.push(current);
+  if (current.trim()) {
+    parts.push(current.trim());
   }
   return parts.length > 0 ? parts : [header];
 }

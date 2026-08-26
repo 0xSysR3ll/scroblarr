@@ -96,6 +96,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
   const [bingersOAuthPopup] = useState(() => new OAuthPopup());
   const traktPinPollIdRef = useRef(0);
   const simklPinPollIdRef = useRef(0);
+  const bingersStatusRequestIdRef = useRef(0);
 
   useEffect(() => {
     async function loadTraktStatus() {
@@ -130,19 +131,30 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
   }, []);
 
   useEffect(() => {
+    const requestId = ++bingersStatusRequestIdRef.current;
+
     async function loadBingersStatus() {
       try {
         setBingersLoading(true);
         const status = await getBingersStatus({ force: true });
+        if (requestId !== bingersStatusRequestIdRef.current) {
+          return;
+        }
         setBingersStatus(status);
       } catch {
         // Error handled by UI state
       } finally {
-        setBingersLoading(false);
+        if (requestId === bingersStatusRequestIdRef.current) {
+          setBingersLoading(false);
+        }
       }
     }
 
     loadBingersStatus();
+
+    return () => {
+      bingersStatusRequestIdRef.current += 1;
+    };
   }, []);
 
   useEffect(() => {
@@ -612,8 +624,11 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
       await linkBingers(bingersMagicLink.trim());
       setBingersMagicLink("");
       bingersOAuthPopup.closePopup();
+      const requestId = ++bingersStatusRequestIdRef.current;
       const status = await getBingersStatus({ force: true });
-      setBingersStatus(status);
+      if (requestId === bingersStatusRequestIdRef.current) {
+        setBingersStatus(status);
+      }
       showSuccess(
         t("bingers.linked", {
           defaultValue: "Bingers account linked successfully",
@@ -645,8 +660,11 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
       setBingersError(null);
       await unlinkBingers();
       setBingersMagicLink("");
+      const requestId = ++bingersStatusRequestIdRef.current;
       const status = await getBingersStatus({ force: true });
-      setBingersStatus(status);
+      if (requestId === bingersStatusRequestIdRef.current) {
+        setBingersStatus(status);
+      }
       showSuccess(
         t("bingers.unlinked", {
           defaultValue: "Bingers account unlinked successfully",
@@ -1194,7 +1212,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         title="Bingers"
         description={t("bingers.description", {
           defaultValue:
-            "Sync your watched movies and episodes to Bingers. Uses magic-link email sign-in for secure authentication.",
+            "Link your Bingers account with magic-link email sign-in. Scroblarr keeps the session alive in the background.",
         })}
         icon={
           <img

@@ -4,6 +4,7 @@ import { BingersApiError, bingersErrorFromResponse } from "./BingersApiError";
 import { BingersAuth, extractMagicLinkToken } from "./BingersAuth";
 import {
   cookieHeaderFromJar,
+  collectSetCookieHeaders,
   mergeSetCookieHeaders,
   parseCookieJar,
   serializeCookieJar,
@@ -25,6 +26,33 @@ describe("cookieJar", () => {
     expect(jar.session_token?.value).toBe("xyz");
     expect(jar.old).toBeUndefined();
     expect(cookieHeaderFromJar(jar)).toContain("session_token=xyz");
+  });
+
+  it("splits comma-joined Set-Cookie values after Path=/ without breaking Expires", () => {
+    const jar = mergeSetCookieHeaders({}, [
+      "session_token=abc; Expires=Thu, 01 Jan 2030 00:00:00 GMT; Path=/, other=xyz; Path=/",
+    ]);
+    expect(jar.session_token?.value).toBe("abc");
+    expect(jar.other?.value).toBe("xyz");
+  });
+
+  it("falls back to headers.get when getSetCookie is unavailable", () => {
+    const response = {
+      headers: {
+        getSetCookie: undefined,
+        get: (name: string) =>
+          name.toLowerCase() === "set-cookie"
+            ? "session_token=abc; Path=/, other=xyz; Path=/"
+            : null,
+      },
+    } as unknown as Response;
+
+    const headers = collectSetCookieHeaders(response);
+    expect(headers).toEqual(["session_token=abc; Path=/, other=xyz; Path=/"]);
+
+    const jar = mergeSetCookieHeaders({}, headers);
+    expect(jar.session_token?.value).toBe("abc");
+    expect(jar.other?.value).toBe("xyz");
   });
 });
 

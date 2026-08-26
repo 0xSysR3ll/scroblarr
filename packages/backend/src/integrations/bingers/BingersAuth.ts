@@ -37,6 +37,8 @@ export interface BingersMeProfile {
 }
 
 export class BingersAuth {
+  private static readonly REQUEST_TIMEOUT_MS = 15_000;
+
   async verifyMagicLink(token: string): Promise<BingersSessionInfo> {
     const url = new URL(`${BINGERS_AUTH_BASE}/magic-link/verify`);
     url.searchParams.set("token", token);
@@ -97,6 +99,7 @@ export class BingersAuth {
         Origin: "https://bingers.app",
         Cookie: cookieHeader,
       },
+      signal: AbortSignal.timeout(BingersAuth.REQUEST_TIMEOUT_MS),
     });
 
     let mergedJar = mergeSetCookieHeaders(
@@ -166,6 +169,7 @@ export class BingersAuth {
         Origin: "https://bingers.app",
         Cookie: cookieHeader,
       },
+      signal: AbortSignal.timeout(BingersAuth.REQUEST_TIMEOUT_MS),
     });
 
     const mergedJar = mergeSetCookieHeaders(

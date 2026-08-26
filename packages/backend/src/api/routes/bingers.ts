@@ -48,7 +48,7 @@ router.post("/link", async (req: Request, res: Response) => {
       {
         userId: user.id,
         bingersUserId: session.user?.id,
-        email: session.user?.email || validated.email,
+        hasEmail: !!(session.user?.email || validated.email),
       },
       "Bingers account linked"
     );
