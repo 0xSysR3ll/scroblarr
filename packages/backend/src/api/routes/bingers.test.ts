@@ -247,4 +247,60 @@ describe("bingers routes", () => {
       error: "Failed to unlink Bingers account",
     });
   });
+
+  it("falls back to stored email when link omits email", async () => {
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      plexUsername: "plex-user",
+      bingersEmail: "stored@example.com",
+    });
+    bingersAuthMocks.verifyMagicLink.mockResolvedValue({
+      session: {},
+      user: { id: "b1" },
+      cookieJar: { session_token: { name: "session_token", value: "s" } },
+    });
+    sessionManagerMocks.storeSessionFromVerify.mockResolvedValue(undefined);
+
+    await request(app)
+      .post("/bingers/link")
+      .send({ token: "magic-token" })
+      .expect(200);
+
+    expect(sessionManagerMocks.storeSessionFromVerify).toHaveBeenCalledWith(
+      "user-id",
+      expect.anything(),
+      "stored@example.com"
+    );
+  });
+
+  it("returns a generic message when link rejects a non-Error", async () => {
+    bingersAuthMocks.verifyMagicLink.mockRejectedValue("string failure");
+
+    const response = await request(app)
+      .post("/bingers/link")
+      .send({ token: "tok" })
+      .expect(500);
+
+    expect(response.body).toEqual({
+      error: "Failed to link Bingers account",
+    });
+  });
+
+  it("logs jellyfin username when unlinking without plex", async () => {
+    authState.user = { id: "user-id", jellyfinUsername: "jf-user" };
+    sessionManagerMocks.clearAll.mockResolvedValue(undefined);
+
+    await request(app).post("/bingers/unlink").expect(200);
+    expect(sessionManagerMocks.clearAll).toHaveBeenCalledWith("user-id");
+  });
+
+  it("returns a generic message when status rejects a non-Error", async () => {
+    sessionManagerMocks.validateAndRefresh.mockRejectedValue("string failure");
+
+    const response = await request(app).get("/bingers/status").expect(500);
+
+    expect(response.body).toEqual({
+      error: "Failed to get Bingers status",
+    });
+  });
 });

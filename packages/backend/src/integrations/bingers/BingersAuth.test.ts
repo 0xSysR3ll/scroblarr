@@ -76,6 +76,17 @@ describe("cookieJar", () => {
     expect(jar.other?.value).toBe("xyz");
   });
 
+  it("returns an empty list when Set-Cookie headers are absent", () => {
+    const response = {
+      headers: {
+        getSetCookie: undefined,
+        get: () => null,
+      },
+    } as unknown as Response;
+
+    expect(collectSetCookieHeaders(response)).toEqual([]);
+  });
+
   it("returns an empty jar helper", () => {
     expect(emptyCookieJar()).toEqual({});
   });
@@ -605,5 +616,88 @@ describe("BingersAuth", () => {
       session_token: { name: "session_token", value: "sess" },
     });
     expect(second.user?.image).toBe("https://img.example/a.png");
+  });
+
+  it("defaults cookie-less verify errors to status 400 when response status is 0", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 0,
+      headers: { get: () => null, getSetCookie: () => [] },
+    }) as unknown as typeof fetch;
+
+    await expect(
+      new BingersAuth().verifyMagicLink("token")
+    ).rejects.toMatchObject({
+      status: 400,
+      message: expect.stringMatching(/did not return session cookies/i),
+    });
+  });
+
+  it("defaults verify HTTP errors to status 400 when response.status is missing", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: undefined,
+      text: async () => "bad",
+      headers: { get: () => null, getSetCookie: () => [] },
+    }) as unknown as typeof fetch;
+
+    await expect(
+      new BingersAuth().verifyMagicLink("token")
+    ).rejects.toMatchObject({
+      status: 400,
+      message: "bad",
+    });
+  });
+
+  it("uses an empty body when verify error text() fails", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      text: async () => {
+        throw new Error("stream closed");
+      },
+      headers: { get: () => null, getSetCookie: () => [] },
+    }) as unknown as typeof fetch;
+
+    await expect(
+      new BingersAuth().verifyMagicLink("token")
+    ).rejects.toMatchObject({
+      status: 502,
+      message: "Bingers API error: 502",
+    });
+  });
+
+  it("normalizes flat sessions with expires and string user image", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          id: "s1",
+          expires: 1_800_000_000_000,
+          user: {
+            id: "u1",
+            email: "user@example.com",
+            username: "handle",
+            image: "https://img.example/from-session.png",
+          },
+        }),
+        headers: { get: () => null, getSetCookie: () => [] },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ user: { id: "u1" }, profile: {} }),
+        headers: { get: () => null, getSetCookie: () => [] },
+      });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const session = await new BingersAuth().getSession({
+      session_token: { name: "session_token", value: "sess" },
+    });
+    expect(session.expiresAt).toBe(1_800_000_000_000);
+    expect(session.user?.username).toBe("handle");
+    expect(session.user?.image).toBe("https://img.example/from-session.png");
   });
 });

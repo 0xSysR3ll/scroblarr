@@ -235,6 +235,70 @@ describe("BingersSessionManager", () => {
     );
   });
 
+  it("falls back to email and null image when auth validation clears the jar", async () => {
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar: serializeCookieJar({
+        session_token: { name: "session_token", value: "old" },
+      }),
+      bingersEmail: "only@example.com",
+      bingersUsername: undefined,
+      bingersUserId: undefined,
+      bingersThumb: undefined,
+    });
+    authMocks.getSession.mockRejectedValue(
+      new BingersApiError("dead", 401, { isAuthError: true })
+    );
+
+    const manager = new BingersSessionManager(
+      userRepositoryMocks as never,
+      authMocks as unknown as BingersAuth
+    );
+
+    await expect(manager.validateAndRefresh("user-id")).resolves.toEqual({
+      linked: false,
+      needsReauthorization: true,
+      username: "only@example.com",
+      image: null,
+    });
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith(
+      "user-id",
+      expect.objectContaining({
+        bingersCookieJar: null,
+        bingersEmail: "only@example.com",
+        bingersUserId: null,
+        bingersUsername: null,
+        bingersThumb: null,
+      })
+    );
+
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar: serializeCookieJar({
+        session_token: { name: "session_token", value: "old" },
+      }),
+      bingersEmail: null,
+      bingersUsername: null,
+      bingersUserId: null,
+      bingersThumb: null,
+    });
+    await expect(manager.validateAndRefresh("user-id")).resolves.toEqual({
+      linked: false,
+      needsReauthorization: true,
+      username: null,
+      image: null,
+    });
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith(
+      "user-id",
+      expect.objectContaining({
+        bingersEmail: null,
+        bingersUserId: null,
+        bingersUsername: null,
+        bingersThumb: null,
+      })
+    );
+  });
+
   it("throws when getValidCookieJar has no stored jar", async () => {
     userRepositoryMocks.findById.mockResolvedValue({
       id: "user-id",
