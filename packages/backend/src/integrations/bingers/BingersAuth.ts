@@ -50,6 +50,7 @@ export class BingersAuth {
         Origin: "https://bingers.app",
       },
       redirect: "manual",
+      signal: AbortSignal.timeout(BingersAuth.REQUEST_TIMEOUT_MS),
     });
 
     const jar = mergeSetCookieHeaders(
