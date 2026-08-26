@@ -593,6 +593,14 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
       bingersOAuthPopup.preparePopup("Bingers Sign-in");
       bingersOAuthPopup.navigateToUrl(BINGERS_MOBILE_SIGNIN_URL);
     } catch (error) {
+      const fallback = window.open(
+        BINGERS_MOBILE_SIGNIN_URL,
+        "_blank",
+        "noopener,noreferrer"
+      );
+      if (fallback) {
+        return;
+      }
       const errorMessage =
         error instanceof Error
           ? error.message
@@ -601,7 +609,6 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                 "Failed to open sign-in window. Please allow popups and try again.",
             });
       setBingersError(errorMessage);
-      window.open(BINGERS_MOBILE_SIGNIN_URL, "_blank", "noopener,noreferrer");
     }
   }
 

@@ -2004,27 +2004,44 @@ describe("IntegrationsTab Bingers integration", () => {
     });
   });
 
-  it("ignores a late Bingers status response after unmount", async () => {
-    let resolveStatus: (value: {
+  it("ignores a stale Bingers status response after a newer request completes", async () => {
+    const user = userEvent.setup();
+    let resolveInitial: (value: {
       linked: boolean;
       needsReauthorization: boolean;
       username: string | null;
       image: string | null;
     }) => void = () => undefined;
-    vi.mocked(getBingersStatus).mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          resolveStatus = resolve;
-        })
-    );
 
-    const view = renderWithProviders(<IntegrationsTab />);
-    await act(async () => {
-      await Promise.resolve();
+    vi.mocked(getBingersStatus)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveInitial = resolve;
+          })
+      )
+      .mockResolvedValueOnce({
+        linked: true,
+        needsReauthorization: false,
+        username: "fresh-user",
+        image: null,
+      });
+    vi.mocked(linkBingers).mockResolvedValue({ success: true });
+
+    renderWithProviders(<IntegrationsTab />);
+    await expandBingersSection(user);
+    await user.type(
+      screen.getByPlaceholderText("https://bingers.app/m?token=…"),
+      "https://bingers.app/m?token=magic"
+    );
+    await user.click(screen.getByRole("button", { name: "Complete link" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("fresh-user")).toBeVisible();
     });
-    view.unmount();
+
     await act(async () => {
-      resolveStatus({
+      resolveInitial({
         linked: true,
         needsReauthorization: false,
         username: "stale-user",
@@ -2032,6 +2049,7 @@ describe("IntegrationsTab Bingers integration", () => {
       });
     });
 
+    expect(screen.getByText("fresh-user")).toBeVisible();
     expect(screen.queryByText("stale-user")).not.toBeInTheDocument();
   });
 
@@ -2088,6 +2106,32 @@ describe("IntegrationsTab Bingers integration", () => {
     );
 
     expect(await screen.findByText("popup blocked by browser")).toBeVisible();
+    openSpy.mockRestore();
+  });
+
+  it("skips the error banner when the window.open fallback succeeds", async () => {
+    const user = userEvent.setup();
+    oauthPopupMocks.preparePopup.mockImplementation(() => {
+      throw new Error("popup blocked by browser");
+    });
+    const openSpy = vi.spyOn(window, "open").mockReturnValue({
+      closed: false,
+    } as Window);
+
+    renderWithProviders(<IntegrationsTab />);
+    await expandBingersSection(user);
+    await user.click(
+      screen.getByRole("button", { name: "Open Bingers sign-in" })
+    );
+
+    expect(openSpy).toHaveBeenCalledWith(
+      "https://bingers.app/mobile-signin",
+      "_blank",
+      "noopener,noreferrer"
+    );
+    expect(
+      screen.queryByText("popup blocked by browser")
+    ).not.toBeInTheDocument();
     openSpy.mockRestore();
   });
 
