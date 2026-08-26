@@ -289,4 +289,138 @@ describe("BingersSessionManager", () => {
     );
     expect(userRepositoryMocks.update).not.toHaveBeenCalled();
   });
+
+  it("throws when the user is missing", async () => {
+    userRepositoryMocks.findById.mockResolvedValue(null);
+    const manager = new BingersSessionManager(
+      userRepositoryMocks as never,
+      authMocks as unknown as BingersAuth
+    );
+
+    await expect(manager.getValidCookieJar("missing")).rejects.toThrow(
+      /User missing not found/
+    );
+    await expect(manager.validateAndRefresh("missing")).rejects.toThrow(
+      /User missing not found/
+    );
+  });
+
+  it("falls back through name, stored username, and email for display", async () => {
+    const manager = new BingersSessionManager(
+      userRepositoryMocks as never,
+      authMocks as unknown as BingersAuth
+    );
+
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar: serializeCookieJar({
+        session_token: { name: "session_token", value: "old" },
+      }),
+      bingersEmail: "stored@example.com",
+      bingersUsername: "stored-user",
+      bingersThumb: "https://img.example/stored.png",
+    });
+    authMocks.getSession.mockResolvedValue({
+      session: { id: "s1" },
+      user: {
+        id: "b1",
+        email: "session@example.com",
+        name: "Session Name",
+      },
+      cookieJar: {
+        session_token: { name: "session_token", value: "new" },
+      },
+    });
+
+    await expect(manager.validateAndRefresh("user-id")).resolves.toEqual({
+      linked: true,
+      needsReauthorization: false,
+      username: "Session Name",
+      image: "https://img.example/stored.png",
+    });
+
+    authMocks.getSession.mockResolvedValue({
+      session: { id: "s1" },
+      user: { id: "b1", email: "session@example.com" },
+      cookieJar: {
+        session_token: { name: "session_token", value: "new" },
+      },
+    });
+    await expect(manager.validateAndRefresh("user-id")).resolves.toMatchObject({
+      username: "stored-user",
+    });
+
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar: serializeCookieJar({
+        session_token: { name: "session_token", value: "old" },
+      }),
+      bingersEmail: "stored@example.com",
+      bingersUsername: null,
+      bingersThumb: null,
+    });
+    await expect(manager.validateAndRefresh("user-id")).resolves.toMatchObject({
+      username: "session@example.com",
+      image: null,
+    });
+
+    authMocks.getSession.mockResolvedValue({
+      session: { id: "s1" },
+      user: { id: "b1" },
+      cookieJar: {
+        session_token: { name: "session_token", value: "new" },
+      },
+    });
+    await expect(manager.validateAndRefresh("user-id")).resolves.toMatchObject({
+      username: "stored@example.com",
+    });
+
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar: serializeCookieJar({
+        session_token: { name: "session_token", value: "old" },
+      }),
+      bingersEmail: null,
+      bingersUsername: null,
+      bingersThumb: null,
+    });
+    await expect(manager.validateAndRefresh("user-id")).resolves.toMatchObject({
+      username: null,
+      image: null,
+    });
+  });
+
+  it("persists a verified session via storeSessionFromVerify", async () => {
+    const manager = new BingersSessionManager(
+      userRepositoryMocks as never,
+      authMocks as unknown as BingersAuth
+    );
+
+    await manager.storeSessionFromVerify(
+      "user-id",
+      {
+        session: { id: "s1" },
+        user: {
+          id: "b1",
+          email: "fresh@example.com",
+          username: "handle",
+          image: "https://img.example/a.png",
+        },
+        expiresAt: 1_800_000_000_000,
+        cookieJar: {
+          session_token: { name: "session_token", value: "sess" },
+        },
+      },
+      "fallback@example.com"
+    );
+
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith(
+      "user-id",
+      expect.objectContaining({
+        bingersEmail: "fresh@example.com",
+        bingersUsername: "handle",
+        bingersThumb: "https://img.example/a.png",
+      })
+    );
+  });
 });

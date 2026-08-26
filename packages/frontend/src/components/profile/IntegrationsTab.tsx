@@ -610,15 +610,6 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
   async function handleLinkBingers() {
     setBingersError(null);
 
-    if (!bingersMagicLink.trim()) {
-      setBingersError(
-        t("bingers.magicLinkRequired", {
-          defaultValue: "Paste the magic-link URL from your email.",
-        })
-      );
-      return;
-    }
-
     try {
       setBingersSaving(true);
       await linkBingers(bingersMagicLink.trim());

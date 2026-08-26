@@ -18,13 +18,22 @@ const sessionManagerMocks = vi.hoisted(() => ({
   validateAndRefresh: vi.fn(),
 }));
 
+const authState = vi.hoisted(() => ({
+  user: {
+    id: "user-id",
+    plexUsername: "plex-user",
+  } as { id: string; plexUsername?: string; jellyfinUsername?: string } | null,
+}));
+
 vi.mock("../middleware/auth", () => ({
   auth: (
     req: express.Request,
     _res: express.Response,
     next: express.NextFunction
   ) => {
-    req.user = { id: "user-id", plexUsername: "plex-user" } as never;
+    if (authState.user) {
+      req.user = authState.user as never;
+    }
     next();
   },
 }));
@@ -77,6 +86,7 @@ describe("bingers routes", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    authState.user = { id: "user-id", plexUsername: "plex-user" };
     userRepositoryMocks.findById.mockResolvedValue({
       id: "user-id",
       plexUsername: "plex-user",
@@ -181,5 +191,60 @@ describe("bingers routes", () => {
     const response = await request(app).get("/bingers/status").expect(500);
 
     expect(response.body).toEqual({ error: "session service down" });
+  });
+
+  it("returns 401 when auth middleware leaves no user", async () => {
+    authState.user = null;
+
+    await request(app).post("/bingers/link").send({ token: "tok" }).expect(401);
+    await request(app).post("/bingers/unlink").expect(401);
+    await request(app).get("/bingers/status").expect(401);
+  });
+
+  it("returns 401 when the user record is missing on link", async () => {
+    userRepositoryMocks.findById.mockResolvedValue(null);
+
+    const response = await request(app)
+      .post("/bingers/link")
+      .send({ token: "tok" })
+      .expect(401);
+
+    expect(response.body).toEqual({ error: "User not found" });
+  });
+
+  it("returns 500 when link fails unexpectedly", async () => {
+    bingersAuthMocks.verifyMagicLink.mockRejectedValue(new Error("db down"));
+
+    const response = await request(app)
+      .post("/bingers/link")
+      .send({ token: "tok" })
+      .expect(500);
+
+    expect(response.body).toEqual({ error: "db down" });
+  });
+
+  it("clamps BingersApiError statuses outside 400-599 to 400", async () => {
+    const { BingersApiError } =
+      await import("@integrations/bingers/BingersApiError");
+    bingersAuthMocks.verifyMagicLink.mockRejectedValue(
+      new BingersApiError("weird", 200, { code: "odd" })
+    );
+
+    const response = await request(app)
+      .post("/bingers/link")
+      .send({ token: "tok" })
+      .expect(400);
+
+    expect(response.body).toEqual({ error: "weird", code: "odd" });
+  });
+
+  it("returns a generic message when unlink rejects a non-Error", async () => {
+    sessionManagerMocks.clearAll.mockRejectedValue("string failure");
+
+    const response = await request(app).post("/bingers/unlink").expect(500);
+
+    expect(response.body).toEqual({
+      error: "Failed to unlink Bingers account",
+    });
   });
 });

@@ -123,9 +123,6 @@ function parseSingleSetCookie(raw: string): CookieEntry | null {
 
   const name = pair.slice(0, eq).trim();
   const value = pair.slice(eq + 1).trim();
-  if (!name) {
-    return null;
-  }
 
   let expires: number | undefined;
   for (const attr of attrs) {

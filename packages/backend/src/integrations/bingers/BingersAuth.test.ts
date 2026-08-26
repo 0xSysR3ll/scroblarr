@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { BingersApiError, bingersErrorFromResponse , isBingersAuthError, isBingersRateLimitError } from "./BingersApiError";
+import {
+  BingersApiError,
+  bingersErrorFromResponse,
+  isBingersAuthError,
+  isBingersRateLimitError,
+} from "./BingersApiError";
 import { BingersAuth, extractMagicLinkToken } from "./BingersAuth";
 import {
   cookieHeaderFromJar,
@@ -74,6 +79,32 @@ describe("cookieJar", () => {
   it("returns an empty jar helper", () => {
     expect(emptyCookieJar()).toEqual({});
   });
+
+  it("skips invalid jar entries when parsing", () => {
+    expect(
+      parseCookieJar(
+        JSON.stringify({
+          ok: { value: "1", expires: 99 },
+          badType: "nope",
+          noValue: { expires: 1 },
+          nullEntry: null,
+        })
+      )
+    ).toEqual({ ok: { name: "ok", value: "1", expires: 99 } });
+  });
+
+  it("ignores blank or malformed Set-Cookie parts", () => {
+    const jar = mergeSetCookieHeaders({}, [
+      "",
+      "=novalue",
+      "deleted=; Max-Age=0",
+      "gone=deleted; Path=/",
+      "live=1; Path=/",
+    ]);
+    expect(jar).toEqual({
+      live: expect.objectContaining({ name: "live", value: "1" }),
+    });
+  });
 });
 
 describe("BingersApiError helpers", () => {
@@ -107,6 +138,26 @@ describe("extractMagicLinkToken", () => {
   it("throws when token is missing", () => {
     expect(() => extractMagicLinkToken("https://bingers.app/m")).toThrow(
       BingersApiError
+    );
+  });
+
+  it("throws for blank input", () => {
+    expect(() => extractMagicLinkToken("   ")).toThrow(/required/i);
+  });
+
+  it("reads magic_link_token query param", () => {
+    expect(
+      extractMagicLinkToken("https://bingers.app/m?magic_link_token=mlt")
+    ).toBe("mlt");
+  });
+
+  it("extracts from relative path-style input via placeholder URL", () => {
+    expect(extractMagicLinkToken("m?token=rel-token")).toBe("rel-token");
+  });
+
+  it("falls back to regex when URL parsing fails", () => {
+    expect(extractMagicLinkToken("https://%?token=catch-tok")).toBe(
+      "catch-tok"
     );
   });
 });
@@ -144,6 +195,20 @@ describe("bingersErrorFromResponse", () => {
     const error = bingersErrorFromResponse(429, '{"message":"slow down"}');
     expect(error.isRateLimited).toBe(true);
     expect(error.message).toBe("slow down");
+  });
+
+  it("treats positive retryAfterSeconds as rate limited without a known code", () => {
+    const error = bingersErrorFromResponse(
+      400,
+      JSON.stringify({
+        error: {
+          message: "try later",
+          retryAfterSeconds: 30,
+        },
+      })
+    );
+    expect(error.isRateLimited).toBe(true);
+    expect(error.retryAfterSeconds).toBe(30);
   });
 });
 
@@ -337,5 +402,208 @@ describe("BingersAuth", () => {
         session_token: { name: "session_token", value: "sess" },
       })
     ).rejects.toMatchObject({ isAuthError: true, status: 401 });
+  });
+
+  it("maps magic-link verify HTTP errors when no cookies are returned", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: async () =>
+        JSON.stringify({
+          error: { code: "magic_link_expired", message: "expired" },
+        }),
+      headers: { get: () => null, getSetCookie: () => [] },
+    }) as unknown as typeof fetch;
+
+    await expect(
+      new BingersAuth().verifyMagicLink("dead")
+    ).rejects.toMatchObject({
+      message: "expired",
+      code: "magic_link_expired",
+      status: 400,
+    });
+  });
+
+  it("maps non-auth get-session failures", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: async () => "boom",
+      headers: { get: () => null, getSetCookie: () => [] },
+    }) as unknown as typeof fetch;
+
+    await expect(
+      new BingersAuth().getSession({
+        session_token: { name: "session_token", value: "sess" },
+      })
+    ).rejects.toMatchObject({ status: 500, message: "boom" });
+  });
+
+  it("rejects null and empty get-session payloads as auth errors", async () => {
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => null,
+        headers: { get: () => null, getSetCookie: () => [] },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({}),
+        headers: { get: () => null, getSetCookie: () => [] },
+      }) as unknown as typeof fetch;
+
+    const auth = new BingersAuth();
+    await expect(
+      auth.getSession({
+        session_token: { name: "session_token", value: "sess" },
+      })
+    ).rejects.toMatchObject({ isAuthError: true });
+    await expect(
+      auth.getSession({
+        session_token: { name: "session_token", value: "sess" },
+      })
+    ).rejects.toMatchObject({ isAuthError: true });
+  });
+
+  it("rejects empty cookie jars in getMe", async () => {
+    await expect(new BingersAuth().getMe({})).rejects.toMatchObject({
+      isAuthError: true,
+      status: 401,
+    });
+  });
+
+  it("normalizes flat session payloads and displayName-only profiles", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          id: "s1",
+          expiresAt: "not-a-date",
+          user: {
+            id: 42,
+            email: "user@example.com",
+            name: "User",
+          },
+        }),
+        headers: { get: () => null, getSetCookie: () => [] },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          user: { id: "u1", name: "  " },
+          profile: { displayName: "Display", avatarUrl: "  " },
+        }),
+        headers: { get: () => null, getSetCookie: () => [] },
+      });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const session = await new BingersAuth().getSession({
+      session_token: { name: "session_token", value: "sess" },
+    });
+    expect(session.session).toMatchObject({ id: "s1" });
+    expect(session.expiresAt).toBeUndefined();
+    expect(session.user?.username).toBe("Display");
+    expect(session.user?.id).toBe("u1");
+  });
+
+  it("keeps session when me enrichment returns a non-object body", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          session: { id: "s1", expires: 1_800_000_000 },
+          user: { id: "u1", username: "handle" },
+        }),
+        headers: { get: () => null, getSetCookie: () => [] },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => null,
+        headers: { get: () => null, getSetCookie: () => [] },
+      });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const session = await new BingersAuth().getSession({
+      session_token: { name: "session_token", value: "sess" },
+    });
+    expect(session.expiresAt).toBe(1_800_000_000_000);
+    expect(session.user?.username).toBe("handle");
+  });
+
+  it("treats non-object get-session bodies as empty sessions", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => 42,
+      headers: { get: () => null, getSetCookie: () => [] },
+    }) as unknown as typeof fetch;
+
+    await expect(
+      new BingersAuth().getSession({
+        session_token: { name: "session_token", value: "sess" },
+      })
+    ).rejects.toMatchObject({ isAuthError: true });
+  });
+
+  it("ignores non-object me user/profile fields and keeps avatar URLs", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          session: { id: "s1" },
+          user: { id: "u1", name: "User" },
+        }),
+        headers: { get: () => null, getSetCookie: () => [] },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          user: "not-an-object",
+          profile: 7,
+        }),
+        headers: { get: () => null, getSetCookie: () => [] },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          session: { id: "s2" },
+          user: { id: "u2" },
+        }),
+        headers: { get: () => null, getSetCookie: () => [] },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          user: { id: "u2" },
+          profile: { avatarUrl: "https://img.example/a.png" },
+        }),
+        headers: { get: () => null, getSetCookie: () => [] },
+      });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const auth = new BingersAuth();
+    const first = await auth.getSession({
+      session_token: { name: "session_token", value: "sess" },
+    });
+    expect(first.user?.username).toBe("User");
+
+    const second = await auth.getSession({
+      session_token: { name: "session_token", value: "sess" },
+    });
+    expect(second.user?.image).toBe("https://img.example/a.png");
   });
 });

@@ -1919,4 +1919,134 @@ describe("IntegrationsTab Bingers integration", () => {
 
     expect(await screen.findByText("Magic link expired")).toBeVisible();
   });
+
+  it("shows a default link message when link rejects a non-Error", async () => {
+    const user = userEvent.setup();
+    vi.mocked(linkBingers).mockRejectedValue("nope");
+
+    renderWithProviders(<IntegrationsTab />);
+    await expandBingersSection(user);
+    await user.type(
+      screen.getByPlaceholderText("https://bingers.app/m?token=…"),
+      "https://bingers.app/m?token=dead"
+    );
+    await user.click(screen.getByRole("button", { name: "Complete link" }));
+
+    expect(
+      await screen.findByText("Failed to link Bingers account")
+    ).toBeVisible();
+  });
+
+  it("ignores a late Bingers status response after unmount", async () => {
+    let resolveStatus: (value: {
+      linked: boolean;
+      needsReauthorization: boolean;
+      username: string | null;
+      image: string | null;
+    }) => void = () => undefined;
+    vi.mocked(getBingersStatus).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveStatus = resolve;
+        })
+    );
+
+    const view = renderWithProviders(<IntegrationsTab />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    view.unmount();
+    await act(async () => {
+      resolveStatus({
+        linked: true,
+        needsReauthorization: false,
+        username: "stale-user",
+        image: null,
+      });
+    });
+
+    expect(screen.queryByText("stale-user")).not.toBeInTheDocument();
+  });
+
+  it("shows unlink errors while the account is still linked", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getBingersStatus).mockResolvedValue({
+      linked: true,
+      needsReauthorization: false,
+      username: "bingers-user",
+      image: null,
+    });
+    vi.mocked(unlinkBingers).mockRejectedValue(new Error("unlink denied"));
+
+    renderWithProviders(<IntegrationsTab />);
+    await expandBingersSection(user);
+    await user.click(screen.getByRole("button", { name: "Unlink" }));
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+
+    expect(await screen.findByText("unlink denied")).toBeVisible();
+    expect(screen.getByText("bingers-user")).toBeVisible();
+  });
+
+  it("shows a default unlink message when unlink rejects a non-Error", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getBingersStatus).mockResolvedValue({
+      linked: true,
+      needsReauthorization: false,
+      username: "bingers-user",
+      image: null,
+    });
+    vi.mocked(unlinkBingers).mockRejectedValue("nope");
+
+    renderWithProviders(<IntegrationsTab />);
+    await expandBingersSection(user);
+    await user.click(screen.getByRole("button", { name: "Unlink" }));
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+
+    expect(
+      await screen.findByText("Failed to unlink Bingers account")
+    ).toBeVisible();
+  });
+
+  it("shows popup Error messages when opening sign-in fails", async () => {
+    const user = userEvent.setup();
+    oauthPopupMocks.preparePopup.mockImplementation(() => {
+      throw new Error("popup blocked by browser");
+    });
+    const openSpy = vi.spyOn(window, "open").mockReturnValue(null);
+
+    renderWithProviders(<IntegrationsTab />);
+    await expandBingersSection(user);
+    await user.click(
+      screen.getByRole("button", { name: "Open Bingers sign-in" })
+    );
+
+    expect(await screen.findByText("popup blocked by browser")).toBeVisible();
+    openSpy.mockRestore();
+  });
+
+  it("shows a default message when opening sign-in fails without an Error", async () => {
+    const user = userEvent.setup();
+    oauthPopupMocks.preparePopup.mockImplementation(() => {
+      throw "popup blocked";
+    });
+    const openSpy = vi.spyOn(window, "open").mockReturnValue(null);
+
+    renderWithProviders(<IntegrationsTab />);
+    await expandBingersSection(user);
+    await user.click(
+      screen.getByRole("button", { name: "Open Bingers sign-in" })
+    );
+
+    expect(
+      await screen.findByText(
+        "Failed to open sign-in window. Please allow popups and try again."
+      )
+    ).toBeVisible();
+    expect(openSpy).toHaveBeenCalledWith(
+      "https://bingers.app/mobile-signin",
+      "_blank",
+      "noopener,noreferrer"
+    );
+    openSpy.mockRestore();
+  });
 });

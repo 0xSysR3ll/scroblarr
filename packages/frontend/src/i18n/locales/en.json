@@ -613,7 +613,6 @@
   },
   "bingers": {
     "openSignInFailed": "Failed to open sign-in window. Please allow popups and try again.",
-    "magicLinkRequired": "Paste the magic-link URL from your email.",
     "linked": "Bingers account linked successfully",
     "linkFailed": "Failed to link Bingers account",
     "unlinked": "Bingers account unlinked successfully",

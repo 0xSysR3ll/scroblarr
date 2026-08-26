@@ -184,4 +184,30 @@ describe("bingers api", () => {
 
     await expect(linkBingers("token")).rejects.toThrow(body);
   });
+
+  it("falls back when the error body cannot be read", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 502,
+      statusText: "Bad Gateway",
+      text: vi.fn().mockRejectedValue(new Error("stream closed")),
+    });
+
+    await expect(linkBingers("token")).rejects.toThrow(
+      "Failed to link Bingers account (502 Bad Gateway)"
+    );
+  });
+
+  it("falls back to the default message when body and status text are empty", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 0,
+      statusText: "",
+      text: vi.fn().mockResolvedValue("   "),
+    });
+
+    await expect(getBingersStatus()).rejects.toThrow(
+      "Failed to fetch Bingers status"
+    );
+  });
 });
