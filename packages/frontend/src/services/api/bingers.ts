@@ -20,32 +20,31 @@ async function getErrorPayload(
   response: Response,
   fallback: string
 ): Promise<{ message: string; code?: string; retryAfterSeconds?: number }> {
+  let bodyText = "";
   try {
-    const jsonSource =
-      typeof response.clone === "function" ? response.clone() : response;
-    const error = (await jsonSource.json()) as {
-      error?: unknown;
-      code?: string;
-      retryAfterSeconds?: number;
-    };
-    if (typeof error.error === "string" && error.error) {
-      return {
-        message: error.error,
-        code: error.code,
-        retryAfterSeconds: error.retryAfterSeconds,
-      };
-    }
+    bodyText = await response.text();
   } catch {
-    // Fall through.
+    // Fall through with an empty body.
   }
 
-  try {
-    const text = await response.text();
-    if (text.trim()) {
-      return { message: text.trim() };
+  if (bodyText.trim()) {
+    try {
+      const error = JSON.parse(bodyText) as {
+        error?: unknown;
+        code?: string;
+        retryAfterSeconds?: number;
+      };
+      if (typeof error.error === "string" && error.error) {
+        return {
+          message: error.error,
+          code: error.code,
+          retryAfterSeconds: error.retryAfterSeconds,
+        };
+      }
+    } catch {
+      // Not JSON — use the raw body text below.
     }
-  } catch {
-    // Fall through.
+    return { message: bodyText.trim() };
   }
 
   const status = [response.status, response.statusText]

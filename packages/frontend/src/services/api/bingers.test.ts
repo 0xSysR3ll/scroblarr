@@ -113,13 +113,31 @@ describe("bingers api", () => {
   it("surfaces link, unlink, and status errors from the backend", async () => {
     fetchMock
       .mockResolvedValueOnce(
-        jsonResponse({ error: "Magic link expired" }, false, 400)
+        new Response(JSON.stringify({ error: "Magic link expired" }), {
+          status: 400,
+          statusText: "Bad Request",
+          headers: { "Content-Type": "application/json" },
+        })
       )
       .mockResolvedValueOnce(
-        jsonResponse({ error: "Failed to unlink Bingers account" }, false, 500)
+        new Response(
+          JSON.stringify({ error: "Failed to unlink Bingers account" }),
+          {
+            status: 500,
+            statusText: "Internal Server Error",
+            headers: { "Content-Type": "application/json" },
+          }
+        )
       )
       .mockResolvedValueOnce(
-        jsonResponse({ error: "Failed to fetch Bingers status" }, false, 500)
+        new Response(
+          JSON.stringify({ error: "Failed to fetch Bingers status" }),
+          {
+            status: 500,
+            statusText: "Internal Server Error",
+            headers: { "Content-Type": "application/json" },
+          }
+        )
       );
 
     await expect(linkBingers("token")).rejects.toThrow("Magic link expired");
@@ -148,5 +166,22 @@ describe("bingers api", () => {
 
     await expect(linkBingers("token")).rejects.toThrow("link proxy failed");
     await expect(unlinkBingers()).rejects.toThrow("unlink proxy failed");
+  });
+
+  it("keeps raw body text when JSON lacks a string error field", async () => {
+    const body = JSON.stringify({ message: "session expired", code: "gone" });
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      statusText: "Unauthorized",
+      // No clone — previously json() would consume the body before text().
+      text: vi.fn().mockResolvedValue(body),
+      json: vi.fn().mockResolvedValue({
+        message: "session expired",
+        code: "gone",
+      }),
+    });
+
+    await expect(linkBingers("token")).rejects.toThrow(body);
   });
 });
