@@ -22,6 +22,7 @@ export interface AuthUser {
   jellyfinUsername?: string;
   hasTrakt?: boolean;
   hasSimkl?: boolean;
+  hasBingers?: boolean;
 }
 
 interface AuthContextType {

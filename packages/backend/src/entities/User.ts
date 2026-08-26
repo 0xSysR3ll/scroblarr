@@ -98,6 +98,30 @@ export class User {
   @Column({ type: "varchar", length: 500, nullable: true })
   simklThumb?: string;
 
+  @Column({ type: "text", nullable: true })
+  bingersCookieJar?: string;
+
+  @Column({ type: "bigint", nullable: true })
+  bingersSessionExpiresAt?: number;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  bingersEmail?: string;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  bingersUserId?: string;
+
+  @Column({ type: "varchar", length: 255, nullable: true })
+  bingersUsername?: string;
+
+  @Column({ type: "varchar", length: 500, nullable: true })
+  bingersThumb?: string;
+
+  @Column({ type: "boolean", default: false })
+  bingersMarkMoviesAsRewatched!: boolean;
+
+  @Column({ type: "boolean", default: false })
+  bingersMarkEpisodesAsRewatched!: boolean;
+
   @CreateDateColumn()
   createdAt!: Date;
 

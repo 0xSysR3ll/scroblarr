@@ -5,5 +5,6 @@ export * from "./auth";
 export * from "./settings";
 export * from "./trakt";
 export * from "./simkl";
+export * from "./bingers";
 export * from "./sync";
 export * from "./logs";

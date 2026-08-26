@@ -17,6 +17,11 @@ import {
   linkSimkl,
   unlinkSimkl,
   type SimklStatus,
+  getBingersStatus,
+  linkBingers,
+  unlinkBingers,
+  BINGERS_MOBILE_SIGNIN_URL,
+  type BingersStatus,
 } from "@services/api";
 import { OAuthPopup } from "@utils/OAuthPopup";
 import { showSuccess } from "@utils/toast";
@@ -80,6 +85,15 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
   const [simklPinMessage, setSimklPinMessage] = useState<string | null>(null);
   const [showSimklUnlinkModal, setShowSimklUnlinkModal] = useState(false);
   const [simklOAuthPopup] = useState(() => new OAuthPopup());
+  const [bingersStatus, setBingersStatus] = useState<BingersStatus | null>(
+    null
+  );
+  const [bingersLoading, setBingersLoading] = useState(true);
+  const [bingersSaving, setBingersSaving] = useState(false);
+  const [bingersError, setBingersError] = useState<string | null>(null);
+  const [bingersMagicLink, setBingersMagicLink] = useState("");
+  const [showBingersUnlinkModal, setShowBingersUnlinkModal] = useState(false);
+  const [bingersOAuthPopup] = useState(() => new OAuthPopup());
   const traktPinPollIdRef = useRef(0);
   const simklPinPollIdRef = useRef(0);
 
@@ -116,6 +130,22 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
   }, []);
 
   useEffect(() => {
+    async function loadBingersStatus() {
+      try {
+        setBingersLoading(true);
+        const status = await getBingersStatus({ force: true });
+        setBingersStatus(status);
+      } catch {
+        // Error handled by UI state
+      } finally {
+        setBingersLoading(false);
+      }
+    }
+
+    loadBingersStatus();
+  }, []);
+
+  useEffect(() => {
     return () => {
       traktPinPollIdRef.current += 1;
       traktOAuthPopup.closePopup();
@@ -128,6 +158,12 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
       simklOAuthPopup.closePopup();
     };
   }, [simklOAuthPopup]);
+
+  useEffect(() => {
+    return () => {
+      bingersOAuthPopup.closePopup();
+    };
+  }, [bingersOAuthPopup]);
 
   async function completeTraktLink(
     userCode: string,
@@ -541,7 +577,103 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
     }
   }
 
-  if (traktLoading && simklLoading && !traktStatus && !simklStatus) {
+  async function handleOpenBingersSignIn() {
+    setBingersError(null);
+    try {
+      bingersOAuthPopup.preparePopup("Bingers Sign-in");
+      bingersOAuthPopup.navigateToUrl(BINGERS_MOBILE_SIGNIN_URL);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : t("bingers.openSignInFailed", {
+              defaultValue:
+                "Failed to open sign-in window. Please allow popups and try again.",
+            });
+      setBingersError(errorMessage);
+      window.open(BINGERS_MOBILE_SIGNIN_URL, "_blank", "noopener,noreferrer");
+    }
+  }
+
+  async function handleLinkBingers() {
+    setBingersError(null);
+
+    if (!bingersMagicLink.trim()) {
+      setBingersError(
+        t("bingers.magicLinkRequired", {
+          defaultValue: "Paste the magic-link URL from your email.",
+        })
+      );
+      return;
+    }
+
+    try {
+      setBingersSaving(true);
+      await linkBingers(bingersMagicLink.trim());
+      setBingersMagicLink("");
+      bingersOAuthPopup.closePopup();
+      const status = await getBingersStatus({ force: true });
+      setBingersStatus(status);
+      showSuccess(
+        t("bingers.linked", {
+          defaultValue: "Bingers account linked successfully",
+        })
+      );
+      onProfileUpdated?.();
+    } catch (err) {
+      setBingersError(
+        err instanceof Error
+          ? err.message
+          : t("bingers.linkFailed", {
+              defaultValue: "Failed to link Bingers account",
+            })
+      );
+    } finally {
+      setBingersSaving(false);
+    }
+  }
+
+  async function handleUnlinkBingers() {
+    setShowBingersUnlinkModal(true);
+  }
+
+  async function confirmUnlinkBingers() {
+    setShowBingersUnlinkModal(false);
+
+    try {
+      setBingersSaving(true);
+      setBingersError(null);
+      await unlinkBingers();
+      setBingersMagicLink("");
+      const status = await getBingersStatus({ force: true });
+      setBingersStatus(status);
+      showSuccess(
+        t("bingers.unlinked", {
+          defaultValue: "Bingers account unlinked successfully",
+        })
+      );
+      onProfileUpdated?.();
+    } catch (err) {
+      setBingersError(
+        err instanceof Error
+          ? err.message
+          : t("bingers.unlinkFailed", {
+              defaultValue: "Failed to unlink Bingers account",
+            })
+      );
+    } finally {
+      setBingersSaving(false);
+    }
+  }
+
+  if (
+    traktLoading &&
+    simklLoading &&
+    bingersLoading &&
+    !traktStatus &&
+    !simklStatus &&
+    !bingersStatus
+  ) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="xl" />
@@ -1056,6 +1188,162 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         )}
       </CollapsibleSettingsCard>
 
+      {/* Bingers Integration */}
+      <CollapsibleSettingsCard
+        key={bingersStatus?.needsReauthorization ? "reauth" : "default"}
+        title="Bingers"
+        description={t("bingers.description", {
+          defaultValue:
+            "Sync your watched movies and episodes to Bingers. Uses magic-link email sign-in for secure authentication.",
+        })}
+        icon={
+          <img
+            src="/logos/bingers.png"
+            alt=""
+            className="h-5 w-5"
+            aria-hidden
+          />
+        }
+        defaultOpen={!!bingersStatus?.needsReauthorization}
+        headerMeta={
+          bingersStatus?.linked ? (
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-green-600 dark:text-green-400">
+              <FaCheckCircle className="h-4 w-4" />
+              {t("profile.linkedAccounts.linked", {
+                defaultValue: "Linked",
+              })}
+            </span>
+          ) : bingersStatus?.needsReauthorization ? (
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-600 dark:text-amber-400">
+              <FaExclamationTriangle className="h-4 w-4" />
+              {t("profile.linkedAccounts.reauthRequired", {
+                defaultValue: "Re-authorization required",
+              })}
+            </span>
+          ) : undefined
+        }
+      >
+        {bingersStatus?.linked ? (
+          <div className="space-y-4">
+            {bingersError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950">
+                <div className="flex items-start gap-2">
+                  <FaTimesCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
+                  <p className="text-sm text-red-800 dark:text-red-200">
+                    {bingersError}
+                  </p>
+                </div>
+              </div>
+            )}
+            <div className="flex items-start gap-4">
+              {bingersStatus.image && (
+                <img
+                  src={bingersStatus.image}
+                  alt="Profile"
+                  className="h-16 w-16 shrink-0 rounded-full"
+                />
+              )}
+              <div className="flex-1 space-y-2">
+                {bingersStatus.username && (
+                  <div>
+                    <p className="mb-0.5 text-xs font-medium text-muted-foreground">
+                      {t("bingers.profile.username", {
+                        defaultValue: "Username",
+                      })}
+                    </p>
+                    <p className="text-sm text-foreground">
+                      {bingersStatus.username}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleUnlinkBingers}
+              disabled={bingersSaving}
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950 dark:hover:text-red-300"
+              title={t("bingers.unlink", { defaultValue: "Unlink" })}
+            >
+              <FaUnlink className="h-3.5 w-3.5" />
+              <span>{t("bingers.unlink", { defaultValue: "Unlink" })}</span>
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {t("bingers.docsHint", {
+                defaultValue:
+                  "Open Bingers sign-in to email yourself a magic link, then paste that link below.",
+              })}
+            </p>
+            {bingersError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950">
+                <div className="flex items-start gap-2">
+                  <FaTimesCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
+                  <p className="text-sm text-red-800 dark:text-red-200">
+                    {bingersError}
+                  </p>
+                </div>
+              </div>
+            )}
+            {bingersStatus?.needsReauthorization && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-amber-700 dark:text-amber-300">
+                <FaExclamationTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <p className="text-sm">
+                  {t("bingers.needsReauthorization", {
+                    defaultValue:
+                      "Bingers authorization expired or was revoked. Link your account again to reconnect.",
+                  })}
+                </p>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleOpenBingersSignIn}
+              disabled={bingersLoading}
+              className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            >
+              {t("bingers.openSignIn", {
+                defaultValue: "Open Bingers sign-in",
+              })}
+            </button>
+
+            <div className="space-y-3 border-t border-border pt-4">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-foreground/90">
+                  {t("bingers.magicLink", {
+                    defaultValue: "Magic-link from email",
+                  })}
+                </label>
+                <input
+                  type="text"
+                  value={bingersMagicLink}
+                  onChange={(e) => setBingersMagicLink(e.target.value)}
+                  placeholder={t("bingers.magicLinkPlaceholder", {
+                    defaultValue: "https://bingers.app/m?token=…",
+                  })}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleLinkBingers}
+                disabled={bingersSaving || !bingersMagicLink.trim()}
+                className="w-full rounded-lg border border-emerald-300 bg-background px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950"
+              >
+                {bingersSaving
+                  ? t("common.loading", { defaultValue: "Loading..." })
+                  : t("bingers.completeLink", {
+                      defaultValue: "Complete link",
+                    })}
+              </button>
+            </div>
+          </div>
+        )}
+      </CollapsibleSettingsCard>
+
       <Dialog
         open={showTraktUnlinkModal}
         onOpenChange={setShowTraktUnlinkModal}
@@ -1127,6 +1415,44 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
               {simklSaving
                 ? t("common.loading", { defaultValue: "Loading..." })
                 : t("simkl.confirm", { defaultValue: "Confirm" })}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showBingersUnlinkModal}
+        onOpenChange={setShowBingersUnlinkModal}
+      >
+        <DialogContent className="max-w-md">
+          <DialogTitle>
+            {t("bingers.unlinkTitle", {
+              defaultValue: "Unlink Bingers Account",
+            })}
+          </DialogTitle>
+          <DialogDescription>
+            {t("bingers.unlinkMessage", {
+              defaultValue:
+                "Are you sure you want to unlink your Bingers account? This will stop syncing to Bingers.",
+            })}
+          </DialogDescription>
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setShowBingersUnlinkModal(false)}
+              className="rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
+              {t("bingers.cancel", { defaultValue: "Cancel" })}
+            </button>
+            <button
+              type="button"
+              onClick={confirmUnlinkBingers}
+              disabled={bingersSaving}
+              className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {bingersSaving
+                ? t("common.loading", { defaultValue: "Loading..." })
+                : t("bingers.confirm", { defaultValue: "Confirm" })}
             </button>
           </div>
         </DialogContent>

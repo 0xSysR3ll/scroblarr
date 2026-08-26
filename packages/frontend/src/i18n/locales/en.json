@@ -72,7 +72,7 @@
     "refresh": "Refresh",
     "empty": {
       "title": "No sync data yet",
-      "description": "Watch something on Plex or Jellyfin and it will appear here. Make sure webhooks are configured and your Trakt or Simkl account is linked in your profile.",
+      "description": "Watch something on Plex or Jellyfin and it will appear here. Make sure webhooks are configured and your Trakt, Simkl, or Bingers account is linked in your profile.",
       "checkProfile": "Check profile & links",
       "topThisMonth": "No syncs this month yet",
       "recentSyncs": "No recent syncs to show"
@@ -217,7 +217,7 @@
       "issues": "Issues & feedback",
       "releases": "All releases",
       "license": "License (MIT)",
-      "trademarkDisclaimer": "Plex, Jellyfin, Trakt, Simkl, and related marks are trademarks of their respective owners. Scroblarr is an independent project and is not sponsored, endorsed, or affiliated with those services.",
+      "trademarkDisclaimer": "Plex, Jellyfin, Trakt, Simkl, Bingers, and related marks are trademarks of their respective owners. Scroblarr is an independent project and is not sponsored, endorsed, or affiliated with those services.",
       "tmdbAttribution": "This product uses the TMDB API but is not endorsed or certified by TMDB."
     },
     "general": {
@@ -617,5 +617,28 @@
         "": ""
       }
     }
+  },
+  "bingers": {
+    "openSignInFailed": "Failed to open sign-in window. Please allow popups and try again.",
+    "magicLinkRequired": "Paste the magic-link URL from your email.",
+    "linked": "Bingers account linked successfully",
+    "linkFailed": "Failed to link Bingers account",
+    "unlinked": "Bingers account unlinked successfully",
+    "unlinkFailed": "Failed to unlink Bingers account",
+    "description": "Sync your watched movies and episodes to Bingers. Uses magic-link email sign-in for secure authentication.",
+    "profile": {
+      "username": "Username"
+    },
+    "unlink": "Unlink",
+    "docsHint": "Open Bingers sign-in to email yourself a magic link, then paste that link below.",
+    "needsReauthorization": "Bingers authorization expired or was revoked. Link your account again to reconnect.",
+    "openSignIn": "Open Bingers sign-in",
+    "magicLink": "Magic-link from email",
+    "magicLinkPlaceholder": "https://bingers.app/m?token=…",
+    "completeLink": "Complete link",
+    "unlinkTitle": "Unlink Bingers Account",
+    "unlinkMessage": "Are you sure you want to unlink your Bingers account? This will stop syncing to Bingers.",
+    "cancel": "Cancel",
+    "confirm": "Confirm"
   }
 }
