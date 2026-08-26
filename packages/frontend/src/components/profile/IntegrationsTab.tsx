@@ -636,6 +636,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
       );
     } finally {
       setBingersSaving(false);
+      setBingersLoading(false);
     }
   }
 
@@ -672,6 +673,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
       );
     } finally {
       setBingersSaving(false);
+      setBingersLoading(false);
     }
   }
 

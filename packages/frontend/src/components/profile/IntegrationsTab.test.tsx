@@ -1937,6 +1937,73 @@ describe("IntegrationsTab Bingers integration", () => {
     ).toBeVisible();
   });
 
+  it("clears Bingers loading after link even if the initial status fetch is still in flight", async () => {
+    const user = userEvent.setup();
+    let resolveInitial: (value: {
+      linked: boolean;
+      needsReauthorization: boolean;
+      username: string | null;
+      image: string | null;
+    }) => void = () => undefined;
+
+    vi.mocked(getBingersStatus)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveInitial = resolve;
+          })
+      )
+      .mockResolvedValueOnce({
+        linked: true,
+        needsReauthorization: false,
+        username: "bingers-user",
+        image: null,
+      });
+    vi.mocked(linkBingers).mockResolvedValue({ success: true });
+
+    renderWithProviders(<IntegrationsTab />);
+    await expandBingersSection(user);
+    await user.type(
+      screen.getByPlaceholderText("https://bingers.app/m?token=…"),
+      "https://bingers.app/m?token=magic"
+    );
+    await user.click(screen.getByRole("button", { name: "Complete link" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("bingers-user")).toBeVisible();
+    });
+
+    await act(async () => {
+      resolveInitial({
+        linked: false,
+        needsReauthorization: false,
+        username: null,
+        image: null,
+      });
+    });
+
+    // Stale initial response must not overwrite the linked status, and
+    // Open sign-in must not stay disabled via a stuck bingersLoading flag.
+    expect(screen.getByText("bingers-user")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Unlink" }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    vi.mocked(getBingersStatus).mockResolvedValue({
+      linked: false,
+      needsReauthorization: false,
+      username: null,
+      image: null,
+    });
+    vi.mocked(unlinkBingers).mockResolvedValue({ success: true });
+    await user.click(screen.getByRole("button", { name: "Unlink" }));
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Open Bingers sign-in" })
+      ).toBeEnabled();
+    });
+  });
+
   it("ignores a late Bingers status response after unmount", async () => {
     let resolveStatus: (value: {
       linked: boolean;
