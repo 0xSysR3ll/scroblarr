@@ -611,13 +611,6 @@
     "cancel": "Cancel",
     "confirm": "Confirm"
   },
-  "": {
-    "": {
-      "": {
-        "": ""
-      }
-    }
-  },
   "bingers": {
     "openSignInFailed": "Failed to open sign-in window. Please allow popups and try again.",
     "magicLinkRequired": "Paste the magic-link URL from your email.",
