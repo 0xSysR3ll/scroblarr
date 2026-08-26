@@ -1,5 +1,6 @@
 import {
   getCurrentUser,
+  invalidateBingersCache,
   invalidateSimklCache,
   invalidateTraktCache,
 } from "@services/api";
@@ -11,6 +12,7 @@ import { AuthProvider, useAuth, type AuthUser } from "./AuthContext";
 
 vi.mock("@services/api", () => ({
   getCurrentUser: vi.fn(),
+  invalidateBingersCache: vi.fn(),
   invalidateSimklCache: vi.fn(),
   invalidateTraktCache: vi.fn(),
 }));
@@ -106,5 +108,6 @@ describe("AuthContext", () => {
     });
     expect(invalidateSimklCache).toHaveBeenCalled();
     expect(invalidateTraktCache).toHaveBeenCalled();
+    expect(invalidateBingersCache).toHaveBeenCalled();
   });
 });

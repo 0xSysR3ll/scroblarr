@@ -1,5 +1,6 @@
 import {
   getCurrentUser,
+  invalidateBingersCache,
   invalidateSimklCache,
   invalidateTraktCache,
 } from "@services/api";
@@ -40,6 +41,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 function invalidateIntegrationCaches() {
   invalidateSimklCache();
   invalidateTraktCache();
+  invalidateBingersCache();
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
