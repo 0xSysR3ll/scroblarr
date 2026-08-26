@@ -702,7 +702,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
 
       {/* Trakt Integration */}
       <CollapsibleSettingsCard
-        key={traktStatus?.needsReauthorization ? "reauth" : "default"}
+        key={traktStatus?.needsReauthorization ? "trakt-reauth" : "trakt"}
         title="Trakt"
         description={t("trakt.description", {
           defaultValue:
@@ -1190,7 +1190,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
 
       {/* Bingers Integration */}
       <CollapsibleSettingsCard
-        key={bingersStatus?.needsReauthorization ? "reauth" : "default"}
+        key={bingersStatus?.needsReauthorization ? "bingers-reauth" : "bingers"}
         title="Bingers"
         description={t("bingers.description", {
           defaultValue:

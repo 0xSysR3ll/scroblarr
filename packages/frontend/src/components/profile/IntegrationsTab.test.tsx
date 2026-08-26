@@ -1,4 +1,5 @@
 import {
+  getBingersStatus,
   getSimklAuthorizeUrl,
   getSimklStatus,
   getTraktAuthorizeUrl,
@@ -50,6 +51,10 @@ vi.mock("@services/api", () => ({
   getSimklAuthorizeUrl: vi.fn(),
   linkSimkl: vi.fn(),
   unlinkSimkl: vi.fn(),
+  getBingersStatus: vi.fn(),
+  linkBingers: vi.fn(),
+  unlinkBingers: vi.fn(),
+  BINGERS_MOBILE_SIGNIN_URL: "https://bingers.app/mobile-signin",
 }));
 
 async function getTraktSection(): Promise<HTMLElement> {
@@ -146,6 +151,12 @@ describe("IntegrationsTab", () => {
       username: null,
       image: null,
       hasCredentials: false,
+    });
+    vi.mocked(getBingersStatus).mockResolvedValue({
+      linked: false,
+      needsReauthorization: false,
+      username: null,
+      image: null,
     });
   });
 
@@ -478,6 +489,12 @@ describe("IntegrationsTab Trakt integration", () => {
       username: null,
       image: null,
       hasCredentials: false,
+    });
+    vi.mocked(getBingersStatus).mockResolvedValue({
+      linked: false,
+      needsReauthorization: false,
+      username: null,
+      image: null,
     });
     oauthPopupMocks.preparePopup.mockReturnValue({ closed: false });
     oauthPopupMocks.navigateToUrl.mockReset();
@@ -1106,6 +1123,12 @@ describe("IntegrationsTab Simkl integration", () => {
       username: null,
       image: null,
       hasCredentials: false,
+    });
+    vi.mocked(getBingersStatus).mockResolvedValue({
+      linked: false,
+      needsReauthorization: false,
+      username: null,
+      image: null,
     });
     oauthPopupMocks.preparePopup.mockReturnValue({ closed: false });
     onProfileUpdated.mockReset();

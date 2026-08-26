@@ -740,7 +740,7 @@ describe("DashboardPage", () => {
 
     expect(
       await screen.findByText(
-        /make sure webhooks are configured and your trakt or simkl account is linked/i
+        /make sure webhooks are configured and your trakt, simkl, or bingers account is linked/i
       )
     ).toBeInTheDocument();
     expect(screen.queryByText("By Destination")).not.toBeInTheDocument();
