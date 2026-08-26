@@ -144,9 +144,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
       } catch {
         // Error handled by UI state
       } finally {
-        if (requestId === bingersStatusRequestIdRef.current) {
-          setBingersLoading(false);
-        }
+        setBingersLoading(false);
       }
     }
 
@@ -636,7 +634,6 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
       );
     } finally {
       setBingersSaving(false);
-      setBingersLoading(false);
     }
   }
 
@@ -673,7 +670,6 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
       );
     } finally {
       setBingersSaving(false);
-      setBingersLoading(false);
     }
   }
 

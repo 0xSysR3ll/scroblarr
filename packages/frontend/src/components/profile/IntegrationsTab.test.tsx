@@ -1982,8 +1982,8 @@ describe("IntegrationsTab Bingers integration", () => {
       });
     });
 
-    // Stale initial response must not overwrite the linked status, and
-    // Open sign-in must not stay disabled via a stuck bingersLoading flag.
+    // Stale initial response must not overwrite the linked status.
+    // Loading is cleared by the initial effect's finally (not link/unlink).
     expect(screen.getByText("bingers-user")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Unlink" }));
     await user.click(screen.getByRole("button", { name: "Cancel" }));
