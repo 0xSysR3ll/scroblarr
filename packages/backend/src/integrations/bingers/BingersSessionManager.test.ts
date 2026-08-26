@@ -167,4 +167,126 @@ describe("BingersSessionManager", () => {
       image: null,
     });
   });
+
+  it("returns linked status after a successful validateAndRefresh", async () => {
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar: serializeCookieJar({
+        session_token: { name: "session_token", value: "old" },
+      }),
+      bingersEmail: "user@example.com",
+    });
+    authMocks.getSession.mockResolvedValue({
+      session: { id: "s1" },
+      user: {
+        id: "b1",
+        email: "user@example.com",
+        username: "handle",
+        image: "https://img.example/avatar.png",
+      },
+      expiresAt: 1_800_000_000_000,
+      cookieJar: {
+        session_token: { name: "session_token", value: "new" },
+      },
+    });
+
+    const manager = new BingersSessionManager(
+      userRepositoryMocks as never,
+      authMocks as unknown as BingersAuth
+    );
+
+    await expect(manager.validateAndRefresh("user-id")).resolves.toEqual({
+      linked: true,
+      needsReauthorization: false,
+      username: "handle",
+      image: "https://img.example/avatar.png",
+    });
+  });
+
+  it("clears the jar on auth errors from getValidCookieJar", async () => {
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar: serializeCookieJar({
+        session_token: { name: "session_token", value: "old" },
+      }),
+      bingersEmail: "user@example.com",
+      bingersUsername: "User",
+      bingersUserId: "b1",
+      bingersThumb: null,
+    });
+    authMocks.getSession.mockRejectedValue(
+      new BingersApiError("dead", 401, { isAuthError: true })
+    );
+
+    const manager = new BingersSessionManager(
+      userRepositoryMocks as never,
+      authMocks as unknown as BingersAuth
+    );
+
+    await expect(manager.getValidCookieJar("user-id")).rejects.toBeInstanceOf(
+      BingersApiError
+    );
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith(
+      "user-id",
+      expect.objectContaining({
+        bingersCookieJar: null,
+        bingersEmail: "user@example.com",
+      })
+    );
+  });
+
+  it("throws when getValidCookieJar has no stored jar", async () => {
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar: null,
+    });
+
+    const manager = new BingersSessionManager(
+      userRepositoryMocks as never,
+      authMocks as unknown as BingersAuth
+    );
+
+    await expect(manager.getValidCookieJar("user-id")).rejects.toMatchObject({
+      isAuthError: true,
+    });
+  });
+
+  it("clears all Bingers fields on clearAll", async () => {
+    const manager = new BingersSessionManager(
+      userRepositoryMocks as never,
+      authMocks as unknown as BingersAuth
+    );
+
+    await manager.clearAll("user-id");
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith(
+      "user-id",
+      expect.objectContaining({
+        bingersCookieJar: null,
+        bingersEmail: null,
+        bingersUserId: null,
+        bingersUsername: null,
+        bingersThumb: null,
+      })
+    );
+  });
+
+  it("rethrows non-auth validateAndRefresh failures", async () => {
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar: serializeCookieJar({
+        session_token: { name: "session_token", value: "old" },
+      }),
+    });
+    authMocks.getSession.mockRejectedValue(new Error("network down"));
+
+    const manager = new BingersSessionManager(
+      userRepositoryMocks as never,
+      authMocks as unknown as BingersAuth
+    );
+
+    await expect(manager.validateAndRefresh("user-id")).rejects.toThrow(
+      "network down"
+    );
+    expect(userRepositoryMocks.update).not.toHaveBeenCalled();
+  });
 });

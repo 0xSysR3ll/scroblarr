@@ -119,4 +119,30 @@ describe("TokenRefreshService", () => {
       "Completed scheduled token refresh"
     );
   });
+
+  it("counts expired and failed Bingers refreshes separately", async () => {
+    const { BingersApiError } =
+      await import("@integrations/bingers/BingersApiError");
+    userRepositoryMocks.findAll.mockResolvedValue([
+      { id: "expired-user", bingersCookieJar: "jar-1" },
+      { id: "failed-user", bingersCookieJar: "jar-2" },
+    ]);
+    bingersSessionManagerMocks.getValidCookieJar
+      .mockRejectedValueOnce(
+        new BingersApiError("dead", 401, { isAuthError: true })
+      )
+      .mockRejectedValueOnce(new Error("network down"));
+
+    const service = new TokenRefreshService();
+    await service.refreshAllTokens();
+
+    expect(loggerMocks.systemInfo).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        bingersSuccess: 0,
+        bingersExpired: 1,
+        bingersFailed: 1,
+      }),
+      "Completed scheduled token refresh"
+    );
+  });
 });

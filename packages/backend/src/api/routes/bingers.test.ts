@@ -134,4 +134,52 @@ describe("bingers routes", () => {
     expect(response.body).not.toHaveProperty("bingersCookieJar");
     expect(response.body).not.toHaveProperty("cookieJar");
   });
+
+  it("returns validation errors for invalid link payloads", async () => {
+    const response = await request(app)
+      .post("/bingers/link")
+      .send({ token: "" })
+      .expect(400);
+
+    expect(response.body.error).toBe("Validation error");
+    expect(bingersAuthMocks.verifyMagicLink).not.toHaveBeenCalled();
+  });
+
+  it("maps BingersApiError from link to the response status", async () => {
+    const { BingersApiError } =
+      await import("@integrations/bingers/BingersApiError");
+    bingersAuthMocks.verifyMagicLink.mockRejectedValue(
+      new BingersApiError("Magic link expired", 400, {
+        code: "magic_link_expired",
+      })
+    );
+
+    const response = await request(app)
+      .post("/bingers/link")
+      .send({ token: "dead-token" })
+      .expect(400);
+
+    expect(response.body).toEqual({
+      error: "Magic link expired",
+      code: "magic_link_expired",
+    });
+  });
+
+  it("returns 500 when unlink fails unexpectedly", async () => {
+    sessionManagerMocks.clearAll.mockRejectedValue(new Error("db down"));
+
+    const response = await request(app).post("/bingers/unlink").expect(500);
+
+    expect(response.body).toEqual({ error: "db down" });
+  });
+
+  it("returns 500 when status validation fails unexpectedly", async () => {
+    sessionManagerMocks.validateAndRefresh.mockRejectedValue(
+      new Error("session service down")
+    );
+
+    const response = await request(app).get("/bingers/status").expect(500);
+
+    expect(response.body).toEqual({ error: "session service down" });
+  });
 });

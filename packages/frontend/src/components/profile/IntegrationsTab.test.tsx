@@ -4,8 +4,10 @@ import {
   getSimklStatus,
   getTraktAuthorizeUrl,
   getTraktStatus,
+  linkBingers,
   linkSimkl,
   linkTrakt,
+  unlinkBingers,
   unlinkSimkl,
   unlinkTrakt,
 } from "@services/api";
@@ -93,6 +95,19 @@ async function expandSimklSection(
   user: ReturnType<typeof userEvent.setup>
 ): Promise<HTMLElement> {
   return expandSection(user, await getSimklSection(), /Simkl/i);
+}
+
+async function getBingersSection(): Promise<HTMLElement> {
+  const heading = await screen.findByRole("heading", { name: /Bingers/i });
+  const section = heading.closest(".rounded-lg.border");
+  expect(section).not.toBeNull();
+  return section as HTMLElement;
+}
+
+async function expandBingersSection(
+  user: ReturnType<typeof userEvent.setup>
+): Promise<HTMLElement> {
+  return expandSection(user, await getBingersSection(), /Bingers/i);
 }
 
 async function clickSimklAuthorize(
@@ -1761,5 +1776,147 @@ describe("IntegrationsTab Simkl integration", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("IntegrationsTab Bingers integration", () => {
+  const onProfileUpdated = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getTraktStatus).mockResolvedValue({
+      linked: false,
+      username: null,
+      image: null,
+      hasCredentials: false,
+    });
+    vi.mocked(getSimklStatus).mockResolvedValue({
+      linked: false,
+      username: null,
+      image: null,
+      hasCredentials: false,
+    });
+    vi.mocked(getBingersStatus).mockResolvedValue({
+      linked: false,
+      needsReauthorization: false,
+      username: null,
+      image: null,
+    });
+    oauthPopupMocks.preparePopup.mockReturnValue({ closed: false });
+    onProfileUpdated.mockReset();
+  });
+
+  it("links a Bingers account from a pasted magic link", async () => {
+    const user = userEvent.setup();
+    vi.mocked(linkBingers).mockResolvedValue({ success: true });
+    vi.mocked(getBingersStatus)
+      .mockResolvedValueOnce({
+        linked: false,
+        needsReauthorization: false,
+        username: null,
+        image: null,
+      })
+      .mockResolvedValueOnce({
+        linked: true,
+        needsReauthorization: false,
+        username: "bingers-user",
+        image: "https://img.example/bingers.png",
+      });
+
+    renderWithProviders(
+      <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+    );
+
+    await expandBingersSection(user);
+    await user.type(
+      screen.getByPlaceholderText("https://bingers.app/m?token=…"),
+      "https://bingers.app/m?token=magic"
+    );
+    await user.click(screen.getByRole("button", { name: "Complete link" }));
+
+    await waitFor(() => {
+      expect(linkBingers).toHaveBeenCalledWith(
+        "https://bingers.app/m?token=magic"
+      );
+      expect(showSuccess).toHaveBeenCalledWith(
+        "Bingers account linked successfully"
+      );
+      expect(onProfileUpdated).toHaveBeenCalled();
+    });
+    expect(await screen.findByText("bingers-user")).toBeVisible();
+  });
+
+  it("unlinks a linked Bingers account", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getBingersStatus)
+      .mockResolvedValueOnce({
+        linked: true,
+        needsReauthorization: false,
+        username: "bingers-user",
+        image: null,
+      })
+      .mockResolvedValueOnce({
+        linked: false,
+        needsReauthorization: false,
+        username: null,
+        image: null,
+      });
+    vi.mocked(unlinkBingers).mockResolvedValue({ success: true });
+
+    renderWithProviders(
+      <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+    );
+
+    await expandBingersSection(user);
+    await user.click(screen.getByRole("button", { name: "Unlink" }));
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+
+    await waitFor(() => {
+      expect(unlinkBingers).toHaveBeenCalled();
+      expect(showSuccess).toHaveBeenCalledWith(
+        "Bingers account unlinked successfully"
+      );
+    });
+  });
+
+  it("opens Bingers when re-authorization is required", async () => {
+    vi.mocked(getBingersStatus).mockResolvedValue({
+      linked: false,
+      needsReauthorization: true,
+      username: "bingers-user",
+      image: null,
+    });
+
+    renderWithProviders(<IntegrationsTab />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(
+      within(await getBingersSection()).getByRole("button", {
+        expanded: true,
+      })
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        "Bingers authorization expired or was revoked. Link your account again to reconnect."
+      )
+    ).toBeVisible();
+  });
+
+  it("shows link errors from the API", async () => {
+    const user = userEvent.setup();
+    vi.mocked(linkBingers).mockRejectedValue(new Error("Magic link expired"));
+
+    renderWithProviders(<IntegrationsTab />);
+    await expandBingersSection(user);
+    await user.type(
+      screen.getByPlaceholderText("https://bingers.app/m?token=…"),
+      "https://bingers.app/m?token=dead"
+    );
+    await user.click(screen.getByRole("button", { name: "Complete link" }));
+
+    expect(await screen.findByText("Magic link expired")).toBeVisible();
   });
 });

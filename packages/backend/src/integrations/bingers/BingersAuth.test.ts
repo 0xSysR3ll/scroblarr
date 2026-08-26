@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { BingersApiError, bingersErrorFromResponse } from "./BingersApiError";
+import { BingersApiError, bingersErrorFromResponse , isBingersAuthError, isBingersRateLimitError } from "./BingersApiError";
 import { BingersAuth, extractMagicLinkToken } from "./BingersAuth";
 import {
   cookieHeaderFromJar,
   collectSetCookieHeaders,
+  emptyCookieJar,
   mergeSetCookieHeaders,
   parseCookieJar,
   serializeCookieJar,
@@ -16,6 +17,21 @@ describe("cookieJar", () => {
       session_token: { name: "session_token", value: "abc", expires: 123 },
     };
     expect(parseCookieJar(serializeCookieJar(jar))).toEqual(jar);
+  });
+
+  it("returns an empty jar for blank or invalid JSON", () => {
+    expect(parseCookieJar("")).toEqual({});
+    expect(parseCookieJar("not-json")).toEqual({});
+    expect(parseCookieJar("[]")).toEqual({});
+  });
+
+  it("omits expired cookies from the Cookie header", () => {
+    expect(
+      cookieHeaderFromJar({
+        live: { name: "live", value: "1", expires: Date.now() + 60_000 },
+        dead: { name: "dead", value: "2", expires: Date.now() - 1 },
+      })
+    ).toBe("live=1");
   });
 
   it("merges Set-Cookie headers into the jar", () => {
@@ -53,6 +69,21 @@ describe("cookieJar", () => {
     const jar = mergeSetCookieHeaders({}, headers);
     expect(jar.session_token?.value).toBe("abc");
     expect(jar.other?.value).toBe("xyz");
+  });
+
+  it("returns an empty jar helper", () => {
+    expect(emptyCookieJar()).toEqual({});
+  });
+});
+
+describe("BingersApiError helpers", () => {
+  it("detects auth and rate-limit errors", () => {
+    const auth = new BingersApiError("dead", 401, { isAuthError: true });
+    const rate = new BingersApiError("slow", 429, { isRateLimited: true });
+    expect(isBingersAuthError(auth)).toBe(true);
+    expect(isBingersAuthError(rate)).toBe(false);
+    expect(isBingersRateLimitError(rate)).toBe(true);
+    expect(isBingersRateLimitError(new Error("nope"))).toBe(false);
   });
 });
 
@@ -95,6 +126,24 @@ describe("bingersErrorFromResponse", () => {
     expect(error.isRateLimited).toBe(true);
     expect(error.retryAfterSeconds).toBe(157);
     expect(error.code).toBe("magic_link_recently_sent");
+  });
+
+  it("marks 401 responses as auth errors and falls back to body text", () => {
+    const error = bingersErrorFromResponse(401, "unauthorized");
+    expect(error.isAuthError).toBe(true);
+    expect(error.message).toBe("unauthorized");
+  });
+
+  it("uses a default message when the body is empty", () => {
+    const error = bingersErrorFromResponse(500, "   ");
+    expect(error.message).toBe("Bingers API error: 500");
+    expect(error.isRateLimited).toBe(false);
+  });
+
+  it("treats 429 as rate limited", () => {
+    const error = bingersErrorFromResponse(429, '{"message":"slow down"}');
+    expect(error.isRateLimited).toBe(true);
+    expect(error.message).toBe("slow down");
   });
 });
 
@@ -169,5 +218,124 @@ describe("BingersAuth", () => {
       "https://api.bingers.app/me",
       expect.objectContaining({ method: "GET" })
     );
+  });
+
+  it("follows a redirect after magic-link verify when cookies are present", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 302,
+        headers: {
+          get: () => null,
+          getSetCookie: () => ["session_token=sess; Path=/"],
+        },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          session: { id: "s1", expiresAt: 1_800_000_000 },
+          user: { id: "u1", email: "user@example.com" },
+        }),
+        headers: { get: () => null, getSetCookie: () => [] },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ user: { id: "u1" }, profile: {} }),
+        headers: { get: () => null, getSetCookie: () => [] },
+      });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const session = await new BingersAuth().verifyMagicLink("magic-token");
+    expect(session.cookieJar.session_token?.value).toBe("sess");
+    expect(session.expiresAt).toBe(1_800_000_000_000);
+  });
+
+  it("throws when magic-link verify returns no cookies", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => null, getSetCookie: () => [] },
+    }) as unknown as typeof fetch;
+
+    await expect(new BingersAuth().verifyMagicLink("token")).rejects.toThrow(
+      /did not return session cookies/i
+    );
+  });
+
+  it("throws auth errors from get-session and keeps non-auth me failures best-effort", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          session: { id: "s1" },
+          user: { id: "u1", email: "user@example.com", name: "User" },
+        }),
+        headers: { get: () => null, getSetCookie: () => [] },
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        text: async () => "me down",
+        headers: { get: () => null, getSetCookie: () => [] },
+      });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const session = await new BingersAuth().getSession({
+      session_token: { name: "session_token", value: "sess" },
+    });
+    expect(session.user?.email).toBe("user@example.com");
+    expect(session.user?.name).toBe("User");
+  });
+
+  it("rejects empty cookie jars as auth errors", async () => {
+    await expect(new BingersAuth().getSession({})).rejects.toMatchObject({
+      isAuthError: true,
+      status: 401,
+    });
+  });
+
+  it("maps get-session 403 responses to auth errors", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      headers: { get: () => null, getSetCookie: () => [] },
+    }) as unknown as typeof fetch;
+
+    await expect(
+      new BingersAuth().getSession({
+        session_token: { name: "session_token", value: "sess" },
+      })
+    ).rejects.toMatchObject({ isAuthError: true, status: 403 });
+  });
+
+  it("rethrows auth errors from getMe during enrichment", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          session: { id: "s1" },
+          user: { id: "u1" },
+        }),
+        headers: { get: () => null, getSetCookie: () => [] },
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        headers: { get: () => null, getSetCookie: () => [] },
+      });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(
+      new BingersAuth().getSession({
+        session_token: { name: "session_token", value: "sess" },
+      })
+    ).rejects.toMatchObject({ isAuthError: true, status: 401 });
   });
 });
