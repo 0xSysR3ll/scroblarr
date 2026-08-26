@@ -10,7 +10,7 @@ describe("BingersCatalogResolver", () => {
   });
 
   it("resolves a movie via search + metadata external IDs", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
       const url = String(input);
       if (url.includes("/search/titles")) {
         return new Response(
@@ -63,7 +63,7 @@ describe("BingersCatalogResolver", () => {
   });
 
   it("resolves an episode via versions + season grain", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
       const url = String(input);
       if (url.includes("/search/titles")) {
         return new Response(
@@ -134,7 +134,7 @@ describe("BingersCatalogResolver", () => {
   });
 
   it("throws when no external IDs or title+year match (no blind first-hit fallback)", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
       const url = String(input);
       if (url.includes("/search/titles")) {
         return new Response(
@@ -179,7 +179,7 @@ describe("BingersCatalogResolver", () => {
   });
 
   it("falls back to title+year when external IDs do not match", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
       const url = String(input);
       if (url.includes("/search/titles")) {
         return new Response(
@@ -228,7 +228,7 @@ describe("BingersCatalogResolver", () => {
   });
 
   it("throws when episode season is missing from versions", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
       const url = String(input);
       if (url.includes("/search/titles")) {
         return new Response(

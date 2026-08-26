@@ -54,9 +54,11 @@ describe("BingersClient", () => {
       })
     );
 
-    const body = JSON.parse(
-      (fetchMock.mock.calls[0][1] as RequestInit).body as string
-    );
+    const [, request] = fetchMock.mock.calls[0] as unknown as [
+      string,
+      { body: string },
+    ];
+    const body = JSON.parse(request.body);
     expect(body.clientBatchId).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     );
@@ -86,9 +88,11 @@ describe("BingersClient", () => {
       markMoviesAsRewatched: true,
     });
 
-    const body = JSON.parse(
-      (fetchMock.mock.calls[0][1] as RequestInit).body as string
-    );
+    const [, request] = fetchMock.mock.calls[0] as unknown as [
+      string,
+      { body: string },
+    ];
+    const body = JSON.parse(request.body);
     expect(body.ops[0].fields.plays).toBe(4);
   });
 
