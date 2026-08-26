@@ -220,6 +220,97 @@ export class SyncHistoryRepository {
     return false;
   }
 
+  async countSuccessfulDestinationSyncs(
+    userId: string,
+    destination: string,
+    mediaType: "episode" | "movie",
+    identifiers: {
+      tvdbEpisodeId?: string;
+      tvdbMovieId?: string;
+      imdbMovieId?: string;
+      imdbEpisodeId?: string;
+      tmdbMovieId?: string;
+      tmdbSeriesId?: string;
+      seasonNumber?: number;
+      episodeNumber?: number;
+    }
+  ): Promise<number> {
+    const destinationPat = `%"${destination}"%`;
+
+    const base = () =>
+      this.repository
+        .createQueryBuilder("sync_history")
+        .where("sync_history.userId = :userId", { userId })
+        .andWhere("sync_history.mediaType = :mediaType", { mediaType })
+        .andWhere("sync_history.success = :success", { success: true })
+        .andWhere("sync_history.destinations LIKE :destinationPat", {
+          destinationPat,
+        });
+
+    if (mediaType === "episode") {
+      if (identifiers.tvdbEpisodeId) {
+        const n = await base()
+          .andWhere("sync_history.tvdbEpisodeId = :tvdbEpisodeId", {
+            tvdbEpisodeId: identifiers.tvdbEpisodeId,
+          })
+          .getCount();
+        if (n > 0) return n;
+      }
+      if (identifiers.imdbEpisodeId) {
+        const n = await base()
+          .andWhere("sync_history.imdbEpisodeId = :imdbEpisodeId", {
+            imdbEpisodeId: identifiers.imdbEpisodeId,
+          })
+          .getCount();
+        if (n > 0) return n;
+      }
+      if (
+        identifiers.tmdbSeriesId &&
+        identifiers.seasonNumber !== undefined &&
+        identifiers.episodeNumber !== undefined
+      ) {
+        return base()
+          .andWhere("sync_history.tmdbSeriesId = :tmdbSeriesId", {
+            tmdbSeriesId: identifiers.tmdbSeriesId,
+          })
+          .andWhere("sync_history.seasonNumber = :seasonNumber", {
+            seasonNumber: identifiers.seasonNumber,
+          })
+          .andWhere("sync_history.episodeNumber = :episodeNumber", {
+            episodeNumber: identifiers.episodeNumber,
+          })
+          .getCount();
+      }
+      return 0;
+    }
+
+    if (identifiers.tvdbMovieId) {
+      const n = await base()
+        .andWhere("sync_history.tvdbMovieId = :tvdbMovieId", {
+          tvdbMovieId: identifiers.tvdbMovieId,
+        })
+        .getCount();
+      if (n > 0) return n;
+    }
+    if (identifiers.imdbMovieId) {
+      const n = await base()
+        .andWhere("sync_history.imdbMovieId = :imdbMovieId", {
+          imdbMovieId: identifiers.imdbMovieId,
+        })
+        .getCount();
+      if (n > 0) return n;
+    }
+    if (identifiers.tmdbMovieId) {
+      return base()
+        .andWhere("sync_history.tmdbMovieId = :tmdbMovieId", {
+          tmdbMovieId: identifiers.tmdbMovieId,
+        })
+        .getCount();
+    }
+
+    return 0;
+  }
+
   async getStatisticsByUser(userId: string): Promise<{
     total: number;
     successful: number;
@@ -238,6 +329,7 @@ export class SyncHistoryRepository {
       trakt: number;
       tvtime: number;
       simkl: number;
+      bingers: number;
     };
     byPeriod: {
       today: number;
@@ -302,6 +394,7 @@ export class SyncHistoryRepository {
       traktCount,
       tvtimeCount,
       simklCount,
+      bingersCount,
       today,
       thisWeek,
       thisMonth,
@@ -357,6 +450,13 @@ export class SyncHistoryRepository {
         .where("sync_history.userId = :userId", { userId })
         .andWhere("sync_history.destinations LIKE :simklPat", {
           simklPat: '%"Simkl"%',
+        })
+        .getCount(),
+      this.repository
+        .createQueryBuilder("sync_history")
+        .where("sync_history.userId = :userId", { userId })
+        .andWhere("sync_history.destinations LIKE :bingersPat", {
+          bingersPat: '%"Bingers"%',
         })
         .getCount(),
       this.repository
@@ -496,6 +596,7 @@ export class SyncHistoryRepository {
         trakt: traktCount,
         tvtime: tvtimeCount,
         simkl: simklCount,
+        bingers: bingersCount,
       },
       byPeriod: {
         today,

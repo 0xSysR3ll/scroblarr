@@ -170,6 +170,7 @@ export interface SyncStatistics {
     trakt: number;
     tvtime: number;
     simkl: number;
+    bingers: number;
   };
   byPeriod: {
     today: number;

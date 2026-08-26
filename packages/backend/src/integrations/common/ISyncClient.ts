@@ -3,6 +3,7 @@ import { MediaEvent } from "@scroblarr/shared";
 export interface SyncOptions {
   markMoviesAsRewatched?: boolean;
   markEpisodesAsRewatched?: boolean;
+  plays?: number;
 }
 
 export interface SyncResult {

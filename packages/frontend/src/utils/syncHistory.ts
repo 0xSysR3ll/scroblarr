@@ -136,7 +136,10 @@ export function getDestinationResults(
 
 export function shouldShowRewatchedBadge(item: SyncHistoryItem): boolean {
   return Boolean(
-    item.success && item.wasRewatched && item.destinations?.includes("TVTime")
+    item.success &&
+    item.wasRewatched &&
+    (item.destinations?.includes("TVTime") ||
+      item.destinations?.includes("Bingers"))
   );
 }
 

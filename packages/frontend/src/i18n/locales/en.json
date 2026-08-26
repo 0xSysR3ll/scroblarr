@@ -544,7 +544,8 @@
     "retrySelectedFailed": "Retry Failed",
     "destinations": {
       "trakt": "Trakt",
-      "simkl": "Simkl"
+      "simkl": "Simkl",
+      "bingers": "Bingers"
     }
   },
   "errors": {

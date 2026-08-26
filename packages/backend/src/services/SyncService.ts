@@ -1,5 +1,8 @@
 import { SyncHistory } from "@entities/SyncHistory";
 import { User } from "@entities/User";
+import { BingersClient } from "@integrations/bingers/BingersClient";
+import { BingersSessionManager } from "@integrations/bingers/BingersSessionManager";
+import { cookieHeaderFromJar } from "@integrations/bingers/cookieJar";
 import { ISyncClient, SyncOptions } from "@integrations/common/ISyncClient";
 import { SimklClient } from "@integrations/simkl/SimklClient";
 import { SimklTokenManager } from "@integrations/simkl/SimklTokenManager";
@@ -45,12 +48,14 @@ export class SyncService {
   private settingsRepository: SettingsRepository;
   private traktTokenManager: TraktTokenManager;
   private simklTokenManager: SimklTokenManager;
+  private bingersSessionManager: BingersSessionManager;
   constructor() {
     this.userRepository = new UserRepository();
     this.syncHistoryRepository = new SyncHistoryRepository();
     this.settingsRepository = new SettingsRepository();
     this.traktTokenManager = new TraktTokenManager();
     this.simklTokenManager = new SimklTokenManager();
+    this.bingersSessionManager = new BingersSessionManager();
   }
 
   private async getSyncDestinations(user: User): Promise<SyncDestination[]> {
@@ -93,6 +98,27 @@ export class SyncService {
         logger.sync.warn(
           { error, userId: user.id },
           "Failed to add Simkl sync destination for user"
+        );
+      }
+    }
+
+    if (user.bingersCookieJar) {
+      try {
+        destinations.push({
+          name: "Bingers",
+          client: new BingersClient(),
+          hasToken: (u) => !!u.bingersCookieJar,
+          getAccessToken: async (u) => {
+            const jar = await this.bingersSessionManager.getValidCookieJar(
+              u.id
+            );
+            return cookieHeaderFromJar(jar);
+          },
+        });
+      } catch (error) {
+        logger.sync.warn(
+          { error, userId: user.id },
+          "Failed to add Bingers sync destination for user"
         );
       }
     }
@@ -293,19 +319,21 @@ export class SyncService {
 
     event = await this.enrichMediaIds(event);
 
+    const mediaIdentifiers = {
+      tvdbEpisodeId: event.media.tvdbEpisodeId?.toString(),
+      tvdbMovieId: event.media.tvdbMovieId?.toString(),
+      imdbMovieId: event.media.imdbMovieId,
+      imdbEpisodeId: event.media.imdbEpisodeId,
+      tmdbMovieId: event.media.tmdbMovieId?.toString(),
+      tmdbSeriesId: event.media.tmdbSeriesId?.toString(),
+      seasonNumber: event.media.seasonNumber,
+      episodeNumber: event.media.episodeNumber,
+    };
+
     const hasExistingSync = await this.syncHistoryRepository.hasExistingSync(
       user.id,
       event.media.type,
-      {
-        tvdbEpisodeId: event.media.tvdbEpisodeId?.toString(),
-        tvdbMovieId: event.media.tvdbMovieId?.toString(),
-        imdbMovieId: event.media.imdbMovieId,
-        imdbEpisodeId: event.media.imdbEpisodeId,
-        tmdbMovieId: event.media.tmdbMovieId?.toString(),
-        tmdbSeriesId: event.media.tmdbSeriesId?.toString(),
-        seasonNumber: event.media.seasonNumber,
-        episodeNumber: event.media.episodeNumber,
-      }
+      mediaIdentifiers
     );
 
     const syncResults: Array<{
@@ -313,6 +341,8 @@ export class SyncService {
       success: boolean;
       error?: string;
     }> = [];
+
+    let bingersWasRewatch = false;
 
     for (const destination of availableDestinations) {
       try {
@@ -327,9 +357,32 @@ export class SyncService {
         );
 
         const accessToken = await destination.getAccessToken(user);
-        const options = destination.getSyncOptions
+        let options = destination.getSyncOptions
           ? destination.getSyncOptions(user, hasExistingSync)
           : {};
+
+        if (destination.name === "Bingers") {
+          const priorPlays =
+            await this.syncHistoryRepository.countSuccessfulDestinationSyncs(
+              user.id,
+              "Bingers",
+              event.media.type,
+              mediaIdentifiers
+            );
+          const allowRewatch =
+            event.media.type === "movie"
+              ? !!user.bingersMarkMoviesAsRewatched
+              : !!user.bingersMarkEpisodesAsRewatched;
+          const shouldRewatch = allowRewatch && priorPlays > 0;
+          bingersWasRewatch = shouldRewatch;
+          options = {
+            plays: shouldRewatch ? priorPlays + 1 : Math.max(1, priorPlays),
+            markMoviesAsRewatched:
+              shouldRewatch && event.media.type === "movie",
+            markEpisodesAsRewatched:
+              shouldRewatch && event.media.type === "episode",
+          };
+        }
 
         await this.scrobbleWithOptionalAuthRetry(
           destination,
@@ -392,7 +445,9 @@ export class SyncService {
     const attemptResult = buildAttemptResult(syncResults);
 
     if (saveFailedHistory) {
-      await this.saveSyncHistory(user.id, event, attemptResult);
+      const wasRewatched =
+        bingersWasRewatch && attemptResult.destinations.includes("Bingers");
+      await this.saveSyncHistory(user.id, event, attemptResult, wasRewatched);
     }
 
     return attemptResult;

@@ -1,4 +1,9 @@
-export const SYNC_DESTINATION_NAMES = ["TVTime", "Trakt", "Simkl"] as const;
+export const SYNC_DESTINATION_NAMES = [
+  "TVTime",
+  "Trakt",
+  "Simkl",
+  "Bingers",
+] as const;
 
 export type SyncDestinationName = (typeof SYNC_DESTINATION_NAMES)[number];
 
@@ -25,7 +30,7 @@ export interface SyncDestinationAttempt {
   error?: string;
 }
 
-const DESTINATION_ERROR_PATTERN = /(?:^|;\s*)(TVTime|Trakt|Simkl):\s*/g;
+const DESTINATION_ERROR_PATTERN = /(?:^|;\s*)(TVTime|Trakt|Simkl|Bingers):\s*/g;
 
 export function isSyncDestinationName(
   value: string

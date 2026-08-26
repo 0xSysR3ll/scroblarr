@@ -20,6 +20,11 @@ const linkSchema = z.object({
   token: z.string().min(1),
 });
 
+const settingsSchema = z.object({
+  markMoviesAsRewatched: z.boolean(),
+  markEpisodesAsRewatched: z.boolean(),
+});
+
 router.use(auth);
 
 router.post("/link", async (req: Request, res: Response) => {
@@ -115,12 +120,15 @@ router.get("/status", async (req: Request, res: Response) => {
     }
 
     const status = await sessionManager.validateAndRefresh(user.id);
+    const freshUser = await userRepository.findById(user.id);
 
     return res.json({
       linked: status.linked,
       needsReauthorization: status.needsReauthorization,
       username: status.username,
       image: status.image,
+      markMoviesAsRewatched: !!freshUser?.bingersMarkMoviesAsRewatched,
+      markEpisodesAsRewatched: !!freshUser?.bingersMarkEpisodesAsRewatched,
     });
   } catch (error) {
     const user = req.user;
@@ -129,6 +137,44 @@ router.get("/status", async (req: Request, res: Response) => {
       "Error getting Bingers status"
     );
     return res.status(500).json({ error: "Failed to get Bingers status" });
+  }
+});
+
+router.patch("/settings", async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const validated = settingsSchema.parse(req.body);
+    const updated = await userRepository.update(user.id, {
+      bingersMarkMoviesAsRewatched: validated.markMoviesAsRewatched,
+      bingersMarkEpisodesAsRewatched: validated.markEpisodesAsRewatched,
+    });
+
+    return res.json({
+      success: true,
+      markMoviesAsRewatched: !!updated.bingersMarkMoviesAsRewatched,
+      markEpisodesAsRewatched: !!updated.bingersMarkEpisodesAsRewatched,
+    });
+  } catch (error) {
+    const user = req.user;
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        error: "Validation error",
+        details: error.issues,
+      });
+    }
+    logger.bingers.error(
+      { error, userId: user?.id },
+      "Error updating Bingers settings"
+    );
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Failed to update Bingers settings";
+    return res.status(500).json({ error: errorMessage });
   }
 });
 

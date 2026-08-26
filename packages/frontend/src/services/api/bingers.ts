@@ -10,6 +10,8 @@ export interface BingersStatus {
   needsReauthorization: boolean;
   username: string | null;
   image: string | null;
+  markMoviesAsRewatched: boolean;
+  markEpisodesAsRewatched: boolean;
 }
 
 export function invalidateBingersCache(): void {
@@ -111,4 +113,28 @@ export async function getBingersStatus(options?: {
   const data = (await response.json()) as BingersStatus;
   setCached(CACHE_KEY_STATUS, data);
   return data;
+}
+
+export async function updateBingersSettings(settings: {
+  markMoviesAsRewatched: boolean;
+  markEpisodesAsRewatched: boolean;
+}): Promise<{
+  success: boolean;
+  markMoviesAsRewatched: boolean;
+  markEpisodesAsRewatched: boolean;
+}> {
+  const response = await fetch(`${API_BASE_URL}/bingers/settings`, {
+    method: "PATCH",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(settings),
+  });
+  if (!response.ok) {
+    const payload = await getErrorPayload(
+      response,
+      "Failed to update Bingers settings"
+    );
+    throw new Error(payload.message);
+  }
+  invalidateBingersCache();
+  return response.json();
 }

@@ -10,6 +10,7 @@ const userRepositoryMocks = vi.hoisted(() => ({
 
 const syncHistoryRepositoryMocks = vi.hoisted(() => ({
   hasExistingSync: vi.fn(),
+  countSuccessfulDestinationSyncs: vi.fn(),
   create: vi.fn(),
   save: vi.fn(),
   clearOldByUser: vi.fn(),
@@ -37,6 +38,14 @@ const simklTokenManagerMocks = vi.hoisted(() => ({
   getValidAccessToken: vi.fn(),
 }));
 
+const bingersClientMocks = vi.hoisted(() => ({
+  scrobble: vi.fn(),
+}));
+
+const bingersSessionManagerMocks = vi.hoisted(() => ({
+  getValidCookieJar: vi.fn(),
+}));
+
 const mediaIdEnricherMocks = vi.hoisted(() => ({
   enrich: vi.fn(async (media: unknown) => media),
 }));
@@ -52,6 +61,8 @@ vi.mock("@repositories/UserRepository", () => ({
 vi.mock("@repositories/SyncHistoryRepository", () => ({
   SyncHistoryRepository: class {
     hasExistingSync = syncHistoryRepositoryMocks.hasExistingSync;
+    countSuccessfulDestinationSyncs =
+      syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs;
     create = syncHistoryRepositoryMocks.create;
     save = syncHistoryRepositoryMocks.save;
     clearOldByUser = syncHistoryRepositoryMocks.clearOldByUser;
@@ -77,6 +88,12 @@ vi.mock("@integrations/simkl/SimklClient", () => ({
   },
 }));
 
+vi.mock("@integrations/bingers/BingersClient", () => ({
+  BingersClient: class {
+    scrobble = bingersClientMocks.scrobble;
+  },
+}));
+
 vi.mock("@integrations/trakt/TraktTokenManager", () => ({
   TraktTokenManager: class {
     getValidAccessToken = traktTokenManagerMocks.getValidAccessToken;
@@ -88,6 +105,16 @@ vi.mock("@integrations/simkl/SimklTokenManager", () => ({
   SimklTokenManager: class {
     getValidAccessToken = simklTokenManagerMocks.getValidAccessToken;
   },
+}));
+
+vi.mock("@integrations/bingers/BingersSessionManager", () => ({
+  BingersSessionManager: class {
+    getValidCookieJar = bingersSessionManagerMocks.getValidCookieJar;
+  },
+}));
+
+vi.mock("@integrations/bingers/cookieJar", () => ({
+  cookieHeaderFromJar: () => "session_token=bingers-cookie",
 }));
 
 vi.mock("./MediaIdEnricher", async (importOriginal) => {
@@ -137,6 +164,9 @@ describe("SyncService", () => {
     settingsRepositoryMocks.get.mockResolvedValue("100");
     settingsRepositoryMocks.getAll.mockResolvedValue({});
     syncHistoryRepositoryMocks.clearOldByUser.mockResolvedValue(0);
+    syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs.mockResolvedValue(
+      0
+    );
     mediaIdEnricherMocks.enrich.mockImplementation(async (media) => media);
   });
 
@@ -217,6 +247,134 @@ describe("SyncService", () => {
         originalMediaId: "m1",
         success: true,
         destinations: JSON.stringify(["Simkl"]),
+      })
+    );
+  });
+
+  it("syncs to Bingers when linked and records the destination", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktAccessToken: null,
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"x"}}',
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs.mockResolvedValue(
+      0
+    );
+    bingersSessionManagerMocks.getValidCookieJar.mockResolvedValue({
+      session_token: { name: "session_token", value: "x" },
+    });
+    bingersClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    await service.syncEvent(makeEvent());
+
+    expect(bingersSessionManagerMocks.getValidCookieJar).toHaveBeenCalledWith(
+      "u1"
+    );
+    expect(bingersClientMocks.scrobble).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "scrobble" }),
+      "session_token=bingers-cookie",
+      expect.objectContaining({ plays: 1 })
+    );
+    expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "u1",
+        originalMediaId: "m1",
+        success: true,
+        destinations: JSON.stringify(["Bingers"]),
+        wasRewatched: false,
+      })
+    );
+  });
+
+  it("increments Bingers plays and marks rewatch on repeat scrobbles", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktAccessToken: null,
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"x"}}',
+      bingersMarkMoviesAsRewatched: true,
+      bingersMarkEpisodesAsRewatched: false,
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(true);
+    syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs.mockResolvedValue(
+      2
+    );
+    bingersSessionManagerMocks.getValidCookieJar.mockResolvedValue({
+      session_token: { name: "session_token", value: "x" },
+    });
+    bingersClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    await service.syncEvent(makeEvent());
+
+    expect(
+      syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs
+    ).toHaveBeenCalledWith(
+      "u1",
+      "Bingers",
+      "movie",
+      expect.objectContaining({ tvdbMovieId: "123" })
+    );
+    expect(bingersClientMocks.scrobble).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "scrobble" }),
+      "session_token=bingers-cookie",
+      expect.objectContaining({
+        plays: 3,
+        markMoviesAsRewatched: true,
+      })
+    );
+    expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        destinations: JSON.stringify(["Bingers"]),
+        wasRewatched: true,
+      })
+    );
+  });
+
+  it("does not increment Bingers plays when rewatch is opted out", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktAccessToken: null,
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"x"}}',
+      bingersMarkMoviesAsRewatched: false,
+      bingersMarkEpisodesAsRewatched: false,
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(true);
+    syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs.mockResolvedValue(
+      2
+    );
+    bingersSessionManagerMocks.getValidCookieJar.mockResolvedValue({
+      session_token: { name: "session_token", value: "x" },
+    });
+    bingersClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    await service.syncEvent(makeEvent());
+
+    expect(bingersClientMocks.scrobble).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "scrobble" }),
+      "session_token=bingers-cookie",
+      expect.objectContaining({
+        plays: 2,
+        markMoviesAsRewatched: false,
+      })
+    );
+    expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        destinations: JSON.stringify(["Bingers"]),
+        wasRewatched: false,
       })
     );
   });

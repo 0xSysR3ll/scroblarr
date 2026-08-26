@@ -10,4 +10,5 @@ export function explicitI18nKeys(
 ): void {
   t("sync.destinations.trakt", { defaultValue: "Trakt" });
   t("sync.destinations.simkl", { defaultValue: "Simkl" });
+  t("sync.destinations.bingers", { defaultValue: "Bingers" });
 }

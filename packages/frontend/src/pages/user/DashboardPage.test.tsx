@@ -37,7 +37,7 @@ function statisticsFixture() {
     successRate: 83,
     byMediaType: { episode: 8, movie: 4, series: 0 },
     bySource: { plex: 10, jellyfin: 2 },
-    byDestination: { trakt: 5, tvtime: 4, simkl: 3 },
+    byDestination: { trakt: 5, tvtime: 4, simkl: 3, bingers: 0 },
     byPeriod: { today: 1, thisWeek: 4, thisMonth: 12, lastMonth: 8 },
     topThisMonth: [],
     last30Days: { total: 12, successful: 10, failed: 2 },
@@ -57,7 +57,7 @@ function emptyStatisticsFixture(): SyncStatistics {
     successRate: 0,
     byMediaType: { episode: 0, movie: 0, series: 0 },
     bySource: { plex: 0, jellyfin: 0 },
-    byDestination: { trakt: 0, simkl: 0, tvtime: 0 },
+    byDestination: { trakt: 0, simkl: 0, tvtime: 0, bingers: 0 },
     byPeriod: { today: 0, thisWeek: 0, thisMonth: 0, lastMonth: 0 },
     topThisMonth: [],
     last30Days: { total: 0, successful: 0, failed: 0 },
@@ -399,7 +399,7 @@ describe("DashboardPage", () => {
   it("renders the hero without destination names", async () => {
     vi.mocked(getSyncStatistics).mockResolvedValue({
       ...statisticsFixture(),
-      byDestination: { trakt: 0, simkl: 0, tvtime: 0 },
+      byDestination: { trakt: 0, simkl: 0, tvtime: 0, bingers: 0 },
     });
 
     renderWithProviders(<DashboardPage />, { route: "/" });
