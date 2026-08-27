@@ -18,7 +18,6 @@ const sessionManager = new BingersSessionManager(userRepository, bingersAuth);
 
 const linkSchema = z.object({
   token: z.string().min(1),
-  email: z.string().email().optional(),
 });
 
 router.use(auth);
@@ -38,17 +37,19 @@ router.post("/link", async (req: Request, res: Response) => {
     const validated = linkSchema.parse(req.body);
     const token = extractMagicLinkToken(validated.token);
     const session = await bingersAuth.verifyMagicLink(token);
+    // Prefer session email from Bingers; only fall back to a previously stored
+    // server-side value — never trust a client-supplied email.
     await sessionManager.storeSessionFromVerify(
       user.id,
       session,
-      validated.email || freshUser.bingersEmail
+      freshUser.bingersEmail
     );
 
     logger.bingers.info(
       {
         userId: user.id,
         bingersUserId: session.user?.id,
-        hasEmail: !!(session.user?.email || validated.email),
+        hasEmail: !!(session.user?.email || freshUser.bingersEmail),
       },
       "Bingers account linked"
     );

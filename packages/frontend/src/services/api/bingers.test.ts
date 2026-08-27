@@ -45,7 +45,7 @@ describe("bingers api", () => {
 
     await getBingersStatus();
     await expect(
-      linkBingers("https://bingers.app/m?token=abc", "alice@example.com")
+      linkBingers("https://bingers.app/m?token=abc")
     ).resolves.toEqual({ success: true });
     await expect(getBingersStatus()).resolves.toMatchObject({
       linked: true,
@@ -57,7 +57,6 @@ describe("bingers api", () => {
       headers: expectedHeaders,
       body: JSON.stringify({
         token: "https://bingers.app/m?token=abc",
-        email: "alice@example.com",
       }),
     });
     expect(fetchMock).toHaveBeenCalledTimes(3);

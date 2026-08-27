@@ -1806,6 +1806,21 @@ describe("IntegrationsTab Bingers integration", () => {
     onProfileUpdated.mockReset();
   });
 
+  it("keeps the unlinked Bingers form when the initial status fetch fails", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getBingersStatus).mockRejectedValue(new Error("status down"));
+
+    renderWithProviders(<IntegrationsTab />);
+    await expandBingersSection(user);
+
+    expect(
+      screen.getByRole("button", { name: "Open Bingers sign-in" })
+    ).toBeVisible();
+    expect(
+      screen.getByPlaceholderText("https://bingers.app/m?token=…")
+    ).toBeVisible();
+  });
+
   it("links a Bingers account from a pasted magic link", async () => {
     const user = userEvent.setup();
     vi.mocked(linkBingers).mockResolvedValue({ success: true });

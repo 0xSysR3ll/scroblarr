@@ -334,24 +334,66 @@ describe("BingersSessionManager", () => {
     );
   });
 
-  it("rethrows non-auth validateAndRefresh failures", async () => {
-    userRepositoryMocks.findById.mockResolvedValue({
-      id: "user-id",
-      bingersCookieJar: serializeCookieJar({
-        session_token: { name: "session_token", value: "old" },
-      }),
-    });
-    authMocks.getSession.mockRejectedValue(new Error("network down"));
-
+  it("returns cached linked status on non-auth validateAndRefresh failures", async () => {
     const manager = new BingersSessionManager(
       userRepositoryMocks as never,
       authMocks as unknown as BingersAuth
     );
 
-    await expect(manager.validateAndRefresh("user-id")).rejects.toThrow(
-      "network down"
-    );
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar: serializeCookieJar({
+        session_token: { name: "session_token", value: "old" },
+      }),
+      bingersEmail: "cached@example.com",
+      bingersUsername: "cached-user",
+      bingersThumb: "https://img.example/cached.png",
+    });
+    authMocks.getSession.mockRejectedValue(new Error("network down"));
+
+    await expect(manager.validateAndRefresh("user-id")).resolves.toEqual({
+      linked: true,
+      needsReauthorization: false,
+      username: "cached-user",
+      image: "https://img.example/cached.png",
+    });
     expect(userRepositoryMocks.update).not.toHaveBeenCalled();
+
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar: serializeCookieJar({
+        session_token: { name: "session_token", value: "old" },
+      }),
+      bingersEmail: "email-only@example.com",
+      bingersUsername: null,
+      bingersThumb: null,
+    });
+    authMocks.getSession.mockRejectedValue(new Error("upstream 503"));
+
+    await expect(manager.validateAndRefresh("user-id")).resolves.toEqual({
+      linked: true,
+      needsReauthorization: false,
+      username: "email-only@example.com",
+      image: null,
+    });
+
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar: serializeCookieJar({
+        session_token: { name: "session_token", value: "old" },
+      }),
+      bingersEmail: null,
+      bingersUsername: null,
+      bingersThumb: null,
+    });
+    authMocks.getSession.mockRejectedValue(new Error("timeout"));
+
+    await expect(manager.validateAndRefresh("user-id")).resolves.toEqual({
+      linked: true,
+      needsReauthorization: false,
+      username: null,
+      image: null,
+    });
   });
 
   it("throws when the user is missing", async () => {

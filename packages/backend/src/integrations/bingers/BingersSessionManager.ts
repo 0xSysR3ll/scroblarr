@@ -100,11 +100,18 @@ export class BingersSessionManager {
           image: user.bingersThumb || null,
         };
       }
+      // Transient upstream failures must not look like an unlink. Keep the
+      // stored jar and report the last known linked profile.
       logger.bingers.warn(
         { userId, error },
-        "Failed to validate Bingers session"
+        "Failed to validate Bingers session; returning cached link state"
       );
-      throw error;
+      return {
+        linked: true,
+        needsReauthorization: false,
+        username: user.bingersUsername || user.bingersEmail || null,
+        image: user.bingersThumb || null,
+      };
     }
   }
 

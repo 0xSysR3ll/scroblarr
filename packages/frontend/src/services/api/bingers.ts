@@ -56,13 +56,12 @@ async function getErrorPayload(
 }
 
 export async function linkBingers(
-  token: string,
-  email?: string
+  token: string
 ): Promise<{ success: boolean }> {
   const response = await fetch(`${API_BASE_URL}/bingers/link`, {
     method: "POST",
     headers: getAuthHeaders(),
-    body: JSON.stringify({ token, email }),
+    body: JSON.stringify({ token }),
   });
   if (!response.ok) {
     const payload = await getErrorPayload(

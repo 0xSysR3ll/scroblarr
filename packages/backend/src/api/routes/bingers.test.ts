@@ -106,14 +106,17 @@ describe("bingers routes", () => {
       .post("/bingers/link")
       .send({
         token: "https://bingers.app/m?token=magic-token",
-        email: "user@example.com",
       })
       .expect(200);
 
     expect(bingersAuthMocks.verifyMagicLink).toHaveBeenCalledWith(
       "magic-token"
     );
-    expect(sessionManagerMocks.storeSessionFromVerify).toHaveBeenCalled();
+    expect(sessionManagerMocks.storeSessionFromVerify).toHaveBeenCalledWith(
+      "user-id",
+      expect.anything(),
+      null
+    );
   });
 
   it("unlinks and clears stored session", async () => {
@@ -254,7 +257,7 @@ describe("bingers routes", () => {
     });
   });
 
-  it("falls back to stored email when link omits email", async () => {
+  it("falls back to stored email and ignores client-supplied email", async () => {
     userRepositoryMocks.findById.mockResolvedValue({
       id: "user-id",
       plexUsername: "plex-user",
@@ -269,7 +272,7 @@ describe("bingers routes", () => {
 
     await request(app)
       .post("/bingers/link")
-      .send({ token: "magic-token" })
+      .send({ token: "magic-token", email: "spoofed@example.com" })
       .expect(200);
 
     expect(sessionManagerMocks.storeSessionFromVerify).toHaveBeenCalledWith(
