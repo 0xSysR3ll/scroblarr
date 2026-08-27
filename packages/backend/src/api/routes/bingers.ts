@@ -74,9 +74,7 @@ router.post("/link", async (req: Request, res: Response) => {
       { error, userId: user?.id },
       "Error linking Bingers account"
     );
-    const errorMessage =
-      error instanceof Error ? error.message : "Failed to link Bingers account";
-    return res.status(500).json({ error: errorMessage });
+    return res.status(500).json({ error: "Failed to link Bingers account" });
   }
 });
 
@@ -104,11 +102,7 @@ router.post("/unlink", async (req: Request, res: Response) => {
       { error, userId: user?.id },
       "Error unlinking Bingers account"
     );
-    const errorMessage =
-      error instanceof Error
-        ? error.message
-        : "Failed to unlink Bingers account";
-    return res.status(500).json({ error: errorMessage });
+    return res.status(500).json({ error: "Failed to unlink Bingers account" });
   }
 });
 
@@ -133,9 +127,7 @@ router.get("/status", async (req: Request, res: Response) => {
       { error, userId: user?.id },
       "Error getting Bingers status"
     );
-    const errorMessage =
-      error instanceof Error ? error.message : "Failed to get Bingers status";
-    return res.status(500).json({ error: errorMessage });
+    return res.status(500).json({ error: "Failed to get Bingers status" });
   }
 });
 

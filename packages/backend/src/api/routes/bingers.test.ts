@@ -180,7 +180,9 @@ describe("bingers routes", () => {
 
     const response = await request(app).post("/bingers/unlink").expect(500);
 
-    expect(response.body).toEqual({ error: "db down" });
+    expect(response.body).toEqual({
+      error: "Failed to unlink Bingers account",
+    });
   });
 
   it("returns 500 when status validation fails unexpectedly", async () => {
@@ -190,7 +192,9 @@ describe("bingers routes", () => {
 
     const response = await request(app).get("/bingers/status").expect(500);
 
-    expect(response.body).toEqual({ error: "session service down" });
+    expect(response.body).toEqual({
+      error: "Failed to get Bingers status",
+    });
   });
 
   it("returns 401 when auth middleware leaves no user", async () => {
@@ -220,7 +224,9 @@ describe("bingers routes", () => {
       .send({ token: "tok" })
       .expect(500);
 
-    expect(response.body).toEqual({ error: "db down" });
+    expect(response.body).toEqual({
+      error: "Failed to link Bingers account",
+    });
   });
 
   it("clamps BingersApiError statuses outside 400-599 to 400", async () => {

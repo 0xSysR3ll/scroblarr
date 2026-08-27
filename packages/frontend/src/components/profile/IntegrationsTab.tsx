@@ -593,12 +593,11 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
       bingersOAuthPopup.preparePopup("Bingers Sign-in");
       bingersOAuthPopup.navigateToUrl(BINGERS_MOBILE_SIGNIN_URL);
     } catch (error) {
-      const fallback = window.open(
-        BINGERS_MOBILE_SIGNIN_URL,
-        "_blank",
-        "noopener,noreferrer"
-      );
+      // Avoid "noopener" in window features: browsers then return null even when
+      // the tab opens. Detect a real window, then drop opener for isolation.
+      const fallback = window.open(BINGERS_MOBILE_SIGNIN_URL, "_blank");
       if (fallback) {
+        fallback.opener = null;
         return;
       }
       const errorMessage =

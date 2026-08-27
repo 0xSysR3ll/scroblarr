@@ -2114,9 +2114,10 @@ describe("IntegrationsTab Bingers integration", () => {
     oauthPopupMocks.preparePopup.mockImplementation(() => {
       throw new Error("popup blocked by browser");
     });
-    const openSpy = vi.spyOn(window, "open").mockReturnValue({
-      closed: false,
-    } as Window);
+    const fallbackWindow = { closed: false, opener: {} as Window | null };
+    const openSpy = vi
+      .spyOn(window, "open")
+      .mockReturnValue(fallbackWindow as Window);
 
     renderWithProviders(<IntegrationsTab />);
     await expandBingersSection(user);
@@ -2126,9 +2127,9 @@ describe("IntegrationsTab Bingers integration", () => {
 
     expect(openSpy).toHaveBeenCalledWith(
       "https://bingers.app/mobile-signin",
-      "_blank",
-      "noopener,noreferrer"
+      "_blank"
     );
+    expect(fallbackWindow.opener).toBeNull();
     expect(
       screen.queryByText("popup blocked by browser")
     ).not.toBeInTheDocument();
@@ -2155,8 +2156,7 @@ describe("IntegrationsTab Bingers integration", () => {
     ).toBeVisible();
     expect(openSpy).toHaveBeenCalledWith(
       "https://bingers.app/mobile-signin",
-      "_blank",
-      "noopener,noreferrer"
+      "_blank"
     );
     openSpy.mockRestore();
   });
