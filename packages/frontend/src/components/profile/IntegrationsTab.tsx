@@ -1359,7 +1359,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
             <button
               type="button"
               onClick={handleUnlinkBingers}
-              disabled={bingersSaving}
+              disabled={bingersSaving || bingersSavingSettings}
               className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950 dark:hover:text-red-300"
               title={t("bingers.unlink", { defaultValue: "Unlink" })}
             >
@@ -1651,7 +1651,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
             <button
               type="button"
               onClick={confirmUnlinkBingers}
-              disabled={bingersSaving}
+              disabled={bingersSaving || bingersSavingSettings}
               className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             >
               {bingersSaving

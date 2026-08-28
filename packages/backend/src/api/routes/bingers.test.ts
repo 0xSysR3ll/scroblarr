@@ -414,7 +414,9 @@ describe("bingers routes", () => {
       })
       .expect(500);
 
-    expect(response.body).toEqual({ error: "db down" });
+    expect(response.body).toEqual({
+      error: "Failed to update Bingers settings",
+    });
   });
 
   it("returns a generic message when settings update rejects a non-Error", async () => {

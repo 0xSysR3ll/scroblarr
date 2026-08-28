@@ -177,11 +177,7 @@ router.patch("/settings", async (req: Request, res: Response) => {
       { error, userId: user?.id },
       "Error updating Bingers settings"
     );
-    const errorMessage =
-      error instanceof Error
-        ? error.message
-        : "Failed to update Bingers settings";
-    return res.status(500).json({ error: errorMessage });
+    return res.status(500).json({ error: "Failed to update Bingers settings" });
   }
 });
 
