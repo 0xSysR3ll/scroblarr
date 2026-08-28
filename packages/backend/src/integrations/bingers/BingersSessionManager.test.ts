@@ -35,6 +35,8 @@ import { serializeCookieJar } from "./cookieJar";
 describe("BingersSessionManager", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    userRepositoryMocks.update.mockReset();
+    userRepositoryMocks.update.mockResolvedValue(undefined);
   });
 
   it("persists refreshed session cookies and profile image on success", async () => {
@@ -331,6 +333,33 @@ describe("BingersSessionManager", () => {
         bingersUsername: null,
         bingersThumb: null,
       })
+    );
+  });
+
+  it("propagates persistence failures from validateAndRefresh", async () => {
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar: serializeCookieJar({
+        session_token: { name: "session_token", value: "old" },
+      }),
+      bingersEmail: "user@example.com",
+    });
+    authMocks.getSession.mockResolvedValue({
+      session: { id: "s1" },
+      user: { id: "b1", email: "user@example.com" },
+      cookieJar: {
+        session_token: { name: "session_token", value: "new" },
+      },
+    });
+    userRepositoryMocks.update.mockRejectedValue(new Error("db down"));
+
+    const manager = new BingersSessionManager(
+      userRepositoryMocks as never,
+      authMocks as unknown as BingersAuth
+    );
+
+    await expect(manager.validateAndRefresh("user-id")).rejects.toThrow(
+      "db down"
     );
   });
 

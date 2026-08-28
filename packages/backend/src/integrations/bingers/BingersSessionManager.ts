@@ -73,23 +73,10 @@ export class BingersSessionManager {
       };
     }
 
+    let session: BingersSessionInfo;
     try {
       const jar = parseCookieJar(user.bingersCookieJar);
-      const session = await this.auth.getSession(jar);
-      await this.persistSession(user.id, session, user.bingersEmail);
-
-      return {
-        linked: true,
-        needsReauthorization: false,
-        username:
-          session.user?.username ||
-          session.user?.name ||
-          user.bingersUsername ||
-          session.user?.email ||
-          user.bingersEmail ||
-          null,
-        image: session.user?.image || user.bingersThumb || null,
-      };
+      session = await this.auth.getSession(jar);
     } catch (error) {
       if (isBingersAuthError(error)) {
         await this.clearSessionKeepEmail(user);
@@ -113,6 +100,21 @@ export class BingersSessionManager {
         image: user.bingersThumb || null,
       };
     }
+
+    await this.persistSession(user.id, session, user.bingersEmail);
+
+    return {
+      linked: true,
+      needsReauthorization: false,
+      username:
+        session.user?.username ||
+        session.user?.name ||
+        user.bingersUsername ||
+        session.user?.email ||
+        user.bingersEmail ||
+        null,
+      image: session.user?.image || user.bingersThumb || null,
+    };
   }
 
   async storeSessionFromVerify(

@@ -629,7 +629,7 @@
     "magicLinkPlaceholder": "https://bingers.app/m?token=…",
     "completeLink": "Complete link",
     "unlinkTitle": "Unlink Bingers Account",
-    "unlinkMessage": "Are you sure you want to unlink your Bingers account? This will stop syncing to Bingers.",
+    "unlinkMessage": "Are you sure you want to unlink your Bingers account? Scroblarr will remove the stored session.",
     "cancel": "Cancel",
     "confirm": "Confirm"
   }

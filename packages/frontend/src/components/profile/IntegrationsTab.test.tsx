@@ -2120,8 +2120,95 @@ describe("IntegrationsTab Bingers integration", () => {
       screen.getByRole("button", { name: "Open Bingers sign-in" })
     );
 
+    expect(oauthPopupMocks.closePopup).toHaveBeenCalled();
     expect(await screen.findByText("popup blocked by browser")).toBeVisible();
     openSpy.mockRestore();
+  });
+
+  it("closes the managed popup before opening the fallback when navigation fails", async () => {
+    const user = userEvent.setup();
+    oauthPopupMocks.preparePopup.mockReturnValue({ closed: false });
+    oauthPopupMocks.navigateToUrl.mockImplementation(() => {
+      throw new Error("navigation failed");
+    });
+    const fallbackWindow = { closed: false, opener: {} as Window | null };
+    const openSpy = vi
+      .spyOn(window, "open")
+      .mockReturnValue(fallbackWindow as Window);
+
+    renderWithProviders(<IntegrationsTab />);
+    await expandBingersSection(user);
+    await user.click(
+      screen.getByRole("button", { name: "Open Bingers sign-in" })
+    );
+
+    expect(oauthPopupMocks.closePopup).toHaveBeenCalled();
+    expect(openSpy).toHaveBeenCalledWith(
+      "https://bingers.app/mobile-signin",
+      "_blank"
+    );
+    expect(fallbackWindow.opener).toBeNull();
+    openSpy.mockRestore();
+  });
+
+  it("shows link success even when the post-link status refresh fails", async () => {
+    const user = userEvent.setup();
+    vi.mocked(linkBingers).mockResolvedValue({ success: true });
+    vi.mocked(getBingersStatus)
+      .mockResolvedValueOnce({
+        linked: false,
+        needsReauthorization: false,
+        username: null,
+        image: null,
+      })
+      .mockRejectedValueOnce(new Error("status down"));
+
+    renderWithProviders(<IntegrationsTab />);
+    await expandBingersSection(user);
+    await user.type(
+      screen.getByPlaceholderText("https://bingers.app/m?token=…"),
+      "https://bingers.app/m?token=magic"
+    );
+    await user.click(screen.getByRole("button", { name: "Complete link" }));
+
+    await waitFor(() => {
+      expect(showSuccess).toHaveBeenCalledWith(
+        "Bingers account linked successfully"
+      );
+    });
+    expect(
+      screen.queryByText("Failed to link Bingers account")
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows unlink success even when the post-unlink status refresh fails", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getBingersStatus)
+      .mockResolvedValueOnce({
+        linked: true,
+        needsReauthorization: false,
+        username: "bingers-user",
+        image: null,
+      })
+      .mockRejectedValueOnce(new Error("status down"));
+    vi.mocked(unlinkBingers).mockResolvedValue({ success: true });
+
+    renderWithProviders(<IntegrationsTab />);
+    await expandBingersSection(user);
+    await user.click(screen.getByRole("button", { name: "Unlink" }));
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+
+    await waitFor(() => {
+      expect(showSuccess).toHaveBeenCalledWith(
+        "Bingers account unlinked successfully"
+      );
+    });
+    expect(
+      screen.queryByText("Failed to unlink Bingers account")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Open Bingers sign-in" })
+    ).toBeVisible();
   });
 
   it("skips the error banner when the window.open fallback succeeds", async () => {

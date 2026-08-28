@@ -593,6 +593,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
       bingersOAuthPopup.preparePopup("Bingers Sign-in");
       bingersOAuthPopup.navigateToUrl(BINGERS_MOBILE_SIGNIN_URL);
     } catch (error) {
+      bingersOAuthPopup.closePopup();
       // Avoid "noopener" in window features: browsers then return null even when
       // the tab opens. Detect a real window, then drop opener for isolation.
       const fallback = window.open(BINGERS_MOBILE_SIGNIN_URL, "_blank");
@@ -619,10 +620,14 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
       await linkBingers(bingersMagicLink.trim());
       setBingersMagicLink("");
       bingersOAuthPopup.closePopup();
-      const requestId = ++bingersStatusRequestIdRef.current;
-      const status = await getBingersStatus({ force: true });
-      if (requestId === bingersStatusRequestIdRef.current) {
-        setBingersStatus(status);
+      try {
+        const requestId = ++bingersStatusRequestIdRef.current;
+        const status = await getBingersStatus({ force: true });
+        if (requestId === bingersStatusRequestIdRef.current) {
+          setBingersStatus(status);
+        }
+      } catch {
+        // Best-effort refresh after a successful link.
       }
       showSuccess(
         t("bingers.linked", {
@@ -655,10 +660,19 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
       setBingersError(null);
       await unlinkBingers();
       setBingersMagicLink("");
-      const requestId = ++bingersStatusRequestIdRef.current;
-      const status = await getBingersStatus({ force: true });
-      if (requestId === bingersStatusRequestIdRef.current) {
-        setBingersStatus(status);
+      try {
+        const requestId = ++bingersStatusRequestIdRef.current;
+        const status = await getBingersStatus({ force: true });
+        if (requestId === bingersStatusRequestIdRef.current) {
+          setBingersStatus(status);
+        }
+      } catch {
+        setBingersStatus({
+          linked: false,
+          needsReauthorization: false,
+          username: null,
+          image: null,
+        });
       }
       showSuccess(
         t("bingers.unlinked", {
@@ -1446,7 +1460,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
           <DialogDescription>
             {t("bingers.unlinkMessage", {
               defaultValue:
-                "Are you sure you want to unlink your Bingers account? This will stop syncing to Bingers.",
+                "Are you sure you want to unlink your Bingers account? Scroblarr will remove the stored session.",
             })}
           </DialogDescription>
           <div className="flex justify-end gap-3">
