@@ -1,4 +1,4 @@
-import type { MediaEvent } from "@scroblarr/shared";
+import type { MediaEvent, MediaItem } from "@scroblarr/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { BingersApiError } from "./BingersApiError";
@@ -175,5 +175,85 @@ describe("BingersClient", () => {
     await expect(
       client.scrobble(makeEvent(), "session_token=abc")
     ).rejects.toThrow("Bingers sync/push timed out");
+  });
+
+  it("returns the integration name", () => {
+    expect(new BingersClient().getName()).toBe("Bingers");
+  });
+
+  it("rejects unsupported media types", async () => {
+    const client = new BingersClient({
+      resolveEntity: vi.fn(),
+    } as unknown as BingersCatalogResolver);
+
+    await expect(
+      client.scrobble(
+        makeEvent({
+          media: {
+            id: "s1",
+            type: "series",
+            title: "Example Series",
+          } as unknown as MediaItem,
+        }),
+        "session_token=abc"
+      )
+    ).rejects.toThrow(/Unsupported media type: series/i);
+  });
+
+  it("pushes episode entries with rewatch play counts", async () => {
+    const catalog = {
+      resolveEntity: vi.fn().mockResolvedValue({
+        entityKind: "episode",
+        entityId: "ep-1",
+        titleId: "show-1",
+      }),
+    } as unknown as BingersCatalogResolver;
+
+    const fetchMock = vi.fn(async () => new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new BingersClient(catalog);
+    await client.scrobble(
+      makeEvent({
+        media: {
+          id: "e1",
+          type: "episode",
+          title: "Example Show",
+          seasonNumber: 1,
+          episodeNumber: 2,
+        },
+      }),
+      "session_token=abc",
+      { markEpisodesAsRewatched: true, plays: 2 }
+    );
+
+    const [, request] = fetchMock.mock.calls[0] as unknown as [
+      string,
+      { body: string },
+    ];
+    expect(JSON.parse(request.body).ops[0].pk.entityKind).toBe("episode");
+    expect(JSON.parse(request.body).ops[0].fields.plays).toBe(2);
+  });
+
+  it("rethrows unexpected push errors", async () => {
+    const catalog = {
+      resolveEntity: vi.fn().mockResolvedValue({
+        entityKind: "movie",
+        entityId: "movie-1",
+        titleId: "movie-1",
+      }),
+    } as unknown as BingersCatalogResolver;
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("network down");
+      })
+    );
+
+    const client = new BingersClient(catalog);
+    await expect(
+      client.scrobble(makeEvent(), "session_token=abc")
+    ).rejects.toThrow("network down");
   });
 });

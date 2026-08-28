@@ -141,6 +141,19 @@ describe("DashboardPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("includes Bingers in hero destination list when synced", async () => {
+    vi.mocked(getSyncStatistics).mockResolvedValue({
+      ...statisticsFixture(),
+      byDestination: { trakt: 0, tvtime: 0, simkl: 0, bingers: 3 },
+    });
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(
+      await screen.findByText(/that's 10 successful syncs to bingers/i)
+    ).toBeInTheDocument();
+  });
+
   it("renders compact trend and peak-day metrics", async () => {
     renderWithProviders(<DashboardPage />, { route: "/" });
 

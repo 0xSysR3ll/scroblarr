@@ -438,6 +438,162 @@ describe("SyncHistoryRepository integration", () => {
     ).resolves.toBe(1);
   });
 
+  it("counts destination syncs across identifier strategies", async () => {
+    await createHistory([
+      {
+        userId: user.id,
+        mediaType: "episode",
+        mediaTitle: "Show A",
+        success: true,
+        tvdbEpisodeId: "1001",
+        destinations: JSON.stringify(["Bingers"]),
+      },
+      {
+        userId: user.id,
+        mediaType: "episode",
+        mediaTitle: "Show B",
+        success: true,
+        imdbEpisodeId: "tt2001",
+        seasonNumber: 2,
+        episodeNumber: 3,
+        destinations: JSON.stringify(["Bingers"]),
+      },
+      {
+        userId: user.id,
+        mediaType: "episode",
+        mediaTitle: "Show C",
+        success: true,
+        tmdbSeriesId: "3001",
+        seasonNumber: 1,
+        episodeNumber: 2,
+        destinations: JSON.stringify(["Bingers"]),
+      },
+      {
+        userId: user.id,
+        mediaType: "movie",
+        mediaTitle: "Movie A",
+        success: true,
+        tvdbMovieId: "4001",
+        destinations: JSON.stringify(["Bingers"]),
+      },
+      {
+        userId: user.id,
+        mediaType: "movie",
+        mediaTitle: "Movie B",
+        success: true,
+        imdbMovieId: "tt5001",
+        destinations: JSON.stringify(["Bingers"]),
+      },
+      {
+        userId: user.id,
+        mediaType: "movie",
+        mediaTitle: "Movie C",
+        success: true,
+        tmdbMovieId: "6001",
+        destinations: JSON.stringify(["Bingers"]),
+      },
+      {
+        userId: user.id,
+        mediaType: "movie",
+        mediaTitle: "Movie D",
+        success: true,
+        year: 2010,
+        destinations: JSON.stringify(["Bingers"]),
+      },
+    ]);
+
+    await expect(
+      repository.countSuccessfulDestinationSyncs(
+        user.id,
+        "Bingers",
+        "episode",
+        {
+          tvdbEpisodeId: "1001",
+        }
+      )
+    ).resolves.toBe(1);
+    await expect(
+      repository.countSuccessfulDestinationSyncs(
+        user.id,
+        "Bingers",
+        "episode",
+        {
+          imdbEpisodeId: "tt2001",
+        }
+      )
+    ).resolves.toBe(1);
+    await expect(
+      repository.countSuccessfulDestinationSyncs(
+        user.id,
+        "Bingers",
+        "episode",
+        {
+          tmdbSeriesId: "3001",
+          seasonNumber: 1,
+          episodeNumber: 2,
+        }
+      )
+    ).resolves.toBe(1);
+    await expect(
+      repository.countSuccessfulDestinationSyncs(user.id, "Bingers", "movie", {
+        tvdbMovieId: "4001",
+      })
+    ).resolves.toBe(1);
+    await expect(
+      repository.countSuccessfulDestinationSyncs(user.id, "Bingers", "movie", {
+        imdbMovieId: "tt5001",
+      })
+    ).resolves.toBe(1);
+    await expect(
+      repository.countSuccessfulDestinationSyncs(user.id, "Bingers", "movie", {
+        tmdbMovieId: "6001",
+      })
+    ).resolves.toBe(1);
+    await expect(
+      repository.countSuccessfulDestinationSyncs(user.id, "Bingers", "movie", {
+        mediaTitle: "Movie D",
+        year: 2010,
+      })
+    ).resolves.toBe(1);
+    await expect(
+      repository.countSuccessfulDestinationSyncs(user.id, "Bingers", "movie", {
+        mediaTitle: "Missing",
+        year: 2099,
+      })
+    ).resolves.toBe(0);
+    await expect(
+      repository.countSuccessfulDestinationSyncs(
+        user.id,
+        "Bingers",
+        "episode",
+        {}
+      )
+    ).resolves.toBe(0);
+    await expect(
+      repository.countSuccessfulDestinationSyncs(
+        user.id,
+        "Bingers",
+        "movie",
+        {}
+      )
+    ).resolves.toBe(0);
+  });
+
+  it("includes Bingers in destination statistics", async () => {
+    await createHistory([
+      {
+        userId: user.id,
+        mediaType: "movie",
+        mediaTitle: "Bingers Movie",
+        success: true,
+        destinations: JSON.stringify(["Bingers"]),
+      },
+    ]);
+
+    const stats = await repository.getStatisticsByUser(user.id);
+    expect(stats.byDestination.bingers).toBe(1);
+  });
+
   async function createHistory(items: Array<Partial<SyncHistory>>) {
     await dataSource.getRepository(SyncHistoryEntity).save(
       items.map((item) => ({

@@ -2306,6 +2306,32 @@ describe("IntegrationsTab Bingers integration", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
   });
 
+  it("shows default error when saving Bingers settings fails with non-Error", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getBingersStatus).mockResolvedValue({
+      linked: true,
+      needsReauthorization: false,
+      username: "bingers-user",
+      image: null,
+      markMoviesAsRewatched: false,
+      markEpisodesAsRewatched: false,
+    });
+    vi.mocked(updateBingersSettings).mockRejectedValue("network down");
+
+    renderWithProviders(<IntegrationsTab />);
+    await expandBingersSection(user);
+
+    await user.click(
+      screen.getByRole("checkbox", { name: "Mark episodes as rewatched" })
+    );
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(
+      await screen.findByText("Failed to save Bingers settings")
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+  });
+
   it("skips the error banner when the window.open fallback succeeds", async () => {
     const user = userEvent.setup();
     oauthPopupMocks.preparePopup.mockImplementation(() => {

@@ -42,6 +42,8 @@ const bingersClientMocks = vi.hoisted(() => ({
   scrobble: vi.fn(),
 }));
 
+const bingersClientCtorThrows = vi.hoisted(() => ({ value: false }));
+
 const bingersSessionManagerMocks = vi.hoisted(() => ({
   getValidCookieJar: vi.fn(),
 }));
@@ -90,6 +92,11 @@ vi.mock("@integrations/simkl/SimklClient", () => ({
 
 vi.mock("@integrations/bingers/BingersClient", () => ({
   BingersClient: class {
+    constructor() {
+      if (bingersClientCtorThrows.value) {
+        throw new Error("Bingers client init failed");
+      }
+    }
     scrobble = bingersClientMocks.scrobble;
   },
 }));
@@ -160,6 +167,7 @@ function makeEvent(overrides?: Partial<MediaEvent>): MediaEvent {
 
 describe("SyncService", () => {
   beforeEach(() => {
+    bingersClientCtorThrows.value = false;
     vi.clearAllMocks();
     settingsRepositoryMocks.get.mockResolvedValue("100");
     settingsRepositoryMocks.getAll.mockResolvedValue({});
@@ -289,6 +297,29 @@ describe("SyncService", () => {
         wasRewatched: false,
       })
     );
+  });
+
+  it("continues syncing when Bingers client initialization fails", async () => {
+    bingersClientCtorThrows.value = true;
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktAccessToken: "trakt-token",
+      traktClientId: "client",
+      traktClientSecret: "secret",
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"x"}}',
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    traktTokenManagerMocks.getValidAccessToken.mockResolvedValue("trakt-token");
+    traktClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    await service.syncEvent(makeEvent());
+
+    expect(traktClientMocks.scrobble).toHaveBeenCalled();
+    expect(bingersClientMocks.scrobble).not.toHaveBeenCalled();
   });
 
   it("increments Bingers plays and marks rewatch on repeat scrobbles", async () => {
