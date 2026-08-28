@@ -314,7 +314,7 @@ export class SyncHistoryRepository {
         identifiers.episodeNumber !== undefined &&
         identifiers.mediaTitle
       ) {
-        return base()
+        return await base()
           .andWhere("sync_history.seasonNumber = :seasonNumber", {
             seasonNumber: identifiers.seasonNumber,
           })
@@ -354,7 +354,7 @@ export class SyncHistoryRepository {
       if (n > 0) return n;
     }
     if (identifiers.mediaTitle && identifiers.year !== undefined) {
-      return base()
+      return await base()
         .andWhere("sync_history.mediaTitle = :mediaTitle", {
           mediaTitle: identifiers.mediaTitle,
         })

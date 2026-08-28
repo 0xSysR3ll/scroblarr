@@ -319,6 +319,7 @@ export class BingersCatalogResolver {
       () => controller.abort(),
       BingersCatalogResolver.FETCH_TIMEOUT_MS
     );
+    const clearFetchTimeout = () => clearTimeout(timeout);
 
     try {
       const response = await fetch(url, {
@@ -332,11 +333,15 @@ export class BingersCatalogResolver {
 
       if (!response.ok) {
         const text = await response.text().catch(() => "");
+        clearFetchTimeout();
         throw bingersErrorFromResponse(response.status, text);
       }
 
-      return (await response.json()) as T;
+      const body = (await response.json()) as T;
+      clearFetchTimeout();
+      return body;
     } catch (error) {
+      clearFetchTimeout();
       if (error instanceof BingersApiError) {
         throw error;
       }
@@ -344,8 +349,6 @@ export class BingersCatalogResolver {
         throw new Error(`Bingers catalog request timed out: ${url}`);
       }
       throw error;
-    } finally {
-      clearTimeout(timeout);
     }
   }
 }

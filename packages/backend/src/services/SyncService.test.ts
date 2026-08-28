@@ -299,6 +299,60 @@ describe("SyncService", () => {
     );
   });
 
+  it("uses destination getSyncOptions when provided", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktClientId: "client",
+      traktClientSecret: "secret",
+      traktAccessToken: "token",
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(true);
+    traktTokenManagerMocks.getValidAccessToken.mockResolvedValue("trakt-token");
+    traktClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    const getSyncOptions = vi.fn(() => ({ markAsRewatched: true }));
+    vi.spyOn(
+      service as unknown as {
+        getSyncDestinations: () => Promise<
+          Array<{
+            name: string;
+            client: { scrobble: typeof traktClientMocks.scrobble };
+            hasToken: () => boolean;
+            getAccessToken: () => Promise<string>;
+            getSyncOptions?: (
+              user: { id: string },
+              hasExistingSync: boolean
+            ) => Record<string, unknown>;
+          }>
+        >;
+      },
+      "getSyncDestinations"
+    ).mockResolvedValue([
+      {
+        name: "Trakt",
+        client: { scrobble: traktClientMocks.scrobble },
+        hasToken: () => true,
+        getAccessToken: async () => "trakt-token",
+        getSyncOptions,
+      },
+    ]);
+
+    await service.syncEvent(makeEvent());
+
+    expect(getSyncOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "u1" }),
+      true
+    );
+    expect(traktClientMocks.scrobble).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "scrobble" }),
+      "trakt-token",
+      { markAsRewatched: true }
+    );
+  });
+
   it("continues syncing when Bingers client initialization fails", async () => {
     bingersClientCtorThrows.value = true;
     userRepositoryMocks.findBySourceUsername.mockResolvedValue({

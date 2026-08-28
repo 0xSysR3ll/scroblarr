@@ -632,4 +632,129 @@ describe("BingersCatalogResolver", () => {
       })
     ).rejects.toThrow("network failure");
   });
+
+  it("handles search responses without a results array", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({}), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          })
+      )
+    );
+
+    const resolver = new BingersCatalogResolver();
+    await expect(
+      resolver.resolveEntity({
+        id: "m1",
+        type: "movie",
+        title: "Unknown Movie",
+        year: 2020,
+      })
+    ).rejects.toThrow(/Could not resolve Bingers movie entity/i);
+  });
+
+  it("handles metadata entries with missing external id values", async () => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/search/titles")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: "movie-1",
+                kind: "movie",
+                metadata: "meta1",
+                card: { originalTitle: "Interstellar", year: 2014 },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/metadata@meta1.json")) {
+        return new Response(
+          JSON.stringify({
+            id: "movie-1",
+            kind: "movie",
+            year: 2014,
+            external_ids: [
+              { source: "imdb", id: null },
+              { source: "themoviedb.com", id: null },
+              { source: "tvdb", id: null },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const resolver = new BingersCatalogResolver();
+    await expect(
+      resolver.resolveEntity({
+        id: "m1",
+        type: "movie",
+        title: "Interstellar",
+        year: 2014,
+        imdbMovieId: "tt0816692",
+        tmdbMovieId: 157336,
+        tvdbMovieId: 12345,
+      })
+    ).resolves.toEqual({
+      entityKind: "movie",
+      entityId: "movie-1",
+      titleId: "movie-1",
+    });
+  });
+
+  it("falls back to title matching when metadata omits external_ids", async () => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/search/titles")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: "movie-1",
+                kind: "movie",
+                metadata: "meta1",
+                card: { originalTitle: "Interstellar", year: 2014 },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/metadata@meta1.json")) {
+        return new Response(
+          JSON.stringify({
+            id: "movie-1",
+            kind: "movie",
+            year: 2014,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const resolver = new BingersCatalogResolver();
+    await expect(
+      resolver.resolveEntity({
+        id: "m1",
+        type: "movie",
+        title: "Interstellar",
+        year: 2014,
+      })
+    ).resolves.toEqual({
+      entityKind: "movie",
+      entityId: "movie-1",
+      titleId: "movie-1",
+    });
+  });
 });
