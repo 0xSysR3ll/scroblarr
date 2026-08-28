@@ -385,4 +385,56 @@ describe("bingers routes", () => {
     expect(response.body.error).toBe("Validation error");
     expect(userRepositoryMocks.update).not.toHaveBeenCalled();
   });
+
+  it("returns 401 when auth middleware leaves no user on settings", async () => {
+    authState.user = null;
+
+    await request(app)
+      .patch("/bingers/settings")
+      .send({
+        markMoviesAsRewatched: true,
+        markEpisodesAsRewatched: false,
+      })
+      .expect(401);
+  });
+
+  it("returns 500 when settings update fails unexpectedly", async () => {
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"s"}}',
+    });
+    userRepositoryMocks.update.mockRejectedValue(new Error("db down"));
+
+    const response = await request(app)
+      .patch("/bingers/settings")
+      .send({
+        markMoviesAsRewatched: true,
+        markEpisodesAsRewatched: false,
+      })
+      .expect(500);
+
+    expect(response.body).toEqual({ error: "db down" });
+  });
+
+  it("returns a generic message when settings update rejects a non-Error", async () => {
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"s"}}',
+    });
+    userRepositoryMocks.update.mockRejectedValue("string failure");
+
+    const response = await request(app)
+      .patch("/bingers/settings")
+      .send({
+        markMoviesAsRewatched: true,
+        markEpisodesAsRewatched: false,
+      })
+      .expect(500);
+
+    expect(response.body).toEqual({
+      error: "Failed to update Bingers settings",
+    });
+  });
 });

@@ -10,6 +10,8 @@ import {
   unlinkBingers,
   unlinkSimkl,
   unlinkTrakt,
+  updateBingersSettings,
+  type BingersStatus,
 } from "@services/api";
 import { renderWithProviders } from "@test/render";
 import {
@@ -56,6 +58,7 @@ vi.mock("@services/api", () => ({
   getBingersStatus: vi.fn(),
   linkBingers: vi.fn(),
   unlinkBingers: vi.fn(),
+  updateBingersSettings: vi.fn(),
   BINGERS_MOBILE_SIGNIN_URL: "https://bingers.app/mobile-signin",
 }));
 
@@ -172,6 +175,8 @@ describe("IntegrationsTab", () => {
       needsReauthorization: false,
       username: null,
       image: null,
+      markMoviesAsRewatched: false,
+      markEpisodesAsRewatched: false,
     });
   });
 
@@ -510,6 +515,8 @@ describe("IntegrationsTab Trakt integration", () => {
       needsReauthorization: false,
       username: null,
       image: null,
+      markMoviesAsRewatched: false,
+      markEpisodesAsRewatched: false,
     });
     oauthPopupMocks.preparePopup.mockReturnValue({ closed: false });
     oauthPopupMocks.navigateToUrl.mockReset();
@@ -1144,6 +1151,8 @@ describe("IntegrationsTab Simkl integration", () => {
       needsReauthorization: false,
       username: null,
       image: null,
+      markMoviesAsRewatched: false,
+      markEpisodesAsRewatched: false,
     });
     oauthPopupMocks.preparePopup.mockReturnValue({ closed: false });
     onProfileUpdated.mockReset();
@@ -1801,6 +1810,8 @@ describe("IntegrationsTab Bingers integration", () => {
       needsReauthorization: false,
       username: null,
       image: null,
+      markMoviesAsRewatched: false,
+      markEpisodesAsRewatched: false,
     });
     oauthPopupMocks.preparePopup.mockReturnValue({ closed: false });
     onProfileUpdated.mockReset();
@@ -1830,12 +1841,16 @@ describe("IntegrationsTab Bingers integration", () => {
         needsReauthorization: false,
         username: null,
         image: null,
+        markMoviesAsRewatched: false,
+        markEpisodesAsRewatched: false,
       })
       .mockResolvedValueOnce({
         linked: true,
         needsReauthorization: false,
         username: "bingers-user",
         image: "https://img.example/bingers.png",
+        markMoviesAsRewatched: false,
+        markEpisodesAsRewatched: false,
       });
 
     renderWithProviders(
@@ -1869,12 +1884,16 @@ describe("IntegrationsTab Bingers integration", () => {
         needsReauthorization: false,
         username: "bingers-user",
         image: null,
+        markMoviesAsRewatched: false,
+        markEpisodesAsRewatched: false,
       })
       .mockResolvedValueOnce({
         linked: false,
         needsReauthorization: false,
         username: null,
         image: null,
+        markMoviesAsRewatched: false,
+        markEpisodesAsRewatched: false,
       });
     vi.mocked(unlinkBingers).mockResolvedValue({ success: true });
 
@@ -1900,6 +1919,8 @@ describe("IntegrationsTab Bingers integration", () => {
       needsReauthorization: true,
       username: "bingers-user",
       image: null,
+      markMoviesAsRewatched: false,
+      markEpisodesAsRewatched: false,
     });
 
     renderWithProviders(<IntegrationsTab />);
@@ -1954,12 +1975,7 @@ describe("IntegrationsTab Bingers integration", () => {
 
   it("clears Bingers loading after link even if the initial status fetch is still in flight", async () => {
     const user = userEvent.setup();
-    let resolveInitial: (value: {
-      linked: boolean;
-      needsReauthorization: boolean;
-      username: string | null;
-      image: string | null;
-    }) => void = () => undefined;
+    let resolveInitial: (value: BingersStatus) => void = () => undefined;
 
     vi.mocked(getBingersStatus)
       .mockImplementationOnce(
@@ -1973,6 +1989,8 @@ describe("IntegrationsTab Bingers integration", () => {
         needsReauthorization: false,
         username: "bingers-user",
         image: null,
+        markMoviesAsRewatched: false,
+        markEpisodesAsRewatched: false,
       });
     vi.mocked(linkBingers).mockResolvedValue({ success: true });
 
@@ -1994,6 +2012,8 @@ describe("IntegrationsTab Bingers integration", () => {
         needsReauthorization: false,
         username: null,
         image: null,
+        markMoviesAsRewatched: false,
+        markEpisodesAsRewatched: false,
       });
     });
 
@@ -2007,6 +2027,8 @@ describe("IntegrationsTab Bingers integration", () => {
       needsReauthorization: false,
       username: null,
       image: null,
+      markMoviesAsRewatched: false,
+      markEpisodesAsRewatched: false,
     });
     vi.mocked(unlinkBingers).mockResolvedValue({ success: true });
     await user.click(screen.getByRole("button", { name: "Unlink" }));
@@ -2021,12 +2043,7 @@ describe("IntegrationsTab Bingers integration", () => {
 
   it("ignores a stale Bingers status response after a newer request completes", async () => {
     const user = userEvent.setup();
-    let resolveInitial: (value: {
-      linked: boolean;
-      needsReauthorization: boolean;
-      username: string | null;
-      image: string | null;
-    }) => void = () => undefined;
+    let resolveInitial: (value: BingersStatus) => void = () => undefined;
 
     vi.mocked(getBingersStatus)
       .mockImplementationOnce(
@@ -2040,6 +2057,8 @@ describe("IntegrationsTab Bingers integration", () => {
         needsReauthorization: false,
         username: "fresh-user",
         image: null,
+        markMoviesAsRewatched: false,
+        markEpisodesAsRewatched: false,
       });
     vi.mocked(linkBingers).mockResolvedValue({ success: true });
 
@@ -2061,6 +2080,8 @@ describe("IntegrationsTab Bingers integration", () => {
         needsReauthorization: false,
         username: "stale-user",
         image: null,
+        markMoviesAsRewatched: false,
+        markEpisodesAsRewatched: false,
       });
     });
 
@@ -2075,6 +2096,8 @@ describe("IntegrationsTab Bingers integration", () => {
       needsReauthorization: false,
       username: "bingers-user",
       image: null,
+      markMoviesAsRewatched: false,
+      markEpisodesAsRewatched: false,
     });
     vi.mocked(unlinkBingers).mockRejectedValue(new Error("unlink denied"));
 
@@ -2094,6 +2117,8 @@ describe("IntegrationsTab Bingers integration", () => {
       needsReauthorization: false,
       username: "bingers-user",
       image: null,
+      markMoviesAsRewatched: false,
+      markEpisodesAsRewatched: false,
     });
     vi.mocked(unlinkBingers).mockRejectedValue("nope");
 
@@ -2160,6 +2185,8 @@ describe("IntegrationsTab Bingers integration", () => {
         needsReauthorization: false,
         username: null,
         image: null,
+        markMoviesAsRewatched: false,
+        markEpisodesAsRewatched: false,
       })
       .mockRejectedValueOnce(new Error("status down"));
 
@@ -2190,6 +2217,8 @@ describe("IntegrationsTab Bingers integration", () => {
         needsReauthorization: false,
         username: "bingers-user",
         image: null,
+        markMoviesAsRewatched: false,
+        markEpisodesAsRewatched: false,
       })
       .mockRejectedValueOnce(new Error("status down"));
     vi.mocked(unlinkBingers).mockResolvedValue({ success: true });
@@ -2210,6 +2239,71 @@ describe("IntegrationsTab Bingers integration", () => {
     expect(
       screen.getByRole("button", { name: "Open Bingers sign-in" })
     ).toBeVisible();
+  });
+
+  it("saves Bingers rewatch settings when linked", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getBingersStatus).mockResolvedValue({
+      linked: true,
+      needsReauthorization: false,
+      username: "bingers-user",
+      image: null,
+      markMoviesAsRewatched: false,
+      markEpisodesAsRewatched: false,
+    });
+    vi.mocked(updateBingersSettings).mockResolvedValue({
+      success: true,
+      markMoviesAsRewatched: true,
+      markEpisodesAsRewatched: false,
+    });
+
+    renderWithProviders(
+      <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+    );
+    await expandBingersSection(user);
+
+    await user.click(
+      screen.getByRole("checkbox", { name: "Mark movies as rewatched" })
+    );
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(updateBingersSettings).toHaveBeenCalledWith({
+        markMoviesAsRewatched: true,
+        markEpisodesAsRewatched: false,
+      });
+      expect(showSuccess).toHaveBeenCalledWith("Settings saved successfully!");
+      expect(onProfileUpdated).toHaveBeenCalled();
+    });
+    expect(
+      screen.queryByRole("button", { name: "Save" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows an error when saving Bingers rewatch settings fails", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getBingersStatus).mockResolvedValue({
+      linked: true,
+      needsReauthorization: false,
+      username: "bingers-user",
+      image: null,
+      markMoviesAsRewatched: false,
+      markEpisodesAsRewatched: false,
+    });
+    vi.mocked(updateBingersSettings).mockRejectedValue(
+      new Error("Settings unavailable")
+    );
+
+    renderWithProviders(<IntegrationsTab />);
+    await expandBingersSection(user);
+
+    await user.click(
+      screen.getByRole("checkbox", { name: "Mark episodes as rewatched" })
+    );
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Settings unavailable")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
   });
 
   it("skips the error banner when the window.open fallback succeeds", async () => {

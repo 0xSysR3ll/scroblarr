@@ -296,7 +296,7 @@ export class SyncHistoryRepository {
         identifiers.seasonNumber !== undefined &&
         identifiers.episodeNumber !== undefined
       ) {
-        return base()
+        const n = await base()
           .andWhere("sync_history.tmdbSeriesId = :tmdbSeriesId", {
             tmdbSeriesId: identifiers.tmdbSeriesId,
           })
@@ -307,6 +307,7 @@ export class SyncHistoryRepository {
             episodeNumber: identifiers.episodeNumber,
           })
           .getCount();
+        if (n > 0) return n;
       }
       if (
         identifiers.seasonNumber !== undefined &&

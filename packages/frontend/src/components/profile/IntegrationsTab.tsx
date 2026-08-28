@@ -1385,6 +1385,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                   <div className="mt-0.5">
                     <CustomCheckbox
                       checked={bingersMarkMoviesAsRewatched}
+                      disabled={bingersSavingSettings}
                       onChange={() =>
                         setBingersMarkMoviesAsRewatched(
                           !bingersMarkMoviesAsRewatched
@@ -1414,6 +1415,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                   <div className="mt-0.5">
                     <CustomCheckbox
                       checked={bingersMarkEpisodesAsRewatched}
+                      disabled={bingersSavingSettings}
                       onChange={() =>
                         setBingersMarkEpisodesAsRewatched(
                           !bingersMarkEpisodesAsRewatched

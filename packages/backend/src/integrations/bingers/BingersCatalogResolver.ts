@@ -182,6 +182,12 @@ export class BingersCatalogResolver {
           const score = this.scoreMetadataMatch(metadata, opts);
           return score > 0 ? { candidate, score } : null;
         } catch (error) {
+          if (
+            error instanceof BingersApiError &&
+            (error.isRateLimited || error.isAuthError)
+          ) {
+            throw error;
+          }
           logger.bingers.debug(
             { error, titleId: candidate.id },
             "Failed to fetch Bingers metadata grain"

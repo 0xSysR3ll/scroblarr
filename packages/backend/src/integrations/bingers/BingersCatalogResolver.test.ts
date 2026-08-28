@@ -227,6 +227,52 @@ describe("BingersCatalogResolver", () => {
     });
   });
 
+  it("rethrows rate-limit and auth errors from metadata fetch", async () => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/search/titles")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: "movie-1",
+                kind: "movie",
+                metadata: "abc",
+                card: { originalTitle: "Interstellar", year: 2014 },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/metadata@abc.json")) {
+        return new Response(
+          JSON.stringify({
+            error: {
+              code: "rate_limited",
+              message: "slow down",
+              retryAfterSeconds: 30,
+            },
+          }),
+          { status: 429, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const resolver = new BingersCatalogResolver();
+    await expect(
+      resolver.resolveEntity({
+        id: "m1",
+        type: "movie",
+        title: "Interstellar",
+        year: 2014,
+        imdbMovieId: "tt0816692",
+      })
+    ).rejects.toMatchObject({ isRateLimited: true, status: 429 });
+  });
+
   it("throws when episode season is missing from versions", async () => {
     const fetchMock = vi.fn(async (input: string | URL) => {
       const url = String(input);

@@ -410,6 +410,34 @@ describe("SyncHistoryRepository integration", () => {
     ).resolves.toBe(1);
   });
 
+  it("counts episodes by title fallback when TMDB id lookup misses", async () => {
+    await createHistory([
+      {
+        userId: user.id,
+        mediaType: "episode",
+        mediaTitle: "Title Only Show",
+        success: true,
+        seasonNumber: 1,
+        episodeNumber: 3,
+        destinations: JSON.stringify(["Bingers"]),
+      },
+    ]);
+
+    await expect(
+      repository.countSuccessfulDestinationSyncs(
+        user.id,
+        "Bingers",
+        "episode",
+        {
+          tmdbSeriesId: "99999",
+          mediaTitle: "Title Only Show",
+          seasonNumber: 1,
+          episodeNumber: 3,
+        }
+      )
+    ).resolves.toBe(1);
+  });
+
   async function createHistory(items: Array<Partial<SyncHistory>>) {
     await dataSource.getRepository(SyncHistoryEntity).save(
       items.map((item) => ({

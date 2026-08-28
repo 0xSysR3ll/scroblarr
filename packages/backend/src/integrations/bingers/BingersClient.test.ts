@@ -129,4 +129,51 @@ describe("BingersClient", () => {
       isAuthError: true,
     });
   });
+
+  it("maps non-auth HTTP errors to BingersApiError", async () => {
+    const catalog = {
+      resolveEntity: vi.fn().mockResolvedValue({
+        entityKind: "movie",
+        entityId: "movie-1",
+        titleId: "movie-1",
+      }),
+    } as unknown as BingersCatalogResolver;
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("server error", { status: 500 }))
+    );
+
+    const client = new BingersClient(catalog);
+    await expect(
+      client.scrobble(makeEvent(), "session_token=abc")
+    ).rejects.toMatchObject({
+      name: "BingersApiError",
+      status: 500,
+    });
+  });
+
+  it("maps push timeouts to a descriptive error", async () => {
+    const catalog = {
+      resolveEntity: vi.fn().mockResolvedValue({
+        entityKind: "movie",
+        entityId: "movie-1",
+        titleId: "movie-1",
+      }),
+    } as unknown as BingersCatalogResolver;
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        const error = new Error("aborted");
+        error.name = "AbortError";
+        throw error;
+      })
+    );
+
+    const client = new BingersClient(catalog);
+    await expect(
+      client.scrobble(makeEvent(), "session_token=abc")
+    ).rejects.toThrow("Bingers sync/push timed out");
+  });
 });

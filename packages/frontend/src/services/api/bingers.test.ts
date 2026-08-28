@@ -6,6 +6,7 @@ import {
   invalidateBingersCache,
   linkBingers,
   unlinkBingers,
+  updateBingersSettings,
 } from "./bingers";
 
 const expectedHeaders = { "Content-Type": "application/json" };
@@ -208,5 +209,64 @@ describe("bingers api", () => {
     await expect(getBingersStatus()).rejects.toThrow(
       "Failed to fetch Bingers status"
     );
+  });
+
+  it("updates rewatch settings and invalidates cached status", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          linked: true,
+          needsReauthorization: false,
+          username: "alice",
+          image: null,
+          markMoviesAsRewatched: false,
+          markEpisodesAsRewatched: false,
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          success: true,
+          markMoviesAsRewatched: true,
+          markEpisodesAsRewatched: false,
+        })
+      );
+
+    await getBingersStatus();
+    await expect(
+      updateBingersSettings({
+        markMoviesAsRewatched: true,
+        markEpisodesAsRewatched: false,
+      })
+    ).resolves.toEqual({
+      success: true,
+      markMoviesAsRewatched: true,
+      markEpisodesAsRewatched: false,
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/v1/bingers/settings", {
+      method: "PATCH",
+      headers: expectedHeaders,
+      body: JSON.stringify({
+        markMoviesAsRewatched: true,
+        markEpisodesAsRewatched: false,
+      }),
+    });
+  });
+
+  it("surfaces settings update errors from the backend", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "Settings unavailable" }), {
+        status: 500,
+        statusText: "Internal Server Error",
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+
+    await expect(
+      updateBingersSettings({
+        markMoviesAsRewatched: true,
+        markEpisodesAsRewatched: true,
+      })
+    ).rejects.toThrow("Settings unavailable");
   });
 });
