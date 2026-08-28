@@ -133,6 +133,8 @@ export class BingersSessionManager {
       bingersUserId: null,
       bingersUsername: null,
       bingersThumb: null,
+      bingersMarkMoviesAsRewatched: false,
+      bingersMarkEpisodesAsRewatched: false,
     } as unknown as Partial<User>);
   }
 

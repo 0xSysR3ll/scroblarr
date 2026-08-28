@@ -170,28 +170,30 @@ export class BingersCatalogResolver {
       preferKind: "movie" | "show";
     }
   ): Promise<SearchTitleResult | null> {
-    const scored: Array<{ candidate: SearchTitleResult; score: number }> = [];
-
-    for (const candidate of candidates.slice(0, 12)) {
-      if (!candidate.metadata) {
-        continue;
-      }
-
-      try {
-        const metadata = await this.fetchJson<MetadataGrain>(
-          `${BINGERS_CATALOG_BASE}/catalog/${candidate.id}/metadata@${candidate.metadata}.json`
-        );
-        const score = this.scoreMetadataMatch(metadata, opts);
-        if (score > 0) {
-          scored.push({ candidate, score });
+    const metadataCandidates = candidates
+      .slice(0, 12)
+      .filter((candidate) => candidate.metadata);
+    const scoredResults = await Promise.all(
+      metadataCandidates.map(async (candidate) => {
+        try {
+          const metadata = await this.fetchJson<MetadataGrain>(
+            `${BINGERS_CATALOG_BASE}/catalog/${candidate.id}/metadata@${candidate.metadata}.json`
+          );
+          const score = this.scoreMetadataMatch(metadata, opts);
+          return score > 0 ? { candidate, score } : null;
+        } catch (error) {
+          logger.bingers.debug(
+            { error, titleId: candidate.id },
+            "Failed to fetch Bingers metadata grain"
+          );
+          return null;
         }
-      } catch (error) {
-        logger.bingers.debug(
-          { error, titleId: candidate.id },
-          "Failed to fetch Bingers metadata grain"
-        );
-      }
-    }
+      })
+    );
+    const scored = scoredResults.filter(
+      (entry): entry is { candidate: SearchTitleResult; score: number } =>
+        entry !== null
+    );
 
     scored.sort((a, b) => b.score - a.score);
     if (scored[0]?.score) {

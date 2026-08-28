@@ -143,6 +143,8 @@ describe("bingers routes", () => {
       needsReauthorization: false,
       username: "User",
       image: "https://img.example/avatar.png",
+      markMoviesAsRewatched: false,
+      markEpisodesAsRewatched: false,
     });
     expect(response.body).not.toHaveProperty("bingersCookieJar");
     expect(response.body).not.toHaveProperty("cookieJar");
@@ -311,5 +313,76 @@ describe("bingers routes", () => {
     expect(response.body).toEqual({
       error: "Failed to get Bingers status",
     });
+  });
+
+  it("updates rewatch settings when linked", async () => {
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      plexUsername: "plex-user",
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"s"}}',
+      bingersMarkMoviesAsRewatched: false,
+      bingersMarkEpisodesAsRewatched: false,
+    });
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "user-id",
+      bingersMarkMoviesAsRewatched: true,
+      bingersMarkEpisodesAsRewatched: false,
+    });
+
+    const response = await request(app)
+      .patch("/bingers/settings")
+      .send({
+        markMoviesAsRewatched: true,
+        markEpisodesAsRewatched: false,
+      })
+      .expect(200);
+
+    expect(response.body).toEqual({
+      success: true,
+      markMoviesAsRewatched: true,
+      markEpisodesAsRewatched: false,
+    });
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith("user-id", {
+      bingersMarkMoviesAsRewatched: true,
+      bingersMarkEpisodesAsRewatched: false,
+    });
+  });
+
+  it("rejects settings updates when Bingers is not linked", async () => {
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      plexUsername: "plex-user",
+      bingersCookieJar: null,
+    });
+
+    const response = await request(app)
+      .patch("/bingers/settings")
+      .send({
+        markMoviesAsRewatched: true,
+        markEpisodesAsRewatched: true,
+      })
+      .expect(400);
+
+    expect(response.body.error).toBe(
+      "Link your Bingers account before changing sync settings"
+    );
+    expect(userRepositoryMocks.update).not.toHaveBeenCalled();
+  });
+
+  it("returns validation errors for invalid settings payloads", async () => {
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"s"}}',
+    });
+
+    const response = await request(app)
+      .patch("/bingers/settings")
+      .send({ markMoviesAsRewatched: "yes" })
+      .expect(400);
+
+    expect(response.body.error).toBe("Validation error");
+    expect(userRepositoryMocks.update).not.toHaveBeenCalled();
   });
 });

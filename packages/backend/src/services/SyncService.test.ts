@@ -366,7 +366,7 @@ describe("SyncService", () => {
       expect.objectContaining({ event: "scrobble" }),
       "session_token=bingers-cookie",
       expect.objectContaining({
-        plays: 2,
+        plays: 1,
         markMoviesAsRewatched: false,
       })
     );
@@ -375,6 +375,61 @@ describe("SyncService", () => {
         success: true,
         destinations: JSON.stringify(["Bingers"]),
         wasRewatched: false,
+      })
+    );
+  });
+
+  it("increments Bingers episode plays when rewatch is enabled", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktAccessToken: null,
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"x"}}',
+      bingersMarkMoviesAsRewatched: false,
+      bingersMarkEpisodesAsRewatched: true,
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(true);
+    syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs.mockResolvedValue(
+      1
+    );
+    bingersSessionManagerMocks.getValidCookieJar.mockResolvedValue({
+      session_token: { name: "session_token", value: "x" },
+    });
+    bingersClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    await service.syncEvent(
+      makeEvent({
+        media: {
+          id: "e1",
+          type: "episode",
+          title: "Example Show",
+          seasonNumber: 1,
+          episodeNumber: 2,
+        },
+      })
+    );
+
+    expect(
+      syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs
+    ).toHaveBeenCalledWith(
+      "u1",
+      "Bingers",
+      "episode",
+      expect.objectContaining({
+        mediaTitle: "Example Show",
+        seasonNumber: 1,
+        episodeNumber: 2,
+      })
+    );
+    expect(bingersClientMocks.scrobble).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "scrobble" }),
+      "session_token=bingers-cookie",
+      expect.objectContaining({
+        plays: 2,
+        markEpisodesAsRewatched: true,
       })
     );
   });

@@ -147,6 +147,13 @@ router.patch("/settings", async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
+    const freshUser = await userRepository.findById(user.id);
+    if (!freshUser?.bingersCookieJar) {
+      return res.status(400).json({
+        error: "Link your Bingers account before changing sync settings",
+      });
+    }
+
     const validated = settingsSchema.parse(req.body);
     const updated = await userRepository.update(user.id, {
       bingersMarkMoviesAsRewatched: validated.markMoviesAsRewatched,

@@ -348,6 +348,68 @@ describe("SyncHistoryRepository integration", () => {
     ).resolves.toBe(false);
   });
 
+  it("matches episodes and movies by title fallback identifiers", async () => {
+    await createHistory([
+      {
+        userId: user.id,
+        mediaType: "episode",
+        mediaTitle: "Fallback Show",
+        success: true,
+        seasonNumber: 2,
+        episodeNumber: 4,
+        destinations: JSON.stringify(["Bingers"]),
+      },
+      {
+        userId: user.id,
+        mediaType: "movie",
+        mediaTitle: "Fallback Movie",
+        success: true,
+        year: 2010,
+        destinations: JSON.stringify(["Bingers"]),
+      },
+    ]);
+
+    await expect(
+      repository.hasExistingSync(user.id, "episode", {
+        mediaTitle: "Fallback Show",
+        seasonNumber: 2,
+        episodeNumber: 4,
+      })
+    ).resolves.toBe(true);
+    await expect(
+      repository.hasExistingSync(user.id, "episode", {
+        mediaTitle: "Fallback Show",
+        seasonNumber: 2,
+        episodeNumber: 5,
+      })
+    ).resolves.toBe(false);
+    await expect(
+      repository.hasExistingSync(user.id, "movie", {
+        mediaTitle: "Fallback Movie",
+        year: 2010,
+      })
+    ).resolves.toBe(true);
+
+    await expect(
+      repository.countSuccessfulDestinationSyncs(
+        user.id,
+        "Bingers",
+        "episode",
+        {
+          mediaTitle: "Fallback Show",
+          seasonNumber: 2,
+          episodeNumber: 4,
+        }
+      )
+    ).resolves.toBe(1);
+    await expect(
+      repository.countSuccessfulDestinationSyncs(user.id, "Bingers", "movie", {
+        mediaTitle: "Fallback Movie",
+        year: 2010,
+      })
+    ).resolves.toBe(1);
+  });
+
   async function createHistory(items: Array<Partial<SyncHistory>>) {
     await dataSource.getRepository(SyncHistoryEntity).save(
       items.map((item) => ({

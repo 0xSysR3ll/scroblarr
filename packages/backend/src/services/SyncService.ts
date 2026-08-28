@@ -328,6 +328,8 @@ export class SyncService {
       tmdbSeriesId: event.media.tmdbSeriesId?.toString(),
       seasonNumber: event.media.seasonNumber,
       episodeNumber: event.media.episodeNumber,
+      mediaTitle: event.media.title,
+      year: event.media.year,
     };
 
     const hasExistingSync = await this.syncHistoryRepository.hasExistingSync(
@@ -376,7 +378,7 @@ export class SyncService {
           const shouldRewatch = allowRewatch && priorPlays > 0;
           bingersWasRewatch = shouldRewatch;
           options = {
-            plays: shouldRewatch ? priorPlays + 1 : Math.max(1, priorPlays),
+            plays: shouldRewatch ? priorPlays + 1 : 1,
             markMoviesAsRewatched:
               shouldRewatch && event.media.type === "movie",
             markEpisodesAsRewatched:

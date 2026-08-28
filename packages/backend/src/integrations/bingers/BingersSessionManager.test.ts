@@ -332,6 +332,8 @@ describe("BingersSessionManager", () => {
         bingersUserId: null,
         bingersUsername: null,
         bingersThumb: null,
+        bingersMarkMoviesAsRewatched: false,
+        bingersMarkEpisodesAsRewatched: false,
       })
     );
   });

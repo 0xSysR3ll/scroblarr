@@ -161,6 +161,8 @@ export class SyncHistoryRepository {
       tmdbSeriesId?: string;
       seasonNumber?: number;
       episodeNumber?: number;
+      mediaTitle?: string;
+      year?: number;
     }
   ): Promise<boolean> {
     const where: FindOptionsWhere<SyncHistory> = {
@@ -194,6 +196,20 @@ export class SyncHistoryRepository {
         const existing = await this.repository.findOne({ where });
         if (existing) return true;
       }
+      if (
+        identifiers.seasonNumber !== undefined &&
+        identifiers.episodeNumber !== undefined &&
+        identifiers.mediaTitle
+      ) {
+        where.tvdbEpisodeId = undefined;
+        where.imdbEpisodeId = undefined;
+        where.tmdbSeriesId = undefined;
+        where.seasonNumber = identifiers.seasonNumber;
+        where.episodeNumber = identifiers.episodeNumber;
+        where.mediaTitle = identifiers.mediaTitle;
+        const existing = await this.repository.findOne({ where });
+        if (existing) return true;
+      }
     }
 
     if (mediaType === "movie") {
@@ -215,6 +231,15 @@ export class SyncHistoryRepository {
         const existing = await this.repository.findOne({ where });
         if (existing) return true;
       }
+      if (identifiers.mediaTitle && identifiers.year !== undefined) {
+        where.tvdbMovieId = undefined;
+        where.imdbMovieId = undefined;
+        where.tmdbMovieId = undefined;
+        where.mediaTitle = identifiers.mediaTitle;
+        where.year = identifiers.year;
+        const existing = await this.repository.findOne({ where });
+        if (existing) return true;
+      }
     }
 
     return false;
@@ -233,6 +258,8 @@ export class SyncHistoryRepository {
       tmdbSeriesId?: string;
       seasonNumber?: number;
       episodeNumber?: number;
+      mediaTitle?: string;
+      year?: number;
     }
   ): Promise<number> {
     const destinationPat = `%"${destination}"%`;
@@ -281,6 +308,23 @@ export class SyncHistoryRepository {
           })
           .getCount();
       }
+      if (
+        identifiers.seasonNumber !== undefined &&
+        identifiers.episodeNumber !== undefined &&
+        identifiers.mediaTitle
+      ) {
+        return base()
+          .andWhere("sync_history.seasonNumber = :seasonNumber", {
+            seasonNumber: identifiers.seasonNumber,
+          })
+          .andWhere("sync_history.episodeNumber = :episodeNumber", {
+            episodeNumber: identifiers.episodeNumber,
+          })
+          .andWhere("sync_history.mediaTitle = :mediaTitle", {
+            mediaTitle: identifiers.mediaTitle,
+          })
+          .getCount();
+      }
       return 0;
     }
 
@@ -301,10 +345,19 @@ export class SyncHistoryRepository {
       if (n > 0) return n;
     }
     if (identifiers.tmdbMovieId) {
-      return base()
+      const n = await base()
         .andWhere("sync_history.tmdbMovieId = :tmdbMovieId", {
           tmdbMovieId: identifiers.tmdbMovieId,
         })
+        .getCount();
+      if (n > 0) return n;
+    }
+    if (identifiers.mediaTitle && identifiers.year !== undefined) {
+      return base()
+        .andWhere("sync_history.mediaTitle = :mediaTitle", {
+          mediaTitle: identifiers.mediaTitle,
+        })
+        .andWhere("sync_history.year = :year", { year: identifiers.year })
         .getCount();
     }
 
