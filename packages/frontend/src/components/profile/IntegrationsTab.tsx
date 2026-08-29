@@ -687,12 +687,16 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         }
       } catch {
         if (requestId === bingersStatusRequestIdRef.current) {
-          setBingersStatus({
+          const linkedStatus: BingersStatus = {
             linked: true,
             needsReauthorization: false,
             username: null,
             image: null,
-          });
+            markMoviesAsRewatched: false,
+            markEpisodesAsRewatched: false,
+          };
+          setBingersStatus(linkedStatus);
+          applyBingersRewatchSettings(linkedStatus);
         }
       }
       showSuccess(
