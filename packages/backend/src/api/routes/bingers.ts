@@ -154,6 +154,15 @@ router.patch("/settings", async (req: Request, res: Response) => {
       });
     }
 
+    const sessionStatus = await sessionManager.validateAndRefresh(user.id);
+    if (!sessionStatus.linked) {
+      return res.status(400).json({
+        error: sessionStatus.needsReauthorization
+          ? "Bingers session expired; link your account again"
+          : "Link your Bingers account before changing sync settings",
+      });
+    }
+
     const validated = settingsSchema.parse(req.body);
     const updated = await userRepository.update(user.id, {
       bingersMarkMoviesAsRewatched: validated.markMoviesAsRewatched,

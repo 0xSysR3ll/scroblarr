@@ -14,6 +14,33 @@ export function serializeCookieJar(jar: CookieJar): string {
   return JSON.stringify(jar);
 }
 
+export function hasUsableSessionCookie(jar: CookieJar): boolean {
+  const now = Date.now();
+  return Object.values(jar).some(
+    (entry) =>
+      entry.name === "session_token" &&
+      !!entry.value &&
+      (!entry.expires || entry.expires > now)
+  );
+}
+
+/** True when stored jar text is present but not a usable session cookie jar. */
+export function isCorruptStoredCookieJar(
+  raw: string | null | undefined
+): boolean {
+  if (!raw?.trim()) {
+    return false;
+  }
+
+  try {
+    JSON.parse(raw);
+  } catch {
+    return true;
+  }
+
+  return !hasUsableSessionCookie(parseCookieJar(raw));
+}
+
 export function parseCookieJar(raw: string): CookieJar {
   if (!raw.trim()) {
     return emptyCookieJar();

@@ -11,6 +11,8 @@ import {
   cookieHeaderFromJar,
   collectSetCookieHeaders,
   emptyCookieJar,
+  hasUsableSessionCookie,
+  isCorruptStoredCookieJar,
   mergeSetCookieHeaders,
   parseCookieJar,
   serializeCookieJar,
@@ -89,6 +91,38 @@ describe("cookieJar", () => {
 
   it("returns an empty jar helper", () => {
     expect(emptyCookieJar()).toEqual({});
+  });
+
+  it("detects corrupt stored cookie jars", () => {
+    expect(isCorruptStoredCookieJar(null)).toBe(false);
+    expect(isCorruptStoredCookieJar("")).toBe(false);
+    expect(isCorruptStoredCookieJar("not-json")).toBe(true);
+    expect(isCorruptStoredCookieJar('{"bad":{"value":"x"}}')).toBe(true);
+    expect(
+      isCorruptStoredCookieJar(
+        serializeCookieJar({
+          session_token: { name: "session_token", value: "abc" },
+        })
+      )
+    ).toBe(false);
+  });
+
+  it("checks for a usable session cookie", () => {
+    expect(hasUsableSessionCookie({})).toBe(false);
+    expect(
+      hasUsableSessionCookie({
+        session_token: { name: "session_token", value: "abc" },
+      })
+    ).toBe(true);
+    expect(
+      hasUsableSessionCookie({
+        session_token: {
+          name: "session_token",
+          value: "dead",
+          expires: Date.now() - 1,
+        },
+      })
+    ).toBe(false);
   });
 
   it("skips invalid jar entries when parsing", () => {

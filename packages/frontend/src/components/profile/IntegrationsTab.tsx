@@ -157,8 +157,16 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         }
         setBingersStatus(status);
         applyBingersRewatchSettings(status);
+        setBingersError(null);
       } catch {
-        // Error handled by UI state
+        if (requestId !== bingersStatusRequestIdRef.current) {
+          return;
+        }
+        setBingersError(
+          t("bingers.statusLoadFailed", {
+            defaultValue: "Failed to load Bingers status",
+          })
+        );
       } finally {
         setBingersLoading(false);
       }

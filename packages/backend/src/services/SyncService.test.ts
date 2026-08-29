@@ -286,7 +286,10 @@ describe("SyncService", () => {
     expect(bingersClientMocks.scrobble).toHaveBeenCalledWith(
       expect.objectContaining({ event: "scrobble" }),
       "session_token=bingers-cookie",
-      expect.objectContaining({ plays: 1 })
+      expect.objectContaining({
+        bingersLocalPlayCount: undefined,
+        markMoviesAsRewatched: false,
+      })
     );
     expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -411,7 +414,7 @@ describe("SyncService", () => {
       expect.objectContaining({ event: "scrobble" }),
       "session_token=bingers-cookie",
       expect.objectContaining({
-        plays: 3,
+        bingersLocalPlayCount: 3,
         markMoviesAsRewatched: true,
       })
     );
@@ -424,7 +427,7 @@ describe("SyncService", () => {
     );
   });
 
-  it("does not increment Bingers plays when rewatch is opted out", async () => {
+  it("skips Bingers when rewatch is opted out and the item was already synced", async () => {
     userRepositoryMocks.findBySourceUsername.mockResolvedValue({
       id: "u1",
       enabled: true,
@@ -447,14 +450,7 @@ describe("SyncService", () => {
     const service = new SyncService();
     await service.syncEvent(makeEvent());
 
-    expect(bingersClientMocks.scrobble).toHaveBeenCalledWith(
-      expect.objectContaining({ event: "scrobble" }),
-      "session_token=bingers-cookie",
-      expect.objectContaining({
-        plays: 1,
-        markMoviesAsRewatched: false,
-      })
-    );
+    expect(bingersClientMocks.scrobble).not.toHaveBeenCalled();
     expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
       expect.objectContaining({
         success: true,
@@ -513,7 +509,7 @@ describe("SyncService", () => {
       expect.objectContaining({ event: "scrobble" }),
       "session_token=bingers-cookie",
       expect.objectContaining({
-        plays: 2,
+        bingersLocalPlayCount: 2,
         markEpisodesAsRewatched: true,
       })
     );

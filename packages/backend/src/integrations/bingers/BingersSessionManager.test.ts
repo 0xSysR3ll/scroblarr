@@ -317,6 +317,31 @@ describe("BingersSessionManager", () => {
     });
   });
 
+  it("clears corrupt stored jars and requires re-authorization", async () => {
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar: "not-json",
+      bingersEmail: "user@example.com",
+    });
+
+    const manager = new BingersSessionManager(
+      userRepositoryMocks as never,
+      authMocks as unknown as BingersAuth
+    );
+
+    await expect(manager.getValidCookieJar("user-id")).rejects.toMatchObject({
+      isAuthError: true,
+    });
+    expect(authMocks.getSession).not.toHaveBeenCalled();
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith(
+      "user-id",
+      expect.objectContaining({
+        bingersCookieJar: null,
+        bingersEmail: "user@example.com",
+      })
+    );
+  });
+
   it("clears all Bingers fields on clearAll", async () => {
     const manager = new BingersSessionManager(
       userRepositoryMocks as never,

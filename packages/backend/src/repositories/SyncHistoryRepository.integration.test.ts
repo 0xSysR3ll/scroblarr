@@ -225,7 +225,7 @@ describe("SyncHistoryRepository integration", () => {
     expect(stats.byMediaType).toEqual({ episode: 2, movie: 1, series: 1 });
     expect(stats.bySource).toEqual({ plex: 2, jellyfin: 1 });
     expect(stats.byDestination).toEqual({
-      trakt: 2,
+      trakt: 1,
       tvtime: 2,
       simkl: 0,
       bingers: 0,

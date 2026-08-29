@@ -1,5 +1,6 @@
 import { SyncHistory } from "@entities/SyncHistory";
 import { User } from "@entities/User";
+import { isBingersAuthError } from "@integrations/bingers/BingersApiError";
 import { BingersClient } from "@integrations/bingers/BingersClient";
 import { BingersSessionManager } from "@integrations/bingers/BingersSessionManager";
 import { cookieHeaderFromJar } from "@integrations/bingers/cookieJar";
@@ -109,6 +110,12 @@ export class SyncService {
           client: new BingersClient(),
           hasToken: (u) => !!u.bingersCookieJar,
           getAccessToken: async (u) => {
+            const jar = await this.bingersSessionManager.getValidCookieJar(
+              u.id
+            );
+            return cookieHeaderFromJar(jar);
+          },
+          refreshAccessToken: async (u) => {
             const jar = await this.bingersSessionManager.getValidCookieJar(
               u.id
             );
@@ -376,13 +383,28 @@ export class SyncService {
               ? !!user.bingersMarkMoviesAsRewatched
               : !!user.bingersMarkEpisodesAsRewatched;
           const shouldRewatch = allowRewatch && priorPlays > 0;
+
+          if (hasExistingSync && !shouldRewatch) {
+            logger.sync.debug(
+              {
+                username: userIdentifier,
+                mediaType: event.media.type,
+                mediaTitle: event.media.title,
+                destination: destination.name,
+              },
+              "Skipping Bingers sync; item already synced and rewatch is disabled"
+            );
+            syncResults.push({ destination: destination.name, success: true });
+            continue;
+          }
+
           bingersWasRewatch = shouldRewatch;
           options = {
-            plays: shouldRewatch ? priorPlays + 1 : 1,
             markMoviesAsRewatched:
               shouldRewatch && event.media.type === "movie",
             markEpisodesAsRewatched:
               shouldRewatch && event.media.type === "episode",
+            bingersLocalPlayCount: shouldRewatch ? priorPlays + 1 : undefined,
           };
         }
 
@@ -547,7 +569,14 @@ export class SyncService {
     try {
       await destination.client.scrobble(event, accessToken, options);
     } catch (error) {
-      if (!destination.refreshAccessToken || !isTraktAuthError(error)) {
+      if (!destination.refreshAccessToken) {
+        throw error;
+      }
+
+      const canRetryTrakt = isTraktAuthError(error);
+      const canRetryBingers =
+        destination.name === "Bingers" && isBingersAuthError(error);
+      if (!canRetryTrakt && !canRetryBingers) {
         throw error;
       }
 

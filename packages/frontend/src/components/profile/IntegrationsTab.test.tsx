@@ -1817,13 +1817,16 @@ describe("IntegrationsTab Bingers integration", () => {
     onProfileUpdated.mockReset();
   });
 
-  it("keeps the unlinked Bingers form when the initial status fetch fails", async () => {
+  it("shows an error and keeps the unlinked Bingers form when the initial status fetch fails", async () => {
     const user = userEvent.setup();
     vi.mocked(getBingersStatus).mockRejectedValue(new Error("status down"));
 
     renderWithProviders(<IntegrationsTab />);
     await expandBingersSection(user);
 
+    expect(
+      await screen.findByText("Failed to load Bingers status")
+    ).toBeVisible();
     expect(
       screen.getByRole("button", { name: "Open Bingers sign-in" })
     ).toBeVisible();

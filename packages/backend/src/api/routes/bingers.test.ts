@@ -92,6 +92,12 @@ describe("bingers routes", () => {
       plexUsername: "plex-user",
       bingersEmail: null,
     });
+    sessionManagerMocks.validateAndRefresh.mockResolvedValue({
+      linked: true,
+      needsReauthorization: false,
+      username: "User",
+      image: null,
+    });
   });
 
   it("extracts token from URL when linking", async () => {
@@ -347,6 +353,34 @@ describe("bingers routes", () => {
       bingersMarkMoviesAsRewatched: true,
       bingersMarkEpisodesAsRewatched: false,
     });
+  });
+
+  it("rejects settings updates when the Bingers session is no longer valid", async () => {
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      plexUsername: "plex-user",
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"s"}}',
+    });
+    sessionManagerMocks.validateAndRefresh.mockResolvedValue({
+      linked: false,
+      needsReauthorization: true,
+      username: "User",
+      image: null,
+    });
+
+    const response = await request(app)
+      .patch("/bingers/settings")
+      .send({
+        markMoviesAsRewatched: true,
+        markEpisodesAsRewatched: false,
+      })
+      .expect(400);
+
+    expect(response.body.error).toBe(
+      "Bingers session expired; link your account again"
+    );
+    expect(userRepositoryMocks.update).not.toHaveBeenCalled();
   });
 
   it("rejects settings updates when Bingers is not linked", async () => {

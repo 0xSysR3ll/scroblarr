@@ -3,7 +3,8 @@ import { MediaEvent } from "@scroblarr/shared";
 export interface SyncOptions {
   markMoviesAsRewatched?: boolean;
   markEpisodesAsRewatched?: boolean;
-  plays?: number;
+  /** Minimum play count from Scroblarr history when marking a rewatch. */
+  bingersLocalPlayCount?: number;
 }
 
 export interface SyncResult {

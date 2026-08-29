@@ -488,6 +488,7 @@ export class SyncHistoryRepository {
       this.repository
         .createQueryBuilder("sync_history")
         .where("sync_history.userId = :userId", { userId })
+        .andWhere("sync_history.success = :success", { success: true })
         .andWhere("sync_history.destinations LIKE :traktPat", {
           traktPat: '%"Trakt"%',
         })
@@ -495,6 +496,7 @@ export class SyncHistoryRepository {
       this.repository
         .createQueryBuilder("sync_history")
         .where("sync_history.userId = :userId", { userId })
+        .andWhere("sync_history.success = :success", { success: true })
         .andWhere("sync_history.destinations LIKE :tvtimePat", {
           tvtimePat: '%"TVTime"%',
         })
@@ -502,6 +504,7 @@ export class SyncHistoryRepository {
       this.repository
         .createQueryBuilder("sync_history")
         .where("sync_history.userId = :userId", { userId })
+        .andWhere("sync_history.success = :success", { success: true })
         .andWhere("sync_history.destinations LIKE :simklPat", {
           simklPat: '%"Simkl"%',
         })
@@ -509,6 +512,7 @@ export class SyncHistoryRepository {
       this.repository
         .createQueryBuilder("sync_history")
         .where("sync_history.userId = :userId", { userId })
+        .andWhere("sync_history.success = :success", { success: true })
         .andWhere("sync_history.destinations LIKE :bingersPat", {
           bingersPat: '%"Bingers"%',
         })

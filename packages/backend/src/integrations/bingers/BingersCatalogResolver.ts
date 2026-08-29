@@ -173,8 +173,10 @@ export class BingersCatalogResolver {
     const metadataCandidates = candidates
       .slice(0, 12)
       .filter((candidate) => candidate.metadata);
-    const scoredResults = await Promise.all(
-      metadataCandidates.map(async (candidate) => {
+    const scoredResults = await this.mapWithConcurrency(
+      metadataCandidates,
+      3,
+      async (candidate) => {
         try {
           const metadata = await this.fetchJson<MetadataGrain>(
             `${BINGERS_CATALOG_BASE}/catalog/${candidate.id}/metadata@${candidate.metadata}.json`
@@ -194,7 +196,7 @@ export class BingersCatalogResolver {
           );
           return null;
         }
-      })
+      }
     );
     const scored = scoredResults.filter(
       (entry): entry is { candidate: SearchTitleResult; score: number } =>
@@ -219,7 +221,45 @@ export class BingersCatalogResolver {
       }
     }
 
+    if (opts.title) {
+      const wanted = this.normalizeTitle(opts.title);
+      const byTitle = candidates.filter((c) =>
+        this.candidateTitles(c).some((t) => this.normalizeTitle(t) === wanted)
+      );
+      if (byTitle.length === 1) {
+        return byTitle[0];
+      }
+    }
+
     return null;
+  }
+
+  private async mapWithConcurrency<T, R>(
+    items: T[],
+    limit: number,
+    fn: (item: T) => Promise<R>
+  ): Promise<R[]> {
+    if (items.length === 0) {
+      return [];
+    }
+
+    const results = new Array<R>(items.length);
+    let nextIndex = 0;
+    const workerCount = Math.min(limit, items.length);
+
+    await Promise.all(
+      Array.from({ length: workerCount }, async () => {
+        while (true) {
+          const index = nextIndex++;
+          if (index >= items.length) {
+            break;
+          }
+          results[index] = await fn(items[index]);
+        }
+      })
+    );
+
+    return results;
   }
 
   private candidateTitles(candidate: SearchTitleResult): string[] {
