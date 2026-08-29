@@ -461,6 +461,50 @@ describe("SyncService", () => {
     );
   });
 
+  it("syncs to Bingers on first watch even when the item was synced to another destination", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktAccessToken: "trakt-token",
+      traktClientId: "client",
+      traktClientSecret: "secret",
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"x"}}',
+      bingersMarkMoviesAsRewatched: false,
+      bingersMarkEpisodesAsRewatched: false,
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(true);
+    syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs.mockResolvedValue(
+      0
+    );
+    traktTokenManagerMocks.getValidAccessToken.mockResolvedValue("trakt-token");
+    traktClientMocks.scrobble.mockResolvedValue(undefined);
+    bingersSessionManagerMocks.getValidCookieJar.mockResolvedValue({
+      session_token: { name: "session_token", value: "x" },
+    });
+    bingersClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    await service.syncEvent(makeEvent());
+
+    expect(bingersClientMocks.scrobble).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "scrobble" }),
+      "session_token=bingers-cookie",
+      expect.objectContaining({
+        bingersLocalPlayCount: undefined,
+        markMoviesAsRewatched: false,
+      })
+    );
+    expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        destinations: JSON.stringify(["Trakt", "Bingers"]),
+        wasRewatched: false,
+      })
+    );
+  });
+
   it("increments Bingers episode plays when rewatch is enabled", async () => {
     userRepositoryMocks.findBySourceUsername.mockResolvedValue({
       id: "u1",

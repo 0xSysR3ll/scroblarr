@@ -384,7 +384,7 @@ export class SyncService {
               : !!user.bingersMarkEpisodesAsRewatched;
           const shouldRewatch = allowRewatch && priorPlays > 0;
 
-          if (hasExistingSync && !shouldRewatch) {
+          if (priorPlays > 0 && !shouldRewatch) {
             logger.sync.debug(
               {
                 username: userIdentifier,
@@ -392,7 +392,7 @@ export class SyncService {
                 mediaTitle: event.media.title,
                 destination: destination.name,
               },
-              "Skipping Bingers sync; item already synced and rewatch is disabled"
+              "Skipping Bingers sync; item already synced to Bingers and rewatch is disabled"
             );
             syncResults.push({ destination: destination.name, success: true });
             continue;

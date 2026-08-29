@@ -465,6 +465,70 @@ describe("BingersClient", () => {
     expect(JSON.parse(request.body).ops[0].fields.plays).toBe(1);
   });
 
+  it("treats remote entries with zero plays as unwatched for play counts", async () => {
+    const catalog = {
+      resolveEntity: vi.fn().mockResolvedValue({
+        entityKind: "movie",
+        entityId: "movie-1",
+        titleId: "movie-1",
+      }),
+    } as unknown as BingersCatalogResolver;
+
+    const fetchMock = mockFetchSequence([
+      () =>
+        new Response(
+          JSON.stringify({
+            entries: [
+              {
+                entityKind: "movie",
+                entityId: "movie-1",
+                watched: true,
+                plays: 0,
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        ),
+      () => new Response(null, { status: 200 }),
+    ]);
+
+    const client = new BingersClient(catalog);
+    await client.scrobble(makeEvent(), "session_token=abc");
+
+    const [, request] = fetchMock.mock.calls[1] as unknown as [
+      string,
+      { body: string },
+    ];
+    expect(JSON.parse(request.body).ops[0].fields.plays).toBe(1);
+  });
+
+  it("continues when remote entry pull returns invalid JSON", async () => {
+    const catalog = {
+      resolveEntity: vi.fn().mockResolvedValue({
+        entityKind: "movie",
+        entityId: "movie-1",
+        titleId: "movie-1",
+      }),
+    } as unknown as BingersCatalogResolver;
+
+    const fetchMock = mockFetchSequence([
+      () =>
+        new Response("not-json", {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      () => new Response(null, { status: 200 }),
+    ]);
+
+    const client = new BingersClient(catalog);
+    await client.scrobble(makeEvent(), "session_token=abc");
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("maps JSON error bodies on successful push responses", async () => {
     const catalog = {
       resolveEntity: vi.fn().mockResolvedValue({

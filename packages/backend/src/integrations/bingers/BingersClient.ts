@@ -155,6 +155,8 @@ export class BingersClient implements ISyncClient {
     url.searchParams.set("entityKind", entityKind);
     url.searchParams.set("entityId", entityId);
 
+    let result: RemoteEntryState | null = null;
+
     try {
       const response = await fetch(url.toString(), {
         method: "GET",
@@ -171,47 +173,48 @@ export class BingersClient implements ISyncClient {
           { status: response.status, entityKind, entityId },
           "Bingers entry pull failed; assuming no remote entry"
         );
-        return null;
+      } else {
+        const body = (await response.json()) as {
+          entries?: Array<{
+            entityKind?: string;
+            entityId?: string;
+            watched?: boolean;
+            plays?: number;
+          }>;
+        };
+
+        const entry = body.entries?.find(
+          (candidate) =>
+            candidate.entityKind === entityKind &&
+            candidate.entityId === entityId
+        );
+        if (entry) {
+          result = {
+            watched: !!entry.watched,
+            plays:
+              typeof entry.plays === "number" && entry.plays > 0
+                ? entry.plays
+                : 0,
+          };
+        }
       }
-
-      const body = (await response.json()) as {
-        entries?: Array<{
-          entityKind?: string;
-          entityId?: string;
-          watched?: boolean;
-          plays?: number;
-        }>;
-      };
-
-      const entry = body.entries?.find(
-        (candidate) =>
-          candidate.entityKind === entityKind && candidate.entityId === entityId
-      );
-      if (!entry) {
-        return null;
-      }
-
-      return {
-        watched: !!entry.watched,
-        plays:
-          typeof entry.plays === "number" && entry.plays > 0 ? entry.plays : 0,
-      };
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         logger.bingers.debug(
           { entityKind, entityId },
           "Timed out fetching remote Bingers entry; assuming no remote entry"
         );
-        return null;
+      } else {
+        logger.bingers.debug(
+          { error, entityKind, entityId },
+          "Failed to fetch remote Bingers entry; assuming no remote entry"
+        );
       }
-      logger.bingers.debug(
-        { error, entityKind, entityId },
-        "Failed to fetch remote Bingers entry; assuming no remote entry"
-      );
-      return null;
     } finally {
       clearTimeout(timeout);
     }
+
+    return result;
   }
 
   private static async withEntityLock<T>(
