@@ -402,6 +402,35 @@ describe("bingers routes", () => {
       "Link your Bingers account before changing sync settings"
     );
     expect(userRepositoryMocks.update).not.toHaveBeenCalled();
+    expect(sessionManagerMocks.validateAndRefresh).not.toHaveBeenCalled();
+  });
+
+  it("rejects settings updates when the stored session is not linked", async () => {
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      plexUsername: "plex-user",
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"s"}}',
+    });
+    sessionManagerMocks.validateAndRefresh.mockResolvedValue({
+      linked: false,
+      needsReauthorization: false,
+      username: null,
+      image: null,
+    });
+
+    const response = await request(app)
+      .patch("/bingers/settings")
+      .send({
+        markMoviesAsRewatched: true,
+        markEpisodesAsRewatched: true,
+      })
+      .expect(400);
+
+    expect(response.body.error).toBe(
+      "Link your Bingers account before changing sync settings"
+    );
+    expect(userRepositoryMocks.update).not.toHaveBeenCalled();
   });
 
   it("returns validation errors for invalid settings payloads", async () => {

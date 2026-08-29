@@ -1,3 +1,4 @@
+import { BingersApiError } from "@integrations/bingers/BingersApiError";
 import { TraktApiError } from "@integrations/trakt/TraktApiError";
 import type { MediaEvent } from "@scroblarr/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -512,6 +513,46 @@ describe("SyncService", () => {
         bingersLocalPlayCount: 2,
         markEpisodesAsRewatched: true,
       })
+    );
+  });
+
+  it("retries Bingers scrobbles after an auth error", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktAccessToken: null,
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"x"}}',
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs.mockResolvedValue(
+      0
+    );
+    bingersSessionManagerMocks.getValidCookieJar
+      .mockResolvedValueOnce({
+        session_token: { name: "session_token", value: "dead" },
+      })
+      .mockResolvedValueOnce({
+        session_token: { name: "session_token", value: "fresh" },
+      });
+    bingersClientMocks.scrobble
+      .mockRejectedValueOnce(
+        new BingersApiError("dead session", 401, { isAuthError: true })
+      )
+      .mockResolvedValueOnce(undefined);
+
+    const service = new SyncService();
+    await service.syncEvent(makeEvent());
+
+    expect(bingersSessionManagerMocks.getValidCookieJar).toHaveBeenCalledTimes(
+      2
+    );
+    expect(bingersClientMocks.scrobble).toHaveBeenCalledTimes(2);
+    expect(bingersClientMocks.scrobble).toHaveBeenLastCalledWith(
+      expect.objectContaining({ event: "scrobble" }),
+      "session_token=bingers-cookie",
+      expect.any(Object)
     );
   });
 

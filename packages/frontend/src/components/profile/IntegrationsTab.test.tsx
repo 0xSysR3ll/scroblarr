@@ -2092,6 +2092,49 @@ describe("IntegrationsTab Bingers integration", () => {
     expect(screen.queryByText("stale-user")).not.toBeInTheDocument();
   });
 
+  it("ignores a stale Bingers status error after a newer request completes", async () => {
+    const user = userEvent.setup();
+    let rejectInitial: (error: Error) => void = () => undefined;
+
+    vi.mocked(getBingersStatus)
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectInitial = reject;
+          })
+      )
+      .mockResolvedValueOnce({
+        linked: true,
+        needsReauthorization: false,
+        username: "fresh-user",
+        image: null,
+        markMoviesAsRewatched: false,
+        markEpisodesAsRewatched: false,
+      });
+    vi.mocked(linkBingers).mockResolvedValue({ success: true });
+
+    renderWithProviders(<IntegrationsTab />);
+    await expandBingersSection(user);
+    await user.type(
+      screen.getByPlaceholderText("https://bingers.app/m?token=…"),
+      "https://bingers.app/m?token=magic"
+    );
+    await user.click(screen.getByRole("button", { name: "Complete link" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("fresh-user")).toBeVisible();
+    });
+
+    await act(async () => {
+      rejectInitial(new Error("status down"));
+    });
+
+    expect(screen.getByText("fresh-user")).toBeVisible();
+    expect(
+      screen.queryByText("Failed to load Bingers status")
+    ).not.toBeInTheDocument();
+  });
+
   it("shows unlink errors while the account is still linked", async () => {
     const user = userEvent.setup();
     vi.mocked(getBingersStatus).mockResolvedValue({

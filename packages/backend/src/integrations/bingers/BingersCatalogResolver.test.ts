@@ -757,4 +757,50 @@ describe("BingersCatalogResolver", () => {
       titleId: "movie-1",
     });
   });
+
+  it("resolves via a unique title-only fallback when metadata does not match", async () => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/search/titles")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: "movie-1",
+                kind: "movie",
+                metadata: "meta1",
+                card: { originalTitle: "Interstellar" },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/metadata@meta1.json")) {
+        return new Response(
+          JSON.stringify({
+            id: "movie-1",
+            kind: "movie",
+            external_ids: [],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const resolver = new BingersCatalogResolver();
+    await expect(
+      resolver.resolveEntity({
+        id: "m1",
+        type: "movie",
+        title: "Interstellar",
+      })
+    ).resolves.toEqual({
+      entityKind: "movie",
+      entityId: "movie-1",
+      titleId: "movie-1",
+    });
+  });
 });

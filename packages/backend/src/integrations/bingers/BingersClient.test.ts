@@ -325,6 +325,183 @@ describe("BingersClient", () => {
     expect(JSON.parse(request.body).ops[0].fields.plays).toBe(2);
   });
 
+  it("defaults rewatch play counts when no local target is provided", async () => {
+    const catalog = {
+      resolveEntity: vi.fn().mockResolvedValue({
+        entityKind: "movie",
+        entityId: "movie-1",
+        titleId: "movie-1",
+      }),
+    } as unknown as BingersCatalogResolver;
+
+    const fetchMock = mockFetchSequence([
+      () =>
+        new Response(JSON.stringify({ entries: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      () => new Response(null, { status: 200 }),
+    ]);
+
+    const client = new BingersClient(catalog);
+    await client.scrobble(makeEvent(), "session_token=abc", {
+      markMoviesAsRewatched: true,
+    });
+
+    const [, request] = fetchMock.mock.calls[1] as unknown as [
+      string,
+      { body: string },
+    ];
+    expect(JSON.parse(request.body).ops[0].fields.plays).toBe(2);
+  });
+
+  it("continues when remote entry pull fails", async () => {
+    const catalog = {
+      resolveEntity: vi.fn().mockResolvedValue({
+        entityKind: "movie",
+        entityId: "movie-1",
+        titleId: "movie-1",
+      }),
+    } as unknown as BingersCatalogResolver;
+
+    const fetchMock = mockFetchSequence([
+      () => new Response("bad gateway", { status: 502 }),
+      () => new Response(null, { status: 200 }),
+    ]);
+
+    const client = new BingersClient(catalog);
+    await client.scrobble(makeEvent(), "session_token=abc");
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("continues when remote entry pull times out", async () => {
+    const catalog = {
+      resolveEntity: vi.fn().mockResolvedValue({
+        entityKind: "movie",
+        entityId: "movie-1",
+        titleId: "movie-1",
+      }),
+    } as unknown as BingersCatalogResolver;
+
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/sync/pull")) {
+        const error = new Error("aborted");
+        error.name = "AbortError";
+        throw error;
+      }
+      return new Response(null, { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new BingersClient(catalog);
+    await client.scrobble(makeEvent(), "session_token=abc");
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("continues when remote entry pull throws unexpectedly", async () => {
+    const catalog = {
+      resolveEntity: vi.fn().mockResolvedValue({
+        entityKind: "movie",
+        entityId: "movie-1",
+        titleId: "movie-1",
+      }),
+    } as unknown as BingersCatalogResolver;
+
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/sync/pull")) {
+        throw new Error("network down");
+      }
+      return new Response(null, { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new BingersClient(catalog);
+    await client.scrobble(makeEvent(), "session_token=abc");
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("pushes when remote pull returns no matching entry", async () => {
+    const catalog = {
+      resolveEntity: vi.fn().mockResolvedValue({
+        entityKind: "movie",
+        entityId: "movie-1",
+        titleId: "movie-1",
+      }),
+    } as unknown as BingersCatalogResolver;
+
+    const fetchMock = mockFetchSequence([
+      () =>
+        new Response(
+          JSON.stringify({
+            entries: [
+              {
+                entityKind: "movie",
+                entityId: "other-movie",
+                watched: true,
+                plays: 3,
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        ),
+      () => new Response(null, { status: 200 }),
+    ]);
+
+    const client = new BingersClient(catalog);
+    await client.scrobble(makeEvent(), "session_token=abc");
+
+    const [, request] = fetchMock.mock.calls[1] as unknown as [
+      string,
+      { body: string },
+    ];
+    expect(JSON.parse(request.body).ops[0].fields.plays).toBe(1);
+  });
+
+  it("maps JSON error bodies on successful push responses", async () => {
+    const catalog = {
+      resolveEntity: vi.fn().mockResolvedValue({
+        entityKind: "movie",
+        entityId: "movie-1",
+        titleId: "movie-1",
+      }),
+    } as unknown as BingersCatalogResolver;
+
+    mockFetchSequence([
+      () =>
+        new Response(JSON.stringify({ entries: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      () =>
+        new Response(
+          JSON.stringify({
+            error: { code: "bad_request", message: "Invalid request body" },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        ),
+    ]);
+
+    const client = new BingersClient(catalog);
+    await expect(
+      client.scrobble(makeEvent(), "session_token=abc")
+    ).rejects.toMatchObject({
+      name: "BingersApiError",
+      message: "Invalid request body",
+      code: "bad_request",
+    });
+  });
+
   it("rethrows unexpected push errors", async () => {
     const catalog = {
       resolveEntity: vi.fn().mockResolvedValue({

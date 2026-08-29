@@ -342,6 +342,30 @@ describe("BingersSessionManager", () => {
     );
   });
 
+  it("reports needsReauthorization when validateAndRefresh finds a corrupt jar", async () => {
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar: "not-json",
+      bingersEmail: "user@example.com",
+      bingersUsername: "User",
+      bingersThumb: "https://img.example/avatar.png",
+    });
+
+    const manager = new BingersSessionManager(
+      userRepositoryMocks as never,
+      authMocks as unknown as BingersAuth
+    );
+
+    const status = await manager.validateAndRefresh("user-id");
+    expect(status).toEqual({
+      linked: false,
+      needsReauthorization: true,
+      username: "User",
+      image: "https://img.example/avatar.png",
+    });
+    expect(authMocks.getSession).not.toHaveBeenCalled();
+  });
+
   it("clears all Bingers fields on clearAll", async () => {
     const manager = new BingersSessionManager(
       userRepositoryMocks as never,
