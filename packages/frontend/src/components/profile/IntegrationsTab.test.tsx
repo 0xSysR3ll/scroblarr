@@ -2179,6 +2179,7 @@ describe("IntegrationsTab Bingers integration", () => {
     expect(
       screen.queryByText("Failed to link Bingers account")
     ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Unlink" })).toBeVisible();
   });
 
   it("shows unlink success even when the post-unlink status refresh fails", async () => {

@@ -620,14 +620,21 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
       await linkBingers(bingersMagicLink.trim());
       setBingersMagicLink("");
       bingersOAuthPopup.closePopup();
+      const requestId = ++bingersStatusRequestIdRef.current;
       try {
-        const requestId = ++bingersStatusRequestIdRef.current;
         const status = await getBingersStatus({ force: true });
         if (requestId === bingersStatusRequestIdRef.current) {
           setBingersStatus(status);
         }
       } catch {
-        // Best-effort refresh after a successful link.
+        if (requestId === bingersStatusRequestIdRef.current) {
+          setBingersStatus({
+            linked: true,
+            needsReauthorization: false,
+            username: null,
+            image: null,
+          });
+        }
       }
       showSuccess(
         t("bingers.linked", {
