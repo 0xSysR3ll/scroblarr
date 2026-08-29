@@ -758,7 +758,7 @@ describe("BingersCatalogResolver", () => {
     });
   });
 
-  it("resolves via a unique title-only fallback when metadata does not match", async () => {
+  it("does not resolve from a title-only match without year or external ids", async () => {
     const fetchMock = vi.fn(async (input: string | URL) => {
       const url = String(input);
       if (url.includes("/search/titles")) {
@@ -797,10 +797,6 @@ describe("BingersCatalogResolver", () => {
         type: "movie",
         title: "Interstellar",
       })
-    ).resolves.toEqual({
-      entityKind: "movie",
-      entityId: "movie-1",
-      titleId: "movie-1",
-    });
+    ).rejects.toThrow(/could not resolve/i);
   });
 });

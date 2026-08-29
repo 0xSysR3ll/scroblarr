@@ -221,16 +221,6 @@ export class BingersCatalogResolver {
       }
     }
 
-    if (opts.title) {
-      const wanted = this.normalizeTitle(opts.title);
-      const byTitle = candidates.filter((c) =>
-        this.candidateTitles(c).some((t) => this.normalizeTitle(t) === wanted)
-      );
-      if (byTitle.length === 1) {
-        return byTitle[0];
-      }
-    }
-
     return null;
   }
 

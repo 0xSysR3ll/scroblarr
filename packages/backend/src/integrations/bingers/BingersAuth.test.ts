@@ -123,6 +123,15 @@ describe("cookieJar", () => {
         },
       })
     ).toBe(false);
+    expect(
+      hasUsableSessionCookie({
+        session_token: {
+          name: "session_token",
+          value: "epoch",
+          expires: 0,
+        },
+      })
+    ).toBe(false);
   });
 
   it("skips invalid jar entries when parsing", () => {

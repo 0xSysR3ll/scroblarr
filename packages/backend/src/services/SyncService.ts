@@ -394,7 +394,6 @@ export class SyncService {
               },
               "Skipping Bingers sync; item already synced to Bingers and rewatch is disabled"
             );
-            syncResults.push({ destination: destination.name, success: true });
             continue;
           }
 

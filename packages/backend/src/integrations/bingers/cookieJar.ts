@@ -20,7 +20,7 @@ export function hasUsableSessionCookie(jar: CookieJar): boolean {
     (entry) =>
       entry.name === "session_token" &&
       !!entry.value &&
-      (!entry.expires || entry.expires > now)
+      (entry.expires === undefined || entry.expires > now)
   );
 }
 
@@ -79,7 +79,7 @@ export function parseCookieJar(raw: string): CookieJar {
 export function cookieHeaderFromJar(jar: CookieJar): string {
   const now = Date.now();
   return Object.values(jar)
-    .filter((entry) => !entry.expires || entry.expires > now)
+    .filter((entry) => entry.expires === undefined || entry.expires > now)
     .map((entry) => `${entry.name}=${entry.value}`)
     .join("; ");
 }
