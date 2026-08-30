@@ -218,6 +218,7 @@ export type LogLabel =
   | "tvtime"
   | "trakt"
   | "simkl"
+  | "bingers"
   | "plex"
   | "jellyfin"
   | "system"
@@ -251,6 +252,7 @@ const logger = {
   tvtime: labeled("tvtime"),
   trakt: labeled("trakt"),
   simkl: labeled("simkl"),
+  bingers: labeled("bingers"),
   plex: labeled("plex"),
   jellyfin: labeled("jellyfin"),
   system: labeled("system"),

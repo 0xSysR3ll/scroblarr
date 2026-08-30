@@ -217,7 +217,7 @@
       "issues": "Issues & feedback",
       "releases": "All releases",
       "license": "License (MIT)",
-      "trademarkDisclaimer": "Plex, Jellyfin, Trakt, Simkl, and related marks are trademarks of their respective owners. Scroblarr is an independent project and is not sponsored, endorsed, or affiliated with those services.",
+      "trademarkDisclaimer": "Plex, Jellyfin, Trakt, Simkl, Bingers, and related marks are trademarks of their respective owners. Scroblarr is an independent project and is not sponsored, endorsed, or affiliated with those services.",
       "tmdbAttribution": "This product uses the TMDB API but is not endorsed or certified by TMDB."
     },
     "general": {
@@ -611,11 +611,26 @@
     "cancel": "Cancel",
     "confirm": "Confirm"
   },
-  "": {
-    "": {
-      "": {
-        "": ""
-      }
-    }
+  "bingers": {
+    "openSignInFailed": "Failed to open sign-in window. Please allow popups and try again.",
+    "linked": "Bingers account linked successfully",
+    "linkFailed": "Failed to link Bingers account",
+    "unlinked": "Bingers account unlinked successfully",
+    "unlinkFailed": "Failed to unlink Bingers account",
+    "description": "Link your Bingers account with magic-link email sign-in. Scroblarr keeps the session alive in the background.",
+    "profile": {
+      "username": "Username"
+    },
+    "unlink": "Unlink",
+    "docsHint": "Open Bingers sign-in to email yourself a magic link, then paste that link below.",
+    "needsReauthorization": "Bingers authorization expired or was revoked. Link your account again to reconnect.",
+    "openSignIn": "Open Bingers sign-in",
+    "magicLink": "Magic-link from email",
+    "magicLinkPlaceholder": "https://bingers.app/m?token=…",
+    "completeLink": "Complete link",
+    "unlinkTitle": "Unlink Bingers Account",
+    "unlinkMessage": "Are you sure you want to unlink your Bingers account? Scroblarr will remove the stored session.",
+    "cancel": "Cancel",
+    "confirm": "Confirm"
   }
 }

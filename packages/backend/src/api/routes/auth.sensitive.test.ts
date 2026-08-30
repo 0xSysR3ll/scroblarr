@@ -269,6 +269,7 @@ describe("auth route sensitive guards", () => {
         hasJellyfin: false,
         hasTrakt: false,
         hasSimkl: false,
+        hasBingers: false,
       })
     );
     expect(response.body).not.toHaveProperty("hasTVTime");

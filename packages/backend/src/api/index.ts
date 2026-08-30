@@ -10,6 +10,7 @@ import helmet from "helmet";
 
 import { authRoutes } from "./routes/auth";
 import { avatarRoutes } from "./routes/avatars";
+import { bingersRoutes } from "./routes/bingers";
 import { logoutRoutes } from "./routes/logout";
 import { logsRoutes } from "./routes/logs";
 import { metaRoutes } from "./routes/meta";
@@ -114,6 +115,7 @@ export function createApp(): Express {
   app.use("/api/v1/settings", settingsRoutes);
   app.use("/api/v1/trakt", integrationLimiter, traktRoutes);
   app.use("/api/v1/simkl", integrationLimiter, simklRoutes);
+  app.use("/api/v1/bingers", integrationLimiter, bingersRoutes);
   app.use("/api/v1/sync", syncRoutes);
   app.use("/api/v1/logs", logsRoutes);
   app.use("/api/v1/logout", logoutRoutes);

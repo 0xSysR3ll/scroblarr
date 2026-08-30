@@ -664,6 +664,7 @@ router.get("/me", auth, async (req: Request, res: Response): Promise<void> => {
       hasJellyfin: !!userWithToken.jellyfinUsername,
       hasTrakt: !!userWithToken.traktAccessToken,
       hasSimkl: !!userWithToken.simklAccessToken,
+      hasBingers: !!userWithToken.bingersCookieJar,
     });
   } catch (error) {
     logger.auth.error({ error }, "Error getting current user:");

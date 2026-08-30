@@ -1,5 +1,6 @@
 import {
   getCurrentUser,
+  invalidateBingersCache,
   invalidateSimklCache,
   invalidateTraktCache,
 } from "@services/api";
@@ -22,6 +23,7 @@ export interface AuthUser {
   jellyfinUsername?: string;
   hasTrakt?: boolean;
   hasSimkl?: boolean;
+  hasBingers?: boolean;
 }
 
 interface AuthContextType {
@@ -39,6 +41,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 function invalidateIntegrationCaches() {
   invalidateSimklCache();
   invalidateTraktCache();
+  invalidateBingersCache();
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
