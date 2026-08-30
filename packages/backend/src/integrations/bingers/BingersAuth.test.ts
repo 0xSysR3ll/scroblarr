@@ -329,6 +329,23 @@ describe("BingersAuth", () => {
     expect(session.expiresAt).toBe(1_800_000_000_000);
   });
 
+  it("rejects reused magic links that redirect without cookies", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 302,
+      headers: { get: () => null, getSetCookie: () => [] },
+    }) as unknown as typeof fetch;
+
+    await expect(
+      new BingersAuth().verifyMagicLink("used-token")
+    ).rejects.toMatchObject({
+      message:
+        "Magic link already used or expired; request a new sign-in link from Bingers",
+      code: "magic_link_invalid",
+      status: 400,
+    });
+  });
+
   it("throws when magic-link verify returns no cookies", async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,

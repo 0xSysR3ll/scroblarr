@@ -67,6 +67,18 @@ export class BingersAuth {
       return this.getSession(jar);
     }
 
+    if (
+      response.status >= 300 &&
+      response.status < 400 &&
+      Object.keys(jar).length === 0
+    ) {
+      throw new BingersApiError(
+        "Magic link already used or expired; request a new sign-in link from Bingers",
+        400,
+        { code: "magic_link_invalid" }
+      );
+    }
+
     if (!response.ok && response.status !== 0) {
       // Node fetch with redirect:manual may still return 200 with cookies.
       if (Object.keys(jar).length === 0) {
