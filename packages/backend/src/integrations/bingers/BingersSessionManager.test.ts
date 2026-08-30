@@ -205,6 +205,47 @@ describe("BingersSessionManager", () => {
     });
   });
 
+  it("accepts better-auth prefixed session cookies during validateAndRefresh", async () => {
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar: serializeCookieJar({
+        "better-auth.session_token": {
+          name: "better-auth.session_token",
+          value: "old",
+        },
+      }),
+      bingersEmail: "user@example.com",
+    });
+    authMocks.getSession.mockResolvedValue({
+      session: { id: "s1" },
+      user: {
+        id: "b1",
+        email: "user@example.com",
+        username: "handle",
+        image: "https://img.example/avatar.png",
+      },
+      cookieJar: {
+        "better-auth.session_token": {
+          name: "better-auth.session_token",
+          value: "new",
+        },
+      },
+    });
+
+    const manager = new BingersSessionManager(
+      userRepositoryMocks as never,
+      authMocks as unknown as BingersAuth
+    );
+
+    await expect(manager.validateAndRefresh("user-id")).resolves.toEqual({
+      linked: true,
+      needsReauthorization: false,
+      username: "handle",
+      image: "https://img.example/avatar.png",
+    });
+    expect(authMocks.getSession).toHaveBeenCalled();
+  });
+
   it("clears the jar on auth errors from getValidCookieJar", async () => {
     userRepositoryMocks.findById.mockResolvedValue({
       id: "user-id",

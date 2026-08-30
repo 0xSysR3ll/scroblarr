@@ -14,11 +14,16 @@ export function serializeCookieJar(jar: CookieJar): string {
   return JSON.stringify(jar);
 }
 
+function isSessionCookieName(name: string): boolean {
+  // better-auth defaults to `${prefix}.session_token` (e.g. better-auth.session_token).
+  return name === "session_token" || name.endsWith(".session_token");
+}
+
 export function hasUsableSessionCookie(jar: CookieJar): boolean {
   const now = Date.now();
   return Object.values(jar).some(
     (entry) =>
-      entry.name === "session_token" &&
+      isSessionCookieName(entry.name) &&
       !!entry.value &&
       (entry.expires === undefined || entry.expires > now)
   );

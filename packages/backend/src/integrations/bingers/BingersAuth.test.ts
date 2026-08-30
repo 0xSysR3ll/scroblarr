@@ -116,6 +116,14 @@ describe("cookieJar", () => {
     ).toBe(true);
     expect(
       hasUsableSessionCookie({
+        "better-auth.session_token": {
+          name: "better-auth.session_token",
+          value: "abc",
+        },
+      })
+    ).toBe(true);
+    expect(
+      hasUsableSessionCookie({
         session_token: {
           name: "session_token",
           value: "dead",
@@ -131,6 +139,19 @@ describe("cookieJar", () => {
           expires: 0,
         },
       })
+    ).toBe(false);
+  });
+
+  it("accepts better-auth prefixed session cookies as valid stored jars", () => {
+    expect(
+      isCorruptStoredCookieJar(
+        serializeCookieJar({
+          "better-auth.session_token": {
+            name: "better-auth.session_token",
+            value: "abc",
+          },
+        })
+      )
     ).toBe(false);
   });
 
