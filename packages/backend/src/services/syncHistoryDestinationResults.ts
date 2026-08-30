@@ -27,7 +27,8 @@ export function attemptsFromSyncResults(
     if (
       result.destination !== "TVTime" &&
       result.destination !== "Trakt" &&
-      result.destination !== "Simkl"
+      result.destination !== "Simkl" &&
+      result.destination !== "Bingers"
     ) {
       return [];
     }

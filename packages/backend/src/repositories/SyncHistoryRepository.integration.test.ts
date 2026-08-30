@@ -224,7 +224,12 @@ describe("SyncHistoryRepository integration", () => {
     expect(stats.successRate).toBe(66.67);
     expect(stats.byMediaType).toEqual({ episode: 2, movie: 1, series: 1 });
     expect(stats.bySource).toEqual({ plex: 2, jellyfin: 1 });
-    expect(stats.byDestination).toEqual({ trakt: 2, tvtime: 2, simkl: 0 });
+    expect(stats.byDestination).toEqual({
+      trakt: 1,
+      tvtime: 2,
+      simkl: 0,
+      bingers: 0,
+    });
     expect(stats.lastFailure?.mediaTitle).toBe("Example Show");
   });
 
@@ -341,6 +346,252 @@ describe("SyncHistoryRepository integration", () => {
         tmdbMovieId: "6002",
       })
     ).resolves.toBe(false);
+  });
+
+  it("matches episodes and movies by title fallback identifiers", async () => {
+    await createHistory([
+      {
+        userId: user.id,
+        mediaType: "episode",
+        mediaTitle: "Fallback Show",
+        success: true,
+        seasonNumber: 2,
+        episodeNumber: 4,
+        destinations: JSON.stringify(["Bingers"]),
+      },
+      {
+        userId: user.id,
+        mediaType: "movie",
+        mediaTitle: "Fallback Movie",
+        success: true,
+        year: 2010,
+        destinations: JSON.stringify(["Bingers"]),
+      },
+    ]);
+
+    await expect(
+      repository.hasExistingSync(user.id, "episode", {
+        mediaTitle: "Fallback Show",
+        seasonNumber: 2,
+        episodeNumber: 4,
+      })
+    ).resolves.toBe(true);
+    await expect(
+      repository.hasExistingSync(user.id, "episode", {
+        mediaTitle: "Fallback Show",
+        seasonNumber: 2,
+        episodeNumber: 5,
+      })
+    ).resolves.toBe(false);
+    await expect(
+      repository.hasExistingSync(user.id, "movie", {
+        mediaTitle: "Fallback Movie",
+        year: 2010,
+      })
+    ).resolves.toBe(true);
+
+    await expect(
+      repository.countSuccessfulDestinationSyncs(
+        user.id,
+        "Bingers",
+        "episode",
+        {
+          mediaTitle: "Fallback Show",
+          seasonNumber: 2,
+          episodeNumber: 4,
+        }
+      )
+    ).resolves.toBe(1);
+    await expect(
+      repository.countSuccessfulDestinationSyncs(user.id, "Bingers", "movie", {
+        mediaTitle: "Fallback Movie",
+        year: 2010,
+      })
+    ).resolves.toBe(1);
+  });
+
+  it("counts episodes by title fallback when TMDB id lookup misses", async () => {
+    await createHistory([
+      {
+        userId: user.id,
+        mediaType: "episode",
+        mediaTitle: "Title Only Show",
+        success: true,
+        seasonNumber: 1,
+        episodeNumber: 3,
+        destinations: JSON.stringify(["Bingers"]),
+      },
+    ]);
+
+    await expect(
+      repository.countSuccessfulDestinationSyncs(
+        user.id,
+        "Bingers",
+        "episode",
+        {
+          tmdbSeriesId: "99999",
+          mediaTitle: "Title Only Show",
+          seasonNumber: 1,
+          episodeNumber: 3,
+        }
+      )
+    ).resolves.toBe(1);
+  });
+
+  it("counts destination syncs across identifier strategies", async () => {
+    await createHistory([
+      {
+        userId: user.id,
+        mediaType: "episode",
+        mediaTitle: "Show A",
+        success: true,
+        tvdbEpisodeId: "1001",
+        destinations: JSON.stringify(["Bingers"]),
+      },
+      {
+        userId: user.id,
+        mediaType: "episode",
+        mediaTitle: "Show B",
+        success: true,
+        imdbEpisodeId: "tt2001",
+        seasonNumber: 2,
+        episodeNumber: 3,
+        destinations: JSON.stringify(["Bingers"]),
+      },
+      {
+        userId: user.id,
+        mediaType: "episode",
+        mediaTitle: "Show C",
+        success: true,
+        tmdbSeriesId: "3001",
+        seasonNumber: 1,
+        episodeNumber: 2,
+        destinations: JSON.stringify(["Bingers"]),
+      },
+      {
+        userId: user.id,
+        mediaType: "movie",
+        mediaTitle: "Movie A",
+        success: true,
+        tvdbMovieId: "4001",
+        destinations: JSON.stringify(["Bingers"]),
+      },
+      {
+        userId: user.id,
+        mediaType: "movie",
+        mediaTitle: "Movie B",
+        success: true,
+        imdbMovieId: "tt5001",
+        destinations: JSON.stringify(["Bingers"]),
+      },
+      {
+        userId: user.id,
+        mediaType: "movie",
+        mediaTitle: "Movie C",
+        success: true,
+        tmdbMovieId: "6001",
+        destinations: JSON.stringify(["Bingers"]),
+      },
+      {
+        userId: user.id,
+        mediaType: "movie",
+        mediaTitle: "Movie D",
+        success: true,
+        year: 2010,
+        destinations: JSON.stringify(["Bingers"]),
+      },
+    ]);
+
+    await expect(
+      repository.countSuccessfulDestinationSyncs(
+        user.id,
+        "Bingers",
+        "episode",
+        {
+          tvdbEpisodeId: "1001",
+        }
+      )
+    ).resolves.toBe(1);
+    await expect(
+      repository.countSuccessfulDestinationSyncs(
+        user.id,
+        "Bingers",
+        "episode",
+        {
+          imdbEpisodeId: "tt2001",
+        }
+      )
+    ).resolves.toBe(1);
+    await expect(
+      repository.countSuccessfulDestinationSyncs(
+        user.id,
+        "Bingers",
+        "episode",
+        {
+          tmdbSeriesId: "3001",
+          seasonNumber: 1,
+          episodeNumber: 2,
+        }
+      )
+    ).resolves.toBe(1);
+    await expect(
+      repository.countSuccessfulDestinationSyncs(user.id, "Bingers", "movie", {
+        tvdbMovieId: "4001",
+      })
+    ).resolves.toBe(1);
+    await expect(
+      repository.countSuccessfulDestinationSyncs(user.id, "Bingers", "movie", {
+        imdbMovieId: "tt5001",
+      })
+    ).resolves.toBe(1);
+    await expect(
+      repository.countSuccessfulDestinationSyncs(user.id, "Bingers", "movie", {
+        tmdbMovieId: "6001",
+      })
+    ).resolves.toBe(1);
+    await expect(
+      repository.countSuccessfulDestinationSyncs(user.id, "Bingers", "movie", {
+        mediaTitle: "Movie D",
+        year: 2010,
+      })
+    ).resolves.toBe(1);
+    await expect(
+      repository.countSuccessfulDestinationSyncs(user.id, "Bingers", "movie", {
+        mediaTitle: "Missing",
+        year: 2099,
+      })
+    ).resolves.toBe(0);
+    await expect(
+      repository.countSuccessfulDestinationSyncs(
+        user.id,
+        "Bingers",
+        "episode",
+        {}
+      )
+    ).resolves.toBe(0);
+    await expect(
+      repository.countSuccessfulDestinationSyncs(
+        user.id,
+        "Bingers",
+        "movie",
+        {}
+      )
+    ).resolves.toBe(0);
+  });
+
+  it("includes Bingers in destination statistics", async () => {
+    await createHistory([
+      {
+        userId: user.id,
+        mediaType: "movie",
+        mediaTitle: "Bingers Movie",
+        success: true,
+        destinations: JSON.stringify(["Bingers"]),
+      },
+    ]);
+
+    const stats = await repository.getStatisticsByUser(user.id);
+    expect(stats.byDestination.bingers).toBe(1);
   });
 
   async function createHistory(items: Array<Partial<SyncHistory>>) {

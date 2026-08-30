@@ -8,12 +8,15 @@ describe("explicitI18nKeys", () => {
 
     explicitI18nKeys(t);
 
-    expect(t).toHaveBeenCalledTimes(2);
+    expect(t).toHaveBeenCalledTimes(3);
     expect(t).toHaveBeenNthCalledWith(1, "sync.destinations.trakt", {
       defaultValue: "Trakt",
     });
     expect(t).toHaveBeenNthCalledWith(2, "sync.destinations.simkl", {
       defaultValue: "Simkl",
+    });
+    expect(t).toHaveBeenNthCalledWith(3, "sync.destinations.bingers", {
+      defaultValue: "Bingers",
     });
   });
 });

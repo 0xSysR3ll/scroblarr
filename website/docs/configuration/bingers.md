@@ -4,11 +4,7 @@ sidebar_position: 6
 
 # Bingers Configuration
 
-Link your Bingers account and keep the session alive. Each user on your media server needs to link their own Bingers account. This page covers account linking only.
-
-:::note
-Watch-history sync to Bingers lands in a follow-up change.
-:::
+Link your Bingers account to sync watch history. Each user on your media server needs to link their own Bingers account.
 
 ## Sign in with Bingers
 
@@ -34,6 +30,31 @@ Bingers uses session cookies instead of OAuth refresh tokens. Scroblarr keeps th
 
 If the session expires or is revoked, Scroblarr will show **Re-authorize** in the Bingers section. You can stay signed in on the Bingers app and Scroblarr at the same time.
 
+## Metadata requirements
+
+Bingers matches watched items using the identifiers and metadata sent by Plex or Jellyfin:
+
+- **Movies**: IMDb, TMDB, TVDB, title, and year can be used for matching. Matches are most reliable when at least one external ID is present.
+- **TV Episodes**: TMDB series ID plus season and episode number are preferred. Title and year are used as a fallback when IDs are missing.
+
+If Bingers cannot match a media item, the sync history entry will show a Bingers error for that destination.
+
+## What gets synced
+
+Scroblarr syncs the following to Bingers:
+
+- **Movies**: When you finish watching a movie
+- **TV Episodes**: When you finish watching an episode
+- **Rewatches** (opt-in): When enabled in Profile → Integrations, watching the same title again increments the play count (shown in the Bingers app as “Watched x2”, etc.)
+
+Scroblarr does **not** sync:
+
+- Ratings or reviews
+- Watchlists
+- Collections
+- In-progress playback
+- Unwatch / remove from history
+
 ## Unlinking your account
 
 If you need to unlink your Bingers account:
@@ -42,13 +63,14 @@ If you need to unlink your Bingers account:
 2. Click **Unlink** in the Bingers section
 3. Confirm the unlink
 
-Unlinking does not log you out of the Bingers app.
+Your watch history will stop syncing to Bingers, but existing synced data remains on Bingers. Unlinking does not log you out of the Bingers app.
 
 ## Troubleshooting
 
-If you're having trouble linking:
+If you're having trouble linking or syncing:
 
 - Request a fresh magic link if the previous one expired or was already used
 - Paste the full URL from the email, including the `token` query parameter
 - Re-authorize if Scroblarr shows the session as expired
-- Check Settings → Logs for Bingers-specific errors
+- Refresh metadata in Plex or Jellyfin if items fail to match
+- Check the sync history and Settings → Logs for Bingers-specific errors

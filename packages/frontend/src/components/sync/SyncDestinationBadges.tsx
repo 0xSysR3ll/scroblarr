@@ -18,18 +18,21 @@ const destinationLabels: Record<SyncDestinationName, string> = {
   TVTime: "TVTime",
   Trakt: "Trakt",
   Simkl: "Simkl",
+  Bingers: "Bingers",
 };
 
 const destinationLogoPaths: Record<SyncDestinationName, string> = {
   TVTime: "/logos/tvtime.svg",
   Trakt: "/logos/trakt.svg",
   Simkl: "/logos/simkl.svg",
+  Bingers: "/logos/bingers.png",
 };
 
 const destinationTranslationKeys: Record<SyncDestinationName, string> = {
   TVTime: "sync.destinations.tvtime",
   Trakt: "sync.destinations.trakt",
   Simkl: "sync.destinations.simkl",
+  Bingers: "sync.destinations.bingers",
 };
 
 function getBadgeClasses(destination: SyncDestinationResult): string {
@@ -43,6 +46,10 @@ function getBadgeClasses(destination: SyncDestinationResult): string {
 
   if (destination.name === "Simkl") {
     return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300";
+  }
+
+  if (destination.name === "Bingers") {
+    return "bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-300";
   }
 
   return "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300";

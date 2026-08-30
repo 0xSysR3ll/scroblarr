@@ -14,6 +14,38 @@ export function serializeCookieJar(jar: CookieJar): string {
   return JSON.stringify(jar);
 }
 
+function isSessionCookieName(name: string): boolean {
+  // better-auth defaults to `${prefix}.session_token` (e.g. better-auth.session_token).
+  return name === "session_token" || name.endsWith(".session_token");
+}
+
+export function hasUsableSessionCookie(jar: CookieJar): boolean {
+  const now = Date.now();
+  return Object.values(jar).some(
+    (entry) =>
+      isSessionCookieName(entry.name) &&
+      !!entry.value &&
+      (entry.expires === undefined || entry.expires > now)
+  );
+}
+
+/** True when stored jar text is present but not a usable session cookie jar. */
+export function isCorruptStoredCookieJar(
+  raw: string | null | undefined
+): boolean {
+  if (!raw?.trim()) {
+    return false;
+  }
+
+  try {
+    JSON.parse(raw);
+  } catch {
+    return true;
+  }
+
+  return !hasUsableSessionCookie(parseCookieJar(raw));
+}
+
 export function parseCookieJar(raw: string): CookieJar {
   if (!raw.trim()) {
     return emptyCookieJar();
@@ -52,7 +84,7 @@ export function parseCookieJar(raw: string): CookieJar {
 export function cookieHeaderFromJar(jar: CookieJar): string {
   const now = Date.now();
   return Object.values(jar)
-    .filter((entry) => !entry.expires || entry.expires > now)
+    .filter((entry) => entry.expires === undefined || entry.expires > now)
     .map((entry) => `${entry.name}=${entry.value}`)
     .join("; ");
 }

@@ -1,4 +1,5 @@
 import { CollapsibleSettingsCard } from "@components/settings/CollapsibleSettingsCard";
+import { CustomCheckbox } from "@components/ui/CustomCheckbox";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +21,7 @@ import {
   getBingersStatus,
   linkBingers,
   unlinkBingers,
+  updateBingersSettings,
   BINGERS_MOBILE_SIGNIN_URL,
   type BingersStatus,
 } from "@services/api";
@@ -94,6 +96,19 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
   const [bingersMagicLink, setBingersMagicLink] = useState("");
   const [showBingersUnlinkModal, setShowBingersUnlinkModal] = useState(false);
   const [bingersOAuthPopup] = useState(() => new OAuthPopup());
+  const [bingersMarkMoviesAsRewatched, setBingersMarkMoviesAsRewatched] =
+    useState(false);
+  const [bingersMarkEpisodesAsRewatched, setBingersMarkEpisodesAsRewatched] =
+    useState(false);
+  const [
+    bingersSavedMarkMoviesAsRewatched,
+    setBingersSavedMarkMoviesAsRewatched,
+  ] = useState(false);
+  const [
+    bingersSavedMarkEpisodesAsRewatched,
+    setBingersSavedMarkEpisodesAsRewatched,
+  ] = useState(false);
+  const [bingersSavingSettings, setBingersSavingSettings] = useState(false);
   const traktPinPollIdRef = useRef(0);
   const simklPinPollIdRef = useRef(0);
   const bingersStatusRequestIdRef = useRef(0);
@@ -141,8 +156,17 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
           return;
         }
         setBingersStatus(status);
+        applyBingersRewatchSettings(status);
+        setBingersError(null);
       } catch {
-        // Error handled by UI state
+        if (requestId !== bingersStatusRequestIdRef.current) {
+          return;
+        }
+        setBingersError(
+          t("bingers.statusLoadFailed", {
+            defaultValue: "Failed to load Bingers status",
+          })
+        );
       } finally {
         setBingersLoading(false);
       }
@@ -154,6 +178,48 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
       bingersStatusRequestIdRef.current += 1;
     };
   }, []);
+
+  function applyBingersRewatchSettings(status: BingersStatus) {
+    const movies = !!status.markMoviesAsRewatched;
+    const episodes = !!status.markEpisodesAsRewatched;
+    setBingersMarkMoviesAsRewatched(movies);
+    setBingersMarkEpisodesAsRewatched(episodes);
+    setBingersSavedMarkMoviesAsRewatched(movies);
+    setBingersSavedMarkEpisodesAsRewatched(episodes);
+  }
+
+  const bingersHasSettingsChanges =
+    bingersMarkMoviesAsRewatched !== bingersSavedMarkMoviesAsRewatched ||
+    bingersMarkEpisodesAsRewatched !== bingersSavedMarkEpisodesAsRewatched;
+
+  async function handleSaveBingersSettings() {
+    try {
+      setBingersSavingSettings(true);
+      setBingersError(null);
+      const updated = await updateBingersSettings({
+        markMoviesAsRewatched: bingersMarkMoviesAsRewatched,
+        markEpisodesAsRewatched: bingersMarkEpisodesAsRewatched,
+      });
+      setBingersSavedMarkMoviesAsRewatched(updated.markMoviesAsRewatched);
+      setBingersSavedMarkEpisodesAsRewatched(updated.markEpisodesAsRewatched);
+      setBingersMarkMoviesAsRewatched(updated.markMoviesAsRewatched);
+      setBingersMarkEpisodesAsRewatched(updated.markEpisodesAsRewatched);
+      showSuccess(
+        t("profile.saved", { defaultValue: "Settings saved successfully!" })
+      );
+      onProfileUpdated?.();
+    } catch (err) {
+      setBingersError(
+        err instanceof Error
+          ? err.message
+          : t("bingers.settingsSaveFailed", {
+              defaultValue: "Failed to save Bingers settings",
+            })
+      );
+    } finally {
+      setBingersSavingSettings(false);
+    }
+  }
 
   useEffect(() => {
     return () => {
@@ -625,15 +691,20 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         const status = await getBingersStatus({ force: true });
         if (requestId === bingersStatusRequestIdRef.current) {
           setBingersStatus(status);
+          applyBingersRewatchSettings(status);
         }
       } catch {
         if (requestId === bingersStatusRequestIdRef.current) {
-          setBingersStatus({
+          const linkedStatus: BingersStatus = {
             linked: true,
             needsReauthorization: false,
             username: null,
             image: null,
-          });
+            markMoviesAsRewatched: false,
+            markEpisodesAsRewatched: false,
+          };
+          setBingersStatus(linkedStatus);
+          applyBingersRewatchSettings(linkedStatus);
         }
       }
       showSuccess(
@@ -672,14 +743,19 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         const status = await getBingersStatus({ force: true });
         if (requestId === bingersStatusRequestIdRef.current) {
           setBingersStatus(status);
+          applyBingersRewatchSettings(status);
         }
       } catch {
-        setBingersStatus({
+        const unlinkedStatus: BingersStatus = {
           linked: false,
           needsReauthorization: false,
           username: null,
           image: null,
-        });
+          markMoviesAsRewatched: false,
+          markEpisodesAsRewatched: false,
+        };
+        setBingersStatus(unlinkedStatus);
+        applyBingersRewatchSettings(unlinkedStatus);
       }
       showSuccess(
         t("bingers.unlinked", {
@@ -1295,13 +1371,119 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
             <button
               type="button"
               onClick={handleUnlinkBingers}
-              disabled={bingersSaving}
+              disabled={bingersSaving || bingersSavingSettings}
               className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950 dark:hover:text-red-300"
               title={t("bingers.unlink", { defaultValue: "Unlink" })}
             >
               <FaUnlink className="h-3.5 w-3.5" />
               <span>{t("bingers.unlink", { defaultValue: "Unlink" })}</span>
             </button>
+
+            <div className="mt-4 border-t border-border pt-4">
+              <h4 className="mb-3 text-sm font-semibold text-foreground">
+                {t("bingers.settings.title", {
+                  defaultValue: "Sync Settings",
+                })}
+              </h4>
+              <p className="mb-4 text-xs text-muted-foreground">
+                {t("bingers.settings.description", {
+                  defaultValue:
+                    "Mark media as rewatched only if it has been synced before. Rewatches increment the play count in Bingers (Watched x2, etc.).",
+                })}
+              </p>
+
+              <div className="space-y-4">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <div className="mt-0.5">
+                    <CustomCheckbox
+                      checked={bingersMarkMoviesAsRewatched}
+                      disabled={bingersSavingSettings}
+                      onChange={() =>
+                        setBingersMarkMoviesAsRewatched(
+                          !bingersMarkMoviesAsRewatched
+                        )
+                      }
+                      ariaLabel={t("bingers.settings.markMoviesAsRewatched", {
+                        defaultValue: "Mark movies as rewatched",
+                      })}
+                    />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-foreground/90">
+                      {t("bingers.settings.markMoviesAsRewatched", {
+                        defaultValue: "Mark movies as rewatched",
+                      })}
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t("bingers.settings.markMoviesAsRewatchedDescription", {
+                        defaultValue:
+                          "When enabled, movies that have been synced before will increment the Bingers play count.",
+                      })}
+                    </p>
+                  </div>
+                </label>
+
+                <label className="flex cursor-pointer items-start gap-3">
+                  <div className="mt-0.5">
+                    <CustomCheckbox
+                      checked={bingersMarkEpisodesAsRewatched}
+                      disabled={bingersSavingSettings}
+                      onChange={() =>
+                        setBingersMarkEpisodesAsRewatched(
+                          !bingersMarkEpisodesAsRewatched
+                        )
+                      }
+                      ariaLabel={t("bingers.settings.markEpisodesAsRewatched", {
+                        defaultValue: "Mark episodes as rewatched",
+                      })}
+                    />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-foreground/90">
+                      {t("bingers.settings.markEpisodesAsRewatched", {
+                        defaultValue: "Mark episodes as rewatched",
+                      })}
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t(
+                        "bingers.settings.markEpisodesAsRewatchedDescription",
+                        {
+                          defaultValue:
+                            "When enabled, episodes that have been synced before will increment the Bingers play count.",
+                        }
+                      )}
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {bingersHasSettingsChanges && (
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleSaveBingersSettings}
+                    disabled={bingersSavingSettings}
+                    className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {bingersSavingSettings ? (
+                      <>
+                        <Spinner size="md" variant="onPrimary" />
+                        <span>
+                          {t("common.saving", { defaultValue: "Saving..." })}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <FaCheckCircle className="h-4 w-4" />
+                        <span>
+                          {t("common.save", { defaultValue: "Save" })}
+                        </span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
@@ -1481,7 +1663,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
             <button
               type="button"
               onClick={confirmUnlinkBingers}
-              disabled={bingersSaving}
+              disabled={bingersSaving || bingersSavingSettings}
               className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             >
               {bingersSaving

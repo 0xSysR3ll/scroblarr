@@ -33,14 +33,16 @@ describe("syncHistoryDestinationResults", () => {
       buildAttemptResult([
         { destination: "Trakt", success: true },
         { destination: "Simkl", success: false, error: "401" },
+        { destination: "Bingers", success: true },
       ])
     ).toEqual({
       success: true,
-      destinations: ["Trakt"],
+      destinations: ["Trakt", "Bingers"],
       errorMessage: "Simkl: 401",
       destinationResults: {
         Trakt: { status: "success" },
         Simkl: { status: "failed", error: "401" },
+        Bingers: { status: "success" },
       },
     });
   });

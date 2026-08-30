@@ -205,6 +205,47 @@ describe("BingersSessionManager", () => {
     });
   });
 
+  it("accepts better-auth prefixed session cookies during validateAndRefresh", async () => {
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar: serializeCookieJar({
+        "better-auth.session_token": {
+          name: "better-auth.session_token",
+          value: "old",
+        },
+      }),
+      bingersEmail: "user@example.com",
+    });
+    authMocks.getSession.mockResolvedValue({
+      session: { id: "s1" },
+      user: {
+        id: "b1",
+        email: "user@example.com",
+        username: "handle",
+        image: "https://img.example/avatar.png",
+      },
+      cookieJar: {
+        "better-auth.session_token": {
+          name: "better-auth.session_token",
+          value: "new",
+        },
+      },
+    });
+
+    const manager = new BingersSessionManager(
+      userRepositoryMocks as never,
+      authMocks as unknown as BingersAuth
+    );
+
+    await expect(manager.validateAndRefresh("user-id")).resolves.toEqual({
+      linked: true,
+      needsReauthorization: false,
+      username: "handle",
+      image: "https://img.example/avatar.png",
+    });
+    expect(authMocks.getSession).toHaveBeenCalled();
+  });
+
   it("clears the jar on auth errors from getValidCookieJar", async () => {
     userRepositoryMocks.findById.mockResolvedValue({
       id: "user-id",
@@ -317,6 +358,101 @@ describe("BingersSessionManager", () => {
     });
   });
 
+  it("clears corrupt stored jars and requires re-authorization", async () => {
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar: "not-json",
+      bingersEmail: "user@example.com",
+    });
+
+    const manager = new BingersSessionManager(
+      userRepositoryMocks as never,
+      authMocks as unknown as BingersAuth
+    );
+
+    await expect(manager.getValidCookieJar("user-id")).rejects.toMatchObject({
+      isAuthError: true,
+    });
+    expect(authMocks.getSession).not.toHaveBeenCalled();
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith(
+      "user-id",
+      expect.objectContaining({
+        bingersCookieJar: null,
+        bingersEmail: "user@example.com",
+      })
+    );
+  });
+
+  it("reports needsReauthorization when validateAndRefresh finds a corrupt jar", async () => {
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar: "not-json",
+      bingersEmail: "user@example.com",
+      bingersUsername: "User",
+      bingersThumb: "https://img.example/avatar.png",
+    });
+
+    const manager = new BingersSessionManager(
+      userRepositoryMocks as never,
+      authMocks as unknown as BingersAuth
+    );
+
+    const status = await manager.validateAndRefresh("user-id");
+    expect(status).toEqual({
+      linked: false,
+      needsReauthorization: true,
+      username: "User",
+      image: "https://img.example/avatar.png",
+    });
+    expect(authMocks.getSession).not.toHaveBeenCalled();
+  });
+
+  it("falls back to stored email when a corrupt jar has no username", async () => {
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar: "not-json",
+      bingersEmail: "user@example.com",
+      bingersUsername: null,
+      bingersThumb: null,
+    });
+
+    const manager = new BingersSessionManager(
+      userRepositoryMocks as never,
+      authMocks as unknown as BingersAuth
+    );
+
+    const status = await manager.validateAndRefresh("user-id");
+    expect(status).toEqual({
+      linked: false,
+      needsReauthorization: true,
+      username: "user@example.com",
+      image: null,
+    });
+  });
+
+  it("returns null profile fields when a corrupt jar has no stored identity", async () => {
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      bingersCookieJar: "not-json",
+      bingersEmail: null,
+      bingersUsername: null,
+      bingersThumb: null,
+    });
+
+    const manager = new BingersSessionManager(
+      userRepositoryMocks as never,
+      authMocks as unknown as BingersAuth
+    );
+
+    const status = await manager.validateAndRefresh("user-id");
+    expect(status).toEqual({
+      linked: false,
+      needsReauthorization: true,
+      username: null,
+      image: null,
+    });
+  });
+
   it("clears all Bingers fields on clearAll", async () => {
     const manager = new BingersSessionManager(
       userRepositoryMocks as never,
@@ -332,6 +468,8 @@ describe("BingersSessionManager", () => {
         bingersUserId: null,
         bingersUsername: null,
         bingersThumb: null,
+        bingersMarkMoviesAsRewatched: false,
+        bingersMarkEpisodesAsRewatched: false,
       })
     );
   });

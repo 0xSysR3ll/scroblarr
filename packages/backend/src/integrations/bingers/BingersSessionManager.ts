@@ -8,7 +8,12 @@ import {
   isBingersAuthError,
 } from "./BingersApiError";
 import { BingersAuth, BingersSessionInfo } from "./BingersAuth";
-import { CookieJar, parseCookieJar, serializeCookieJar } from "./cookieJar";
+import {
+  CookieJar,
+  isCorruptStoredCookieJar,
+  parseCookieJar,
+  serializeCookieJar,
+} from "./cookieJar";
 
 export class BingersSessionManager {
   private userRepository: UserRepository;
@@ -29,6 +34,13 @@ export class BingersSessionManager {
     }
 
     if (!user.bingersCookieJar) {
+      throw new BingersApiError(BINGERS_REAUTH_MESSAGE, 401, {
+        isAuthError: true,
+      });
+    }
+
+    if (isCorruptStoredCookieJar(user.bingersCookieJar)) {
+      await this.clearSessionKeepEmail(user);
       throw new BingersApiError(BINGERS_REAUTH_MESSAGE, 401, {
         isAuthError: true,
       });
@@ -68,6 +80,16 @@ export class BingersSessionManager {
       return {
         linked: false,
         needsReauthorization: hadPriorLink,
+        username: user.bingersUsername || user.bingersEmail || null,
+        image: user.bingersThumb || null,
+      };
+    }
+
+    if (isCorruptStoredCookieJar(user.bingersCookieJar)) {
+      await this.clearSessionKeepEmail(user);
+      return {
+        linked: false,
+        needsReauthorization: true,
         username: user.bingersUsername || user.bingersEmail || null,
         image: user.bingersThumb || null,
       };
@@ -133,6 +155,8 @@ export class BingersSessionManager {
       bingersUserId: null,
       bingersUsername: null,
       bingersThumb: null,
+      bingersMarkMoviesAsRewatched: false,
+      bingersMarkEpisodesAsRewatched: false,
     } as unknown as Partial<User>);
   }
 

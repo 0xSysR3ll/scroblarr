@@ -111,6 +111,9 @@ function destinationNames(statistics: SyncStatistics): string[] {
   if (statistics.byDestination.simkl > 0) {
     names.push("Simkl");
   }
+  if (statistics.byDestination.bingers > 0) {
+    names.push("Bingers");
+  }
   if (statistics.byDestination.tvtime > 0) {
     names.push("TVTime");
   }
@@ -655,6 +658,7 @@ export function DashboardPage() {
   const destinationTotal = statistics
     ? statistics.byDestination.trakt +
       statistics.byDestination.simkl +
+      statistics.byDestination.bingers +
       statistics.byDestination.tvtime
     : 0;
 
@@ -794,7 +798,7 @@ export function DashboardPage() {
                 <p className="mb-6 text-muted-foreground">
                   {t("dashboard.empty.description", {
                     defaultValue:
-                      "Watch something on Plex or Jellyfin and it will appear here. Make sure webhooks are configured and your Trakt or Simkl account is linked in your profile.",
+                      "Watch something on Plex or Jellyfin and it will appear here. Make sure webhooks are configured and your Trakt, Simkl, or Bingers account is linked in your profile.",
                   })}
                 </p>
                 <button
@@ -1300,6 +1304,11 @@ export function DashboardPage() {
                         "Simkl",
                         statistics.byDestination.simkl,
                         "var(--chart-2)",
+                      ],
+                      [
+                        "Bingers",
+                        statistics.byDestination.bingers,
+                        "var(--chart-3)",
                       ],
                     ] as const
                   ).map(([label, value, color]) => (

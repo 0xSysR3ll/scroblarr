@@ -1,3 +1,4 @@
+import { BingersApiError } from "@integrations/bingers/BingersApiError";
 import { TraktApiError } from "@integrations/trakt/TraktApiError";
 import type { MediaEvent } from "@scroblarr/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,6 +11,7 @@ const userRepositoryMocks = vi.hoisted(() => ({
 
 const syncHistoryRepositoryMocks = vi.hoisted(() => ({
   hasExistingSync: vi.fn(),
+  countSuccessfulDestinationSyncs: vi.fn(),
   create: vi.fn(),
   save: vi.fn(),
   clearOldByUser: vi.fn(),
@@ -37,6 +39,16 @@ const simklTokenManagerMocks = vi.hoisted(() => ({
   getValidAccessToken: vi.fn(),
 }));
 
+const bingersClientMocks = vi.hoisted(() => ({
+  scrobble: vi.fn(),
+}));
+
+const bingersClientCtorThrows = vi.hoisted(() => ({ value: false }));
+
+const bingersSessionManagerMocks = vi.hoisted(() => ({
+  getValidCookieJar: vi.fn(),
+}));
+
 const mediaIdEnricherMocks = vi.hoisted(() => ({
   enrich: vi.fn(async (media: unknown) => media),
 }));
@@ -52,6 +64,8 @@ vi.mock("@repositories/UserRepository", () => ({
 vi.mock("@repositories/SyncHistoryRepository", () => ({
   SyncHistoryRepository: class {
     hasExistingSync = syncHistoryRepositoryMocks.hasExistingSync;
+    countSuccessfulDestinationSyncs =
+      syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs;
     create = syncHistoryRepositoryMocks.create;
     save = syncHistoryRepositoryMocks.save;
     clearOldByUser = syncHistoryRepositoryMocks.clearOldByUser;
@@ -77,6 +91,17 @@ vi.mock("@integrations/simkl/SimklClient", () => ({
   },
 }));
 
+vi.mock("@integrations/bingers/BingersClient", () => ({
+  BingersClient: class {
+    constructor() {
+      if (bingersClientCtorThrows.value) {
+        throw new Error("Bingers client init failed");
+      }
+    }
+    scrobble = bingersClientMocks.scrobble;
+  },
+}));
+
 vi.mock("@integrations/trakt/TraktTokenManager", () => ({
   TraktTokenManager: class {
     getValidAccessToken = traktTokenManagerMocks.getValidAccessToken;
@@ -88,6 +113,16 @@ vi.mock("@integrations/simkl/SimklTokenManager", () => ({
   SimklTokenManager: class {
     getValidAccessToken = simklTokenManagerMocks.getValidAccessToken;
   },
+}));
+
+vi.mock("@integrations/bingers/BingersSessionManager", () => ({
+  BingersSessionManager: class {
+    getValidCookieJar = bingersSessionManagerMocks.getValidCookieJar;
+  },
+}));
+
+vi.mock("@integrations/bingers/cookieJar", () => ({
+  cookieHeaderFromJar: () => "session_token=bingers-cookie",
 }));
 
 vi.mock("./MediaIdEnricher", async (importOriginal) => {
@@ -133,10 +168,14 @@ function makeEvent(overrides?: Partial<MediaEvent>): MediaEvent {
 
 describe("SyncService", () => {
   beforeEach(() => {
+    bingersClientCtorThrows.value = false;
     vi.clearAllMocks();
     settingsRepositoryMocks.get.mockResolvedValue("100");
     settingsRepositoryMocks.getAll.mockResolvedValue({});
     syncHistoryRepositoryMocks.clearOldByUser.mockResolvedValue(0);
+    syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs.mockResolvedValue(
+      0
+    );
     mediaIdEnricherMocks.enrich.mockImplementation(async (media) => media);
   });
 
@@ -218,6 +257,375 @@ describe("SyncService", () => {
         success: true,
         destinations: JSON.stringify(["Simkl"]),
       })
+    );
+  });
+
+  it("syncs to Bingers when linked and records the destination", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktAccessToken: null,
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"x"}}',
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs.mockResolvedValue(
+      0
+    );
+    bingersSessionManagerMocks.getValidCookieJar.mockResolvedValue({
+      session_token: { name: "session_token", value: "x" },
+    });
+    bingersClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    await service.syncEvent(makeEvent());
+
+    expect(bingersSessionManagerMocks.getValidCookieJar).toHaveBeenCalledWith(
+      "u1"
+    );
+    expect(bingersClientMocks.scrobble).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "scrobble" }),
+      "session_token=bingers-cookie",
+      expect.objectContaining({
+        bingersLocalPlayCount: undefined,
+        markMoviesAsRewatched: false,
+      })
+    );
+    expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "u1",
+        originalMediaId: "m1",
+        success: true,
+        destinations: JSON.stringify(["Bingers"]),
+        wasRewatched: false,
+      })
+    );
+  });
+
+  it("uses destination getSyncOptions when provided", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktClientId: "client",
+      traktClientSecret: "secret",
+      traktAccessToken: "token",
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(true);
+    traktTokenManagerMocks.getValidAccessToken.mockResolvedValue("trakt-token");
+    traktClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    const getSyncOptions = vi.fn(() => ({ markAsRewatched: true }));
+    vi.spyOn(
+      service as unknown as {
+        getSyncDestinations: () => Promise<
+          Array<{
+            name: string;
+            client: { scrobble: typeof traktClientMocks.scrobble };
+            hasToken: () => boolean;
+            getAccessToken: () => Promise<string>;
+            getSyncOptions?: (
+              user: { id: string },
+              hasExistingSync: boolean
+            ) => Record<string, unknown>;
+          }>
+        >;
+      },
+      "getSyncDestinations"
+    ).mockResolvedValue([
+      {
+        name: "Trakt",
+        client: { scrobble: traktClientMocks.scrobble },
+        hasToken: () => true,
+        getAccessToken: async () => "trakt-token",
+        getSyncOptions,
+      },
+    ]);
+
+    await service.syncEvent(makeEvent());
+
+    expect(getSyncOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "u1" }),
+      true
+    );
+    expect(traktClientMocks.scrobble).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "scrobble" }),
+      "trakt-token",
+      { markAsRewatched: true }
+    );
+  });
+
+  it("continues syncing when Bingers client initialization fails", async () => {
+    bingersClientCtorThrows.value = true;
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktAccessToken: "trakt-token",
+      traktClientId: "client",
+      traktClientSecret: "secret",
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"x"}}',
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    traktTokenManagerMocks.getValidAccessToken.mockResolvedValue("trakt-token");
+    traktClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    await service.syncEvent(makeEvent());
+
+    expect(traktClientMocks.scrobble).toHaveBeenCalled();
+    expect(bingersClientMocks.scrobble).not.toHaveBeenCalled();
+  });
+
+  it("increments Bingers plays and marks rewatch on repeat scrobbles", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktAccessToken: null,
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"x"}}',
+      bingersMarkMoviesAsRewatched: true,
+      bingersMarkEpisodesAsRewatched: false,
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(true);
+    syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs.mockResolvedValue(
+      2
+    );
+    bingersSessionManagerMocks.getValidCookieJar.mockResolvedValue({
+      session_token: { name: "session_token", value: "x" },
+    });
+    bingersClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    await service.syncEvent(makeEvent());
+
+    expect(
+      syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs
+    ).toHaveBeenCalledWith(
+      "u1",
+      "Bingers",
+      "movie",
+      expect.objectContaining({ tvdbMovieId: "123" })
+    );
+    expect(bingersClientMocks.scrobble).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "scrobble" }),
+      "session_token=bingers-cookie",
+      expect.objectContaining({
+        bingersLocalPlayCount: 3,
+        markMoviesAsRewatched: true,
+      })
+    );
+    expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        destinations: JSON.stringify(["Bingers"]),
+        wasRewatched: true,
+      })
+    );
+  });
+
+  it("skips Bingers when rewatch is opted out and the item was already synced", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktAccessToken: null,
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"x"}}',
+      bingersMarkMoviesAsRewatched: false,
+      bingersMarkEpisodesAsRewatched: false,
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(true);
+    syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs.mockResolvedValue(
+      2
+    );
+    bingersSessionManagerMocks.getValidCookieJar.mockResolvedValue({
+      session_token: { name: "session_token", value: "x" },
+    });
+    bingersClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    await service.syncEvent(makeEvent());
+
+    expect(bingersClientMocks.scrobble).not.toHaveBeenCalled();
+    const historyCall =
+      syncHistoryRepositoryMocks.create.mock.calls.at(-1)?.[0];
+    expect(historyCall?.destinations).toBeUndefined();
+  });
+
+  it("does not inflate Bingers play counts when skipped syncs are not recorded", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktAccessToken: null,
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"x"}}',
+      bingersMarkMoviesAsRewatched: true,
+      bingersMarkEpisodesAsRewatched: false,
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(true);
+    syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs.mockResolvedValue(
+      1
+    );
+    bingersSessionManagerMocks.getValidCookieJar.mockResolvedValue({
+      session_token: { name: "session_token", value: "x" },
+    });
+    bingersClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    await service.syncEvent(makeEvent());
+
+    expect(bingersClientMocks.scrobble).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "scrobble" }),
+      "session_token=bingers-cookie",
+      expect.objectContaining({
+        bingersLocalPlayCount: 2,
+        markMoviesAsRewatched: true,
+      })
+    );
+  });
+
+  it("syncs to Bingers on first watch even when the item was synced to another destination", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktAccessToken: "trakt-token",
+      traktClientId: "client",
+      traktClientSecret: "secret",
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"x"}}',
+      bingersMarkMoviesAsRewatched: false,
+      bingersMarkEpisodesAsRewatched: false,
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(true);
+    syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs.mockResolvedValue(
+      0
+    );
+    traktTokenManagerMocks.getValidAccessToken.mockResolvedValue("trakt-token");
+    traktClientMocks.scrobble.mockResolvedValue(undefined);
+    bingersSessionManagerMocks.getValidCookieJar.mockResolvedValue({
+      session_token: { name: "session_token", value: "x" },
+    });
+    bingersClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    await service.syncEvent(makeEvent());
+
+    expect(bingersClientMocks.scrobble).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "scrobble" }),
+      "session_token=bingers-cookie",
+      expect.objectContaining({
+        bingersLocalPlayCount: undefined,
+        markMoviesAsRewatched: false,
+      })
+    );
+    expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        destinations: JSON.stringify(["Trakt", "Bingers"]),
+        wasRewatched: false,
+      })
+    );
+  });
+
+  it("increments Bingers episode plays when rewatch is enabled", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktAccessToken: null,
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"x"}}',
+      bingersMarkMoviesAsRewatched: false,
+      bingersMarkEpisodesAsRewatched: true,
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(true);
+    syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs.mockResolvedValue(
+      1
+    );
+    bingersSessionManagerMocks.getValidCookieJar.mockResolvedValue({
+      session_token: { name: "session_token", value: "x" },
+    });
+    bingersClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    await service.syncEvent(
+      makeEvent({
+        media: {
+          id: "e1",
+          type: "episode",
+          title: "Example Show",
+          seasonNumber: 1,
+          episodeNumber: 2,
+        },
+      })
+    );
+
+    expect(
+      syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs
+    ).toHaveBeenCalledWith(
+      "u1",
+      "Bingers",
+      "episode",
+      expect.objectContaining({
+        mediaTitle: "Example Show",
+        seasonNumber: 1,
+        episodeNumber: 2,
+      })
+    );
+    expect(bingersClientMocks.scrobble).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "scrobble" }),
+      "session_token=bingers-cookie",
+      expect.objectContaining({
+        bingersLocalPlayCount: 2,
+        markEpisodesAsRewatched: true,
+      })
+    );
+  });
+
+  it("retries Bingers scrobbles after an auth error", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktAccessToken: null,
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"x"}}',
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs.mockResolvedValue(
+      0
+    );
+    bingersSessionManagerMocks.getValidCookieJar
+      .mockResolvedValueOnce({
+        session_token: { name: "session_token", value: "dead" },
+      })
+      .mockResolvedValueOnce({
+        session_token: { name: "session_token", value: "fresh" },
+      });
+    bingersClientMocks.scrobble
+      .mockRejectedValueOnce(
+        new BingersApiError("dead session", 401, { isAuthError: true })
+      )
+      .mockResolvedValueOnce(undefined);
+
+    const service = new SyncService();
+    await service.syncEvent(makeEvent());
+
+    expect(bingersSessionManagerMocks.getValidCookieJar).toHaveBeenCalledTimes(
+      2
+    );
+    expect(bingersClientMocks.scrobble).toHaveBeenCalledTimes(2);
+    expect(bingersClientMocks.scrobble).toHaveBeenLastCalledWith(
+      expect.objectContaining({ event: "scrobble" }),
+      "session_token=bingers-cookie",
+      expect.any(Object)
     );
   });
 

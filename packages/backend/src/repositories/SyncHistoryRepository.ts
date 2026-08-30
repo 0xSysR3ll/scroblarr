@@ -161,6 +161,8 @@ export class SyncHistoryRepository {
       tmdbSeriesId?: string;
       seasonNumber?: number;
       episodeNumber?: number;
+      mediaTitle?: string;
+      year?: number;
     }
   ): Promise<boolean> {
     const where: FindOptionsWhere<SyncHistory> = {
@@ -194,6 +196,20 @@ export class SyncHistoryRepository {
         const existing = await this.repository.findOne({ where });
         if (existing) return true;
       }
+      if (
+        identifiers.seasonNumber !== undefined &&
+        identifiers.episodeNumber !== undefined &&
+        identifiers.mediaTitle
+      ) {
+        where.tvdbEpisodeId = undefined;
+        where.imdbEpisodeId = undefined;
+        where.tmdbSeriesId = undefined;
+        where.seasonNumber = identifiers.seasonNumber;
+        where.episodeNumber = identifiers.episodeNumber;
+        where.mediaTitle = identifiers.mediaTitle;
+        const existing = await this.repository.findOne({ where });
+        if (existing) return true;
+      }
     }
 
     if (mediaType === "movie") {
@@ -215,9 +231,138 @@ export class SyncHistoryRepository {
         const existing = await this.repository.findOne({ where });
         if (existing) return true;
       }
+      if (identifiers.mediaTitle && identifiers.year !== undefined) {
+        where.tvdbMovieId = undefined;
+        where.imdbMovieId = undefined;
+        where.tmdbMovieId = undefined;
+        where.mediaTitle = identifiers.mediaTitle;
+        where.year = identifiers.year;
+        const existing = await this.repository.findOne({ where });
+        if (existing) return true;
+      }
     }
 
     return false;
+  }
+
+  async countSuccessfulDestinationSyncs(
+    userId: string,
+    destination: string,
+    mediaType: "episode" | "movie",
+    identifiers: {
+      tvdbEpisodeId?: string;
+      tvdbMovieId?: string;
+      imdbMovieId?: string;
+      imdbEpisodeId?: string;
+      tmdbMovieId?: string;
+      tmdbSeriesId?: string;
+      seasonNumber?: number;
+      episodeNumber?: number;
+      mediaTitle?: string;
+      year?: number;
+    }
+  ): Promise<number> {
+    const destinationPat = `%"${destination}"%`;
+
+    const base = () =>
+      this.repository
+        .createQueryBuilder("sync_history")
+        .where("sync_history.userId = :userId", { userId })
+        .andWhere("sync_history.mediaType = :mediaType", { mediaType })
+        .andWhere("sync_history.success = :success", { success: true })
+        .andWhere("sync_history.destinations LIKE :destinationPat", {
+          destinationPat,
+        });
+
+    if (mediaType === "episode") {
+      if (identifiers.tvdbEpisodeId) {
+        const n = await base()
+          .andWhere("sync_history.tvdbEpisodeId = :tvdbEpisodeId", {
+            tvdbEpisodeId: identifiers.tvdbEpisodeId,
+          })
+          .getCount();
+        if (n > 0) return n;
+      }
+      if (identifiers.imdbEpisodeId) {
+        const n = await base()
+          .andWhere("sync_history.imdbEpisodeId = :imdbEpisodeId", {
+            imdbEpisodeId: identifiers.imdbEpisodeId,
+          })
+          .getCount();
+        if (n > 0) return n;
+      }
+      if (
+        identifiers.tmdbSeriesId &&
+        identifiers.seasonNumber !== undefined &&
+        identifiers.episodeNumber !== undefined
+      ) {
+        const n = await base()
+          .andWhere("sync_history.tmdbSeriesId = :tmdbSeriesId", {
+            tmdbSeriesId: identifiers.tmdbSeriesId,
+          })
+          .andWhere("sync_history.seasonNumber = :seasonNumber", {
+            seasonNumber: identifiers.seasonNumber,
+          })
+          .andWhere("sync_history.episodeNumber = :episodeNumber", {
+            episodeNumber: identifiers.episodeNumber,
+          })
+          .getCount();
+        if (n > 0) return n;
+      }
+      if (
+        identifiers.seasonNumber !== undefined &&
+        identifiers.episodeNumber !== undefined &&
+        identifiers.mediaTitle
+      ) {
+        return await base()
+          .andWhere("sync_history.seasonNumber = :seasonNumber", {
+            seasonNumber: identifiers.seasonNumber,
+          })
+          .andWhere("sync_history.episodeNumber = :episodeNumber", {
+            episodeNumber: identifiers.episodeNumber,
+          })
+          .andWhere("sync_history.mediaTitle = :mediaTitle", {
+            mediaTitle: identifiers.mediaTitle,
+          })
+          .getCount();
+      }
+      return 0;
+    }
+
+    if (identifiers.tvdbMovieId) {
+      const n = await base()
+        .andWhere("sync_history.tvdbMovieId = :tvdbMovieId", {
+          tvdbMovieId: identifiers.tvdbMovieId,
+        })
+        .getCount();
+      if (n > 0) return n;
+    }
+    if (identifiers.imdbMovieId) {
+      const n = await base()
+        .andWhere("sync_history.imdbMovieId = :imdbMovieId", {
+          imdbMovieId: identifiers.imdbMovieId,
+        })
+        .getCount();
+      if (n > 0) return n;
+    }
+    if (identifiers.tmdbMovieId) {
+      const n = await base()
+        .andWhere("sync_history.tmdbMovieId = :tmdbMovieId", {
+          tmdbMovieId: identifiers.tmdbMovieId,
+        })
+        .getCount();
+      if (n > 0) return n;
+    }
+    if (identifiers.mediaTitle && identifiers.year !== undefined) {
+      return await base()
+        .andWhere("sync_history.mediaTitle = :mediaTitle", {
+          mediaTitle: identifiers.mediaTitle,
+        })
+        .andWhere("sync_history.year = :year", { year: identifiers.year })
+        .getCount();
+    }
+
+    return 0;
   }
 
   async getStatisticsByUser(userId: string): Promise<{
@@ -238,6 +383,7 @@ export class SyncHistoryRepository {
       trakt: number;
       tvtime: number;
       simkl: number;
+      bingers: number;
     };
     byPeriod: {
       today: number;
@@ -302,6 +448,7 @@ export class SyncHistoryRepository {
       traktCount,
       tvtimeCount,
       simklCount,
+      bingersCount,
       today,
       thisWeek,
       thisMonth,
@@ -341,6 +488,7 @@ export class SyncHistoryRepository {
       this.repository
         .createQueryBuilder("sync_history")
         .where("sync_history.userId = :userId", { userId })
+        .andWhere("sync_history.success = :success", { success: true })
         .andWhere("sync_history.destinations LIKE :traktPat", {
           traktPat: '%"Trakt"%',
         })
@@ -348,6 +496,7 @@ export class SyncHistoryRepository {
       this.repository
         .createQueryBuilder("sync_history")
         .where("sync_history.userId = :userId", { userId })
+        .andWhere("sync_history.success = :success", { success: true })
         .andWhere("sync_history.destinations LIKE :tvtimePat", {
           tvtimePat: '%"TVTime"%',
         })
@@ -355,8 +504,17 @@ export class SyncHistoryRepository {
       this.repository
         .createQueryBuilder("sync_history")
         .where("sync_history.userId = :userId", { userId })
+        .andWhere("sync_history.success = :success", { success: true })
         .andWhere("sync_history.destinations LIKE :simklPat", {
           simklPat: '%"Simkl"%',
+        })
+        .getCount(),
+      this.repository
+        .createQueryBuilder("sync_history")
+        .where("sync_history.userId = :userId", { userId })
+        .andWhere("sync_history.success = :success", { success: true })
+        .andWhere("sync_history.destinations LIKE :bingersPat", {
+          bingersPat: '%"Bingers"%',
         })
         .getCount(),
       this.repository
@@ -496,6 +654,7 @@ export class SyncHistoryRepository {
         trakt: traktCount,
         tvtime: tvtimeCount,
         simkl: simklCount,
+        bingers: bingersCount,
       },
       byPeriod: {
         today,
