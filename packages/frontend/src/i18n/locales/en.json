@@ -618,7 +618,7 @@
     "linkFailed": "Failed to link Bingers account",
     "unlinked": "Bingers account unlinked successfully",
     "unlinkFailed": "Failed to unlink Bingers account",
-    "description": "Link your Bingers account with magic-link email sign-in. Scroblarr keeps the session alive in the background.",
+    "description": "Sync your watched movies and episodes to Bingers. Uses magic-link email sign-in for secure authentication.",
     "profile": {
       "username": "Username"
     },
