@@ -339,6 +339,246 @@ describe("BingersCatalogResolver", () => {
     ).rejects.toThrow(/seasonNumber and episodeNumber/i);
   });
 
+  it("resolves a show via TVDB series id metadata", async () => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/search/titles")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: "show-1",
+                kind: "show",
+                metadata: "meta1",
+                card: { originalTitle: "Locke & Key", year: 2020 },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/metadata@meta1.json")) {
+        return new Response(
+          JSON.stringify({
+            id: "show-1",
+            kind: "show",
+            year: 2020,
+            external_ids: [{ id: "361594", source: "tvdb", type: "series" }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/versions.json")) {
+        return new Response(
+          JSON.stringify({ files: { seasons: { "1": "seasonTok" } } }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/season-1@seasonTok.json")) {
+        return new Response(
+          JSON.stringify({
+            season: 1,
+            episodes: [{ id: "ep-1", n: 1 }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const resolver = new BingersCatalogResolver();
+    await expect(
+      resolver.resolveEntity({
+        id: "e1",
+        type: "episode",
+        title: "Locke & Key",
+        year: 2020,
+        seasonNumber: 1,
+        episodeNumber: 1,
+        tvdbSeriesId: 361594,
+      })
+    ).resolves.toEqual({
+      entityKind: "episode",
+      entityId: "ep-1",
+      titleId: "show-1",
+    });
+  });
+
+  it("resolves a show via unique exact title match when IDs are missing", async () => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/search/titles")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: "show-1",
+                kind: "show",
+                metadata: "meta1",
+                card: { originalTitle: "Locke & Key", year: 2020 },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/metadata@meta1.json")) {
+        return new Response(
+          JSON.stringify({
+            id: "show-1",
+            kind: "show",
+            year: 2020,
+            external_ids: [],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/versions.json")) {
+        return new Response(
+          JSON.stringify({ files: { seasons: { "1": "seasonTok" } } }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/season-1@seasonTok.json")) {
+        return new Response(
+          JSON.stringify({
+            season: 1,
+            episodes: [{ id: "ep-1", n: 1 }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const resolver = new BingersCatalogResolver();
+    await expect(
+      resolver.resolveEntity({
+        id: "e1",
+        type: "episode",
+        title: "Locke & Key",
+        seasonNumber: 1,
+        episodeNumber: 1,
+        tvdbEpisodeId: 9300505,
+      })
+    ).resolves.toEqual({
+      entityKind: "episode",
+      entityId: "ep-1",
+      titleId: "show-1",
+    });
+  });
+
+  it("does not use title-only fallback when year is present but unmatched", async () => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/search/titles")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: "show-1",
+                kind: "show",
+                metadata: "meta1",
+                card: { originalTitle: "Locke & Key", year: 2020 },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/metadata@meta1.json")) {
+        return new Response(
+          JSON.stringify({
+            id: "show-1",
+            kind: "show",
+            year: 2020,
+            external_ids: [],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const resolver = new BingersCatalogResolver();
+    await expect(
+      resolver.resolveEntity({
+        id: "e1",
+        type: "episode",
+        title: "Locke & Key",
+        year: 2021,
+        seasonNumber: 1,
+        episodeNumber: 1,
+        tvdbEpisodeId: 9300505,
+      })
+    ).rejects.toThrow(/Could not resolve Bingers show entity/i);
+  });
+
+  it("does not use title-only fallback when multiple shows share the title", async () => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/search/titles")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: "show-uk",
+                kind: "show",
+                metadata: "meta-uk",
+                card: { originalTitle: "The Office", year: 2001 },
+              },
+              {
+                id: "show-us",
+                kind: "show",
+                metadata: "meta-us",
+                card: { originalTitle: "The Office", year: 2005 },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/metadata@meta-uk.json")) {
+        return new Response(
+          JSON.stringify({
+            id: "show-uk",
+            kind: "show",
+            year: 2001,
+            external_ids: [],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/metadata@meta-us.json")) {
+        return new Response(
+          JSON.stringify({
+            id: "show-us",
+            kind: "show",
+            year: 2005,
+            external_ids: [],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const resolver = new BingersCatalogResolver();
+    await expect(
+      resolver.resolveEntity({
+        id: "e1",
+        type: "episode",
+        title: "The Office",
+        seasonNumber: 1,
+        episodeNumber: 1,
+      })
+    ).rejects.toThrow(/Could not resolve Bingers show entity/i);
+  });
+
   it("throws when the show cannot be matched", async () => {
     vi.stubGlobal(
       "fetch",

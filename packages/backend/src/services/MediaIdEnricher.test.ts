@@ -43,9 +43,6 @@ describe("needsMediaIdEnrichment", () => {
     expect(
       needsMediaIdEnrichment(episode({ tvdbEpisodeId: 123, tmdbSeriesId: 1 }))
     ).toBe(false);
-    expect(needsMediaIdEnrichment(episode({ imdbEpisodeId: "tt1" }))).toBe(
-      false
-    );
     expect(needsMediaIdEnrichment(episode({ tmdbSeriesId: 99 }))).toBe(false);
     expect(
       needsMediaIdEnrichment({
@@ -54,6 +51,19 @@ describe("needsMediaIdEnrichment", () => {
         title: "Interstellar",
         tmdbMovieId: 1,
       })
+    ).toBe(false);
+  });
+
+  it("enriches episodes missing TMDB series IDs only when year is unavailable", () => {
+    expect(needsMediaIdEnrichment(episode({ tvdbEpisodeId: 123 }))).toBe(true);
+    expect(needsMediaIdEnrichment(episode({ imdbEpisodeId: "tt1" }))).toBe(
+      true
+    );
+    expect(
+      needsMediaIdEnrichment(episode({ tvdbEpisodeId: 123, year: 2020 }))
+    ).toBe(false);
+    expect(
+      needsMediaIdEnrichment(episode({ imdbEpisodeId: "tt1", year: 2020 }))
     ).toBe(false);
   });
 
@@ -111,6 +121,70 @@ describe("MediaIdEnricher", () => {
     );
     expect(client.getEpisodeExternalIds).toHaveBeenCalledWith(308014, 2, 1);
     expect(client.getEpisodeExternalIds).toHaveBeenCalledWith(308014, 1, 1);
+  });
+
+  it("enriches episode TMDB series ID from a TVDB series ID when year is missing", async () => {
+    const client = {
+      findSeriesIdByExternalId: vi.fn().mockResolvedValue(86423),
+      getEpisodeExternalIds: vi.fn().mockResolvedValue({ tvdbId: 9300505 }),
+      hasTvSeason: vi.fn().mockResolvedValue(true),
+      getTvShowDetails: vi.fn(),
+      searchTv: vi.fn(),
+    } as unknown as TmdbClient;
+
+    const enricher = new MediaIdEnricher(client);
+    const enriched = await enricher.enrich(
+      episode({
+        title: "Locke & Key",
+        seasonNumber: 1,
+        episodeNumber: 1,
+        tvdbSeriesId: 361594,
+      })
+    );
+
+    expect(enriched).toEqual(
+      expect.objectContaining({
+        tmdbSeriesId: 86423,
+        tvdbSeriesId: 361594,
+      })
+    );
+    expect(client.findSeriesIdByExternalId).toHaveBeenCalledWith(
+      "361594",
+      "tvdb_id"
+    );
+    expect(client.searchTv).not.toHaveBeenCalled();
+  });
+
+  it("enriches episode TMDB series ID from a TVDB episode ID", async () => {
+    const client = {
+      findSeriesIdByEpisodeExternalId: vi.fn().mockResolvedValue(86423),
+      getEpisodeExternalIds: vi.fn().mockResolvedValue({ tvdbId: 9300505 }),
+      hasTvSeason: vi.fn().mockResolvedValue(true),
+      getTvShowDetails: vi.fn(),
+      searchTv: vi.fn(),
+    } as unknown as TmdbClient;
+
+    const enricher = new MediaIdEnricher(client);
+    const enriched = await enricher.enrich(
+      episode({
+        title: "Locke & Key",
+        seasonNumber: 1,
+        episodeNumber: 1,
+        tvdbEpisodeId: 9300505,
+      })
+    );
+
+    expect(enriched).toEqual(
+      expect.objectContaining({
+        tmdbSeriesId: 86423,
+        tvdbEpisodeId: 9300505,
+      })
+    );
+    expect(client.findSeriesIdByEpisodeExternalId).toHaveBeenCalledWith(
+      "9300505",
+      "tvdb_id"
+    );
+    expect(client.searchTv).not.toHaveBeenCalled();
   });
 
   it("keeps the original season when TMDB has that season", async () => {
@@ -522,7 +596,29 @@ describe("MediaIdEnricher", () => {
     await expect(enricher.enrich(media)).resolves.toBe(media);
   });
 
-  it("prefers year-matched TV results when ranking candidates", async () => {
+  it("skips episode enrichment when year is already present", async () => {
+    const client = {
+      searchTv: vi.fn(),
+      findSeriesIdByEpisodeExternalId: vi.fn(),
+      getEpisodeExternalIds: vi.fn(),
+    } as unknown as TmdbClient;
+
+    const enricher = new MediaIdEnricher(client);
+    const media = episode({
+      title: "Berlin",
+      year: 2023,
+      seasonNumber: 1,
+      episodeNumber: 1,
+      tvdbEpisodeId: 8865290,
+    });
+
+    await expect(enricher.enrich(media)).resolves.toBe(media);
+    expect(client.searchTv).not.toHaveBeenCalled();
+    expect(client.findSeriesIdByEpisodeExternalId).not.toHaveBeenCalled();
+    expect(client.getEpisodeExternalIds).not.toHaveBeenCalled();
+  });
+
+  it("prefers year-matched TV results when ranking candidates without webhook year", async () => {
     const client = {
       searchTv: vi.fn().mockResolvedValue([
         {
@@ -557,7 +653,6 @@ describe("MediaIdEnricher", () => {
     const enriched = await enricher.enrich(
       episode({
         title: "Berlin",
-        year: 2023,
         seasonNumber: 1,
         episodeNumber: 1,
       })

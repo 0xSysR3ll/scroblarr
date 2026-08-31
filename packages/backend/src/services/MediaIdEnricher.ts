@@ -27,7 +27,7 @@ export function needsMediaIdEnrichment(media: MediaItem): boolean {
   }
 
   if (media.type === "episode") {
-    return !(media.tmdbSeriesId || media.imdbEpisodeId || media.tvdbEpisodeId);
+    return !media.tmdbSeriesId && media.year === undefined;
   }
 
   return false;
@@ -111,6 +111,15 @@ export class MediaIdEnricher {
       return media;
     }
 
+    const cache = this.createLookupCache();
+    const fromExternalIds = await this.enrichEpisodeFromExternalIds(
+      media,
+      cache
+    );
+    if (fromExternalIds) {
+      return fromExternalIds;
+    }
+
     const results = await this.tmdbClient.searchTv(media.title, media.year);
     const candidates = this.rankTvMatches(
       results,
@@ -118,7 +127,6 @@ export class MediaIdEnricher {
       media.year
     ).filter((candidate) => candidate.score >= 10);
 
-    const cache = this.createLookupCache();
     const ranked = candidates.slice(0, MAX_TV_CANDIDATES);
 
     for (const candidate of ranked) {
@@ -154,6 +162,41 @@ export class MediaIdEnricher {
     );
 
     return media;
+  }
+
+  private async enrichEpisodeFromExternalIds(
+    media: MediaItem,
+    cache: ReturnType<MediaIdEnricher["createLookupCache"]>
+  ): Promise<MediaItem | null> {
+    let seriesId: number | null = null;
+
+    if (media.tvdbSeriesId) {
+      seriesId = await this.tmdbClient.findSeriesIdByExternalId(
+        String(media.tvdbSeriesId),
+        "tvdb_id"
+      );
+    } else if (media.imdbSeriesId) {
+      seriesId = await this.tmdbClient.findSeriesIdByExternalId(
+        media.imdbSeriesId,
+        "imdb_id"
+      );
+    } else if (media.tvdbEpisodeId) {
+      seriesId = await this.tmdbClient.findSeriesIdByEpisodeExternalId(
+        String(media.tvdbEpisodeId),
+        "tvdb_id"
+      );
+    } else if (media.imdbEpisodeId) {
+      seriesId = await this.tmdbClient.findSeriesIdByEpisodeExternalId(
+        media.imdbEpisodeId,
+        "imdb_id"
+      );
+    }
+
+    if (!seriesId) {
+      return null;
+    }
+
+    return this.resolveEpisodeAgainstShow(media, seriesId, cache);
   }
 
   private createLookupCache() {
