@@ -1304,7 +1304,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         title="Bingers"
         description={t("bingers.description", {
           defaultValue:
-            "Link your Bingers account with magic-link email sign-in. Scroblarr keeps the session alive in the background.",
+            "Sync your watched movies and episodes to Bingers. Uses magic-link email sign-in for secure authentication.",
         })}
         icon={
           <img

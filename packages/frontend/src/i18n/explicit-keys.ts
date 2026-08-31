@@ -1,6 +1,6 @@
 /**
  * Static `t()` references for keys resolved dynamically at runtime.
- * i18next-scanner only sees literal `t("...")` calls; keep those keys here
+ * i18next-scanner only sees literal t("key") calls; keep those keys here
  * so `removeUnusedKeys` does not drop them from locale files.
  *
  * This module is not imported by the application.

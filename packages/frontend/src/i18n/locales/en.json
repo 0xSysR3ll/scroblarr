@@ -50,7 +50,8 @@
     "success": "Success",
     "failed": "Failed",
     "close": "Close",
-    "error": "Error"
+    "error": "Error",
+    "saving": "Saving..."
   },
   "footer": {
     "documentation": "Documentation",
@@ -72,7 +73,7 @@
     "refresh": "Refresh",
     "empty": {
       "title": "No sync data yet",
-      "description": "Watch something on Plex or Jellyfin and it will appear here. Make sure webhooks are configured and your Trakt or Simkl account is linked in your profile.",
+      "description": "Watch something on Plex or Jellyfin and it will appear here. Make sure webhooks are configured and your Trakt, Simkl, or Bingers account is linked in your profile.",
       "checkProfile": "Check profile & links",
       "topThisMonth": "No syncs this month yet",
       "recentSyncs": "No recent syncs to show"
@@ -369,7 +370,8 @@
       "general": "General",
       "linkedAccounts": "Linked Accounts",
       "integrations": "Integrations"
-    }
+    },
+    "saved": "Settings saved successfully!"
   },
   "trakt": {
     "getAuthUrlFailed": "Failed to get Trakt PIN code",
@@ -618,7 +620,7 @@
     "linkFailed": "Failed to link Bingers account",
     "unlinked": "Bingers account unlinked successfully",
     "unlinkFailed": "Failed to unlink Bingers account",
-    "description": "Link your Bingers account with magic-link email sign-in. Scroblarr keeps the session alive in the background.",
+    "description": "Sync your watched movies and episodes to Bingers. Uses magic-link email sign-in for secure authentication.",
     "profile": {
       "username": "Username"
     },
@@ -632,6 +634,17 @@
     "unlinkTitle": "Unlink Bingers Account",
     "unlinkMessage": "Are you sure you want to unlink your Bingers account? Scroblarr will remove the stored session.",
     "cancel": "Cancel",
-    "confirm": "Confirm"
-  }
+    "confirm": "Confirm",
+    "statusLoadFailed": "Failed to load Bingers status",
+    "settingsSaveFailed": "Failed to save Bingers settings",
+    "settings": {
+      "title": "Sync Settings",
+      "description": "Mark media as rewatched only if it has been synced before. Rewatches increment the play count in Bingers (Watched x2, etc.).",
+      "markMoviesAsRewatched": "Mark movies as rewatched",
+      "markMoviesAsRewatchedDescription": "When enabled, movies that have been synced before will increment the Bingers play count.",
+      "markEpisodesAsRewatched": "Mark episodes as rewatched",
+      "markEpisodesAsRewatchedDescription": "When enabled, episodes that have been synced before will increment the Bingers play count."
+    }
+  },
+  "key": ""
 }

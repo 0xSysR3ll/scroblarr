@@ -24,11 +24,9 @@ Magic links are one-shot and expire in about **15 minutes**. If the link expires
 
 Your Bingers account is now linked!
 
-## Session keep-alive
+## Session
 
-Bingers uses session cookies instead of OAuth refresh tokens. Scroblarr keeps the session alive in the background so you usually do not need to reconnect.
-
-If the session expires or is revoked, Scroblarr will show **Re-authorize** in the Bingers section. You can stay signed in on the Bingers app and Scroblarr at the same time.
+Bingers uses session cookies instead of OAuth refresh tokens. If the session expires or is revoked, Scroblarr will show **Re-authorize** in the Bingers section. You can stay signed in on the Bingers app and Scroblarr at the same time.
 
 ## Metadata requirements
 
