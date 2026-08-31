@@ -34,6 +34,7 @@ describe("webhooks utils", () => {
     expect(JELLYFIN_WEBHOOK_TEMPLATE).toContain(
       '"notificationType": "{{NotificationType}}"'
     );
+    expect(JELLYFIN_WEBHOOK_TEMPLATE).toContain('"year": "{{Year}}"');
     expect(JELLYFIN_WEBHOOK_TEMPLATE).toContain(
       '"playedToCompletion": "{{PlayedToCompletion}}"'
     );

@@ -96,9 +96,10 @@ export class BingersCatalogResolver {
 
     const candidates = await this.searchTitles(media.title, "show");
     const matched = await this.pickTitleByExternalIds(candidates, {
-      // Episode IMDb is episode-level; show match relies on TMDB series + title/year
       title: media.title,
+      imdb: media.imdbSeriesId,
       tmdb: media.tmdbSeriesId,
+      tvdb: media.tvdbSeriesId,
       year: media.year,
       preferKind: "show",
     });
@@ -218,6 +219,20 @@ export class BingersCatalogResolver {
       );
       if (byTitleAndYear) {
         return byTitleAndYear;
+      }
+    }
+
+    if (opts.preferKind === "show" && opts.title && opts.year === undefined) {
+      const wanted = this.normalizeTitle(opts.title);
+      const titleMatches = candidates.filter(
+        (candidate) =>
+          candidate.kind === "show" &&
+          this.candidateTitles(candidate).some(
+            (title) => this.normalizeTitle(title) === wanted
+          )
+      );
+      if (titleMatches.length === 1) {
+        return titleMatches[0];
       }
     }
 

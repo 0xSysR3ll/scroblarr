@@ -242,6 +242,23 @@ export class TmdbClient {
     };
   }
 
+  async findSeriesIdByEpisodeExternalId(
+    externalId: string,
+    externalSource: "imdb_id" | "tvdb_id"
+  ): Promise<number | null> {
+    return this.findEpisodeShowId(externalId, externalSource);
+  }
+
+  async findSeriesIdByExternalId(
+    externalId: string,
+    externalSource: "imdb_id" | "tvdb_id"
+  ): Promise<number | null> {
+    const result = await this.apiGet<TmdbFindResult>(
+      `/find/${encodeURIComponent(externalId)}?external_source=${externalSource}`
+    );
+    return result?.tv_results?.[0]?.id ?? null;
+  }
+
   async getEpisodeExternalIds(
     seriesId: string | number,
     seasonNumber: number,
