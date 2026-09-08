@@ -99,6 +99,29 @@ Notes:
 - Empty fields (for example movie-only events without `SeriesName`) become empty strings; Scroblarr ignores what it does not need.
 - `PlayedToCompletion` is only set on **Playback Stop**; on start it is empty and treated as not completed.
 
+### What the webhook plugin actually sends
+
+Based on the [official plugin source](https://github.com/jellyfin/jellyfin-plugin-webhook/blob/master/Jellyfin.Plugin.Webhook/Helpers/DataObjectHelpers.cs) (not just the README):
+
+| Handlebars variable | In stock plugin? | What it really is                                                                                                                                                                                                                          |
+| ------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `{{Year}}`          | Yes              | For episodes, the plugin **overwrites** this with the **parent series production year** (`episode.Series.ProductionYear`). The README calls it "episode production year", but the code uses the show year — e.g. `2020` for _Locke & Key_. |
+| `{{Provider_tvdb}}` | Yes              | **Episode item** `ProviderIds` (often from `{tvdb-…}` in the filename) → episode TVDB id                                                                                                                                                   |
+| `{{Provider_imdb}}` | Yes              | **Episode item** `ProviderIds` → episode IMDb id (`tt…`), **not** the series IMDb                                                                                                                                                          |
+| `{{Provider_tmdb}}` | Yes              | **Episode item** `ProviderIds` → episode TMDB id if present; Scroblarr does not use this for show matching                                                                                                                                 |
+
+The webhook only includes **episode-level** `Provider_*` ids. For Bingers, Scroblarr matches shows using `year` + title from the webhook.
+
+Scroblarr handles Bingers matching by:
+
+1. **Primary:** `year` + title from the webhook payload (include `"year": "{{Year}}"` in your template).
+2. **No year:** unique exact title match when Bingers returns only one show candidate.
+3. **No year + TMDB token:** TMDB enrichment from episode TVDB/IMDb ids to resolve `tmdbSeriesId`.
+
+When Jellyfin sends `year`, Scroblarr skips TMDB enrichment on the scrobble path to avoid extra latency.
+
+Official plugin variable docs: [webhook plugin README](https://github.com/jellyfin/jellyfin-plugin-webhook/blob/master/README.md).
+
 ### 7. Request headers
 
 Add these request headers (Generic destination → **Add Request Header**):

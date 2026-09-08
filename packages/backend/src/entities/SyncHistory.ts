@@ -69,13 +69,13 @@ export class SyncHistory {
   success!: boolean;
 
   @Column({ type: "text", nullable: true })
-  errorMessage?: string;
+  errorMessage?: string | null;
 
   @Column({ type: "boolean", default: false })
   wasRewatched!: boolean;
 
   @Column({ type: "text", nullable: true })
-  destinations?: string;
+  destinations?: string | null;
 
   @Column({ type: "text", nullable: true })
   destinationResults?: string;

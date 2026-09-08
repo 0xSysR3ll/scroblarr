@@ -75,30 +75,32 @@ describe("JellyfinWebhookParser", () => {
     });
   });
 
-  it("uses the series TMDB id from SeriesProvider_tmdb for episodes", () => {
+  it("maps series production year for episodes", () => {
     const event = JellyfinWebhookParser.parse({
       notificationType: "PlaybackStop",
       username: "jellyfin-user",
       userId: "jellyfin-user-id",
       itemType: "Episode",
       itemId: "episode-id",
-      name: "Pilot",
-      seriesName: "Example Show",
+      name: "Welcome to Matheson",
+      seriesName: "Locke & Key",
+      year: "2020",
       seasonNumber: "1",
-      episodeNumber: "2",
-      provider_tmdb: "3485701",
-      SeriesProvider_tmdb: "1396",
-      provider_tvdb: "12345",
-      provider_imdb: "tt7654321",
-      runtimeTicks: "1000000000",
-      playbackPositionTicks: "900000000",
-      timestamp: "2026-06-04T17:00:00.000Z",
+      episodeNumber: "1",
+      provider_tvdb: "9300505",
+      provider_imdb: "tt9692918",
+      runtimeTicks: "36000000000",
+      playbackPositionTicks: "35000000000",
+      timestamp: "2026-08-31T19:00:00.000Z",
     });
 
     expect(event).toMatchObject({
       media: {
         type: "episode",
-        tmdbSeriesId: 1396,
+        title: "Locke & Key",
+        year: 2020,
+        tvdbEpisodeId: 9300505,
+        imdbEpisodeId: "tt9692918",
       },
     });
   });

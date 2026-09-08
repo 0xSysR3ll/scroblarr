@@ -13,9 +13,11 @@ export interface MediaItem {
   duration?: number;
   watchedDuration?: number;
   tvdbEpisodeId?: number;
+  tvdbSeriesId?: number;
   tvdbMovieId?: number;
   imdbMovieId?: string;
   imdbEpisodeId?: string;
+  imdbSeriesId?: string;
   tmdbMovieId?: number;
   tmdbSeriesId?: number;
   posterUrl?: string;

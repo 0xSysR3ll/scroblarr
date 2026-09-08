@@ -825,4 +825,95 @@ describe("TmdbClient", () => {
       tvdbId: undefined,
     });
   });
+
+  it("finds a series ID from a series-level external ID", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tv_results: [{ id: 86423 }],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new TmdbClient("test-token");
+    await expect(
+      client.findSeriesIdByExternalId("361594", "tvdb_id")
+    ).resolves.toBe(86423);
+    await expect(
+      client.findSeriesIdByExternalId("tt9288030", "imdb_id")
+    ).resolves.toBe(86423);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "https://api.themoviedb.org/3/find/361594?external_source=tvdb_id",
+      expect.any(Object)
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "https://api.themoviedb.org/3/find/tt9288030?external_source=imdb_id",
+      expect.any(Object)
+    );
+  });
+
+  it("returns null when series-level external ID lookup misses", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ tv_results: [] }),
+      })
+    );
+
+    const client = new TmdbClient("test-token");
+    await expect(
+      client.findSeriesIdByExternalId("missing", "tvdb_id")
+    ).resolves.toBeNull();
+  });
+
+  it("finds a series ID from an episode-level external ID", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        tv_episode_results: [{ show_id: 86423 }],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new TmdbClient("test-token");
+    await expect(
+      client.findSeriesIdByEpisodeExternalId("9300505", "tvdb_id")
+    ).resolves.toBe(86423);
+    await expect(
+      client.findSeriesIdByEpisodeExternalId("tt9288032", "imdb_id")
+    ).resolves.toBe(86423);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "https://api.themoviedb.org/3/find/9300505?external_source=tvdb_id",
+      expect.any(Object)
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "https://api.themoviedb.org/3/find/tt9288032?external_source=imdb_id",
+      expect.any(Object)
+    );
+  });
+
+  it("returns null when episode-level external ID lookup misses", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+      })
+    );
+
+    const client = new TmdbClient("test-token");
+    await expect(
+      client.findSeriesIdByEpisodeExternalId("missing", "tvdb_id")
+    ).resolves.toBeNull();
+  });
 });

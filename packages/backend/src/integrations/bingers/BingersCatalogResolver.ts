@@ -96,9 +96,10 @@ export class BingersCatalogResolver {
 
     const candidates = await this.searchTitles(media.title, "show");
     const matched = await this.pickTitleByExternalIds(candidates, {
-      // Episode IMDb is episode-level; show match relies on TMDB series + title/year
       title: media.title,
+      imdb: media.imdbSeriesId,
       tmdb: media.tmdbSeriesId,
+      tvdb: media.tvdbSeriesId,
       year: media.year,
       preferKind: "show",
     });
@@ -209,7 +210,7 @@ export class BingersCatalogResolver {
     }
 
     // Soft fallback only when both title and year verify — never pick an unmatched hit
-    if (opts.title && opts.year !== undefined) {
+    if (opts.title && Number.isFinite(opts.year)) {
       const wanted = this.normalizeTitle(opts.title);
       const byTitleAndYear = candidates.find(
         (c) =>
@@ -218,6 +219,24 @@ export class BingersCatalogResolver {
       );
       if (byTitleAndYear) {
         return byTitleAndYear;
+      }
+    }
+
+    if (
+      opts.preferKind === "show" &&
+      opts.title &&
+      !Number.isFinite(opts.year)
+    ) {
+      const wanted = this.normalizeTitle(opts.title);
+      const titleMatches = candidates.filter(
+        (candidate) =>
+          candidate.kind === "show" &&
+          this.candidateTitles(candidate).some(
+            (title) => this.normalizeTitle(title) === wanted
+          )
+      );
+      if (titleMatches.length === 1) {
+        return titleMatches[0];
       }
     }
 
@@ -268,7 +287,7 @@ export class BingersCatalogResolver {
       .toLowerCase()
       .normalize("NFKD")
       .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, " ")
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
       .trim();
   }
 
