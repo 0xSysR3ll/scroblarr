@@ -1,6 +1,11 @@
 import { SyncHistory } from "@entities/SyncHistory";
 import { User } from "@entities/User";
+import { createBingersAlternateTitles } from "@integrations/bingers/bingersAlternateTitles";
 import { isBingersAuthError } from "@integrations/bingers/BingersApiError";
+import {
+  BingersCatalogResolver,
+  type BingersAlternateTitles,
+} from "@integrations/bingers/BingersCatalogResolver";
 import { BingersClient } from "@integrations/bingers/BingersClient";
 import { BingersSessionManager } from "@integrations/bingers/BingersSessionManager";
 import { cookieHeaderFromJar } from "@integrations/bingers/cookieJar";
@@ -105,9 +110,26 @@ export class SyncService {
 
     if (user.bingersCookieJar) {
       try {
+        let alternateTitles: BingersAlternateTitles | undefined;
+        try {
+          const settings = await this.settingsRepository.getAll();
+          const tmdbToken = getTmdbAccessToken(settings);
+          if (tmdbToken) {
+            alternateTitles = createBingersAlternateTitles(
+              new TmdbClient(tmdbToken)
+            );
+          }
+        } catch (error) {
+          logger.sync.debug(
+            { error, userId: user.id },
+            "Skipping Bingers TMDB alternate titles; settings unavailable"
+          );
+        }
+
+        const catalog = new BingersCatalogResolver(alternateTitles);
         destinations.push({
           name: "Bingers",
-          client: new BingersClient(),
+          client: new BingersClient(catalog),
           hasToken: (u) => !!u.bingersCookieJar,
           getAccessToken: async (u) => {
             const jar = await this.bingersSessionManager.getValidCookieJar(

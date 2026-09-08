@@ -13,6 +13,8 @@ interface TmdbMediaDetails {
   number_of_seasons?: number;
   name?: string;
   original_name?: string;
+  title?: string;
+  original_title?: string;
   first_air_date?: string;
 }
 
@@ -190,6 +192,21 @@ export class TmdbClient {
       posterPath: details.poster_path,
       numberOfSeasons: details.number_of_seasons,
       firstAirDate: details.first_air_date,
+    };
+  }
+
+  async getMovieTitleDetails(movieId: string | number): Promise<{
+    title?: string;
+    originalTitle?: string;
+  } | null> {
+    const details = await this.getMovieDetails(movieId.toString());
+    if (!details) {
+      return null;
+    }
+
+    return {
+      title: details.title,
+      originalTitle: details.original_title,
     };
   }
 
