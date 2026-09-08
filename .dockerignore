@@ -28,7 +28,8 @@ data/
 .idea/
 
 # Docs and tooling (not needed for app image)
-website/
+website/**
+!website/package.json
 docs/
 *.md
 !README.md
