@@ -75,7 +75,7 @@ export class SyncHistory {
   wasRewatched!: boolean;
 
   @Column({ type: "text", nullable: true })
-  destinations?: string;
+  destinations?: string | null;
 
   @Column({ type: "text", nullable: true })
   destinationResults?: string;

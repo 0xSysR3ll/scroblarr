@@ -175,17 +175,23 @@ export class MediaIdEnricher {
         String(media.tvdbSeriesId),
         "tvdb_id"
       );
-    } else if (media.imdbSeriesId) {
+    }
+
+    if (!seriesId && media.imdbSeriesId) {
       seriesId = await this.tmdbClient.findSeriesIdByExternalId(
         media.imdbSeriesId,
         "imdb_id"
       );
-    } else if (media.tvdbEpisodeId) {
+    }
+
+    if (!seriesId && media.tvdbEpisodeId) {
       seriesId = await this.tmdbClient.findSeriesIdByEpisodeExternalId(
         String(media.tvdbEpisodeId),
         "tvdb_id"
       );
-    } else if (media.imdbEpisodeId) {
+    }
+
+    if (!seriesId && media.imdbEpisodeId) {
       seriesId = await this.tmdbClient.findSeriesIdByEpisodeExternalId(
         media.imdbEpisodeId,
         "imdb_id"

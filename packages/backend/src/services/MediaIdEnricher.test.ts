@@ -257,6 +257,44 @@ describe("MediaIdEnricher", () => {
     expect(client.searchTv).not.toHaveBeenCalled();
   });
 
+  it("falls back to episode external ID when series-level lookup misses", async () => {
+    const client = {
+      findSeriesIdByExternalId: vi.fn().mockResolvedValue(null),
+      findSeriesIdByEpisodeExternalId: vi.fn().mockResolvedValue(86423),
+      getEpisodeExternalIds: vi.fn().mockResolvedValue({ tvdbId: 9300505 }),
+      hasTvSeason: vi.fn().mockResolvedValue(true),
+      getTvShowDetails: vi.fn(),
+      searchTv: vi.fn(),
+    } as unknown as TmdbClient;
+
+    const enricher = new MediaIdEnricher(client);
+    const enriched = await enricher.enrich(
+      episode({
+        title: "Locke & Key",
+        seasonNumber: 1,
+        episodeNumber: 1,
+        tvdbSeriesId: 361594,
+        tvdbEpisodeId: 9300505,
+      })
+    );
+
+    expect(client.findSeriesIdByExternalId).toHaveBeenCalledWith(
+      "361594",
+      "tvdb_id"
+    );
+    expect(client.findSeriesIdByEpisodeExternalId).toHaveBeenCalledWith(
+      "9300505",
+      "tvdb_id"
+    );
+    expect(client.searchTv).not.toHaveBeenCalled();
+    expect(enriched).toEqual(
+      expect.objectContaining({
+        tmdbSeriesId: 86423,
+        tvdbEpisodeId: 9300505,
+      })
+    );
+  });
+
   it("falls back to title search when external ID lookup misses", async () => {
     const client = {
       findSeriesIdByExternalId: vi.fn().mockResolvedValue(null),
@@ -290,7 +328,10 @@ describe("MediaIdEnricher", () => {
       "361594",
       "tvdb_id"
     );
-    expect(client.findSeriesIdByEpisodeExternalId).not.toHaveBeenCalled();
+    expect(client.findSeriesIdByEpisodeExternalId).toHaveBeenCalledWith(
+      "9300505",
+      "tvdb_id"
+    );
     expect(client.searchTv).toHaveBeenCalledWith("Locke & Key", undefined);
     expect(enriched).toEqual(
       expect.objectContaining({

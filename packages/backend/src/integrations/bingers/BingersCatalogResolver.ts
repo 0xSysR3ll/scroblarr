@@ -210,7 +210,7 @@ export class BingersCatalogResolver {
     }
 
     // Soft fallback only when both title and year verify — never pick an unmatched hit
-    if (opts.title && opts.year !== undefined) {
+    if (opts.title && Number.isFinite(opts.year)) {
       const wanted = this.normalizeTitle(opts.title);
       const byTitleAndYear = candidates.find(
         (c) =>
@@ -222,7 +222,11 @@ export class BingersCatalogResolver {
       }
     }
 
-    if (opts.preferKind === "show" && opts.title && opts.year === undefined) {
+    if (
+      opts.preferKind === "show" &&
+      opts.title &&
+      !Number.isFinite(opts.year)
+    ) {
       const wanted = this.normalizeTitle(opts.title);
       const titleMatches = candidates.filter(
         (candidate) =>

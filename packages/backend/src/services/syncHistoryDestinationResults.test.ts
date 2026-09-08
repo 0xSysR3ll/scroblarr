@@ -60,7 +60,7 @@ describe("syncHistoryDestinationResults", () => {
 
     expect(historyItem).toEqual({
       success: false,
-      destinations: undefined,
+      destinations: null,
       errorMessage: "TVTime: down",
       destinationResults: JSON.stringify({
         TVTime: { status: "failed", error: "down" },

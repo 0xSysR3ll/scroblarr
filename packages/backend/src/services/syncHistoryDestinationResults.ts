@@ -78,7 +78,7 @@ export function applyDestinationResultsToHistoryItem(
   historyItem: {
     success: boolean;
     errorMessage?: string | null;
-    destinations?: string;
+    destinations?: string | null;
     destinationResults?: string;
   },
   results: SyncDestinationResults
@@ -88,9 +88,7 @@ export function applyDestinationResultsToHistoryItem(
   historyItem.success = legacy.success;
   historyItem.errorMessage = legacy.errorMessage ?? null;
   historyItem.destinations =
-    legacy.destinations.length > 0
-      ? JSON.stringify(legacy.destinations)
-      : undefined;
+    legacy.destinations.length > 0 ? JSON.stringify(legacy.destinations) : null;
 }
 
 export function getRetryDestinationNamesFromHistory(historyItem: {
@@ -109,7 +107,7 @@ export function mergeRetryAttemptIntoHistory(
   historyItem: {
     success: boolean;
     errorMessage?: string | null;
-    destinations?: string;
+    destinations?: string | null;
     destinationResults?: string;
   },
   retryAttempt: SyncDestinationResults

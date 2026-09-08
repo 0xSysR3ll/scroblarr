@@ -534,6 +534,71 @@ describe("BingersCatalogResolver", () => {
     });
   });
 
+  it("resolves a unique exact title match when year is null", async () => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/search/titles")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: "show-1",
+                kind: "show",
+                metadata: "meta1",
+                card: { originalTitle: "Locke & Key", year: 2020 },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/metadata@meta1.json")) {
+        return new Response(
+          JSON.stringify({
+            id: "show-1",
+            kind: "show",
+            year: 2020,
+            external_ids: [],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/versions.json")) {
+        return new Response(
+          JSON.stringify({ files: { seasons: { "1": "seasonTok" } } }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/season-1@seasonTok.json")) {
+        return new Response(
+          JSON.stringify({
+            season: 1,
+            episodes: [{ id: "ep-1", n: 1 }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const resolver = new BingersCatalogResolver();
+    await expect(
+      resolver.resolveEntity({
+        id: "e1",
+        type: "episode",
+        title: "Locke & Key",
+        year: null as unknown as number | undefined,
+        seasonNumber: 1,
+        episodeNumber: 1,
+      })
+    ).resolves.toEqual({
+      entityKind: "episode",
+      entityId: "ep-1",
+      titleId: "show-1",
+    });
+  });
+
   it("does not treat unrelated non-ASCII titles as an empty-string match", async () => {
     const fetchMock = vi.fn(async (input: string | URL) => {
       const url = String(input);
