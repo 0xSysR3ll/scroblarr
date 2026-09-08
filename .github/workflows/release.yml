@@ -87,8 +87,12 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ steps.meta.outputs.repo }}:${{ github.ref_name }}
             ${{ env.REGISTRY }}/${{ steps.meta.outputs.repo }}:latest
-          cache-from: type=gha,scope=scroblarr-docker
-          cache-to: type=gha,scope=scroblarr-docker,mode=max
+          cache-from: |
+            type=gha,scope=scroblarr-docker
+            type=registry,ref=${{ env.REGISTRY }}/${{ steps.meta.outputs.repo }}:buildcache
+          cache-to: |
+            type=gha,scope=scroblarr-docker,mode=max
+            type=registry,ref=${{ env.REGISTRY }}/${{ steps.meta.outputs.repo }}:buildcache,mode=max
 
   publish-release:
     name: Publish release
