@@ -99,22 +99,22 @@ export class User {
   simklThumb?: string;
 
   @Column({ type: "text", nullable: true })
-  bingersCookieJar?: string;
+  bingersCookieJar?: string | null;
 
   @Column({ type: "bigint", nullable: true })
-  bingersSessionExpiresAt?: number;
+  bingersSessionExpiresAt?: number | null;
 
   @Column({ type: "varchar", length: 255, nullable: true })
-  bingersEmail?: string;
+  bingersEmail?: string | null;
 
   @Column({ type: "varchar", length: 255, nullable: true })
-  bingersUserId?: string;
+  bingersUserId?: string | null;
 
   @Column({ type: "varchar", length: 255, nullable: true })
-  bingersUsername?: string;
+  bingersUsername?: string | null;
 
   @Column({ type: "varchar", length: 500, nullable: true })
-  bingersThumb?: string;
+  bingersThumb?: string | null;
 
   @Column({ type: "boolean", default: false })
   bingersMarkMoviesAsRewatched!: boolean;
