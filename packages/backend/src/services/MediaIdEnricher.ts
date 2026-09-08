@@ -27,7 +27,7 @@ export function needsMediaIdEnrichment(media: MediaItem): boolean {
   }
 
   if (media.type === "episode") {
-    return !media.tmdbSeriesId && media.year === undefined;
+    return !media.tmdbSeriesId && !Number.isFinite(media.year);
   }
 
   return false;

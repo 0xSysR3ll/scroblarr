@@ -65,6 +65,12 @@ describe("needsMediaIdEnrichment", () => {
     expect(
       needsMediaIdEnrichment(episode({ imdbEpisodeId: "tt1", year: 2020 }))
     ).toBe(false);
+    expect(needsMediaIdEnrichment(episode({ year: Number.NaN }))).toBe(true);
+    expect(
+      needsMediaIdEnrichment(
+        episode({ year: null as unknown as number | undefined })
+      )
+    ).toBe(true);
   });
 
   it("is false for unsupported media types", () => {
@@ -616,6 +622,47 @@ describe("MediaIdEnricher", () => {
     expect(client.searchTv).not.toHaveBeenCalled();
     expect(client.findSeriesIdByEpisodeExternalId).not.toHaveBeenCalled();
     expect(client.getEpisodeExternalIds).not.toHaveBeenCalled();
+  });
+
+  it("still enriches episodes when year is null or NaN", async () => {
+    const searchTv = vi.fn().mockResolvedValue([
+      {
+        id: 146176,
+        name: "Berlin",
+        firstAirDate: "2023-12-29",
+        popularity: 20,
+      },
+    ]);
+    const client = {
+      searchTv,
+      getEpisodeExternalIds: vi.fn().mockResolvedValue({
+        imdbId: "tt999",
+        tvdbId: 555,
+      }),
+      hasTvSeason: vi.fn().mockResolvedValue(true),
+      getTvShowDetails: vi.fn(),
+      getTvRecommendations: vi.fn(),
+    } as unknown as TmdbClient;
+    const enricher = new MediaIdEnricher(client);
+
+    for (const year of [null, Number.NaN] as const) {
+      searchTv.mockClear();
+      const media = episode({
+        title: "Berlin",
+        seasonNumber: 1,
+        episodeNumber: 1,
+        year: year as unknown as number | undefined,
+      });
+      const enriched = await enricher.enrich(media);
+      expect(searchTv).toHaveBeenCalledWith("Berlin", year);
+      expect(enriched).toEqual(
+        expect.objectContaining({
+          tmdbSeriesId: 146176,
+          imdbEpisodeId: "tt999",
+          tvdbEpisodeId: 555,
+        })
+      );
+    }
   });
 
   it("prefers year-matched TV results when ranking candidates without webhook year", async () => {

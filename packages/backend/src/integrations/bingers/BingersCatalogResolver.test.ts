@@ -470,6 +470,115 @@ describe("BingersCatalogResolver", () => {
     });
   });
 
+  it("resolves a unique non-ASCII title match when year is missing", async () => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/search/titles")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: "show-jp",
+                kind: "show",
+                metadata: "meta-jp",
+                card: { originalTitle: "東京", year: 2019 },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/metadata@meta-jp.json")) {
+        return new Response(
+          JSON.stringify({
+            id: "show-jp",
+            kind: "show",
+            year: 2019,
+            external_ids: [],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/versions.json")) {
+        return new Response(
+          JSON.stringify({ files: { seasons: { "1": "seasonTok" } } }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/season-1@seasonTok.json")) {
+        return new Response(
+          JSON.stringify({
+            season: 1,
+            episodes: [{ id: "ep-jp", n: 1 }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const resolver = new BingersCatalogResolver();
+    await expect(
+      resolver.resolveEntity({
+        id: "e1",
+        type: "episode",
+        title: "東京",
+        seasonNumber: 1,
+        episodeNumber: 1,
+      })
+    ).resolves.toEqual({
+      entityKind: "episode",
+      entityId: "ep-jp",
+      titleId: "show-jp",
+    });
+  });
+
+  it("does not treat unrelated non-ASCII titles as an empty-string match", async () => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/search/titles")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: "show-osaka",
+                kind: "show",
+                metadata: "meta-osaka",
+                card: { originalTitle: "大阪", year: 2018 },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/metadata@meta-osaka.json")) {
+        return new Response(
+          JSON.stringify({
+            id: "show-osaka",
+            kind: "show",
+            year: 2018,
+            external_ids: [],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const resolver = new BingersCatalogResolver();
+    await expect(
+      resolver.resolveEntity({
+        id: "e1",
+        type: "episode",
+        title: "東京",
+        seasonNumber: 1,
+        episodeNumber: 1,
+      })
+    ).rejects.toThrow(/Could not resolve Bingers show entity/i);
+  });
+
   it("does not use title-only fallback when year is present but unmatched", async () => {
     const fetchMock = vi.fn(async (input: string | URL) => {
       const url = String(input);
