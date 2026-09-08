@@ -40,7 +40,7 @@ function getProjectRoot(): string {
 const isPostgres = Boolean(process.env.POSTGRES_HOST);
 
 const sqliteConfig: DataSourceOptions = {
-  type: "sqlite",
+  type: "better-sqlite3",
   database:
     process.env.DATABASE_PATH || join(getDataDir(), "db", "scroblarr.db"),
   entities: ["src/entities/*.ts"],

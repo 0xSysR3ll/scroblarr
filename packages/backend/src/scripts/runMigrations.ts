@@ -2,13 +2,6 @@ import "reflect-metadata";
 import { dataSource, ensureDatabase } from "@config/database";
 import { logger } from "@utils/logger";
 
-// Ensure sqlite3 is loaded before TypeORM tries to use it
-try {
-  await import("sqlite3");
-} catch {
-  // sqlite3 might be in root node_modules with pnpm
-}
-
 async function runMigrations() {
   try {
     logger.migration.info("Initializing database connection...");
