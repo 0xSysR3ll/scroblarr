@@ -39,7 +39,7 @@
     },
     {
       "description": "Group database-related packages",
-      "matchPackageNames": ["pg", "sqlite3", "typeorm"],
+      "matchPackageNames": ["pg", "better-sqlite3", "typeorm"],
       "groupName": "Database"
     },
     {

@@ -20,7 +20,7 @@ const baseConfig = {
 
 const sqliteConfig: DataSourceOptions = {
   ...baseConfig,
-  type: "sqlite",
+  type: "better-sqlite3",
   database:
     process.env.DATABASE_PATH || join(getDataDir(), "db", "scroblarr.db"),
 };

@@ -3,7 +3,7 @@ import { MigrationInterface, QueryRunner, TableColumn } from "typeorm";
 export class AddSyncHistoryRetryFields0000000000007 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     const dateColumnType =
-      queryRunner.connection.options.type === "sqlite"
+      queryRunner.connection.options.type === "better-sqlite3"
         ? "datetime"
         : "timestamp";
 
