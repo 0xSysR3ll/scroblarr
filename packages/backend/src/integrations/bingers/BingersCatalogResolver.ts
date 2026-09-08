@@ -192,6 +192,12 @@ export class BingersCatalogResolver {
         }
       }
     } catch (error) {
+      if (
+        error instanceof BingersApiError &&
+        (error.isRateLimited || error.isAuthError)
+      ) {
+        throw error;
+      }
       logger.bingers.debug(
         { error, title: primaryTitle, tmdb: ids.tmdb, preferKind },
         "Failed to load TMDB alternate titles for Bingers catalog match"

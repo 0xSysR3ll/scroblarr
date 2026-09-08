@@ -1470,6 +1470,64 @@ describe("BingersCatalogResolver", () => {
     ).rejects.toThrow(/Could not resolve Bingers show entity/i);
   });
 
+  it("rethrows auth errors from alternate-title catalog search", async () => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/search/titles") && url.includes("q=The")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: "wrong-1",
+                kind: "show",
+                metadata: "wrong-meta",
+                card: {
+                  originalTitle: "Other Show",
+                  titlesI18n: { en: "Other Show" },
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/metadata@wrong-meta.json")) {
+        return new Response(
+          JSON.stringify({
+            id: "wrong-1",
+            kind: "show",
+            external_ids: [{ id: "1", source: "tmdb", type: "tv" }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/search/titles") && url.includes("q=La")) {
+        return new Response(
+          JSON.stringify({ error: { code: "unauthorized", message: "auth" } }),
+          { status: 401, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { BingersApiError } = await import("./BingersApiError");
+    const resolver = new BingersCatalogResolver({
+      forTv: async () => ["La Flamme"],
+    });
+
+    await expect(
+      resolver.resolveEntity({
+        id: "e1",
+        type: "episode",
+        title: "The Flame",
+        seasonNumber: 1,
+        episodeNumber: 1,
+        tmdbSeriesId: 94626,
+      })
+    ).rejects.toBeInstanceOf(BingersApiError);
+  });
+
   it("fails closed when TMDB alternate titles also miss the catalog", async () => {
     const fetchMock = vi.fn(async (input: string | URL) => {
       const url = String(input);

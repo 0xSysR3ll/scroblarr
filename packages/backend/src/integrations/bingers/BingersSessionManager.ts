@@ -142,7 +142,7 @@ export class BingersSessionManager {
   async storeSessionFromVerify(
     userId: string,
     session: BingersSessionInfo,
-    fallbackEmail?: string
+    fallbackEmail?: string | null
   ): Promise<void> {
     await this.persistSession(userId, session, fallbackEmail);
   }
