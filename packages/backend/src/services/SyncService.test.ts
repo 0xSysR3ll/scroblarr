@@ -725,7 +725,7 @@ describe("SyncService", () => {
       expect.objectContaining({
         id: "sync-history-id",
         success: true,
-        errorMessage: undefined,
+        errorMessage: null,
         retriedAt: expect.any(Date),
         destinations: JSON.stringify(["Trakt"]),
       })
@@ -853,7 +853,7 @@ describe("SyncService", () => {
       expect.objectContaining({
         id: "sync-history-id",
         success: true,
-        errorMessage: undefined,
+        errorMessage: null,
         destinations: expect.stringMatching(/Simkl.*Trakt|Trakt.*Simkl/),
       })
     );

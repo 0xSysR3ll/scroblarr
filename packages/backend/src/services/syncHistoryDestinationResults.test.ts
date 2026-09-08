@@ -97,7 +97,7 @@ describe("syncHistoryDestinationResults", () => {
         TVTime: { status: "success" },
         Trakt: { status: "failed", error: "401" },
       }),
-      errorMessage: undefined as string | undefined,
+      errorMessage: "Trakt: 401",
     };
 
     const merged = mergeRetryAttemptIntoHistory(historyItem, {
@@ -110,6 +110,6 @@ describe("syncHistoryDestinationResults", () => {
     });
     expect(historyItem.success).toBe(true);
     expect(historyItem.destinations).toBe(JSON.stringify(["TVTime", "Trakt"]));
-    expect(historyItem.errorMessage).toBeUndefined();
+    expect(historyItem.errorMessage).toBeNull();
   });
 });
