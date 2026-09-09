@@ -6,11 +6,11 @@ title: Scroblarr
 
 **Automatically sync your watch history across platforms**
 
-Scroblarr keeps your viewing data synchronized between your media servers (Plex, Jellyfin) and tracking services (Trakt, Simkl). No manual logging required—just watch and sync.
+Scroblarr keeps your viewing data synchronized between your media servers (Plex, Jellyfin) and tracking services (Trakt, Simkl, Bingers). No manual logging required—just watch and sync.
 
 ## How it works
 
-When you watch content on Plex or Jellyfin, Scroblarr receives webhook events and automatically syncs that watch data to Trakt and Simkl. This keeps your watch history synchronized across all platforms—no manual intervention needed.
+When you watch content on Plex or Jellyfin, Scroblarr receives webhook events and automatically syncs that watch data to Trakt, Simkl, and Bingers. This keeps your watch history synchronized across all platforms—no manual intervention needed.
 
 All users from your configured media servers can use Scroblarr. Each user's watch history syncs independently to their linked destination accounts.
 
@@ -91,6 +91,17 @@ All users from your configured media servers can use Scroblarr. Each user's watc
     <img src="img/logos/simkl.svg" alt="Simkl" style={{ width: '24px', height: '24px' }} />
     <span><strong>Simkl</strong></span>
   </div>
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    padding: '0.5rem 1rem',
+    backgroundColor: 'var(--ifm-color-emphasis-100)',
+    borderRadius: '8px',
+  }}>
+    <img src="img/logos/bingers.png" alt="Bingers" style={{ width: '24px', height: '24px' }} />
+    <span><strong>Bingers</strong></span>
+  </div>
 </div>
 
 Both sources and destinations can be configured simultaneously. Multiple users are supported with individual account linking.
@@ -146,7 +157,7 @@ Both sources and destinations can be configured simultaneously. Multiple users a
 - **Web interface** for configuration and monitoring
 - **REST API** for automation and integration
 - **Sync history** tracking with detailed statistics
-- **Multi-destination** support (sync to Trakt and Simkl simultaneously)
+- **Multi-destination** support (sync to Trakt, Simkl, and Bingers simultaneously)
 
 <div style={{
   marginTop: '2rem',

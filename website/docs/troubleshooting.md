@@ -51,7 +51,7 @@ Scroblarr compares the webhook JSON `Server.uuid` to the machine identifier save
 
 ## Syncs not appearing
 
-### Watch history not syncing to Trakt or Simkl
+### Watch history not syncing to Trakt, Simkl, or Bingers
 
 - **Check account linking**: Go to Profile → Integrations and verify your accounts are linked
 - **Check user matching**: Make sure the Plex/Jellyfin username matches the user in Scroblarr
@@ -63,6 +63,7 @@ Scroblarr compares the webhook JSON `Server.uuid` to the machine identifier save
 
 - **Trakt**: Your OAuth token might have expired. Try unlinking and re-linking your Trakt account
 - **Simkl**: Your access token or Client ID might be invalid. Try unlinking and re-linking your Simkl account with the Client ID from your Simkl developer app.
+- **Bingers**: The session cookie may have expired or been revoked. When Scroblarr shows **Re-authorization required**, open Bingers sign-in again and paste a fresh magic-link URL from your email.
 - **Trakt OAuth app**: Confirm your **Trakt Client ID** and **Client Secret** (from [app.trakt.tv/settings/apps/api](https://app.trakt.tv/settings/apps/api)) match what you entered in Scroblarr—these are not the same as the Scroblarr **Settings → General** webhook API key.
 
 ### Simkl sync fails with "could not match" or missing metadata
@@ -74,6 +75,18 @@ Simkl matches items using external IDs and titles from Plex or Jellyfin. If sync
 - **Movies**: Confirm the item has IMDb, TMDB, TVDB, or accurate title/year metadata.
 
 See [Simkl configuration](/docs/configuration/simkl#metadata-requirements) for details.
+
+### Bingers sync fails with matching or session errors
+
+Bingers matches items using external IDs and titles from Plex or Jellyfin. If sync history shows a Bingers error:
+
+- **Refresh metadata** for the movie or show in Plex or Jellyfin.
+- **Movies**: Prefer IMDb, TMDB, or TVDB IDs plus an accurate year.
+- **Episodes**: Prefer a TMDB series ID with season and episode numbers; title and year are the fallback.
+- **Jellyfin shows**: Webhooks often lack series provider IDs — Scroblarr can still match by year + title when Bingers returns a unique candidate.
+- **Session**: If Scroblarr shows **Re-authorization required**, paste a fresh magic-link URL (links expire in about 15 minutes and are one-shot).
+
+See [Bingers configuration](/docs/configuration/bingers#metadata-requirements) for details.
 
 ## User import issues
 
@@ -107,7 +120,7 @@ This usually happens if multiple instances are running or if the database file h
 ### Slow syncs
 
 - **Check network**: Slow internet can cause delays
-- **Check API rate limits**: Trakt and Simkl have rate limits. If you're syncing a lot at once, it might be slow
+- **Check API rate limits**: Trakt, Simkl, and Bingers have rate limits. If you're syncing a lot at once, it might be slow
 - **Check server resources**: Make sure your server has enough CPU and memory
 
 ### High memory usage

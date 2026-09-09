@@ -95,7 +95,7 @@ In Scroblarr, open **Settings → General**, generate or set a **Webhook API key
 
 ### 3. Triggers
 
-On the **Triggers** tab, enable **Watched**. That is the Tautulli equivalent of Plex's scrobble event and is what Scroblarr syncs to Trakt/Simkl.
+On the **Triggers** tab, enable **Watched**. That is the Tautulli equivalent of Plex's scrobble event and is what Scroblarr syncs to Trakt/Simkl/Bingers.
 
 Optional (ignored for sync, but accepted):
 

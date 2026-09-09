@@ -17,6 +17,7 @@ Scroblarr needs two types of configuration:
 2. **Destination services** - Where your watch history syncs to
    - [Trakt](/docs/configuration/trakt) - Link your Trakt account
    - [Simkl](/docs/configuration/simkl) - Link your Simkl account
+   - [Bingers](/docs/configuration/bingers) - Link your Bingers account
 
 ## General settings
 

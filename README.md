@@ -11,13 +11,13 @@
 [![License](https://img.shields.io/github/license/0xsysr3ll/scroblarr?style=flat-square)](LICENSE)
 [![Discord](https://img.shields.io/badge/discord-join-5865F2?logo=discord&logoColor=white&style=flat-square)](https://discord.gg/pS6rRyxctw)
 
-**Scroblarr** automatically syncs your watch history from [Plex](https://plex.tv) and [Jellyfin](https://jellyfin.org) to [Trakt](https://trakt.tv) and [Simkl](https://simkl.com). \
+**Scroblarr** automatically syncs your watch history from [Plex](https://plex.tv) and [Jellyfin](https://jellyfin.org) to [Trakt](https://trakt.tv), [Simkl](https://simkl.com), and [Bingers](https://bingers.app). \
 No manual logging — just watch and sync.
 
 ## Features
 
 - **Automatic syncing** — Real-time webhook-based sync; no manual steps
-- **Multi-user** — Each user links their own Trakt and/or Simkl accounts
+- **Multi-user** — Each user links their own Trakt, Simkl, and/or Bingers accounts
 - **Self-hosted** — Your data stays on your server
 - **Web UI** — Configure media servers, link accounts, and view sync history
 - **Sync history & stats** — Dashboard with activity, failures, and trends
@@ -55,7 +55,7 @@ Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 
 ## Trademarks
 
-**Plex**, **Jellyfin**, **Trakt**, **Simkl**, and other product names or logos used in this project are trademarks of their respective owners. Scroblarr is an independent open-source project and is not sponsored, endorsed, or affiliated with those services.
+**Plex**, **Jellyfin**, **Trakt**, **Simkl**, **Bingers**, and other product names or logos used in this project are trademarks of their respective owners. Scroblarr is an independent open-source project and is not sponsored, endorsed, or affiliated with those services.
 
 ## License
 

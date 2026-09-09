@@ -5,7 +5,7 @@ info:
   description: |
     API documentation for Scroblarr - Media scrobbling service for Plex, Jellyfin, and Emby.
 
-    This API allows you to manage users, sync media watching history across services, and configure integrations with Trakt and Simkl.
+    This API allows you to manage users, sync media watching history across services, and configure integrations with Trakt, Simkl, and Bingers.
 
 servers:
   - url: http://localhost:3000
@@ -26,6 +26,10 @@ tags:
     description: Sync history and operations
   - name: Trakt
     description: Trakt integration endpoints
+  - name: Simkl
+    description: Simkl integration endpoints
+  - name: Bingers
+    description: Bingers integration endpoints
   - name: Webhooks
     description: Webhook endpoints for media server events
   - name: Logs
@@ -337,7 +341,7 @@ components:
           description: Destinations that were successfully synced
           items:
             type: string
-            enum: [Trakt, Simkl]
+            enum: [Trakt, Simkl, Bingers]
         errorMessage:
           type: string
           nullable: true
@@ -380,6 +384,81 @@ components:
           nullable: true
         hasCredentials:
           type: boolean
+
+    SimklStatus:
+      type: object
+      properties:
+        linked:
+          type: boolean
+        username:
+          type: string
+          nullable: true
+        image:
+          type: string
+          nullable: true
+        hasCredentials:
+          type: boolean
+
+    SimklProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+          nullable: true
+        username:
+          type: string
+          nullable: true
+        image:
+          type: string
+          nullable: true
+
+    BingersStatus:
+      type: object
+      properties:
+        linked:
+          type: boolean
+        needsReauthorization:
+          type: boolean
+        username:
+          type: string
+          nullable: true
+        image:
+          type: string
+          nullable: true
+        markMoviesAsRewatched:
+          type: boolean
+        markEpisodesAsRewatched:
+          type: boolean
+
+    BingersSettingsResponse:
+      type: object
+      required:
+        - success
+        - markMoviesAsRewatched
+        - markEpisodesAsRewatched
+      properties:
+        success:
+          type: boolean
+        markMoviesAsRewatched:
+          type: boolean
+        markEpisodesAsRewatched:
+          type: boolean
+
+    BingersApiErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          description: Upstream Bingers error code when present (e.g. magic_link_expired)
+        details:
+          type: array
+          items:
+            type: object
+          description: Zod validation issues when the request body fails schema checks
 
     LogEntry:
       type: object
@@ -1697,6 +1776,289 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TraktStatus'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/simkl/authorize:
+    get:
+      summary: Get Simkl PIN authorization codes
+      tags: [Simkl]
+      security:
+        - sessionAuth: []
+      parameters:
+        - name: clientId
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Simkl Client ID (falls back to the value stored on the user profile)
+      responses:
+        '200':
+          description: PIN authorization codes
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - userCode
+                  - verificationUrl
+                  - expiresIn
+                  - interval
+                properties:
+                  userCode:
+                    type: string
+                  verificationUrl:
+                    type: string
+                    format: uri
+                  expiresIn:
+                    type: integer
+                  interval:
+                    type: integer
+        '400':
+          description: Bad request (missing Client ID or validation error)
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/simkl/link:
+    post:
+      summary: Link Simkl account via PIN approval
+      tags: [Simkl]
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userCode
+              properties:
+                userCode:
+                  type: string
+                clientId:
+                  type: string
+                  description: Simkl Client ID (falls back to the value stored on the user profile)
+      responses:
+        '200':
+          description: Account linked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          description: Validation error, pending authorization, or missing Client ID
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/simkl/unlink:
+    post:
+      summary: Unlink Simkl account
+      tags: [Simkl]
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Account unlinked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/simkl/status:
+    get:
+      summary: Get Simkl account status
+      tags: [Simkl]
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Account status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimklStatus'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/simkl/profile:
+    get:
+      summary: Get Simkl user profile
+      description: Fetches the live Simkl profile and refreshes stored username/avatar when they change.
+      tags: [Simkl]
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Simkl profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimklProfile'
+        '400':
+          description: Simkl account not linked
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/bingers/link:
+    post:
+      summary: Link Bingers account via magic-link token
+      description: |
+        Accepts either the raw magic-link token or the full email URL
+        (`https://bingers.app/m?token=…`). Magic links are one-shot and expire
+        quickly; request a fresh link if linking fails.
+      tags: [Bingers]
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                  description: Magic-link token or full `https://bingers.app/m?token=…` URL
+                  example: https://bingers.app/m?token=abc123
+      responses:
+        '200':
+          description: Account linked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          description: Validation error or Bingers API error (expired/used link, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BingersApiErrorResponse'
+        '401':
+          description: Unauthorized (missing Scroblarr session) or Bingers auth error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BingersApiErrorResponse'
+        '403':
+          description: Bingers forbidden / revoked session from upstream
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BingersApiErrorResponse'
+        '429':
+          description: Bingers rate limited (e.g. magic_link_recently_sent)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BingersApiErrorResponse'
+        '500':
+          description: Internal server error or upstream Bingers 5xx
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BingersApiErrorResponse'
+        default:
+          description: |
+            Other Bingers API errors forwarded with their upstream HTTP status
+            when it is in the 400–599 range (statuses outside that range are
+            clamped to 400).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BingersApiErrorResponse'
+
+  /api/v1/bingers/unlink:
+    post:
+      summary: Unlink Bingers account
+      description: Clears the stored Bingers session cookie jar and related profile fields.
+      tags: [Bingers]
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Account unlinked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/bingers/status:
+    get:
+      summary: Get Bingers account status
+      description: Validates the stored session (refreshing cookies when possible) and returns link status plus rewatch settings.
+      tags: [Bingers]
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Account status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BingersStatus'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/bingers/settings:
+    patch:
+      summary: Update Bingers sync settings
+      description: |
+        Updates opt-in rewatch behavior. Requires an active linked Bingers session.
+        When enabled, rewatching a previously synced title increments the Bingers play count.
+      tags: [Bingers]
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - markMoviesAsRewatched
+                - markEpisodesAsRewatched
+              properties:
+                markMoviesAsRewatched:
+                  type: boolean
+                markEpisodesAsRewatched:
+                  type: boolean
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BingersSettingsResponse'
+        '400':
+          description: Not linked, session expired, or validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
           description: Unauthorized
         '500':
