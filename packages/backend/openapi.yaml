@@ -444,6 +444,22 @@ components:
         markEpisodesAsRewatched:
           type: boolean
 
+    BingersApiErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          description: Upstream Bingers error code when present (e.g. magic_link_expired)
+        details:
+          type: array
+          items:
+            type: object
+          description: Zod validation issues when the request body fails schema checks
+
     LogEntry:
       type: object
       properties:
@@ -1934,20 +1950,40 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                  code:
-                    type: string
-                  details:
-                    type: array
-                    items:
-                      type: object
+                $ref: '#/components/schemas/BingersApiErrorResponse'
         '401':
-          description: Unauthorized
+          description: Unauthorized (missing Scroblarr session) or Bingers auth error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BingersApiErrorResponse'
+        '403':
+          description: Bingers forbidden / revoked session from upstream
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BingersApiErrorResponse'
+        '429':
+          description: Bingers rate limited (e.g. magic_link_recently_sent)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BingersApiErrorResponse'
         '500':
-          description: Internal server error
+          description: Internal server error or upstream Bingers 5xx
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BingersApiErrorResponse'
+        default:
+          description: |
+            Other Bingers API errors forwarded with their upstream HTTP status
+            when it is in the 400–599 range (statuses outside that range are
+            clamped to 400).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BingersApiErrorResponse'
 
   /api/v1/bingers/unlink:
     post:
