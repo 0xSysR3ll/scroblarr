@@ -13,7 +13,7 @@ Scroblarr is built as a monorepo using pnpm workspaces. This keeps everything or
 The backend is an Express.js API server that handles:
 
 - **Webhook endpoints**: Receives events from Plex and Jellyfin, and from Tautulli as a webhook source for Plex playback
-- **Sync service**: Processes watch events and syncs to Trakt and Simkl
+- **Sync service**: Processes watch events and syncs to Trakt, Simkl, and Bingers
 - **User management**: Handles authentication and user operations
 - **Settings management**: Stores and retrieves configuration
 - **Database**: TypeORM with SQLite or PostgreSQL; migrations run automatically on startup
@@ -56,7 +56,7 @@ This ensures type safety between frontend and backend.
 1. **Media server** (Plex or Jellyfin) sends a webhook to the **backend webhook endpoint**. Tautulli can forward Plex playback events to the same pipeline.
 2. **Webhook parser** extracts watch event data
 3. **Sync service** matches event to user and destination accounts
-4. **Integration clients** (Trakt/Simkl) sync the watch data
+4. **Integration clients** (Trakt/Simkl/Bingers) sync the watch data
 5. **Database** stores sync history
 6. **Frontend** displays sync history and statistics
 
@@ -72,6 +72,7 @@ The backend exposes a REST API at `/api/v1/`:
 - `/api/v1/sync/*` - Sync history (authenticated users)
 - `/api/v1/trakt/*` - Trakt OAuth and linking
 - `/api/v1/simkl/*` - Simkl PIN linking and profile helpers
+- `/api/v1/bingers/*` - Bingers magic-link linking, status, and sync settings
 - `/api/v1/logs/*` - Structured application logs (**admin**)
 - `/api/v1/avatars/*` - User avatar proxy/fetch helpers
 - `/api/v1/meta/*` - Build/version metadata (e.g. `/version` for health and diagnostics)

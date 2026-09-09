@@ -26,7 +26,7 @@ Your Bingers account is now linked!
 
 ## Session
 
-Bingers uses session cookies instead of OAuth refresh tokens. If the session expires or is revoked, Scroblarr will show **Re-authorize** in the Bingers section. You can stay signed in on the Bingers app and Scroblarr at the same time.
+Bingers uses session cookies instead of OAuth refresh tokens. If the session expires or is revoked, Scroblarr shows **Re-authorization required** in the Bingers section—open sign-in again and paste a fresh magic-link URL. You can stay signed in on the Bingers app and Scroblarr at the same time.
 
 ## Metadata requirements
 
@@ -69,6 +69,6 @@ If you're having trouble linking or syncing:
 
 - Request a fresh magic link if the previous one expired or was already used
 - Paste the full URL from the email, including the `token` query parameter
-- Re-authorize if Scroblarr shows the session as expired
+- Re-link with a fresh magic link if Scroblarr shows **Re-authorization required**
 - Refresh metadata in Plex or Jellyfin if items fail to match
 - Check the sync history and Settings → Logs for Bingers-specific errors
