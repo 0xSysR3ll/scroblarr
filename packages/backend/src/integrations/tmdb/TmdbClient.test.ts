@@ -639,6 +639,18 @@ describe("TmdbClient", () => {
         }),
       },
       {
+        match: "/movie/157336",
+        response: okJson({
+          title: "Interstellar",
+          original_title: "Interstellar",
+          poster_path: "/interstellar.jpg",
+        }),
+      },
+      {
+        match: "/movie/missing",
+        response: notFound,
+      },
+      {
         match: "/tv/308014/season/1/episode/1/external_ids",
         response: okJson({
           imdb_id: "tt31397887",
@@ -711,6 +723,11 @@ describe("TmdbClient", () => {
       numberOfSeasons: 1,
       firstAirDate: "2023-12-29",
     });
+    await expect(client.getMovieTitleDetails(157336)).resolves.toEqual({
+      title: "Interstellar",
+      originalTitle: "Interstellar",
+    });
+    await expect(client.getMovieTitleDetails("missing")).resolves.toBeNull();
     await expect(client.getTvRecommendations(146176)).resolves.toEqual([
       {
         id: 308014,

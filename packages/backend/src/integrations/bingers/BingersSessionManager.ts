@@ -142,7 +142,7 @@ export class BingersSessionManager {
   async storeSessionFromVerify(
     userId: string,
     session: BingersSessionInfo,
-    fallbackEmail?: string
+    fallbackEmail?: string | null
   ): Promise<void> {
     await this.persistSession(userId, session, fallbackEmail);
   }
@@ -165,15 +165,18 @@ export class BingersSessionManager {
     session: BingersSessionInfo,
     fallbackEmail?: string | null
   ): Promise<void> {
-    const update: Partial<User> = {
+    const update = {
       bingersCookieJar: serializeCookieJar(session.cookieJar),
-      bingersSessionExpiresAt: session.expiresAt,
-      bingersEmail: session.user?.email || fallbackEmail || undefined,
-      bingersUserId: session.user?.id,
-      bingersUsername: session.user?.username || session.user?.name,
-      bingersThumb: session.user?.image,
+      bingersSessionExpiresAt: session.expiresAt ?? null,
+      bingersEmail: session.user?.email || fallbackEmail || null,
+      bingersUserId: session.user?.id ?? null,
+      bingersUsername: session.user?.username || session.user?.name || null,
+      bingersThumb: session.user?.image ?? null,
     };
-    await this.userRepository.update(userId, update);
+    await this.userRepository.update(
+      userId,
+      update as unknown as Partial<User>
+    );
   }
 
   private async clearSessionKeepEmail(user: User): Promise<void> {

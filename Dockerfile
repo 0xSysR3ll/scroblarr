@@ -36,6 +36,10 @@ ENV GIT_TAG=${GIT_TAG}
 ENV NODE_ENV=production
 ENV PUBLIC_DIR=/app/public
 
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends wget \
+  && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY --from=builder /deploy/ ./

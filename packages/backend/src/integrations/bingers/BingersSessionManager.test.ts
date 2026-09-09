@@ -696,4 +696,28 @@ describe("BingersSessionManager", () => {
       })
     );
   });
+
+  it("clears stale profile fields with null when the session omits them", async () => {
+    const manager = new BingersSessionManager(
+      userRepositoryMocks as never,
+      authMocks as unknown as BingersAuth
+    );
+
+    await manager.storeSessionFromVerify("user-id", {
+      session: { id: "s1" },
+      user: { id: "b1" },
+      cookieJar: {
+        session_token: { name: "session_token", value: "sess" },
+      },
+    });
+
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith("user-id", {
+      bingersCookieJar: expect.any(String),
+      bingersSessionExpiresAt: null,
+      bingersEmail: null,
+      bingersUserId: "b1",
+      bingersUsername: null,
+      bingersThumb: null,
+    });
+  });
 });

@@ -52,8 +52,15 @@ interface SeasonGrain {
   episodes?: Array<{ id?: string; n?: number }>;
 }
 
+export type BingersAlternateTitles = {
+  forTv?: (tmdbSeriesId: number) => Promise<string[]>;
+  forMovie?: (tmdbMovieId: number) => Promise<string[]>;
+};
+
 export class BingersCatalogResolver {
   private static readonly FETCH_TIMEOUT_MS = 20_000;
+
+  constructor(private readonly getAlternateTitles?: BingersAlternateTitles) {}
 
   async resolveEntity(media: MediaItem): Promise<BingersEntityRef> {
     if (media.type === "movie") {
@@ -66,15 +73,21 @@ export class BingersCatalogResolver {
   }
 
   private async resolveMovie(media: MediaItem): Promise<BingersEntityRef> {
-    const candidates = await this.searchTitles(media.title, "movie");
-    const matched = await this.pickTitleByExternalIds(candidates, {
-      title: media.title,
-      imdb: media.imdbMovieId,
-      tmdb: media.tmdbMovieId,
-      tvdb: media.tvdbMovieId,
-      year: media.year,
-      preferKind: "movie",
-    });
+    const tmdbMovieId = media.tmdbMovieId;
+    const forMovie = this.getAlternateTitles?.forMovie;
+    const matched = await this.matchTitle(
+      media.title,
+      "movie",
+      {
+        imdb: media.imdbMovieId,
+        tmdb: tmdbMovieId,
+        tvdb: media.tvdbMovieId,
+        year: media.year,
+      },
+      tmdbMovieId !== undefined && forMovie
+        ? () => forMovie(tmdbMovieId)
+        : undefined
+    );
 
     if (!matched) {
       throw new Error(
@@ -94,15 +107,21 @@ export class BingersCatalogResolver {
       throw new Error("Episode requires seasonNumber and episodeNumber");
     }
 
-    const candidates = await this.searchTitles(media.title, "show");
-    const matched = await this.pickTitleByExternalIds(candidates, {
-      title: media.title,
-      imdb: media.imdbSeriesId,
-      tmdb: media.tmdbSeriesId,
-      tvdb: media.tvdbSeriesId,
-      year: media.year,
-      preferKind: "show",
-    });
+    const tmdbSeriesId = media.tmdbSeriesId;
+    const forTv = this.getAlternateTitles?.forTv;
+    const matched = await this.matchTitle(
+      media.title,
+      "show",
+      {
+        imdb: media.imdbSeriesId,
+        tmdb: tmdbSeriesId,
+        tvdb: media.tvdbSeriesId,
+        year: media.year,
+      },
+      tmdbSeriesId !== undefined && forTv
+        ? () => forTv(tmdbSeriesId)
+        : undefined
+    );
 
     if (!matched) {
       throw new Error(
@@ -137,6 +156,57 @@ export class BingersCatalogResolver {
     };
   }
 
+  private async matchTitle(
+    primaryTitle: string,
+    preferKind: "movie" | "show",
+    ids: {
+      imdb?: string;
+      tmdb?: number;
+      tvdb?: number;
+      year?: number;
+    },
+    loadAlternates?: () => Promise<string[]>
+  ): Promise<SearchTitleResult | null> {
+    const matchOpts = { ...ids, preferKind, title: primaryTitle };
+    let matched = await this.pickTitleByExternalIds(
+      await this.searchTitles(primaryTitle, preferKind),
+      matchOpts
+    );
+    if (matched || !loadAlternates) {
+      return matched;
+    }
+
+    try {
+      const alternates = await loadAlternates();
+      const primary = this.normalizeTitle(primaryTitle);
+      for (const alternate of alternates) {
+        if (!alternate.trim() || this.normalizeTitle(alternate) === primary) {
+          continue;
+        }
+        matched = await this.pickTitleByExternalIds(
+          await this.searchTitles(alternate, preferKind),
+          { ...matchOpts, title: alternate, allowTitleFallback: false }
+        );
+        if (matched) {
+          return matched;
+        }
+      }
+    } catch (error) {
+      if (
+        error instanceof BingersApiError &&
+        (error.isRateLimited || error.isAuthError)
+      ) {
+        throw error;
+      }
+      logger.bingers.debug(
+        { error, title: primaryTitle, tmdb: ids.tmdb, preferKind },
+        "Failed to load TMDB alternate titles for Bingers catalog match"
+      );
+    }
+
+    return null;
+  }
+
   private async searchTitles(
     query: string,
     preferKind: "movie" | "show"
@@ -169,6 +239,7 @@ export class BingersCatalogResolver {
       tvdb?: number;
       year?: number;
       preferKind: "movie" | "show";
+      allowTitleFallback?: boolean;
     }
   ): Promise<SearchTitleResult | null> {
     const metadataCandidates = candidates
@@ -207,6 +278,10 @@ export class BingersCatalogResolver {
     scored.sort((a, b) => b.score - a.score);
     if (scored[0]?.score) {
       return scored[0].candidate;
+    }
+
+    if (opts.allowTitleFallback === false) {
+      return null;
     }
 
     // Soft fallback only when both title and year verify — never pick an unmatched hit

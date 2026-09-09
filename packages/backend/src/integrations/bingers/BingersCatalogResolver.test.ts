@@ -1213,4 +1213,449 @@ describe("BingersCatalogResolver", () => {
       })
     ).rejects.toThrow(/could not resolve/i);
   });
+
+  it("retries Bingers search with TMDB original title when localized title misses", async () => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/search/titles") && url.includes("q=The")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: "wrong-1",
+                kind: "show",
+                metadata: "wrong-meta",
+                card: {
+                  originalTitle: "The Flame Imperial Guards",
+                  year: 2022,
+                  titlesI18n: { en: "The Flame Imperial Guards" },
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/search/titles") && url.includes("q=La")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: "show-flamme",
+                kind: "show",
+                metadata: "flamme-meta",
+                card: {
+                  originalTitle: "La Flamme",
+                  year: 2020,
+                  titlesI18n: { en: "Burning Love (FR)" },
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/metadata@wrong-meta.json")) {
+        return new Response(
+          JSON.stringify({
+            id: "wrong-1",
+            kind: "show",
+            year: 2022,
+            external_ids: [{ id: "211213", source: "tmdb", type: "tv" }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/metadata@flamme-meta.json")) {
+        return new Response(
+          JSON.stringify({
+            id: "show-flamme",
+            kind: "show",
+            year: 2020,
+            external_ids: [{ id: "94626", source: "tmdb", type: "tv" }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/versions.json")) {
+        return new Response(
+          JSON.stringify({
+            titleId: "show-flamme",
+            kind: "show",
+            files: { seasons: { "1": "seasonTok" } },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/season-1@seasonTok.json")) {
+        return new Response(
+          JSON.stringify({
+            season: 1,
+            episodes: [{ id: "ep-6", n: 6 }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const getTvAlternateTitles = vi.fn(async () => ["The Flame", "La Flamme"]);
+    const resolver = new BingersCatalogResolver({
+      forTv: getTvAlternateTitles,
+    });
+
+    await expect(
+      resolver.resolveEntity({
+        id: "episode-The Flame-1-6",
+        type: "episode",
+        title: "The Flame",
+        seasonNumber: 1,
+        episodeNumber: 6,
+        tmdbSeriesId: 94626,
+      })
+    ).resolves.toEqual({
+      entityKind: "episode",
+      entityId: "ep-6",
+      titleId: "show-flamme",
+    });
+
+    expect(getTvAlternateTitles).toHaveBeenCalledWith(94626);
+    const searchUrls = fetchMock.mock.calls
+      .map((call) => String(call[0]))
+      .filter((url) => url.includes("/search/titles"));
+    expect(searchUrls.some((url) => /q=The[+%20]Flame/.test(url))).toBe(true);
+    expect(searchUrls.some((url) => /q=La[+%20]Flamme/.test(url))).toBe(true);
+  });
+
+  it("retries Bingers movie search with TMDB original title when localized title misses", async () => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/search/titles") && url.includes("q=The")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: "wrong-1",
+                kind: "movie",
+                metadata: "wrong-meta",
+                card: {
+                  originalTitle: "The Untouchables",
+                  year: 1987,
+                  titlesI18n: { en: "The Untouchables" },
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/search/titles") && url.includes("q=Intouchables")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: "movie-intouchables",
+                kind: "movie",
+                metadata: "intouchables-meta",
+                card: {
+                  originalTitle: "Intouchables",
+                  year: 2011,
+                  titlesI18n: { en: "The Intouchables" },
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/metadata@wrong-meta.json")) {
+        return new Response(
+          JSON.stringify({
+            id: "wrong-1",
+            kind: "movie",
+            year: 1987,
+            external_ids: [{ id: "117", source: "tmdb" }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/metadata@intouchables-meta.json")) {
+        return new Response(
+          JSON.stringify({
+            id: "movie-intouchables",
+            kind: "movie",
+            year: 2011,
+            external_ids: [{ id: "77338", source: "tmdb" }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const forMovie = vi.fn(async () => ["The Intouchables", "Intouchables"]);
+    const resolver = new BingersCatalogResolver({ forMovie });
+
+    await expect(
+      resolver.resolveEntity({
+        id: "m1",
+        type: "movie",
+        title: "The Intouchables",
+        year: 2011,
+        tmdbMovieId: 77338,
+      })
+    ).resolves.toEqual({
+      entityKind: "movie",
+      entityId: "movie-intouchables",
+      titleId: "movie-intouchables",
+    });
+
+    expect(forMovie).toHaveBeenCalledWith(77338);
+  });
+
+  it("ignores alternate-title lookup failures and still fails closed", async () => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/search/titles")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: "wrong-1",
+                kind: "show",
+                metadata: "wrong-meta",
+                card: {
+                  originalTitle: "Other Show",
+                  year: 1999,
+                  titlesI18n: { en: "Other Show" },
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/metadata@wrong-meta.json")) {
+        return new Response(
+          JSON.stringify({
+            id: "wrong-1",
+            kind: "show",
+            year: 1999,
+            external_ids: [{ id: "1", source: "tmdb", type: "tv" }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const resolver = new BingersCatalogResolver({
+      forTv: async () => {
+        throw new Error("tmdb down");
+      },
+    });
+
+    await expect(
+      resolver.resolveEntity({
+        id: "e1",
+        type: "episode",
+        title: "The Flame",
+        seasonNumber: 1,
+        episodeNumber: 1,
+        tmdbSeriesId: 94626,
+      })
+    ).rejects.toThrow(/Could not resolve Bingers show entity/i);
+  });
+
+  it("rethrows auth errors from alternate-title catalog search", async () => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/search/titles") && url.includes("q=The")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: "wrong-1",
+                kind: "show",
+                metadata: "wrong-meta",
+                card: {
+                  originalTitle: "Other Show",
+                  titlesI18n: { en: "Other Show" },
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/metadata@wrong-meta.json")) {
+        return new Response(
+          JSON.stringify({
+            id: "wrong-1",
+            kind: "show",
+            external_ids: [{ id: "1", source: "tmdb", type: "tv" }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/search/titles") && url.includes("q=La")) {
+        return new Response(
+          JSON.stringify({ error: { code: "unauthorized", message: "auth" } }),
+          { status: 401, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { BingersApiError } = await import("./BingersApiError");
+    const resolver = new BingersCatalogResolver({
+      forTv: async () => ["La Flamme"],
+    });
+
+    await expect(
+      resolver.resolveEntity({
+        id: "e1",
+        type: "episode",
+        title: "The Flame",
+        seasonNumber: 1,
+        episodeNumber: 1,
+        tmdbSeriesId: 94626,
+      })
+    ).rejects.toBeInstanceOf(BingersApiError);
+  });
+
+  it("fails closed when TMDB alternate titles also miss the catalog", async () => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/search/titles")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: "wrong-1",
+                kind: "show",
+                metadata: "wrong-meta",
+                card: {
+                  originalTitle: "Other Show",
+                  titlesI18n: { en: "Other Show" },
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/metadata@wrong-meta.json")) {
+        return new Response(
+          JSON.stringify({
+            id: "wrong-1",
+            kind: "show",
+            external_ids: [{ id: "1", source: "tmdb", type: "tv" }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const resolver = new BingersCatalogResolver({
+      forTv: async () => ["La Flamme", "  ", "The Flame"],
+    });
+
+    await expect(
+      resolver.resolveEntity({
+        id: "e1",
+        type: "episode",
+        title: "The Flame",
+        seasonNumber: 1,
+        episodeNumber: 1,
+        tmdbSeriesId: 94626,
+      })
+    ).rejects.toThrow(/Could not resolve Bingers show entity/i);
+  });
+
+  it("does not accept alternate title-only matches when TMDB ids disagree", async () => {
+    const fetchMock = vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/search/titles") && url.includes("q=The")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: "wrong-1",
+                kind: "show",
+                metadata: "wrong-meta",
+                card: {
+                  originalTitle: "The Flame Imperial Guards",
+                  titlesI18n: { en: "The Flame Imperial Guards" },
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/search/titles") && url.includes("q=La")) {
+        return new Response(
+          JSON.stringify({
+            results: [
+              {
+                id: "show-collision",
+                kind: "show",
+                metadata: "collision-meta",
+                card: {
+                  originalTitle: "La Flamme",
+                  titlesI18n: { en: "Burning Love (FR)" },
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/metadata@wrong-meta.json")) {
+        return new Response(
+          JSON.stringify({
+            id: "wrong-1",
+            kind: "show",
+            external_ids: [{ id: "1", source: "tmdb", type: "tv" }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/metadata@collision-meta.json")) {
+        return new Response(
+          JSON.stringify({
+            id: "show-collision",
+            kind: "show",
+            // Unique title matches, but TMDB id does not.
+            external_ids: [{ id: "99999", source: "tmdb", type: "tv" }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const resolver = new BingersCatalogResolver({
+      forTv: async () => ["La Flamme"],
+    });
+
+    await expect(
+      resolver.resolveEntity({
+        id: "e1",
+        type: "episode",
+        title: "The Flame",
+        seasonNumber: 1,
+        episodeNumber: 1,
+        tmdbSeriesId: 94626,
+      })
+    ).rejects.toThrow(/Could not resolve Bingers show entity/i);
+  });
 });

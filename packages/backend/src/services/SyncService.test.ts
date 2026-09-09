@@ -269,6 +269,9 @@ describe("SyncService", () => {
       bingersCookieJar:
         '{"session_token":{"name":"session_token","value":"x"}}',
     });
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      tmdbAccessToken: "tmdb-token",
+    });
     syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
     syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs.mockResolvedValue(
       0
@@ -299,6 +302,64 @@ describe("SyncService", () => {
         success: true,
         destinations: JSON.stringify(["Bingers"]),
         wasRewatched: false,
+      })
+    );
+  });
+
+  it("wires Bingers without TMDB alternate titles when token is missing", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktAccessToken: null,
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"x"}}',
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs.mockResolvedValue(
+      0
+    );
+    bingersSessionManagerMocks.getValidCookieJar.mockResolvedValue({
+      session_token: { name: "session_token", value: "x" },
+    });
+    bingersClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    await service.syncEvent(makeEvent());
+
+    expect(bingersClientMocks.scrobble).toHaveBeenCalled();
+  });
+
+  it("still wires Bingers when settings lookup fails", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktAccessToken: null,
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"x"}}',
+    });
+    settingsRepositoryMocks.getAll.mockRejectedValue(
+      new Error("settings unavailable")
+    );
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs.mockResolvedValue(
+      0
+    );
+    bingersSessionManagerMocks.getValidCookieJar.mockResolvedValue({
+      session_token: { name: "session_token", value: "x" },
+    });
+    bingersClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    await service.syncEvent(makeEvent());
+
+    expect(bingersClientMocks.scrobble).toHaveBeenCalled();
+    expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        destinations: JSON.stringify(["Bingers"]),
+        success: true,
       })
     );
   });
