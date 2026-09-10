@@ -240,16 +240,12 @@ router.post("/plex", async (req: Request, res: Response): Promise<void> => {
 
     const existingAdmin = await userRepository.findAdmin();
 
-    let existingUser: User | null = null;
-    if (account.email) {
-      const allUsers = await userRepository.findAll();
-      existingUser = allUsers.find((u) => u.email === account.email) ?? null;
-    }
-
+    // Identity is Plex username only — never match/login by email alone
+    // (email collisions would allow account takeover).
     if (!existingAdmin) {
-      const user =
-        existingUser ??
-        (await userRepository.findByPlexUsernameOrCreate(account.username));
+      const user = await userRepository.findByPlexUsernameOrCreate(
+        account.username
+      );
 
       const updatedUser = await userRepository.update(user.id, {
         plexUsername: account.username,
@@ -287,7 +283,7 @@ router.post("/plex", async (req: Request, res: Response): Promise<void> => {
           username: account.username,
           email: account.email || user.email,
           isAdmin: true,
-          hadExistingUser: !!existingUser,
+          hadExistingUser: !!user.plexAccessToken,
         },
         "Plex admin created via direct auth"
       );
@@ -309,55 +305,45 @@ router.post("/plex", async (req: Request, res: Response): Promise<void> => {
           isAdmin: true,
         });
       return;
-    } else {
-      let user: User | null = null;
+    }
 
-      if (existingUser) {
-        user = existingUser;
-      } else {
-        user = await userRepository.findByPlexUsername(account.username);
-      }
+    const user = await userRepository.findByPlexUsername(account.username);
 
-      if (!user) {
-        res.status(403).json({
-          error:
-            "Access denied. Please contact an administrator to import your account.",
-        });
-        return;
-      }
-
-      const updatedUser = await userRepository.update(user.id, {
-        plexUsername: account.username,
-        plexAccessToken: authToken.trim(),
-        email: account.email || user.email,
-        displayName: account.username || user.displayName,
-        plexThumb: account.thumb,
+    if (!user) {
+      res.status(403).json({
+        error:
+          "Access denied. Please contact an administrator to import your account.",
       });
-
-      const ttlMs = 7 * 24 * 60 * 60 * 1000;
-      const sessionToken = await userRepository.createSession(
-        updatedUser,
-        ttlMs
-      );
-
-      const primaryUsername = userRepository.getPrimaryUsername(updatedUser);
-
-      res
-        .cookie("session", sessionToken, {
-          httpOnly: true,
-          secure: env.NODE_ENV === "production",
-          sameSite: "lax",
-          maxAge: ttlMs,
-        })
-        .json({
-          id: updatedUser.id,
-          username: primaryUsername,
-          displayName: updatedUser.displayName,
-          email: updatedUser.email,
-          isAdmin: updatedUser.isAdmin,
-        });
       return;
     }
+
+    const updatedUser = await userRepository.update(user.id, {
+      plexAccessToken: authToken.trim(),
+      email: account.email || user.email,
+      displayName: account.username || user.displayName,
+      plexThumb: account.thumb,
+    });
+
+    const ttlMs = 7 * 24 * 60 * 60 * 1000;
+    const sessionToken = await userRepository.createSession(updatedUser, ttlMs);
+
+    const primaryUsername = userRepository.getPrimaryUsername(updatedUser);
+
+    res
+      .cookie("session", sessionToken, {
+        httpOnly: true,
+        secure: env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: ttlMs,
+      })
+      .json({
+        id: updatedUser.id,
+        username: primaryUsername,
+        displayName: updatedUser.displayName,
+        email: updatedUser.email,
+        isAdmin: updatedUser.isAdmin,
+      });
+    return;
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unable to authenticate";
