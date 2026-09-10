@@ -35,6 +35,7 @@ ARG GIT_TAG=
 ENV GIT_TAG=${GIT_TAG}
 ENV NODE_ENV=production
 ENV PUBLIC_DIR=/app/public
+ENV DATA_DIR=/app/data
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends wget \
