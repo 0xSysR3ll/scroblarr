@@ -120,7 +120,7 @@ vi.mock("@utils/userSanitizer", () => ({
 
 const getEnvMock = vi.hoisted(() =>
   vi.fn(() => ({
-    NODE_ENV: "test" as const,
+    NODE_ENV: "test" as "development" | "production" | "test",
     PORT: "3000",
   }))
 );
