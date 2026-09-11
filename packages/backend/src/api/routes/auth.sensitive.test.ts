@@ -138,6 +138,7 @@ describe("auth route sensitive guards", () => {
       NODE_ENV: "test",
       PORT: "3000",
     });
+    userRepositoryMocks.findByPlexUsername.mockResolvedValue(null);
   });
 
   it("returns 401 on /plex/link when auth middleware yields no user", async () => {

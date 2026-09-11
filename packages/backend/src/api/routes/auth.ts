@@ -253,7 +253,7 @@ router.post("/plex", async (req: Request, res: Response): Promise<void> => {
         plexUsername,
         plexAccessToken: authToken.trim(),
         email: account.email || user.email,
-        displayName: plexUsername || user.displayName,
+        displayName: plexUsername,
         plexThumb: account.thumb,
         isAdmin: true,
       });
@@ -322,7 +322,7 @@ router.post("/plex", async (req: Request, res: Response): Promise<void> => {
     const updatedUser = await userRepository.update(user.id, {
       plexAccessToken: authToken.trim(),
       email: account.email || user.email,
-      displayName: plexUsername || user.displayName,
+      displayName: plexUsername,
       plexThumb: account.thumb,
     });
 
