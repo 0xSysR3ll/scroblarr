@@ -237,21 +237,23 @@ router.post("/plex", async (req: Request, res: Response): Promise<void> => {
       clientIdentifier || (await getOrCreatePlexClientIdentifier());
     const plexOAuth = new PlexOAuth(resolvedClientIdentifier);
     const account = await plexOAuth.getUserInfo(authToken);
+    const plexUsername = account.username?.trim();
+    if (!plexUsername) {
+      res.status(400).json({ error: "Plex username is required" });
+      return;
+    }
 
     const existingAdmin = await userRepository.findAdmin();
 
-    // Identity is Plex username only — never match/login by email alone
-    // (email collisions would allow account takeover).
     if (!existingAdmin) {
-      const user = await userRepository.findByPlexUsernameOrCreate(
-        account.username
-      );
+      const user =
+        await userRepository.findByPlexUsernameOrCreate(plexUsername);
 
       const updatedUser = await userRepository.update(user.id, {
-        plexUsername: account.username,
+        plexUsername,
         plexAccessToken: authToken.trim(),
         email: account.email || user.email,
-        displayName: account.username || user.displayName,
+        displayName: plexUsername || user.displayName,
         plexThumb: account.thumb,
         isAdmin: true,
       });
@@ -280,7 +282,7 @@ router.post("/plex", async (req: Request, res: Response): Promise<void> => {
       logger.auth.info(
         {
           userId: updatedUser.id,
-          username: account.username,
+          username: plexUsername,
           email: account.email || user.email,
           isAdmin: true,
           hadExistingUser: !!user.plexAccessToken,
@@ -307,7 +309,7 @@ router.post("/plex", async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const user = await userRepository.findByPlexUsername(account.username);
+    const user = await userRepository.findByPlexUsername(plexUsername);
 
     if (!user) {
       res.status(403).json({
@@ -320,7 +322,7 @@ router.post("/plex", async (req: Request, res: Response): Promise<void> => {
     const updatedUser = await userRepository.update(user.id, {
       plexAccessToken: authToken.trim(),
       email: account.email || user.email,
-      displayName: account.username || user.displayName,
+      displayName: plexUsername || user.displayName,
       plexThumb: account.thumb,
     });
 
@@ -357,7 +359,7 @@ router.post("/plex", async (req: Request, res: Response): Promise<void> => {
       },
       "Plex login error"
     );
-    res.status(500).json({ error: errorMessage });
+    res.status(500).json({ error: "Unable to authenticate" });
   }
 });
 

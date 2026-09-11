@@ -288,13 +288,13 @@ describe("auth route sensitive guards", () => {
     });
   });
 
-  it("keeps stored email/displayName when Plex account omits them", async () => {
+  it("keeps stored email when Plex account omits it", async () => {
     userRepositoryMocks.findAdmin.mockResolvedValue({
       id: "admin-id",
       isAdmin: true,
     });
     plexOAuthMocks.getUserInfo.mockResolvedValue({
-      username: "",
+      username: "imported-user",
       email: undefined,
       thumb: null,
     });
@@ -309,7 +309,7 @@ describe("auth route sensitive guards", () => {
       id: "imported-id",
       plexUsername: "imported-user",
       email: "stored@example.com",
-      displayName: "Stored Name",
+      displayName: "imported-user",
       isAdmin: false,
     });
     userRepositoryMocks.createSession.mockResolvedValue("session-token");
@@ -326,9 +326,33 @@ describe("auth route sensitive guards", () => {
     expect(userRepositoryMocks.update).toHaveBeenCalledWith("imported-id", {
       plexAccessToken: "plex-token",
       email: "stored@example.com",
-      displayName: "Stored Name",
+      displayName: "imported-user",
       plexThumb: null,
     });
+  });
+
+  it("rejects Plex login when username is empty", async () => {
+    plexOAuthMocks.getUserInfo.mockResolvedValue({
+      username: "   ",
+      email: "user@example.com",
+      thumb: null,
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/plex")
+      .send({ authToken: "plex-token", clientIdentifier: "client-id" });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "Plex username is required" });
+    expect(userRepositoryMocks.findAdmin).not.toHaveBeenCalled();
+    expect(userRepositoryMocks.findByPlexUsername).not.toHaveBeenCalled();
+    expect(
+      userRepositoryMocks.findByPlexUsernameOrCreate
+    ).not.toHaveBeenCalled();
   });
 
   it("creates the first admin via Plex username and stores server settings", async () => {
@@ -397,7 +421,7 @@ describe("auth route sensitive guards", () => {
     userRepositoryMocks.findAdmin.mockResolvedValue(null);
     settingsRepositoryMocks.get.mockResolvedValue(null);
     plexOAuthMocks.getUserInfo.mockResolvedValue({
-      username: "",
+      username: "first-admin",
       email: undefined,
       thumb: null,
     });
@@ -412,7 +436,7 @@ describe("auth route sensitive guards", () => {
       id: "new-admin-id",
       plexUsername: "first-admin",
       email: "stored@example.com",
-      displayName: "Stored",
+      displayName: "first-admin",
       isAdmin: true,
     });
     userRepositoryMocks.createSession.mockResolvedValue("session-token");
@@ -442,10 +466,10 @@ describe("auth route sensitive guards", () => {
       expect.anything()
     );
     expect(userRepositoryMocks.update).toHaveBeenCalledWith("new-admin-id", {
-      plexUsername: "",
+      plexUsername: "first-admin",
       plexAccessToken: "admin-token",
       email: "stored@example.com",
-      displayName: "Stored",
+      displayName: "first-admin",
       plexThumb: null,
       isAdmin: true,
     });
@@ -572,7 +596,7 @@ describe("auth route sensitive guards", () => {
       .send({ authToken: "token", clientIdentifier: "client-id" });
 
     expect(response.status).toBe(500);
-    expect(response.body).toEqual({ error: "plex boom" });
+    expect(response.body).toEqual({ error: "Unable to authenticate" });
   });
 
   it("returns a generic 500 message when Plex login rejects a non-Error", async () => {
