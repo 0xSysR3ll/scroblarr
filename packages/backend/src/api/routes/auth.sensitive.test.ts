@@ -6,6 +6,7 @@ const userRepositoryMocks = vi.hoisted(() => ({
   findByPlexUsername: vi.fn(),
   findByJellyfinUsername: vi.fn(),
   findByPlexUsernameOrCreate: vi.fn(),
+  findByJellyfinUsernameOrCreate: vi.fn(),
   findAdmin: vi.fn(),
   findAll: vi.fn(),
   createSession: vi.fn(),
@@ -29,6 +30,13 @@ const sessionRepositoryMocks = vi.hoisted(() => ({
 const plexOAuthMocks = vi.hoisted(() => ({
   getUserInfo: vi.fn(),
   getServers: vi.fn(),
+}));
+
+const jellyfinClientMocks = vi.hoisted(() => ({
+  login: vi.fn(),
+  getUserInfo: vi.fn(),
+  createApiKey: vi.fn(),
+  constructedWith: [] as string[],
 }));
 
 vi.mock("../middleware/auth", () => ({
@@ -66,7 +74,8 @@ vi.mock("@repositories/UserRepository", () => ({
     createSession = userRepositoryMocks.createSession;
     update = userRepositoryMocks.update;
     findBySessionToken = vi.fn();
-    findByJellyfinUsernameOrCreate = vi.fn();
+    findByJellyfinUsernameOrCreate =
+      userRepositoryMocks.findByJellyfinUsernameOrCreate;
     getPrimaryUsername = userRepositoryMocks.getPrimaryUsername;
   },
 }));
@@ -98,9 +107,12 @@ vi.mock("@integrations/plex/PlexOAuth", () => ({
 
 vi.mock("@integrations/jellyfin/JellyfinClient", () => ({
   JellyfinClient: class {
-    login = vi.fn();
-    getUserInfo = vi.fn();
-    createApiKey = vi.fn();
+    constructor(baseUrl: string) {
+      jellyfinClientMocks.constructedWith.push(baseUrl);
+    }
+    login = jellyfinClientMocks.login;
+    getUserInfo = jellyfinClientMocks.getUserInfo;
+    createApiKey = jellyfinClientMocks.createApiKey;
   },
 }));
 
@@ -134,6 +146,7 @@ import { authRoutes } from "./auth";
 describe("auth route sensitive guards", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    jellyfinClientMocks.constructedWith.length = 0;
     getEnvMock.mockReturnValue({
       NODE_ENV: "test",
       PORT: "3000",
@@ -734,5 +747,386 @@ describe("auth route sensitive guards", () => {
       })
     );
     expect(response.body).not.toHaveProperty("hasTVTime");
+  });
+
+  it("ignores client hostname on Jellyfin login when admin and host are configured", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue({
+      id: "admin-id",
+      isAdmin: true,
+    });
+    userRepositoryMocks.findByJellyfinUsername.mockResolvedValue({
+      id: "imported-id",
+      jellyfinUsername: "imported-user",
+      isAdmin: false,
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://jellyfin.real:8920",
+    });
+    jellyfinClientMocks.login.mockResolvedValue({
+      AccessToken: "jf-token",
+      User: { Id: "jf-user-id", Name: "imported-user" },
+    });
+    jellyfinClientMocks.getUserInfo.mockResolvedValue({
+      id: "jf-user-id",
+      username: "imported-user",
+      displayName: "Imported",
+      thumb: null,
+    });
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "imported-id",
+      jellyfinUsername: "imported-user",
+      displayName: "Imported",
+      isAdmin: false,
+    });
+    userRepositoryMocks.createSession.mockResolvedValue("session-token");
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app).post("/api/v1/auth/jellyfin").send({
+      username: "imported-user",
+      password: "any-password",
+      hostname: "evil.example",
+      port: 443,
+      useSsl: true,
+    });
+
+    expect(response.status).toBe(200);
+    expect(jellyfinClientMocks.constructedWith).toEqual([
+      "https://jellyfin.real:8920",
+    ]);
+    expect(userRepositoryMocks.createSession).toHaveBeenCalled();
+  });
+
+  it("rejects Jellyfin login host override when admin exists but jellyfinHost is unset", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue({
+      id: "admin-id",
+      isAdmin: true,
+    });
+    userRepositoryMocks.findByJellyfinUsername.mockResolvedValue({
+      id: "imported-id",
+      jellyfinUsername: "imported-user",
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app).post("/api/v1/auth/jellyfin").send({
+      username: "imported-user",
+      password: "any-password",
+      hostname: "evil.example",
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: "Jellyfin server not configured. Please provide server details.",
+    });
+    expect(jellyfinClientMocks.constructedWith).toEqual([]);
+    expect(jellyfinClientMocks.login).not.toHaveBeenCalled();
+  });
+
+  it("ignores client hostname on Jellyfin link for non-admin users", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://jellyfin.real:8920",
+    });
+    userRepositoryMocks.findByJellyfinUsername.mockResolvedValue(null);
+    jellyfinClientMocks.login.mockResolvedValue({
+      AccessToken: "jf-token",
+      User: { Id: "jf-user-id", Name: "link-user" },
+    });
+    jellyfinClientMocks.getUserInfo.mockResolvedValue({
+      id: "jf-user-id",
+      username: "link-user",
+      displayName: "Link User",
+      thumb: null,
+    });
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "current-user-id",
+      jellyfinUsername: "link-user",
+      displayName: "Link User",
+      isAdmin: false,
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/jellyfin/link")
+      .set("x-test-admin", "false")
+      .send({
+        username: "link-user",
+        password: "secret",
+        hostname: "evil.example",
+        port: 443,
+        useSsl: true,
+      });
+
+    expect(response.status).toBe(200);
+    expect(jellyfinClientMocks.constructedWith).toEqual([
+      "https://jellyfin.real:8920",
+    ]);
+    expect(settingsRepositoryMocks.set).not.toHaveBeenCalledWith(
+      "jellyfinHost",
+      expect.anything()
+    );
+  });
+
+  it("allows client hostname on Jellyfin login during first-admin bootstrap", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue(null);
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+    jellyfinClientMocks.login.mockResolvedValue({
+      AccessToken: "jf-token",
+      User: { Id: "jf-admin-id", Name: "first-admin" },
+    });
+    jellyfinClientMocks.getUserInfo.mockResolvedValue({
+      id: "jf-admin-id",
+      username: "first-admin",
+      displayName: "First Admin",
+      thumb: null,
+    });
+    jellyfinClientMocks.createApiKey.mockResolvedValue("jf-api-key");
+    userRepositoryMocks.findByJellyfinUsernameOrCreate.mockResolvedValue({
+      id: "new-admin-id",
+      jellyfinUsername: "first-admin",
+    });
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "new-admin-id",
+      jellyfinUsername: "first-admin",
+      displayName: "First Admin",
+      isAdmin: true,
+    });
+    userRepositoryMocks.createSession.mockResolvedValue("session-token");
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app).post("/api/v1/auth/jellyfin").send({
+      username: "first-admin",
+      password: "secret",
+      hostname: "jellyfin.bootstrap",
+      port: 8096,
+      useSsl: false,
+      urlBase: "/jf",
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body.isAdmin).toBe(true);
+    expect(jellyfinClientMocks.constructedWith).toEqual([
+      "http://jellyfin.bootstrap:8096/jf",
+    ]);
+    expect(settingsRepositoryMocks.set).toHaveBeenCalledWith(
+      "jellyfinHost",
+      "http://jellyfin.bootstrap:8096/jf"
+    );
+  });
+
+  it("uses stored jellyfinHost on first-admin login when body omits hostname", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue(null);
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://jellyfin.preconfigured:8920",
+    });
+    jellyfinClientMocks.login.mockResolvedValue({
+      AccessToken: "jf-token",
+      User: { Id: "jf-admin-id", Name: "first-admin" },
+    });
+    jellyfinClientMocks.getUserInfo.mockResolvedValue({
+      id: "jf-admin-id",
+      username: "first-admin",
+      displayName: "First Admin",
+      thumb: null,
+    });
+    jellyfinClientMocks.createApiKey.mockRejectedValue(new Error("no key"));
+    userRepositoryMocks.findByJellyfinUsernameOrCreate.mockResolvedValue({
+      id: "new-admin-id",
+      jellyfinUsername: "first-admin",
+    });
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "new-admin-id",
+      jellyfinUsername: "first-admin",
+      displayName: "First Admin",
+      isAdmin: true,
+    });
+    userRepositoryMocks.createSession.mockResolvedValue("session-token");
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app).post("/api/v1/auth/jellyfin").send({
+      username: "first-admin",
+      password: "secret",
+    });
+
+    expect(response.status).toBe(200);
+    expect(jellyfinClientMocks.constructedWith).toEqual([
+      "https://jellyfin.preconfigured:8920",
+    ]);
+  });
+
+  it("rejects first-admin Jellyfin login when no host is available", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue(null);
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app).post("/api/v1/auth/jellyfin").send({
+      username: "first-admin",
+      password: "secret",
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: "Jellyfin server not configured. Please provide server details.",
+    });
+    expect(jellyfinClientMocks.login).not.toHaveBeenCalled();
+  });
+
+  it("allows admin Jellyfin link to supply hostname and update settings", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+    userRepositoryMocks.findByJellyfinUsername.mockResolvedValue(null);
+    jellyfinClientMocks.login.mockResolvedValue({
+      AccessToken: "jf-token",
+      User: { Id: "jf-user-id", Name: "admin-link" },
+    });
+    jellyfinClientMocks.getUserInfo.mockResolvedValue({
+      id: "jf-user-id",
+      username: "admin-link",
+      displayName: "Admin Link",
+      thumb: null,
+    });
+    jellyfinClientMocks.createApiKey.mockResolvedValue("jf-api-key");
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "current-user-id",
+      jellyfinUsername: "admin-link",
+      displayName: "Admin Link",
+      isAdmin: true,
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/jellyfin/link")
+      .set("x-test-admin", "true")
+      .send({
+        username: "admin-link",
+        password: "secret",
+        hostname: "jellyfin.admin",
+        port: 443,
+        useSsl: true,
+      });
+
+    expect(response.status).toBe(200);
+    expect(jellyfinClientMocks.constructedWith).toEqual([
+      "https://jellyfin.admin:443",
+    ]);
+    expect(settingsRepositoryMocks.set).toHaveBeenCalledWith(
+      "jellyfinHost",
+      "https://jellyfin.admin:443"
+    );
+    expect(settingsRepositoryMocks.set).toHaveBeenCalledWith(
+      "jellyfinApiKey",
+      "jf-api-key"
+    );
+  });
+
+  it("rejects non-admin Jellyfin link when jellyfinHost is unset", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+    userRepositoryMocks.findByJellyfinUsername.mockResolvedValue(null);
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/jellyfin/link")
+      .set("x-test-admin", "false")
+      .send({
+        username: "link-user",
+        password: "secret",
+        hostname: "evil.example",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: "Jellyfin server not configured. Please provide server details.",
+    });
+    expect(jellyfinClientMocks.login).not.toHaveBeenCalled();
+  });
+
+  it("uses configured jellyfinHost on admin link when hostname is omitted", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://jellyfin.real:8920",
+    });
+    userRepositoryMocks.findByJellyfinUsername.mockResolvedValue(null);
+    jellyfinClientMocks.login.mockResolvedValue({
+      AccessToken: "jf-token",
+      User: { Id: "jf-user-id", Name: "admin-link" },
+    });
+    jellyfinClientMocks.getUserInfo.mockResolvedValue({
+      id: "jf-user-id",
+      username: "admin-link",
+      displayName: "Admin Link",
+      thumb: null,
+    });
+    jellyfinClientMocks.createApiKey.mockResolvedValue("jf-api-key");
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "current-user-id",
+      jellyfinUsername: "admin-link",
+      displayName: "Admin Link",
+      isAdmin: true,
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/jellyfin/link")
+      .set("x-test-admin", "true")
+      .send({
+        username: "admin-link",
+        password: "secret",
+      });
+
+    expect(response.status).toBe(200);
+    expect(jellyfinClientMocks.constructedWith).toEqual([
+      "https://jellyfin.real:8920",
+    ]);
+    expect(settingsRepositoryMocks.set).not.toHaveBeenCalledWith(
+      "jellyfinHost",
+      expect.anything()
+    );
+  });
+
+  it("rejects admin Jellyfin link when neither hostname nor jellyfinHost is set", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+    userRepositoryMocks.findByJellyfinUsername.mockResolvedValue(null);
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/jellyfin/link")
+      .set("x-test-admin", "true")
+      .send({
+        username: "admin-link",
+        password: "secret",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: "Jellyfin server not configured. Please provide server details.",
+    });
+    expect(jellyfinClientMocks.login).not.toHaveBeenCalled();
   });
 });

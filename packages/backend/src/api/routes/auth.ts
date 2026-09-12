@@ -692,7 +692,15 @@ router.post("/jellyfin", async (req: Request, res: Response) => {
     let baseUrl: string;
     const settings = await settingsRepository.getAll();
 
-    if (hostname) {
+    if (existingAdmin) {
+      if (!settings.jellyfinHost) {
+        return res.status(400).json({
+          error:
+            "Jellyfin server not configured. Please provide server details.",
+        });
+      }
+      baseUrl = settings.jellyfinHost;
+    } else if (hostname) {
       baseUrl = buildJellyfinBaseUrl(hostname, port, useSsl, urlBase);
     } else if (settings.jellyfinHost) {
       baseUrl = settings.jellyfinHost;
@@ -990,7 +998,7 @@ router.post(
 
       let baseUrl: string;
 
-      if (hostname) {
+      if (currentUser.isAdmin && hostname) {
         baseUrl = buildJellyfinBaseUrl(hostname, port, useSsl, urlBase);
       } else if (settings.jellyfinHost) {
         baseUrl = settings.jellyfinHost;
