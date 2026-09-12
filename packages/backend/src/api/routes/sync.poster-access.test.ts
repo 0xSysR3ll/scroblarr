@@ -142,8 +142,48 @@ describe("sync poster sensitive access", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers["content-type"]).toContain("image/png");
-    expect(response.headers["cache-control"]).toBe("public, max-age=86400");
+    expect(response.headers["cache-control"]).toBe("no-store");
     expect(Buffer.from(response.body)).toEqual(Buffer.from([1, 2, 3]));
+  });
+
+  it("returns 401 when poster is requested without credentials", async () => {
+    const app = express();
+    app.use("/api/v1/sync", syncRoutes);
+
+    const response = await request(app).get("/api/v1/sync/poster/sync-id");
+
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({ error: "Unauthorized" });
+  });
+
+  it("allows admins to fetch another user's poster", async () => {
+    userRepositoryMocks.findBySessionToken.mockResolvedValue({
+      id: "admin-id",
+      isAdmin: true,
+    });
+    syncHistoryRepositoryMocks.findById.mockResolvedValue({
+      id: "sync-id",
+      userId: "owner-id",
+      posterUrl: "https://example.com/poster.jpg",
+      tmdbMovieId: "123",
+      user: { id: "owner-id" },
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+    posterServiceMocks.fetchPoster.mockResolvedValue({
+      buffer: Buffer.from([4, 5, 6]),
+      contentType: "image/webp",
+    });
+
+    const app = express();
+    app.use("/api/v1/sync", syncRoutes);
+
+    const response = await request(app)
+      .get("/api/v1/sync/poster/sync-id")
+      .set("authorization", "Bearer admin-token");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(Buffer.from(response.body)).toEqual(Buffer.from([4, 5, 6]));
   });
 
   it("returns proxied poster bytes when authenticated with API key only", async () => {
@@ -170,6 +210,7 @@ describe("sync poster sensitive access", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers["content-type"]).toContain("image/jpeg");
+    expect(response.headers["cache-control"]).toBe("no-store");
     expect(Buffer.from(response.body)).toEqual(Buffer.from([9, 8, 7]));
   });
 

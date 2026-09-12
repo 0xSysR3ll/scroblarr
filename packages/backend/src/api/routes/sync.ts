@@ -394,7 +394,7 @@ router.get("/poster/:id", auth, async (req: Request, res: Response) => {
     }
 
     res.setHeader("Content-Type", result.contentType);
-    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.setHeader("Cache-Control", "no-store");
     return res.send(result.buffer);
   } catch (error) {
     logger.api.error({ error }, "Error fetching poster");
