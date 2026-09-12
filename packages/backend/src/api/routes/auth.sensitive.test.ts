@@ -877,7 +877,9 @@ describe("auth route sensitive guards", () => {
 
   it("allows client hostname on Jellyfin login during first-admin bootstrap", async () => {
     userRepositoryMocks.findAdmin.mockResolvedValue(null);
-    settingsRepositoryMocks.getAll.mockResolvedValue({});
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://jellyfin.stale:8920",
+    });
     jellyfinClientMocks.login.mockResolvedValue({
       AccessToken: "jf-token",
       User: { Id: "jf-admin-id", Name: "first-admin" },
@@ -989,7 +991,9 @@ describe("auth route sensitive guards", () => {
   });
 
   it("allows admin Jellyfin link to supply hostname and update settings", async () => {
-    settingsRepositoryMocks.getAll.mockResolvedValue({});
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://jellyfin.stale:8920",
+    });
     userRepositoryMocks.findByJellyfinUsername.mockResolvedValue(null);
     jellyfinClientMocks.login.mockResolvedValue({
       AccessToken: "jf-token",
