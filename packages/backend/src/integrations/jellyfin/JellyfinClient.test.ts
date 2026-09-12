@@ -100,4 +100,34 @@ describe("JellyfinClient", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(result.contentType).toBe("image/jpeg");
   });
+
+  it("builds season poster URLs under the configured Jellyfin base path", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ Type: "Series", Id: "series-1" }],
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          Items: [{ Id: "season-9", IndexNumber: 2 }],
+        }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new JellyfinClient("https://jellyfin.local/jf");
+    await expect(
+      client.getSeasonPosterUrl("access-token", "episode-1", 2)
+    ).resolves.toBe("https://jellyfin.local/jf/Items/season-9/Images/Primary");
+  });
+
+  it("returns null when season poster lookup throws", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network")));
+
+    const client = new JellyfinClient("https://jellyfin.local");
+    await expect(
+      client.getSeasonPosterUrl("access-token", "episode-1", 1)
+    ).resolves.toBeNull();
+  });
 });

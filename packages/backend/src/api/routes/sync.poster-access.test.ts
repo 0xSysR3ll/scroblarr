@@ -19,6 +19,15 @@ const posterServiceMocks = vi.hoisted(() => ({
   fetchPoster: vi.fn(),
 }));
 
+const routeParamMocks = vi.hoisted(() => ({
+  routeParam: vi.fn((value: string | string[] | undefined) => {
+    if (value === undefined) {
+      return undefined;
+    }
+    return Array.isArray(value) ? value[0] : value;
+  }),
+}));
+
 vi.mock("@repositories/SettingsRepository", () => ({
   SettingsRepository: class {
     get = settingsRepositoryMocks.get;
@@ -36,6 +45,11 @@ vi.mock("@repositories/SyncHistoryRepository", () => ({
   SyncHistoryRepository: class {
     findById = syncHistoryRepositoryMocks.findById;
   },
+}));
+
+vi.mock("@utils/routeParams", () => ({
+  routeParam: (value: string | string[] | undefined) =>
+    routeParamMocks.routeParam(value),
 }));
 
 vi.mock("@utils/logger", () => ({
@@ -154,6 +168,24 @@ describe("sync poster sensitive access", () => {
 
     expect(response.status).toBe(401);
     expect(response.body).toEqual({ error: "Unauthorized" });
+  });
+
+  it("returns 400 when the poster id param is missing", async () => {
+    userRepositoryMocks.findBySessionToken.mockResolvedValue({
+      id: "owner-id",
+      isAdmin: false,
+    });
+    routeParamMocks.routeParam.mockReturnValueOnce(undefined);
+
+    const app = express();
+    app.use("/api/v1/sync", syncRoutes);
+
+    const response = await request(app)
+      .get("/api/v1/sync/poster/sync-id")
+      .set("authorization", "Bearer owner-token");
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "Missing id" });
   });
 
   it("allows admins to fetch another user's poster", async () => {

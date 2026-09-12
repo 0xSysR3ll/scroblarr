@@ -356,9 +356,6 @@ router.get("/statistics", auth, async (req: Request, res: Response) => {
 router.get("/poster/:id", auth, async (req: Request, res: Response) => {
   try {
     const viewer = req.user;
-    if (!viewer && !req.apiKeyAuth) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
 
     const id = routeParam(req.params.id);
     if (!id) {
