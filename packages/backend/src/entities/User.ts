@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  Index,
 } from "typeorm";
 
 @Entity("users")
@@ -107,6 +108,10 @@ export class User {
   @Column({ type: "varchar", length: 255, nullable: true })
   bingersEmail?: string | null;
 
+  @Index("IDX_users_bingersUserId_unique", {
+    unique: true,
+    where: '"bingersUserId" IS NOT NULL',
+  })
   @Column({ type: "varchar", length: 255, nullable: true })
   bingersUserId?: string | null;
 
