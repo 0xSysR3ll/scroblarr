@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const userRepositoryMocks = vi.hoisted(() => ({
   findById: vi.fn(),
+  findByBingersUserId: vi.fn(),
   update: vi.fn(),
 }));
 
@@ -12,6 +13,7 @@ const authMocks = vi.hoisted(() => ({
 vi.mock("@repositories/UserRepository", () => ({
   UserRepository: class {
     findById = userRepositoryMocks.findById;
+    findByBingersUserId = userRepositoryMocks.findByBingersUserId;
     update = userRepositoryMocks.update;
   },
 }));
@@ -37,6 +39,7 @@ describe("BingersSessionManager", () => {
     vi.clearAllMocks();
     userRepositoryMocks.update.mockReset();
     userRepositoryMocks.update.mockResolvedValue(undefined);
+    userRepositoryMocks.findByBingersUserId.mockResolvedValue(null);
   });
 
   it("persists refreshed session cookies and profile image on success", async () => {
@@ -687,6 +690,7 @@ describe("BingersSessionManager", () => {
       "fallback@example.com"
     );
 
+    expect(userRepositoryMocks.findByBingersUserId).toHaveBeenCalledWith("b1");
     expect(userRepositoryMocks.update).toHaveBeenCalledWith(
       "user-id",
       expect.objectContaining({
@@ -695,6 +699,81 @@ describe("BingersSessionManager", () => {
         bingersThumb: "https://img.example/a.png",
       })
     );
+  });
+
+  it("allows re-linking the same Bingers account to the same user", async () => {
+    userRepositoryMocks.findByBingersUserId.mockResolvedValue({
+      id: "user-id",
+      bingersUserId: "b1",
+    });
+
+    const manager = new BingersSessionManager(
+      userRepositoryMocks as never,
+      authMocks as unknown as BingersAuth
+    );
+
+    await manager.storeSessionFromVerify("user-id", {
+      session: { id: "s1" },
+      user: { id: "b1", email: "user@example.com" },
+      cookieJar: {
+        session_token: { name: "session_token", value: "sess" },
+      },
+    });
+
+    expect(userRepositoryMocks.update).toHaveBeenCalled();
+  });
+
+  it("rejects linking a Bingers account already bound to another user", async () => {
+    userRepositoryMocks.findByBingersUserId.mockResolvedValue({
+      id: "other-user",
+      bingersUserId: "b1",
+    });
+
+    const manager = new BingersSessionManager(
+      userRepositoryMocks as never,
+      authMocks as unknown as BingersAuth
+    );
+
+    await expect(
+      manager.storeSessionFromVerify("user-id", {
+        session: { id: "s1" },
+        user: { id: "b1", email: "victim@example.com" },
+        cookieJar: {
+          session_token: { name: "session_token", value: "sess" },
+        },
+      })
+    ).rejects.toMatchObject({
+      message: "This Bingers account is already linked to another user",
+      status: 409,
+      code: "bingers_already_linked",
+    });
+
+    expect(userRepositoryMocks.update).not.toHaveBeenCalled();
+  });
+
+  it("persists without a uniqueness check when the session has no Bingers user id", async () => {
+    const manager = new BingersSessionManager(
+      userRepositoryMocks as never,
+      authMocks as unknown as BingersAuth
+    );
+
+    await manager.storeSessionFromVerify("user-id", {
+      session: { id: "s1" },
+      user: { email: "user@example.com", username: "handle" },
+      cookieJar: {
+        session_token: { name: "session_token", value: "sess" },
+      },
+    });
+
+    expect(userRepositoryMocks.findByBingersUserId).not.toHaveBeenCalled();
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith("user-id", {
+      bingersCookieJar: expect.any(String),
+      bingersSessionExpiresAt: null,
+      bingersEmail: "user@example.com",
+      bingersUserId: null,
+      bingersUsername: "handle",
+      bingersThumb: null,
+    });
   });
 
   it("clears stale profile fields with null when the session omits them", async () => {

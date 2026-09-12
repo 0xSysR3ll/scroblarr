@@ -186,6 +186,33 @@ describe("bingers routes", () => {
     });
   });
 
+  it("returns 409 when the Bingers account is already linked elsewhere", async () => {
+    const { BingersApiError } =
+      await import("@integrations/bingers/BingersApiError");
+    bingersAuthMocks.verifyMagicLink.mockResolvedValue({
+      session: {},
+      user: { id: "b1", email: "victim@example.com" },
+      cookieJar: { session_token: { name: "session_token", value: "s" } },
+    });
+    sessionManagerMocks.storeSessionFromVerify.mockRejectedValue(
+      new BingersApiError(
+        "This Bingers account is already linked to another user",
+        409,
+        { code: "bingers_already_linked" }
+      )
+    );
+
+    const response = await request(app)
+      .post("/bingers/link")
+      .send({ token: "magic-token" })
+      .expect(409);
+
+    expect(response.body).toEqual({
+      error: "This Bingers account is already linked to another user",
+      code: "bingers_already_linked",
+    });
+  });
+
   it("returns 500 when unlink fails unexpectedly", async () => {
     sessionManagerMocks.clearAll.mockRejectedValue(new Error("db down"));
 
