@@ -5,7 +5,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const userRepositoryMocks = vi.hoisted(() => ({
   findByPlexUsername: vi.fn(),
   findByJellyfinUsername: vi.fn(),
+  findByPlexUsernameOrCreate: vi.fn(),
+  findAdmin: vi.fn(),
+  findAll: vi.fn(),
+  createSession: vi.fn(),
   update: vi.fn(),
+  getPrimaryUsername: vi.fn(
+    (u: { plexUsername?: string; jellyfinUsername?: string }) =>
+      u.plexUsername || u.jellyfinUsername
+  ),
 }));
 
 const settingsRepositoryMocks = vi.hoisted(() => ({
@@ -20,6 +28,7 @@ const sessionRepositoryMocks = vi.hoisted(() => ({
 
 const plexOAuthMocks = vi.hoisted(() => ({
   getUserInfo: vi.fn(),
+  getServers: vi.fn(),
 }));
 
 vi.mock("../middleware/auth", () => ({
@@ -51,14 +60,14 @@ vi.mock("@repositories/UserRepository", () => ({
   UserRepository: class {
     findByPlexUsername = userRepositoryMocks.findByPlexUsername;
     findByJellyfinUsername = userRepositoryMocks.findByJellyfinUsername;
+    findByPlexUsernameOrCreate = userRepositoryMocks.findByPlexUsernameOrCreate;
+    findAdmin = userRepositoryMocks.findAdmin;
+    findAll = userRepositoryMocks.findAll;
+    createSession = userRepositoryMocks.createSession;
     update = userRepositoryMocks.update;
-    findAdmin = vi.fn();
     findBySessionToken = vi.fn();
-    findByPlexUsernameOrCreate = vi.fn();
     findByJellyfinUsernameOrCreate = vi.fn();
-    findAll = vi.fn();
-    createSession = vi.fn();
-    getPrimaryUsername = vi.fn((u) => u.plexUsername || u.jellyfinUsername);
+    getPrimaryUsername = userRepositoryMocks.getPrimaryUsername;
   },
 }));
 
@@ -83,7 +92,7 @@ vi.mock("@integrations/plex/PlexOAuth", () => ({
     getUserInfo = plexOAuthMocks.getUserInfo;
     createPin = vi.fn();
     getTokenFromPin = vi.fn();
-    getServers = vi.fn();
+    getServers = plexOAuthMocks.getServers;
   },
 }));
 
@@ -109,11 +118,27 @@ vi.mock("@utils/userSanitizer", () => ({
   getProxiedThumbUrl: vi.fn(() => undefined),
 }));
 
+const getEnvMock = vi.hoisted(() =>
+  vi.fn(() => ({
+    NODE_ENV: "test" as "development" | "production" | "test",
+    PORT: "3000",
+  }))
+);
+
+vi.mock("@config/env", () => ({
+  getEnv: getEnvMock,
+}));
+
 import { authRoutes } from "./auth";
 
 describe("auth route sensitive guards", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getEnvMock.mockReturnValue({
+      NODE_ENV: "test",
+      PORT: "3000",
+    });
+    userRepositoryMocks.findByPlexUsername.mockResolvedValue(null);
   });
 
   it("returns 401 on /plex/link when auth middleware yields no user", async () => {
@@ -156,6 +181,442 @@ describe("auth route sensitive guards", () => {
     expect(response.body).toEqual({
       error: "This Plex account is already linked to another user",
     });
+  });
+
+  it("does not log in by email alone when Plex usernames differ", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue({
+      id: "admin-id",
+      isAdmin: true,
+    });
+    plexOAuthMocks.getUserInfo.mockResolvedValue({
+      username: "attacker-plex",
+      email: "victim@example.com",
+      thumb: "https://img",
+    });
+    userRepositoryMocks.findByPlexUsername.mockResolvedValue(null);
+    userRepositoryMocks.findAll.mockResolvedValue([
+      {
+        id: "victim-id",
+        plexUsername: "victim-plex",
+        email: "victim@example.com",
+      },
+    ]);
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/plex")
+      .send({ authToken: "attacker-token" });
+
+    expect(response.status).toBe(403);
+    expect(response.body).toEqual({
+      error:
+        "Access denied. Please contact an administrator to import your account.",
+    });
+    expect(userRepositoryMocks.findByPlexUsername).toHaveBeenCalledWith(
+      "attacker-plex"
+    );
+    expect(userRepositoryMocks.findAll).not.toHaveBeenCalled();
+    expect(userRepositoryMocks.update).not.toHaveBeenCalled();
+    expect(userRepositoryMocks.createSession).not.toHaveBeenCalled();
+  });
+
+  it("logs in by Plex username and updates the matched user", async () => {
+    getEnvMock.mockReturnValue({
+      NODE_ENV: "production",
+      PORT: "3000",
+    });
+    userRepositoryMocks.findAdmin.mockResolvedValue({
+      id: "admin-id",
+      isAdmin: true,
+    });
+    plexOAuthMocks.getUserInfo.mockResolvedValue({
+      username: "imported-user",
+      email: "user@example.com",
+      thumb: "https://img",
+    });
+    userRepositoryMocks.findByPlexUsername.mockResolvedValue({
+      id: "imported-id",
+      plexUsername: "imported-user",
+      email: "old@example.com",
+      displayName: "Old Name",
+      isAdmin: false,
+    });
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "imported-id",
+      plexUsername: "imported-user",
+      email: "user@example.com",
+      displayName: "imported-user",
+      isAdmin: false,
+    });
+    userRepositoryMocks.createSession.mockResolvedValue("session-token");
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/plex")
+      .send({ authToken: "plex-token" });
+
+    expect(response.status).toBe(200);
+    expect(userRepositoryMocks.findAll).not.toHaveBeenCalled();
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith("imported-id", {
+      plexAccessToken: "plex-token",
+      email: "user@example.com",
+      displayName: "imported-user",
+      plexThumb: "https://img",
+    });
+    expect(response.body).toMatchObject({
+      id: "imported-id",
+      username: "imported-user",
+      isAdmin: false,
+    });
+  });
+
+  it("rejects Plex login without an auth token", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app).post("/api/v1/auth/plex").send({});
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: "Authentication token required",
+    });
+  });
+
+  it("keeps stored email when Plex account omits it", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue({
+      id: "admin-id",
+      isAdmin: true,
+    });
+    plexOAuthMocks.getUserInfo.mockResolvedValue({
+      username: "imported-user",
+      email: undefined,
+      thumb: null,
+    });
+    userRepositoryMocks.findByPlexUsername.mockResolvedValue({
+      id: "imported-id",
+      plexUsername: "imported-user",
+      email: "stored@example.com",
+      displayName: "Stored Name",
+      isAdmin: false,
+    });
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "imported-id",
+      plexUsername: "imported-user",
+      email: "stored@example.com",
+      displayName: "imported-user",
+      isAdmin: false,
+    });
+    userRepositoryMocks.createSession.mockResolvedValue("session-token");
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/plex")
+      .send({ authToken: "plex-token", clientIdentifier: "client-id" });
+
+    expect(response.status).toBe(200);
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith("imported-id", {
+      plexAccessToken: "plex-token",
+      email: "stored@example.com",
+      displayName: "imported-user",
+      plexThumb: null,
+    });
+  });
+
+  it("rejects Plex login when username is empty", async () => {
+    plexOAuthMocks.getUserInfo.mockResolvedValue({
+      username: "   ",
+      email: "user@example.com",
+      thumb: null,
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/plex")
+      .send({ authToken: "plex-token", clientIdentifier: "client-id" });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "Plex username is required" });
+    expect(userRepositoryMocks.findAdmin).not.toHaveBeenCalled();
+    expect(userRepositoryMocks.findByPlexUsername).not.toHaveBeenCalled();
+    expect(
+      userRepositoryMocks.findByPlexUsernameOrCreate
+    ).not.toHaveBeenCalled();
+  });
+
+  it("creates the first admin via Plex username and stores server settings", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue(null);
+    settingsRepositoryMocks.get.mockResolvedValue("stored-client-id");
+    plexOAuthMocks.getUserInfo.mockResolvedValue({
+      username: "first-admin",
+      email: "admin@example.com",
+      thumb: "https://img",
+    });
+    userRepositoryMocks.findByPlexUsernameOrCreate.mockResolvedValue({
+      id: "new-admin-id",
+      plexUsername: "first-admin",
+      plexAccessToken: null,
+      email: null,
+      displayName: null,
+    });
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "new-admin-id",
+      plexUsername: "first-admin",
+      email: "admin@example.com",
+      displayName: "first-admin",
+      isAdmin: true,
+    });
+    userRepositoryMocks.createSession.mockResolvedValue("session-token");
+    plexOAuthMocks.getServers.mockResolvedValue([
+      {
+        url: "https://plex.local:32400",
+        machineIdentifier: "machine-1",
+      },
+    ]);
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/plex")
+      .send({ authToken: "admin-token" });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      id: "new-admin-id",
+      username: "first-admin",
+      isAdmin: true,
+    });
+    expect(userRepositoryMocks.findByPlexUsernameOrCreate).toHaveBeenCalledWith(
+      "first-admin"
+    );
+    expect(userRepositoryMocks.findAll).not.toHaveBeenCalled();
+    expect(settingsRepositoryMocks.set).toHaveBeenCalledWith(
+      "plexServerUrl",
+      "https://plex.local:32400"
+    );
+    expect(settingsRepositoryMocks.set).toHaveBeenCalledWith(
+      "plexServerMachineIdentifier",
+      "machine-1"
+    );
+  });
+
+  it("creates a plex client identifier when none is stored during first-admin setup", async () => {
+    getEnvMock.mockReturnValue({
+      NODE_ENV: "production",
+      PORT: "3000",
+    });
+    userRepositoryMocks.findAdmin.mockResolvedValue(null);
+    settingsRepositoryMocks.get.mockResolvedValue(null);
+    plexOAuthMocks.getUserInfo.mockResolvedValue({
+      username: "first-admin",
+      email: undefined,
+      thumb: null,
+    });
+    userRepositoryMocks.findByPlexUsernameOrCreate.mockResolvedValue({
+      id: "new-admin-id",
+      plexUsername: "first-admin",
+      plexAccessToken: "already-linked",
+      email: "stored@example.com",
+      displayName: "Stored",
+    });
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "new-admin-id",
+      plexUsername: "first-admin",
+      email: "stored@example.com",
+      displayName: "first-admin",
+      isAdmin: true,
+    });
+    userRepositoryMocks.createSession.mockResolvedValue("session-token");
+    plexOAuthMocks.getServers.mockResolvedValue([
+      { url: "https://plex.local" },
+    ]);
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/plex")
+      .send({ authToken: "admin-token" });
+
+    expect(response.status).toBe(200);
+    expect(settingsRepositoryMocks.set).toHaveBeenCalledWith(
+      "plexClientIdentifier",
+      expect.any(String)
+    );
+    expect(settingsRepositoryMocks.set).toHaveBeenCalledWith(
+      "plexServerUrl",
+      "https://plex.local"
+    );
+    expect(settingsRepositoryMocks.set).not.toHaveBeenCalledWith(
+      "plexServerMachineIdentifier",
+      expect.anything()
+    );
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith("new-admin-id", {
+      plexUsername: "first-admin",
+      plexAccessToken: "admin-token",
+      email: "stored@example.com",
+      displayName: "first-admin",
+      plexThumb: null,
+      isAdmin: true,
+    });
+  });
+
+  it("ignores Plex server auto-config failures during first-admin setup", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue(null);
+    plexOAuthMocks.getUserInfo.mockResolvedValue({
+      username: "first-admin",
+      email: "admin@example.com",
+      thumb: "https://img",
+    });
+    userRepositoryMocks.findByPlexUsernameOrCreate.mockResolvedValue({
+      id: "new-admin-id",
+      plexUsername: "first-admin",
+    });
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "new-admin-id",
+      plexUsername: "first-admin",
+      email: "admin@example.com",
+      displayName: "first-admin",
+      isAdmin: true,
+    });
+    userRepositoryMocks.createSession.mockResolvedValue("session-token");
+    plexOAuthMocks.getServers.mockRejectedValue(new Error("plex down"));
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/plex")
+      .send({ authToken: "admin-token", clientIdentifier: "client-id" });
+
+    expect(response.status).toBe(200);
+    expect(response.body.isAdmin).toBe(true);
+  });
+
+  it("skips server settings when first-admin discovery returns no usable URL", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue(null);
+    plexOAuthMocks.getUserInfo.mockResolvedValue({
+      username: "first-admin",
+      email: "admin@example.com",
+      thumb: "https://img",
+    });
+    userRepositoryMocks.findByPlexUsernameOrCreate.mockResolvedValue({
+      id: "new-admin-id",
+      plexUsername: "first-admin",
+    });
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "new-admin-id",
+      plexUsername: "first-admin",
+      email: "admin@example.com",
+      displayName: "first-admin",
+      isAdmin: true,
+    });
+    userRepositoryMocks.createSession.mockResolvedValue("session-token");
+    plexOAuthMocks.getServers.mockResolvedValue([{ url: "" }, {}]);
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/plex")
+      .send({ authToken: "admin-token", clientIdentifier: "client-id" });
+
+    expect(response.status).toBe(200);
+    expect(settingsRepositoryMocks.set).not.toHaveBeenCalledWith(
+      "plexServerUrl",
+      expect.anything()
+    );
+  });
+
+  it("skips server settings when first-admin discovery returns no servers", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue(null);
+    plexOAuthMocks.getUserInfo.mockResolvedValue({
+      username: "first-admin",
+      email: "admin@example.com",
+      thumb: "https://img",
+    });
+    userRepositoryMocks.findByPlexUsernameOrCreate.mockResolvedValue({
+      id: "new-admin-id",
+      plexUsername: "first-admin",
+    });
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "new-admin-id",
+      plexUsername: "first-admin",
+      email: "admin@example.com",
+      displayName: "first-admin",
+      isAdmin: true,
+    });
+    userRepositoryMocks.createSession.mockResolvedValue("session-token");
+    plexOAuthMocks.getServers.mockResolvedValue([]);
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/plex")
+      .send({ authToken: "admin-token", clientIdentifier: "client-id" });
+
+    expect(response.status).toBe(200);
+    expect(settingsRepositoryMocks.set).not.toHaveBeenCalledWith(
+      "plexServerUrl",
+      expect.anything()
+    );
+  });
+
+  it("returns 500 when Plex login throws an Error", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue({
+      id: "admin-id",
+      isAdmin: true,
+    });
+    plexOAuthMocks.getUserInfo.mockRejectedValue(new Error("plex boom"));
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/plex")
+      .send({ authToken: "token", clientIdentifier: "client-id" });
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: "Unable to authenticate" });
+  });
+
+  it("returns a generic 500 message when Plex login rejects a non-Error", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue({
+      id: "admin-id",
+      isAdmin: true,
+    });
+    plexOAuthMocks.getUserInfo.mockRejectedValue("string failure");
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/plex")
+      .send({ authToken: "token", clientIdentifier: "client-id" });
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: "Unable to authenticate" });
   });
 
   it("prevents admin from unlinking their last remaining Plex account", async () => {
