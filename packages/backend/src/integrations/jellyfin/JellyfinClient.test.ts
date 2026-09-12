@@ -54,4 +54,18 @@ describe("JellyfinClient", () => {
       )
     ).rejects.toThrow("Failed to fetch image: 404 Not Found");
   });
+
+  it("rejects image URLs outside the configured Jellyfin host", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new JellyfinClient("https://jellyfin.local");
+    await expect(
+      client.fetchImage(
+        "access-token",
+        "http://169.254.169.254/latest/meta-data/"
+      )
+    ).rejects.toThrow("Jellyfin image URL must match configured server");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

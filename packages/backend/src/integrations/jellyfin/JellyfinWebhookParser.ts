@@ -24,7 +24,10 @@ export interface JellyfinWebhookPayload {
 }
 
 export class JellyfinWebhookParser {
-  static parse(payload: JellyfinWebhookPayload): MediaEvent | null {
+  static parse(
+    payload: JellyfinWebhookPayload,
+    jellyfinHost?: string
+  ): MediaEvent | null {
     const {
       notificationType,
       userId,
@@ -37,7 +40,6 @@ export class JellyfinWebhookParser {
       provider_tvdb,
       provider_imdb,
       provider_tmdb,
-      thumbnail,
       runtimeTicks,
       playbackPositionTicks,
       playedToCompletion,
@@ -87,6 +89,11 @@ export class JellyfinWebhookParser {
       return null;
     }
 
+    const posterUrl =
+      jellyfinHost && payload.itemId
+        ? `${jellyfinHost.replace(/\/$/, "")}/Items/${encodeURIComponent(payload.itemId)}/Images/Primary`
+        : undefined;
+
     const media = this.parseMediaItem(
       itemType,
       name,
@@ -97,7 +104,7 @@ export class JellyfinWebhookParser {
       provider_tvdb,
       provider_imdb,
       provider_tmdb,
-      thumbnail,
+      posterUrl,
       runtimeTicks,
       playbackPositionTicks
     );
@@ -141,7 +148,7 @@ export class JellyfinWebhookParser {
     providerTvdb: string | undefined,
     providerImdb: string | undefined,
     providerTmdb: string | undefined,
-    thumbnail: { url?: string } | undefined,
+    posterUrl: string | undefined,
     runtimeTicks: string | undefined,
     playbackPositionTicks: string | undefined
   ): MediaItem | null {
@@ -175,8 +182,6 @@ export class JellyfinWebhookParser {
       const id = parseInt(provider, 10);
       return isNaN(id) ? undefined : id;
     };
-
-    const posterUrl = thumbnail?.url;
 
     if (itemType === "Movie") {
       const tvdbMovieId = extractTvdbId(providerTvdb);

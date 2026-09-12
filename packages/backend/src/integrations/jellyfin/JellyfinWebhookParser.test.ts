@@ -105,6 +105,28 @@ describe("JellyfinWebhookParser", () => {
     });
   });
 
+  it("builds poster URLs from the configured Jellyfin host and ignores webhook thumbnail.url", () => {
+    const event = JellyfinWebhookParser.parse(
+      {
+        notificationType: "PlaybackStop",
+        username: "jellyfin-user",
+        userId: "jellyfin-user-id",
+        itemType: "Movie",
+        itemId: "abc-123",
+        name: "Example Movie",
+        year: "2024",
+        thumbnail: { url: "http://169.254.169.254/latest/meta-data/" },
+        playedToCompletion: "true",
+        timestamp: "2026-06-04T17:00:00.000Z",
+      },
+      "https://jellyfin.local:8096/jf"
+    );
+
+    expect(event?.media.posterUrl).toBe(
+      "https://jellyfin.local:8096/jf/Items/abc-123/Images/Primary"
+    );
+  });
+
   it("ignores unsupported item types and missing users", () => {
     expect(
       JellyfinWebhookParser.parse({

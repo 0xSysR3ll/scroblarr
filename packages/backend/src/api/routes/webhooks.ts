@@ -195,8 +195,10 @@ router.post("/jellyfin", async (req: Request, res: Response) => {
       delete payloadWithApiKey.apiKey;
     }
 
+    const settings = await settingsRepository.getAll();
     const event = JellyfinWebhookParser.parse(
-      payload as JellyfinWebhookPayload
+      payload as JellyfinWebhookPayload,
+      settings.jellyfinHost
     );
 
     if (!event) {
