@@ -399,7 +399,13 @@ export class JellyfinClient {
     signal?: AbortSignal
   ): Promise<{ buffer: ArrayBuffer; contentType: string }> {
     const base = this.baseUrl.replace(/\/$/, "");
-    if (!imageUrl.startsWith(`${base}/`)) {
+    let allowed = false;
+    try {
+      allowed = new URL(imageUrl).origin === new URL(base).origin;
+    } catch {
+      allowed = false;
+    }
+    if (!allowed) {
       throw new Error("Jellyfin image URL must match configured server");
     }
 

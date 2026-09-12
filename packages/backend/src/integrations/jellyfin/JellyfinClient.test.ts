@@ -68,4 +68,25 @@ describe("JellyfinClient", () => {
     ).rejects.toThrow("Jellyfin image URL must match configured server");
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("allows image URLs when only the default HTTPS port differs", async () => {
+    const imageBytes = new Uint8Array([1, 2, 3]).buffer;
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: {
+        get: (name: string) =>
+          name.toLowerCase() === "content-type" ? "image/jpeg" : null,
+      },
+      arrayBuffer: async () => imageBytes,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new JellyfinClient("https://jellyfin.local:443");
+    await client.fetchImage(
+      "access-token",
+      "https://jellyfin.local/Items/1/Images/Primary"
+    );
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
 });

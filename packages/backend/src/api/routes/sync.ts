@@ -356,7 +356,7 @@ router.get("/statistics", auth, async (req: Request, res: Response) => {
 router.get("/poster/:id", auth, async (req: Request, res: Response) => {
   try {
     const viewer = req.user;
-    if (!viewer) {
+    if (!viewer && !req.apiKeyAuth) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
@@ -371,7 +371,8 @@ router.get("/poster/:id", auth, async (req: Request, res: Response) => {
     }
 
     const canAccess =
-      req.apiKeyAuth || viewer.isAdmin || syncHistory.userId === viewer.id;
+      req.apiKeyAuth ||
+      (!!viewer && (viewer.isAdmin || syncHistory.userId === viewer.id));
     if (!canAccess) {
       return res.status(403).json({ error: "Forbidden" });
     }

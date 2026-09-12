@@ -89,10 +89,20 @@ export class JellyfinWebhookParser {
       return null;
     }
 
-    const posterUrl =
-      jellyfinHost && payload.itemId
-        ? `${jellyfinHost.replace(/\/$/, "")}/Items/${encodeURIComponent(payload.itemId)}/Images/Primary`
-        : undefined;
+    let posterUrl: string | undefined;
+    if (jellyfinHost && payload.itemId) {
+      try {
+        const base = jellyfinHost.endsWith("/")
+          ? jellyfinHost
+          : `${jellyfinHost}/`;
+        posterUrl = new URL(
+          `Items/${encodeURIComponent(payload.itemId)}/Images/Primary`,
+          base
+        ).toString();
+      } catch {
+        posterUrl = undefined;
+      }
+    }
 
     const media = this.parseMediaItem(
       itemType,

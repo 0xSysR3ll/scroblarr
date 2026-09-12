@@ -146,6 +146,33 @@ describe("sync poster sensitive access", () => {
     expect(Buffer.from(response.body)).toEqual(Buffer.from([1, 2, 3]));
   });
 
+  it("returns proxied poster bytes when authenticated with API key only", async () => {
+    settingsRepositoryMocks.get.mockResolvedValue("stored-api-key");
+    syncHistoryRepositoryMocks.findById.mockResolvedValue({
+      id: "sync-id",
+      userId: "owner-id",
+      posterUrl: "https://example.com/poster.jpg",
+      tmdbMovieId: "123",
+      user: { id: "owner-id" },
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+    posterServiceMocks.fetchPoster.mockResolvedValue({
+      buffer: Buffer.from([9, 8, 7]),
+      contentType: "image/jpeg",
+    });
+
+    const app = express();
+    app.use("/api/v1/sync", syncRoutes);
+
+    const response = await request(app)
+      .get("/api/v1/sync/poster/sync-id")
+      .set("x-api-key", "stored-api-key");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toContain("image/jpeg");
+    expect(Buffer.from(response.body)).toEqual(Buffer.from([9, 8, 7]));
+  });
+
   it("returns 404 when the sync history item does not exist", async () => {
     userRepositoryMocks.findBySessionToken.mockResolvedValue({
       id: "owner-id",
