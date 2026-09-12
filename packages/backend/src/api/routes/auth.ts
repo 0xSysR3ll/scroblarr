@@ -285,7 +285,7 @@ router.post("/plex", async (req: Request, res: Response): Promise<void> => {
           username: plexUsername,
           email: account.email || user.email,
           isAdmin: true,
-          hadExistingUser: !!user.plexAccessToken,
+          hadExistingToken: !!user.plexAccessToken,
         },
         "Plex admin created via direct auth"
       );
