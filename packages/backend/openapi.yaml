@@ -1963,6 +1963,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BingersApiErrorResponse'
+        '409':
+          description: Bingers account already linked to another Scroblarr user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BingersApiErrorResponse'
         '429':
           description: Bingers rate limited (e.g. magic_link_recently_sent)
           content:

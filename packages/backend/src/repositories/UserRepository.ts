@@ -48,6 +48,14 @@ export class UserRepository {
     });
   }
 
+  async findByBingersUserId(bingersUserId: string): Promise<User | null> {
+    return this.repository.findOne({
+      where: {
+        bingersUserId,
+      },
+    });
+  }
+
   async findAdmin(): Promise<User | null> {
     return this.repository.findOne({
       where: {

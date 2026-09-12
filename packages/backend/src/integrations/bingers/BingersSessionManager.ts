@@ -144,6 +144,19 @@ export class BingersSessionManager {
     session: BingersSessionInfo,
     fallbackEmail?: string | null
   ): Promise<void> {
+    const bingersUserId = session.user?.id;
+    if (bingersUserId) {
+      const existing =
+        await this.userRepository.findByBingersUserId(bingersUserId);
+      if (existing && existing.id !== userId) {
+        throw new BingersApiError(
+          "This Bingers account is already linked to another user",
+          409,
+          { code: "bingers_already_linked" }
+        );
+      }
+    }
+
     await this.persistSession(userId, session, fallbackEmail);
   }
 

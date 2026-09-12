@@ -1,4 +1,9 @@
-import { MigrationInterface, QueryRunner, TableColumn } from "typeorm";
+import {
+  MigrationInterface,
+  QueryRunner,
+  TableColumn,
+  TableIndex,
+} from "typeorm";
 
 export class AddBingersFields0000000000010 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -37,6 +42,16 @@ export class AddBingersFields0000000000010 implements MigrationInterface {
         type: "varchar",
         length: "255",
         isNullable: true,
+      })
+    );
+
+    await queryRunner.createIndex(
+      "users",
+      new TableIndex({
+        name: "IDX_users_bingersUserId_unique",
+        columnNames: ["bingersUserId"],
+        isUnique: true,
+        where: '"bingersUserId" IS NOT NULL',
       })
     );
 
@@ -86,6 +101,7 @@ export class AddBingersFields0000000000010 implements MigrationInterface {
     await queryRunner.dropColumn("users", "bingersMarkMoviesAsRewatched");
     await queryRunner.dropColumn("users", "bingersThumb");
     await queryRunner.dropColumn("users", "bingersUsername");
+    await queryRunner.dropIndex("users", "IDX_users_bingersUserId_unique");
     await queryRunner.dropColumn("users", "bingersUserId");
     await queryRunner.dropColumn("users", "bingersEmail");
     await queryRunner.dropColumn("users", "bingersSessionExpiresAt");
