@@ -356,9 +356,6 @@ router.get("/statistics", auth, async (req: Request, res: Response) => {
 router.get("/poster/:id", auth, async (req: Request, res: Response) => {
   try {
     const viewer = req.user;
-    if (!viewer) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
 
     const id = routeParam(req.params.id);
     if (!id) {
@@ -371,7 +368,8 @@ router.get("/poster/:id", auth, async (req: Request, res: Response) => {
     }
 
     const canAccess =
-      req.apiKeyAuth || viewer.isAdmin || syncHistory.userId === viewer.id;
+      req.apiKeyAuth ||
+      (!!viewer && (viewer.isAdmin || syncHistory.userId === viewer.id));
     if (!canAccess) {
       return res.status(403).json({ error: "Forbidden" });
     }
@@ -393,7 +391,7 @@ router.get("/poster/:id", auth, async (req: Request, res: Response) => {
     }
 
     res.setHeader("Content-Type", result.contentType);
-    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.setHeader("Cache-Control", "no-store");
     return res.send(result.buffer);
   } catch (error) {
     logger.api.error({ error }, "Error fetching poster");
