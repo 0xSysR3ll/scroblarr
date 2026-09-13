@@ -183,12 +183,7 @@ export function LogsTab() {
               onChange={(e) =>
                 setLevel(
                   e.target.value as
-                    | "debug"
-                    | "info"
-                    | "warn"
-                    | "error"
-                    | "fatal"
-                    | ""
+                    "debug" | "info" | "warn" | "error" | "fatal" | ""
                 )
               }
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"

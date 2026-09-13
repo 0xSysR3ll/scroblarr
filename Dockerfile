@@ -1,4 +1,4 @@
-ARG NODE_IMAGE=node:24-bookworm-slim@sha256:24dc26ef1e3c3690f27ebc4136c9c186c3133b25563ae4d7f0692e4d1fe5db0e
+ARG NODE_IMAGE=node:24-bookworm-slim@sha256:ba849c60be29959425b8734d57b8b4b7d56f98edd9504c9af091d5281095a71e
 
 FROM ${NODE_IMAGE} AS base
 
@@ -10,7 +10,7 @@ FROM base AS builder
 
 ENV HUSKY=0
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc .pnpmfile.cjs ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY packages/backend/package.json packages/backend/
 COPY packages/frontend/package.json packages/frontend/
 COPY packages/shared/package.json packages/shared/

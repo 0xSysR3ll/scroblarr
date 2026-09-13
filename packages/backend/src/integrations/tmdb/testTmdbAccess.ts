@@ -14,8 +14,7 @@ export interface TmdbConnectionTestFailure {
 }
 
 export type TmdbConnectionTestResult =
-  | TmdbConnectionTestSuccess
-  | TmdbConnectionTestFailure;
+  TmdbConnectionTestSuccess | TmdbConnectionTestFailure;
 
 export async function testTmdbAccessToken(
   accessToken: string
