@@ -69,6 +69,51 @@ describe("PlexOAuth.pollPinAuthToken", () => {
   });
 });
 
+describe("PlexOAuth.getTokenFromPin", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("returns null while the pin is pending", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ authToken: null }),
+    } as Response);
+
+    await expect(
+      new PlexOAuth("client-id").getTokenFromPin(99)
+    ).resolves.toBeNull();
+  });
+
+  it("returns user token data when the pin is authorized", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ authToken: "plex-token" }),
+    } as Response);
+
+    const plexOAuth = new PlexOAuth("client-id");
+    vi.spyOn(plexOAuth, "getUserInfo").mockResolvedValue({
+      username: "plex-user",
+      email: "plex@example.com",
+      thumb: "https://img",
+    });
+
+    await expect(plexOAuth.getTokenFromPin(99)).resolves.toEqual({
+      accessToken: "plex-token",
+      username: "plex-user",
+      email: "plex@example.com",
+      thumb: "https://img",
+    });
+  });
+});
+
 describe("PlexPinNotFoundError", () => {
   it("uses the default message when none is provided", () => {
     const error = new PlexPinNotFoundError();
