@@ -1149,6 +1149,39 @@ describe("auth route sensitive guards", () => {
     expect(jellyfinClientMocks.login).not.toHaveBeenCalled();
   });
 
+  it("creates a Plex OAuth pin", async () => {
+    settingsRepositoryMocks.get.mockResolvedValue("client-id");
+    plexOAuthMocks.createPin.mockResolvedValue({ id: 42, code: "ABCD" });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app).post("/api/v1/auth/plex/pin").send({});
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      pinId: 42,
+      code: "ABCD",
+      clientIdentifier: "client-id",
+    });
+    expect(plexOAuthMocks.createPin).toHaveBeenCalled();
+  });
+
+  it("returns 500 when Plex OAuth pin creation fails", async () => {
+    settingsRepositoryMocks.get.mockResolvedValue("client-id");
+    plexOAuthMocks.createPin.mockRejectedValue(new Error("plex down"));
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app).post("/api/v1/auth/plex/pin").send({});
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: "Failed to create OAuth pin" });
+  });
+
   it("returns 202 while Plex PIN poll is pending", async () => {
     settingsRepositoryMocks.get.mockResolvedValue("client-id");
     plexOAuthMocks.pollPinAuthToken.mockResolvedValue(null);
@@ -1206,6 +1239,24 @@ describe("auth route sensitive guards", () => {
     expect(response.body).toEqual({ error: "Plex PIN not found or expired" });
   });
 
+  it("returns 500 when Plex PIN poll fails unexpectedly", async () => {
+    settingsRepositoryMocks.get.mockResolvedValue("client-id");
+    plexOAuthMocks.pollPinAuthToken.mockRejectedValue(
+      new Error("upstream timeout")
+    );
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/plex/pin/poll")
+      .send({ pinId: 12345 });
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: "Failed to poll OAuth pin" });
+  });
+
   it("rejects invalid pin ids", async () => {
     const app = express();
     app.use(express.json());
@@ -1214,6 +1265,22 @@ describe("auth route sensitive guards", () => {
     const response = await request(app)
       .post("/api/v1/auth/plex/pin/poll")
       .send({ pinId: "nope" });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: "pinId must be a positive integer",
+    });
+    expect(plexOAuthMocks.pollPinAuthToken).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-positive pin ids", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/plex/pin/poll")
+      .send({ pinId: 0 });
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({
