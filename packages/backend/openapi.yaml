@@ -556,11 +556,64 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [pinId, code, clientIdentifier]
                 properties:
                   pinId:
-                    type: string
+                    type: integer
                   code:
                     type: string
+                  clientIdentifier:
+                    type: string
+        '500':
+          description: Internal server error
+
+  /api/v1/auth/plex/pin/poll:
+    post:
+      summary: Poll Plex OAuth PIN authorization status
+      description: >
+        Server-side poll against plex.tv using the installation client
+        identifier.
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pinId]
+              properties:
+                pinId:
+                  type: integer
+      responses:
+        '200':
+          description: PIN authorized
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [authToken, clientIdentifier]
+                properties:
+                  authToken:
+                    type: string
+                  clientIdentifier:
+                    type: string
+        '202':
+          description: PIN not yet authorized
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, clientIdentifier]
+                properties:
+                  status:
+                    type: string
+                    enum: [pending]
+                  clientIdentifier:
+                    type: string
+        '400':
+          description: Invalid pinId
+        '404':
+          description: PIN not found or expired
         '500':
           description: Internal server error
 

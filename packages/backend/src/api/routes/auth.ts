@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import { getEnv } from "@config/env";
 import { User } from "@entities/User";
 import { JellyfinClient } from "@integrations/jellyfin/JellyfinClient";
-import { PlexOAuth } from "@integrations/plex/PlexOAuth";
+import { PlexOAuth, PlexPinNotFoundError } from "@integrations/plex/PlexOAuth";
 import { SessionRepository } from "@repositories/SessionRepository";
 import { SettingsRepository } from "@repositories/SettingsRepository";
 import { UserRepository } from "@repositories/UserRepository";
@@ -132,9 +132,46 @@ router.post(
       return;
     } catch (error) {
       logger.auth.error({ error }, "Error creating Plex OAuth pin");
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to create OAuth pin";
-      res.status(500).json({ error: errorMessage });
+      res.status(500).json({ error: "Failed to create OAuth pin" });
+      return;
+    }
+  }
+);
+
+router.post(
+  "/plex/pin/poll",
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const pinId = Number((req.body as { pinId?: unknown }).pinId);
+      if (!Number.isInteger(pinId) || pinId <= 0) {
+        res.status(400).json({ error: "pinId must be a positive integer" });
+        return;
+      }
+
+      const clientIdentifier = await getOrCreatePlexClientIdentifier();
+      const plexOAuth = new PlexOAuth(clientIdentifier);
+      const authToken = await plexOAuth.pollPinAuthToken(pinId);
+
+      if (!authToken) {
+        res.status(202).json({
+          status: "pending",
+          clientIdentifier,
+        });
+        return;
+      }
+
+      res.json({
+        authToken,
+        clientIdentifier,
+      });
+      return;
+    } catch (error) {
+      if (error instanceof PlexPinNotFoundError) {
+        res.status(404).json({ error: "Plex PIN not found or expired" });
+        return;
+      }
+      logger.auth.error({ error }, "Error polling Plex OAuth pin");
+      res.status(500).json({ error: "Failed to poll OAuth pin" });
       return;
     }
   }

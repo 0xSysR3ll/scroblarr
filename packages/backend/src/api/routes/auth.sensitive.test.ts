@@ -27,10 +27,23 @@ const sessionRepositoryMocks = vi.hoisted(() => ({
   deleteAllForUser: vi.fn(),
 }));
 
-const plexOAuthMocks = vi.hoisted(() => ({
-  getUserInfo: vi.fn(),
-  getServers: vi.fn(),
-}));
+const plexOAuthMocks = vi.hoisted(() => {
+  class PlexPinNotFoundError extends Error {
+    constructor(message = "Plex PIN not found or expired") {
+      super(message);
+      this.name = "PlexPinNotFoundError";
+    }
+  }
+
+  return {
+    PlexPinNotFoundError,
+    getUserInfo: vi.fn(),
+    getServers: vi.fn(),
+    createPin: vi.fn(),
+    getTokenFromPin: vi.fn(),
+    pollPinAuthToken: vi.fn(),
+  };
+});
 
 const jellyfinClientMocks = vi.hoisted(() => ({
   login: vi.fn(),
@@ -97,10 +110,12 @@ vi.mock("@repositories/SessionRepository", () => ({
 }));
 
 vi.mock("@integrations/plex/PlexOAuth", () => ({
+  PlexPinNotFoundError: plexOAuthMocks.PlexPinNotFoundError,
   PlexOAuth: class {
     getUserInfo = plexOAuthMocks.getUserInfo;
-    createPin = vi.fn();
-    getTokenFromPin = vi.fn();
+    createPin = plexOAuthMocks.createPin;
+    getTokenFromPin = plexOAuthMocks.getTokenFromPin;
+    pollPinAuthToken = plexOAuthMocks.pollPinAuthToken;
     getServers = plexOAuthMocks.getServers;
   },
 }));
@@ -1132,5 +1147,78 @@ describe("auth route sensitive guards", () => {
       error: "Jellyfin server not configured. Please provide server details.",
     });
     expect(jellyfinClientMocks.login).not.toHaveBeenCalled();
+  });
+
+  it("returns 202 while Plex PIN poll is pending", async () => {
+    settingsRepositoryMocks.get.mockResolvedValue("client-id");
+    plexOAuthMocks.pollPinAuthToken.mockResolvedValue(null);
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/plex/pin/poll")
+      .send({ pinId: 12345 });
+
+    expect(response.status).toBe(202);
+    expect(response.body).toEqual({
+      status: "pending",
+      clientIdentifier: "client-id",
+    });
+    expect(plexOAuthMocks.pollPinAuthToken).toHaveBeenCalledWith(12345);
+  });
+
+  it("returns authToken when Plex PIN poll succeeds", async () => {
+    settingsRepositoryMocks.get.mockResolvedValue("client-id");
+    plexOAuthMocks.pollPinAuthToken.mockResolvedValue("plex-auth-token");
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/plex/pin/poll")
+      .send({ pinId: 12345 });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      authToken: "plex-auth-token",
+      clientIdentifier: "client-id",
+    });
+  });
+
+  it("returns 404 when Plex PIN is missing or expired", async () => {
+    settingsRepositoryMocks.get.mockResolvedValue("client-id");
+    plexOAuthMocks.pollPinAuthToken.mockRejectedValue(
+      new plexOAuthMocks.PlexPinNotFoundError("Plex PIN not found or expired")
+    );
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/plex/pin/poll")
+      .send({ pinId: 12345 });
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: "Plex PIN not found or expired" });
+  });
+
+  it("rejects invalid pin ids", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/plex/pin/poll")
+      .send({ pinId: "nope" });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: "pinId must be a positive integer",
+    });
+    expect(plexOAuthMocks.pollPinAuthToken).not.toHaveBeenCalled();
   });
 });

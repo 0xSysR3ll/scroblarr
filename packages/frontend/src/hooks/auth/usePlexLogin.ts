@@ -1,49 +1,52 @@
 import { PlexOAuth, PlexAuthResult } from "@utils/PlexOAuth";
-import { useState, useRef } from "react";
+import { useRef, useState } from "react";
 
 interface UsePlexLoginOptions {
-  onAuthToken: (result: PlexAuthResult) => void;
+  onAuthToken: (result: PlexAuthResult) => void | Promise<void>;
   onError?: (message: string) => void;
 }
 
 export function usePlexLogin({ onAuthToken, onError }: UsePlexLoginOptions) {
   const [loading, setLoading] = useState(false);
   const plexOAuthRef = useRef<PlexOAuth | null>(null);
+  const inFlightRef = useRef(false);
 
   const login = () => {
+    if (inFlightRef.current) {
+      return;
+    }
+    inFlightRef.current = true;
+    setLoading(true);
+
     if (!plexOAuthRef.current) {
       plexOAuthRef.current = new PlexOAuth();
     }
-
     const plexOAuth = plexOAuthRef.current;
 
     try {
       plexOAuth.preparePopup();
     } catch (error) {
-      const errorMessage =
+      inFlightRef.current = false;
+      setLoading(false);
+      onError?.(
         error instanceof Error
           ? error.message
-          : "Failed to open authentication window. Please allow popups and try again.";
-      if (onError) {
-        onError(errorMessage);
-      }
+          : "Failed to open authentication window. Please allow popups and try again."
+      );
       return;
     }
 
     setTimeout(async () => {
       try {
-        setLoading(true);
         const result = await plexOAuth.login();
-        onAuthToken(result);
+        await onAuthToken(result);
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : "Failed to login with Plex";
-        if (onError) {
-          onError(errorMessage);
-        }
+        onError?.(
+          error instanceof Error ? error.message : "Failed to login with Plex"
+        );
       } finally {
-        // Ensure popup is closed even if cross-origin close on first attempt was ignored.
         plexOAuth.closePopup();
+        inFlightRef.current = false;
         setLoading(false);
       }
     }, 1500);

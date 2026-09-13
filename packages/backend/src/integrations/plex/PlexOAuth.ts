@@ -93,6 +93,13 @@ export interface PlexOAuthToken {
   thumb?: string;
 }
 
+export class PlexPinNotFoundError extends Error {
+  constructor(message = "Plex PIN not found or expired") {
+    super(message);
+    this.name = "PlexPinNotFoundError";
+  }
+}
+
 export class PlexOAuth {
   private clientIdentifier: string;
   private baseUrl = "https://plex.tv";
@@ -171,7 +178,7 @@ export class PlexOAuth {
     };
   }
 
-  async getTokenFromPin(pinId: number): Promise<PlexOAuthToken | null> {
+  async pollPinAuthToken(pinId: number): Promise<string | null> {
     const response = await fetch(`${this.baseUrl}/api/v2/pins/${pinId}`, {
       headers: {
         "X-Plex-Client-Identifier": this.clientIdentifier,
@@ -179,34 +186,32 @@ export class PlexOAuth {
       },
     });
 
+    if (response.status === 404) {
+      throw new PlexPinNotFoundError("Plex PIN not found or expired");
+    }
+
     if (!response.ok) {
       const text = await response.text();
       throw new Error(
-        `Failed to get token from pin: ${response.status} ${
+        `Failed to poll Plex pin: ${response.status} ${
           response.statusText
         } - ${text.substring(0, 200)}`
       );
     }
 
-    const contentType = response.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-      const text = await response.text();
-      throw new Error(
-        `Expected JSON but got ${contentType}. Response: ${text.substring(
-          0,
-          200
-        )}`
-      );
-    }
-
     const data = (await response.json()) as { authToken?: string };
-    if (!data.authToken) {
+    return data.authToken || null;
+  }
+
+  async getTokenFromPin(pinId: number): Promise<PlexOAuthToken | null> {
+    const authToken = await this.pollPinAuthToken(pinId);
+    if (!authToken) {
       return null;
     }
 
-    const userInfo = await this.getUserInfo(data.authToken);
+    const userInfo = await this.getUserInfo(authToken);
     return {
-      accessToken: data.authToken,
+      accessToken: authToken,
       username: userInfo.username,
       email: userInfo.email,
       thumb: userInfo.thumb,
