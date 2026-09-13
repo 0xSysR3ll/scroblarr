@@ -19,6 +19,15 @@ const posterServiceMocks = vi.hoisted(() => ({
   fetchPoster: vi.fn(),
 }));
 
+const routeParamMocks = vi.hoisted(() => ({
+  routeParam: vi.fn((value: string | string[] | undefined) => {
+    if (value === undefined) {
+      return undefined;
+    }
+    return Array.isArray(value) ? value[0] : value;
+  }),
+}));
+
 vi.mock("@repositories/SettingsRepository", () => ({
   SettingsRepository: class {
     get = settingsRepositoryMocks.get;
@@ -36,6 +45,11 @@ vi.mock("@repositories/SyncHistoryRepository", () => ({
   SyncHistoryRepository: class {
     findById = syncHistoryRepositoryMocks.findById;
   },
+}));
+
+vi.mock("@utils/routeParams", () => ({
+  routeParam: (value: string | string[] | undefined) =>
+    routeParamMocks.routeParam(value),
 }));
 
 vi.mock("@utils/logger", () => ({
@@ -142,8 +156,94 @@ describe("sync poster sensitive access", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers["content-type"]).toContain("image/png");
-    expect(response.headers["cache-control"]).toBe("public, max-age=86400");
+    expect(response.headers["cache-control"]).toBe("no-store");
     expect(Buffer.from(response.body)).toEqual(Buffer.from([1, 2, 3]));
+  });
+
+  it("returns 401 when poster is requested without credentials", async () => {
+    const app = express();
+    app.use("/api/v1/sync", syncRoutes);
+
+    const response = await request(app).get("/api/v1/sync/poster/sync-id");
+
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({ error: "Unauthorized" });
+  });
+
+  it("returns 400 when the poster id param is missing", async () => {
+    userRepositoryMocks.findBySessionToken.mockResolvedValue({
+      id: "owner-id",
+      isAdmin: false,
+    });
+    routeParamMocks.routeParam.mockReturnValueOnce(undefined);
+
+    const app = express();
+    app.use("/api/v1/sync", syncRoutes);
+
+    const response = await request(app)
+      .get("/api/v1/sync/poster/sync-id")
+      .set("authorization", "Bearer owner-token");
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "Missing id" });
+  });
+
+  it("allows admins to fetch another user's poster", async () => {
+    userRepositoryMocks.findBySessionToken.mockResolvedValue({
+      id: "admin-id",
+      isAdmin: true,
+    });
+    syncHistoryRepositoryMocks.findById.mockResolvedValue({
+      id: "sync-id",
+      userId: "owner-id",
+      posterUrl: "https://example.com/poster.jpg",
+      tmdbMovieId: "123",
+      user: { id: "owner-id" },
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+    posterServiceMocks.fetchPoster.mockResolvedValue({
+      buffer: Buffer.from([4, 5, 6]),
+      contentType: "image/webp",
+    });
+
+    const app = express();
+    app.use("/api/v1/sync", syncRoutes);
+
+    const response = await request(app)
+      .get("/api/v1/sync/poster/sync-id")
+      .set("authorization", "Bearer admin-token");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(Buffer.from(response.body)).toEqual(Buffer.from([4, 5, 6]));
+  });
+
+  it("returns proxied poster bytes when authenticated with API key only", async () => {
+    settingsRepositoryMocks.get.mockResolvedValue("stored-api-key");
+    syncHistoryRepositoryMocks.findById.mockResolvedValue({
+      id: "sync-id",
+      userId: "owner-id",
+      posterUrl: "https://example.com/poster.jpg",
+      tmdbMovieId: "123",
+      user: { id: "owner-id" },
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+    posterServiceMocks.fetchPoster.mockResolvedValue({
+      buffer: Buffer.from([9, 8, 7]),
+      contentType: "image/jpeg",
+    });
+
+    const app = express();
+    app.use("/api/v1/sync", syncRoutes);
+
+    const response = await request(app)
+      .get("/api/v1/sync/poster/sync-id")
+      .set("x-api-key", "stored-api-key");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toContain("image/jpeg");
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(Buffer.from(response.body)).toEqual(Buffer.from([9, 8, 7]));
   });
 
   it("returns 404 when the sync history item does not exist", async () => {

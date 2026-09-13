@@ -381,8 +381,8 @@ export class JellyfinClient {
       }
 
       return new URL(
-        `/Items/${season.Id}/Images/Primary`,
-        this.baseUrl
+        `Items/${season.Id}/Images/Primary`,
+        `${this.baseUrl}/`
       ).toString();
     } catch (error) {
       logger.jellyfin.error(
@@ -398,6 +398,17 @@ export class JellyfinClient {
     imageUrl: string,
     signal?: AbortSignal
   ): Promise<{ buffer: ArrayBuffer; contentType: string }> {
+    const base = this.baseUrl.replace(/\/$/, "");
+    let allowed = false;
+    try {
+      allowed = new URL(imageUrl).origin === new URL(base).origin;
+    } catch {
+      allowed = false;
+    }
+    if (!allowed) {
+      throw new Error("Jellyfin image URL must match configured server");
+    }
+
     const authHeader = this.getAuthHeader(accessToken);
     const response = await fetch(imageUrl, {
       headers: {
