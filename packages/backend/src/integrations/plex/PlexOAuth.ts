@@ -104,6 +104,7 @@ export class PlexOAuth {
   private clientIdentifier: string;
   private baseUrl = "https://plex.tv";
   private static readonly MAX_CONNECTIONS_PER_SERVER = 6;
+  private static readonly PIN_POLL_TIMEOUT_MS = 10_000;
 
   constructor(clientIdentifier?: string) {
     this.clientIdentifier = clientIdentifier || this.generateClientIdentifier();
@@ -184,6 +185,7 @@ export class PlexOAuth {
         "X-Plex-Client-Identifier": this.clientIdentifier,
         Accept: "application/json",
       },
+      signal: AbortSignal.timeout(PlexOAuth.PIN_POLL_TIMEOUT_MS),
     });
 
     if (response.status === 404) {

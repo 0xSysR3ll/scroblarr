@@ -631,7 +631,7 @@ paths:
                 - pinId
               properties:
                 pinId:
-                  type: string
+                  type: integer
       responses:
         '200':
           description: Token obtained and session created (session cookie set)

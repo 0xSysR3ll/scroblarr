@@ -127,14 +127,29 @@ export class PlexOAuth {
     const timeoutMs = 3 * 60 * 1000;
 
     while (Date.now() - startedAt < timeoutMs) {
-      const response = await fetch("/api/v1/auth/plex/pin/poll", {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ pinId: this.pin!.id }),
-      });
+      const remainingMs = timeoutMs - (Date.now() - startedAt);
+      const controller = new AbortController();
+      const abortTimer = setTimeout(() => controller.abort(), remainingMs);
+
+      let response: Response;
+      try {
+        response = await fetch("/api/v1/auth/plex/pin/poll", {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ pinId: this.pin!.id }),
+          signal: controller.signal,
+        });
+      } catch (error) {
+        if (controller.signal.aborted) {
+          break;
+        }
+        throw error;
+      } finally {
+        clearTimeout(abortTimer);
+      }
 
       if (response.status === 202) {
         await new Promise((resolve) => setTimeout(resolve, 1000));

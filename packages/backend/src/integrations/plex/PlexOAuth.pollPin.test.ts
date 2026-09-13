@@ -26,6 +26,7 @@ describe("PlexOAuth.pollPinAuthToken", () => {
         headers: expect.objectContaining({
           "X-Plex-Client-Identifier": "client-id",
         }),
+        signal: expect.any(AbortSignal),
       })
     );
   });
