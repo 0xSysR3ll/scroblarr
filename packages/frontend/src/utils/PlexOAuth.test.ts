@@ -229,6 +229,14 @@ describe("PlexOAuth", () => {
     );
   });
 
+  it("rethrows non-abort poll network errors", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(pinCreateResponse())
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    await expect(new PlexOAuth().login()).rejects.toThrow("Failed to fetch");
+  });
+
   it("times out when the pin stays pending", async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(pinCreateResponse())
@@ -244,6 +252,37 @@ describe("PlexOAuth", () => {
     for (let i = 0; i < 181; i++) {
       await vi.advanceTimersByTimeAsync(1000);
     }
+
+    await expect(loginPromise).rejects.toThrow(
+      "Plex authentication timed out before authorization completed"
+    );
+    expect(popupMocks.closePopup).toHaveBeenCalled();
+  });
+
+  it("aborts a hung poll request when the login deadline expires", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(pinCreateResponse())
+      .mockImplementationOnce(
+        (_url, init) =>
+          new Promise((_resolve, reject) => {
+            const signal = init?.signal;
+            if (!signal) {
+              return;
+            }
+            if (signal.aborted) {
+              reject(new DOMException("Aborted", "AbortError"));
+              return;
+            }
+            signal.addEventListener("abort", () => {
+              reject(new DOMException("Aborted", "AbortError"));
+            });
+          })
+      );
+
+    const loginPromise = new PlexOAuth().login();
+    loginPromise.catch(() => undefined);
+
+    await vi.advanceTimersByTimeAsync(3 * 60 * 1000);
 
     await expect(loginPromise).rejects.toThrow(
       "Plex authentication timed out before authorization completed"
