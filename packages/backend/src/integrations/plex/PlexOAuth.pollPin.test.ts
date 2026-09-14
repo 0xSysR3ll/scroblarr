@@ -2,6 +2,40 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PlexOAuth, PlexPinNotFoundError } from "./PlexOAuth";
 
+describe("PlexOAuth.createPin", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("creates a pin with a request timeout", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: { get: () => "application/json" },
+      json: async () => ({ id: 42, code: "ABCD" }),
+    } as unknown as Response);
+
+    await expect(new PlexOAuth("client-id").createPin()).resolves.toEqual({
+      id: 42,
+      code: "ABCD",
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      "https://plex.tv/api/v2/pins?strong=true",
+      expect.objectContaining({
+        method: "POST",
+        signal: expect.any(AbortSignal),
+        headers: expect.objectContaining({
+          "X-Plex-Client-Identifier": "client-id",
+        }),
+      })
+    );
+  });
+});
+
 describe("PlexOAuth.pollPinAuthToken", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());

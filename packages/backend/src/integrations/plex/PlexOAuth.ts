@@ -144,6 +144,7 @@ export class PlexOAuth {
   async createPin(): Promise<PlexPin> {
     const response = await fetch(`${this.baseUrl}/api/v2/pins?strong=true`, {
       method: "POST",
+      signal: AbortSignal.timeout(PlexOAuth.PIN_POLL_TIMEOUT_MS),
       headers: {
         "X-Plex-Client-Identifier": this.clientIdentifier,
         "X-Plex-Product": "Scroblarr",

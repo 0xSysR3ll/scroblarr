@@ -725,7 +725,7 @@ paths:
                 - pinId
               properties:
                 pinId:
-                  type: string
+                  type: integer
       responses:
         '200':
           description: Admin setup successful
