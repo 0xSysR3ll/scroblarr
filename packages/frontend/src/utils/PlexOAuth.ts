@@ -133,13 +133,11 @@ export class PlexOAuth {
 
       let response: Response;
       try {
-        response = await fetch("/api/v1/auth/plex/pin/poll", {
-          method: "POST",
+        response = await fetch(`https://plex.tv/api/v2/pins/${this.pin!.id}`, {
           headers: {
             Accept: "application/json",
-            "Content-Type": "application/json",
+            "X-Plex-Client-Identifier": this.clientIdentifier!,
           },
-          body: JSON.stringify({ pinId: this.pin!.id }),
           signal: controller.signal,
         });
       } catch (error) {
@@ -151,29 +149,17 @@ export class PlexOAuth {
         clearTimeout(abortTimer);
       }
 
-      if (response.status === 202) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        continue;
-      }
-
       if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as {
-          error?: string;
-        } | null;
         throw new Error(
-          body?.error ||
-            `Failed to poll pin: ${response.status} ${response.statusText}`
+          `Failed to poll pin: ${response.status} ${response.statusText}`
         );
       }
 
-      const data = (await response.json()) as {
-        authToken?: string;
-        clientIdentifier?: string;
-      };
+      const data = (await response.json()) as { authToken?: string | null };
       if (data.authToken) {
         const result = {
           authToken: data.authToken,
-          clientIdentifier: data.clientIdentifier || this.clientIdentifier!,
+          clientIdentifier: this.clientIdentifier!,
         };
         this.pin = undefined;
         this.clientIdentifier = undefined;
