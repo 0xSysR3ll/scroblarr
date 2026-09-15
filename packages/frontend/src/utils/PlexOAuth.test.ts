@@ -42,6 +42,14 @@ function pinCreateResponse(
   } as Response;
 }
 
+function plexPinPollResponse(authToken: string | null = null) {
+  return {
+    ok: true,
+    status: 200,
+    json: async () => ({ authToken }),
+  } as Response;
+}
+
 describe("PlexOAuth", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -71,23 +79,12 @@ describe("PlexOAuth", () => {
     expect(popupMocks.closePopup).toHaveBeenCalled();
   });
 
-  it("mints a fresh pin, opens auth URL, and resolves via backend poll", async () => {
+  it("mints a fresh pin, opens auth URL, and resolves via plex.tv poll", async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock
       .mockResolvedValueOnce(pinCreateResponse())
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 202,
-        json: async () => ({ status: "pending" }),
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          authToken: "plex-token",
-          clientIdentifier: "client-id",
-        }),
-      } as Response);
+      .mockResolvedValueOnce(plexPinPollResponse(null))
+      .mockResolvedValueOnce(plexPinPollResponse("plex-token"));
 
     const oauth = new PlexOAuth();
     const loginPromise = oauth.login();
@@ -108,39 +105,21 @@ describe("PlexOAuth", () => {
       authToken: "plex-token",
       clientIdentifier: "client-id",
     });
-  });
-
-  it("falls back to the local client identifier when the poll omits it", async () => {
-    vi.mocked(fetch)
-      .mockResolvedValueOnce(pinCreateResponse())
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({ authToken: "plex-token" }),
-      } as Response);
-
-    await expect(new PlexOAuth().login()).resolves.toEqual({
-      authToken: "plex-token",
-      clientIdentifier: "client-id",
-    });
-  });
-
-  it("keeps polling when a 200 response has no authToken yet", async () => {
-    vi.mocked(fetch)
-      .mockResolvedValueOnce(pinCreateResponse())
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({}),
-      } as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          authToken: "late-token",
-          clientIdentifier: "client-id",
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://plex.tv/api/v2/pins/42",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "X-Plex-Client-Identifier": "client-id",
         }),
-      } as Response);
+      })
+    );
+  });
+
+  it("keeps polling when plex.tv has no authToken yet", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(pinCreateResponse())
+      .mockResolvedValueOnce(plexPinPollResponse(null))
+      .mockResolvedValueOnce(plexPinPollResponse("late-token"));
 
     const loginPromise = new PlexOAuth().login();
     await vi.advanceTimersByTimeAsync(1000);
@@ -158,21 +137,13 @@ describe("PlexOAuth", () => {
         ok: false,
         status: 404,
         statusText: "Not Found",
-        json: async () => ({ error: "Plex PIN not found or expired" }),
       } as Response)
       .mockResolvedValueOnce(pinCreateResponse({ pinId: 2, code: "b" }))
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          authToken: "token-2",
-          clientIdentifier: "client-id",
-        }),
-      } as Response);
+      .mockResolvedValueOnce(plexPinPollResponse("token-2"));
 
     const oauth = new PlexOAuth();
     await expect(oauth.login()).rejects.toThrow(
-      "Plex PIN not found or expired"
+      "Failed to poll pin: 404 Not Found"
     );
     await expect(oauth.login()).resolves.toEqual({
       authToken: "token-2",
@@ -212,17 +183,14 @@ describe("PlexOAuth", () => {
     );
   });
 
-  it("uses a statusText fallback when the poll error body has no message", async () => {
+  it("throws when plex.tv poll fails", async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(pinCreateResponse())
       .mockResolvedValueOnce({
         ok: false,
         status: 502,
         statusText: "Bad Gateway",
-        json: async () => {
-          throw new Error("no json");
-        },
-      } as unknown as Response);
+      } as Response);
 
     await expect(new PlexOAuth().login()).rejects.toThrow(
       "Failed to poll pin: 502 Bad Gateway"
@@ -240,11 +208,7 @@ describe("PlexOAuth", () => {
   it("times out when the pin stays pending", async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(pinCreateResponse())
-      .mockResolvedValue({
-        ok: true,
-        status: 202,
-        json: async () => ({ status: "pending" }),
-      } as Response);
+      .mockResolvedValue(plexPinPollResponse(null));
 
     const loginPromise = new PlexOAuth().login();
     loginPromise.catch(() => undefined);
@@ -333,14 +297,7 @@ describe("PlexOAuth", () => {
     stubUserAgent(ua);
     vi.mocked(fetch)
       .mockResolvedValueOnce(pinCreateResponse())
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          authToken: "token",
-          clientIdentifier: "client-id",
-        }),
-      } as Response);
+      .mockResolvedValueOnce(plexPinPollResponse("token"));
 
     await new PlexOAuth().login();
     const authUrl = popupMocks.navigateToUrl.mock.calls[0][0] as string;
@@ -356,14 +313,7 @@ describe("PlexOAuth", () => {
     stubUserAgent("Firefox without-version Windows");
     vi.mocked(fetch)
       .mockResolvedValueOnce(pinCreateResponse())
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          authToken: "token",
-          clientIdentifier: "client-id",
-        }),
-      } as Response);
+      .mockResolvedValueOnce(plexPinPollResponse("token"));
 
     await new PlexOAuth().login();
     expect(popupMocks.navigateToUrl.mock.calls[0][0]).toContain(
@@ -375,14 +325,7 @@ describe("PlexOAuth", () => {
     stubUserAgent("Versionless Safari browser");
     vi.mocked(fetch)
       .mockResolvedValueOnce(pinCreateResponse())
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          authToken: "token",
-          clientIdentifier: "client-id",
-        }),
-      } as Response);
+      .mockResolvedValueOnce(plexPinPollResponse("token"));
     await new PlexOAuth().login();
     expect(popupMocks.navigateToUrl.mock.calls[0][0]).toContain(
       "context%5Bdevice%5D%5BplatformVersion%5D=Unknown"
@@ -392,14 +335,7 @@ describe("PlexOAuth", () => {
     popupMocks.navigateToUrl.mockClear();
     vi.mocked(fetch)
       .mockResolvedValueOnce(pinCreateResponse())
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          authToken: "token",
-          clientIdentifier: "client-id",
-        }),
-      } as Response);
+      .mockResolvedValueOnce(plexPinPollResponse("token"));
     await new PlexOAuth().login();
     expect(popupMocks.navigateToUrl.mock.calls[0][0]).toContain(
       "context%5Bdevice%5D%5BplatformVersion%5D=Unknown"
@@ -410,14 +346,7 @@ describe("PlexOAuth", () => {
     stubUserAgent("Chrome without digits on Linux");
     vi.mocked(fetch)
       .mockResolvedValueOnce(pinCreateResponse())
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          authToken: "token",
-          clientIdentifier: "client-id",
-        }),
-      } as Response);
+      .mockResolvedValueOnce(plexPinPollResponse("token"));
 
     await new PlexOAuth().login();
     expect(popupMocks.navigateToUrl.mock.calls[0][0]).toContain(
