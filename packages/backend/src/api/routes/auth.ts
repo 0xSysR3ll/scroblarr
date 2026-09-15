@@ -18,14 +18,26 @@ const userRepository = new UserRepository();
 const settingsRepository = new SettingsRepository();
 const sessionRepository = new SessionRepository();
 
+let plexClientIdentifierInFlight: Promise<string> | null = null;
+
 async function getOrCreatePlexClientIdentifier(): Promise<string> {
-  const existing = await settingsRepository.get("plexClientIdentifier");
-  if (existing) {
-    return existing;
+  if (plexClientIdentifierInFlight) {
+    return plexClientIdentifierInFlight;
   }
-  const created = randomUUID();
-  await settingsRepository.set("plexClientIdentifier", created);
-  return created;
+
+  plexClientIdentifierInFlight = (async () => {
+    const existing = await settingsRepository.get("plexClientIdentifier");
+    if (existing) {
+      return existing;
+    }
+    const created = randomUUID();
+    await settingsRepository.set("plexClientIdentifier", created);
+    return created;
+  })().finally(() => {
+    plexClientIdentifierInFlight = null;
+  });
+
+  return plexClientIdentifierInFlight;
 }
 
 function buildJellyfinBaseUrl(
@@ -132,9 +144,7 @@ router.post(
       return;
     } catch (error) {
       logger.auth.error({ error }, "Error creating Plex OAuth pin");
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to create OAuth pin";
-      res.status(500).json({ error: errorMessage });
+      res.status(500).json({ error: "Failed to create OAuth pin" });
       return;
     }
   }
@@ -467,7 +477,8 @@ router.post(
         return;
       }
 
-      const plexOAuth = new PlexOAuth();
+      const clientIdentifier = await getOrCreatePlexClientIdentifier();
+      const plexOAuth = new PlexOAuth(clientIdentifier);
       const tokenData = await plexOAuth.getTokenFromPin(pinId);
       if (!tokenData) {
         res.status(202).json({ message: "Pin not yet authorized" });
