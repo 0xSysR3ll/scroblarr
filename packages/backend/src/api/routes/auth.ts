@@ -18,14 +18,26 @@ const userRepository = new UserRepository();
 const settingsRepository = new SettingsRepository();
 const sessionRepository = new SessionRepository();
 
+let plexClientIdentifierInFlight: Promise<string> | null = null;
+
 async function getOrCreatePlexClientIdentifier(): Promise<string> {
-  const existing = await settingsRepository.get("plexClientIdentifier");
-  if (existing) {
-    return existing;
+  if (plexClientIdentifierInFlight) {
+    return plexClientIdentifierInFlight;
   }
-  const created = randomUUID();
-  await settingsRepository.set("plexClientIdentifier", created);
-  return created;
+
+  plexClientIdentifierInFlight = (async () => {
+    const existing = await settingsRepository.get("plexClientIdentifier");
+    if (existing) {
+      return existing;
+    }
+    const created = randomUUID();
+    await settingsRepository.set("plexClientIdentifier", created);
+    return created;
+  })().finally(() => {
+    plexClientIdentifierInFlight = null;
+  });
+
+  return plexClientIdentifierInFlight;
 }
 
 function buildJellyfinBaseUrl(
