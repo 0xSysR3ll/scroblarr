@@ -465,7 +465,8 @@ router.post(
         return;
       }
 
-      const plexOAuth = new PlexOAuth();
+      const clientIdentifier = await getOrCreatePlexClientIdentifier();
+      const plexOAuth = new PlexOAuth(clientIdentifier);
       const tokenData = await plexOAuth.getTokenFromPin(pinId);
       if (!tokenData) {
         res.status(202).json({ message: "Pin not yet authorized" });
