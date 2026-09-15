@@ -42,6 +42,7 @@ const plexOAuthMocks = vi.hoisted(() => {
     createPin: vi.fn(),
     getTokenFromPin: vi.fn(),
     pollPinAuthToken: vi.fn(),
+    constructedWith: [] as Array<string | undefined>,
   };
 });
 
@@ -112,6 +113,9 @@ vi.mock("@repositories/SessionRepository", () => ({
 vi.mock("@integrations/plex/PlexOAuth", () => ({
   PlexPinNotFoundError: plexOAuthMocks.PlexPinNotFoundError,
   PlexOAuth: class {
+    constructor(clientIdentifier?: string) {
+      plexOAuthMocks.constructedWith.push(clientIdentifier);
+    }
     getUserInfo = plexOAuthMocks.getUserInfo;
     createPin = plexOAuthMocks.createPin;
     getTokenFromPin = plexOAuthMocks.getTokenFromPin;
@@ -162,6 +166,7 @@ describe("auth route sensitive guards", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     jellyfinClientMocks.constructedWith.length = 0;
+    plexOAuthMocks.constructedWith.length = 0;
     getEnvMock.mockReturnValue({
       NODE_ENV: "test",
       PORT: "3000",
@@ -1180,5 +1185,51 @@ describe("auth route sensitive guards", () => {
 
     expect(response.status).toBe(500);
     expect(response.body).toEqual({ error: "Failed to create OAuth pin" });
+  });
+
+  it("polls setup-admin with the same client identifier used to create the PIN", async () => {
+    settingsRepositoryMocks.get.mockResolvedValue("installation-client-id");
+    userRepositoryMocks.findAdmin.mockResolvedValue(null);
+    plexOAuthMocks.createPin.mockResolvedValue({ id: 99, code: "ABCD" });
+    plexOAuthMocks.getTokenFromPin.mockResolvedValue({
+      accessToken: "plex-token",
+      username: "admin-user",
+      email: "admin@example.com",
+      thumb: "https://img",
+    });
+    userRepositoryMocks.findByPlexUsernameOrCreate.mockResolvedValue({
+      id: "user-1",
+      plexUsername: "admin-user",
+      plexAccessToken: null,
+    });
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "user-1",
+      plexUsername: "admin-user",
+      displayName: "admin-user",
+      email: "admin@example.com",
+      isAdmin: true,
+    });
+    plexOAuthMocks.getServers.mockResolvedValue([]);
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const createResponse = await request(app)
+      .post("/api/v1/auth/plex/pin")
+      .send({});
+    expect(createResponse.status).toBe(200);
+    expect(createResponse.body.clientIdentifier).toBe("installation-client-id");
+    expect(plexOAuthMocks.constructedWith).toEqual(["installation-client-id"]);
+
+    plexOAuthMocks.constructedWith.length = 0;
+
+    const setupResponse = await request(app)
+      .post("/api/v1/auth/plex/setup-admin")
+      .send({ pinId: createResponse.body.pinId });
+
+    expect(setupResponse.status).toBe(200);
+    expect(plexOAuthMocks.constructedWith).toEqual(["installation-client-id"]);
+    expect(plexOAuthMocks.getTokenFromPin).toHaveBeenCalledWith(99);
   });
 });
