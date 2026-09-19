@@ -161,7 +161,9 @@ export function SyncDashboardPage() {
           firstPage.pagination.total
         );
 
-        if (quiet && fingerprintRef.current === nextFingerprint) {
+        // Quiet refresh: one cheap probe; skip React updates when unchanged.
+        // force (pull-to-refresh) always reloads remaining pages.
+        if (quiet && !force && fingerprintRef.current === nextFingerprint) {
           return;
         }
 
@@ -169,16 +171,13 @@ export function SyncDashboardPage() {
         // This allows search and quick filters to work on recent history
         const maxItemsForClientSide = 500;
         const maxPages = Math.min(
-          5,
+          Math.ceil(maxItemsForClientSide / 100),
           Math.ceil(firstPage.pagination.total / 100)
         );
 
         const allItems = [...firstPage.data];
 
-        if (
-          maxPages > 1 &&
-          firstPage.pagination.total <= maxItemsForClientSide
-        ) {
+        if (maxPages > 1) {
           // Load remaining pages
           const remainingPages = [];
           for (let p = 2; p <= maxPages; p++) {

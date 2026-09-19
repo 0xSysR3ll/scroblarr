@@ -5,10 +5,10 @@ import {
   retrySyncHistoryItems,
 } from "@services/api";
 import { renderWithProviders } from "@test/render";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { showSuccess } from "@utils/toast";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SyncDashboardPage } from "./SyncDashboardPage";
 
@@ -104,7 +104,29 @@ const history: SyncHistoryItem[] = [
   },
 ];
 
-function syncHistoryResponse(data = history): SyncHistoryResponse {
+function makeItem(
+  id: string,
+  title: string,
+  overrides: Partial<SyncHistoryItem> = {}
+): SyncHistoryItem {
+  return {
+    id,
+    userId: "user-1",
+    username: "alice",
+    mediaType: "movie",
+    mediaTitle: title,
+    source: "plex",
+    success: true,
+    syncedAt: "2026-01-01T12:00:00.000Z",
+    destinations: ["Trakt"],
+    ...overrides,
+  };
+}
+
+function syncHistoryResponse(
+  data = history,
+  pagination: Partial<SyncHistoryResponse["pagination"]> = {}
+): SyncHistoryResponse {
   return {
     data,
     pagination: {
@@ -112,6 +134,7 @@ function syncHistoryResponse(data = history): SyncHistoryResponse {
       pageSize: 100,
       total: data.length,
       totalPages: 1,
+      ...pagination,
     },
   };
 }
@@ -133,6 +156,14 @@ describe("SyncDashboardPage", () => {
       failed: 0,
       results: [{ success: true, destinations: ["TVTime"] }],
     });
+    Object.defineProperty(document, "hidden", {
+      configurable: true,
+      get: () => false,
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("filters loaded history with search text", async () => {
@@ -222,6 +253,176 @@ describe("SyncDashboardPage", () => {
     await waitFor(() => {
       expect(retrySyncHistoryItems).toHaveBeenCalledWith(["2"]);
       expect(showSuccess).toHaveBeenCalledWith("Retried 1 failed sync item");
+    });
+  });
+
+  it("quietly refreshes and shows new history after the auto-refresh interval", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const newer = [
+      makeItem("3", "Fresh Movie", {
+        syncedAt: "2026-01-01T13:00:00.000Z",
+      }),
+      ...history,
+    ];
+
+    vi.mocked(getSyncHistory)
+      .mockResolvedValueOnce(syncHistoryResponse())
+      .mockResolvedValue(syncHistoryResponse(newer));
+
+    renderWithProviders(<SyncDashboardPage />, { route: "/sync" });
+
+    expect(await screen.findByText("Example Movie")).toBeVisible();
+    const callsAfterMount = vi.mocked(getSyncHistory).mock.calls.length;
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+
+    await waitFor(() => {
+      expect(getSyncHistory.mock.calls.length).toBeGreaterThan(callsAfterMount);
+      expect(screen.getByText("Fresh Movie")).toBeVisible();
+    });
+  });
+
+  it("skips applying quiet refresh results when the fingerprint is unchanged", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.mocked(getSyncHistory).mockResolvedValue(syncHistoryResponse());
+
+    renderWithProviders(<SyncDashboardPage />, { route: "/sync" });
+    expect(await screen.findByText("Example Movie")).toBeVisible();
+    const callsAfterMount = vi.mocked(getSyncHistory).mock.calls.length;
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+
+    await waitFor(() => {
+      expect(getSyncHistory.mock.calls.length).toBe(callsAfterMount + 1);
+    });
+    expect(screen.getByText("Example Movie")).toBeVisible();
+    expect(screen.getByText("Broken Episode")).toBeVisible();
+  });
+
+  it("does not quiet-refresh while the document is hidden", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    Object.defineProperty(document, "hidden", {
+      configurable: true,
+      get: () => true,
+    });
+    vi.mocked(getSyncHistory).mockResolvedValue(syncHistoryResponse());
+
+    renderWithProviders(<SyncDashboardPage />, { route: "/sync" });
+    expect(await screen.findByText("Example Movie")).toBeVisible();
+    const callsAfterMount = vi.mocked(getSyncHistory).mock.calls.length;
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+
+    expect(getSyncHistory).toHaveBeenCalledTimes(callsAfterMount);
+  });
+
+  it("loads up to five pages when history total exceeds 500", async () => {
+    const page1 = Array.from({ length: 100 }, (_, i) =>
+      makeItem(`p1-${i}`, `Page1 ${i}`)
+    );
+    const page2 = Array.from({ length: 100 }, (_, i) =>
+      makeItem(`p2-${i}`, `Page2 ${i}`)
+    );
+    const page3 = Array.from({ length: 100 }, (_, i) =>
+      makeItem(`p3-${i}`, `Page3 ${i}`)
+    );
+    const page4 = Array.from({ length: 100 }, (_, i) =>
+      makeItem(`p4-${i}`, `Page4 ${i}`)
+    );
+    const page5 = Array.from({ length: 100 }, (_, i) =>
+      makeItem(`p5-${i}`, `Page5 ${i}`)
+    );
+
+    vi.mocked(getSyncHistory).mockImplementation(async (page = 1) => {
+      const pages = [page1, page2, page3, page4, page5];
+      return syncHistoryResponse(pages[page - 1] ?? [], {
+        page,
+        total: 600,
+        totalPages: 6,
+      });
+    });
+
+    renderWithProviders(<SyncDashboardPage />, { route: "/sync" });
+
+    expect(await screen.findByText("Page1 0")).toBeVisible();
+    await waitFor(() => {
+      const requestedPages = vi
+        .mocked(getSyncHistory)
+        .mock.calls.map((call) => call[0] ?? 1);
+      expect(requestedPages).toEqual(expect.arrayContaining([1, 2, 3, 4, 5]));
+    });
+    expect(
+      screen.getByText(/You have more than 500 sync history items/i)
+    ).toBeVisible();
+  });
+
+  it("force-refreshes via pull-to-refresh even when the fingerprint matches", async () => {
+    const page1 = Array.from({ length: 100 }, (_, i) =>
+      makeItem(`p1-${i}`, `Movie ${i}`)
+    );
+    const page2 = Array.from({ length: 50 }, (_, i) =>
+      makeItem(`p2-${i}`, `Later ${i}`)
+    );
+
+    vi.mocked(getSyncHistory).mockImplementation(async (page = 1) => {
+      if (page === 1) {
+        return syncHistoryResponse(page1, {
+          page: 1,
+          total: 150,
+          totalPages: 2,
+        });
+      }
+      return syncHistoryResponse(page2, {
+        page: 2,
+        total: 150,
+        totalPages: 2,
+      });
+    });
+
+    Object.defineProperty(window, "scrollY", {
+      configurable: true,
+      value: 0,
+      writable: true,
+    });
+
+    const { container } = renderWithProviders(<SyncDashboardPage />, {
+      route: "/sync",
+    });
+    expect(await screen.findByText("Movie 0")).toBeVisible();
+    await waitFor(() => {
+      expect(
+        vi.mocked(getSyncHistory).mock.calls.some((call) => call[0] === 2)
+      ).toBe(true);
+    });
+    const callsAfterInitialLoad = vi.mocked(getSyncHistory).mock.calls.length;
+
+    const root = container.firstElementChild!;
+
+    fireEvent.touchStart(root, {
+      touches: [{ clientY: 0 }],
+    });
+    fireEvent.touchMove(root, {
+      touches: [{ clientY: 200 }],
+    });
+    await act(async () => {
+      fireEvent.touchEnd(root);
+    });
+
+    await waitFor(() => {
+      expect(getSyncHistory.mock.calls.length).toBeGreaterThan(
+        callsAfterInitialLoad
+      );
+      // Force refresh must request page 2 again even if page 1 fingerprint matched
+      const page2Calls = vi
+        .mocked(getSyncHistory)
+        .mock.calls.filter((call) => call[0] === 2);
+      expect(page2Calls.length).toBeGreaterThanOrEqual(2);
     });
   });
 });

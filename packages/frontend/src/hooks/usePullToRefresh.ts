@@ -98,6 +98,7 @@ export function usePullToRefresh({
       onTouchStart,
       onTouchMove,
       onTouchEnd,
+      onTouchCancel: resetPull,
     },
   };
 }
