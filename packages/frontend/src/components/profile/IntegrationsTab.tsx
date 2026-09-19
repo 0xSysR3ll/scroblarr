@@ -1388,7 +1388,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
               <p className="mb-4 text-xs text-muted-foreground">
                 {t("bingers.settings.description", {
                   defaultValue:
-                    "Mark media as rewatched only if it has been synced before. Rewatches increment the play count in Bingers (Watched x2, etc.).",
+                    "Mark media as rewatched when it was synced before or is already watched in Bingers. Rewatches increment the play count in Bingers (Watched x2, etc.).",
                 })}
               </p>
 
@@ -1417,7 +1417,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                     <p className="mt-1 text-xs text-muted-foreground">
                       {t("bingers.settings.markMoviesAsRewatchedDescription", {
                         defaultValue:
-                          "When enabled, movies that have been synced before will increment the Bingers play count.",
+                          "When enabled, movies already watched in Bingers (via Scroblarr sync, manual tracking, or import) will increment the play count on the next sync.",
                       })}
                     </p>
                   </div>
@@ -1449,7 +1449,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                         "bingers.settings.markEpisodesAsRewatchedDescription",
                         {
                           defaultValue:
-                            "When enabled, episodes that have been synced before will increment the Bingers play count.",
+                            "When enabled, episodes already watched in Bingers (via Scroblarr sync, manual tracking, or import) will increment the play count on the next sync.",
                         }
                       )}
                     </p>

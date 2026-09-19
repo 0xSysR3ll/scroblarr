@@ -1,6 +1,10 @@
 import { randomUUID } from "crypto";
 
-import { ISyncClient, SyncOptions } from "@integrations/common/ISyncClient";
+import {
+  ISyncClient,
+  ScrobbleResult,
+  SyncOptions,
+} from "@integrations/common/ISyncClient";
 import { MediaEvent } from "@scroblarr/shared";
 import { logger } from "@utils/logger";
 
@@ -34,7 +38,7 @@ export class BingersClient implements ISyncClient {
     event: MediaEvent,
     cookieHeader: string,
     options?: SyncOptions
-  ): Promise<void> {
+  ): Promise<ScrobbleResult> {
     if (!cookieHeader.trim()) {
       throw new BingersApiError("Bingers session cookie is required", 401, {
         isAuthError: true,
@@ -46,21 +50,21 @@ export class BingersClient implements ISyncClient {
     }
 
     const entity = await this.catalog.resolveEntity(event.media);
-    const isRewatch =
+    const allowRewatch =
       event.media.type === "movie"
         ? !!options?.markMoviesAsRewatched
         : !!options?.markEpisodesAsRewatched;
 
     const lockKey = `${cookieHeader}:${entity.entityKind}:${entity.entityId}`;
-    await BingersClient.withEntityLock(lockKey, async () => {
+    return BingersClient.withEntityLock(lockKey, async () => {
       const remote = await this.fetchRemoteEntry(
         cookieHeader,
         entity.entityKind,
         entity.entityId
       );
-      const { plays, skip } = this.computePlays(
+      const { plays, skip, wasRewatched } = this.computePlays(
         remote,
-        isRewatch,
+        allowRewatch,
         options?.bingersLocalPlayCount
       );
 
@@ -73,7 +77,7 @@ export class BingersClient implements ISyncClient {
           },
           "Skipping Bingers push; entry is already watched remotely"
         );
-        return;
+        return { wasRewatched: false };
       }
 
       const body = {
@@ -103,29 +107,33 @@ export class BingersClient implements ISyncClient {
           title: event.media.title,
           plays,
           remotePlays: remote?.plays,
-          rewatch: isRewatch,
+          rewatch: wasRewatched,
         },
         "Pushing Bingers watched entry"
       );
 
       await this.push(cookieHeader, body);
+      return { wasRewatched };
     });
   }
 
   private computePlays(
     remote: RemoteEntryState | null,
-    isRewatch: boolean,
+    allowRewatch: boolean,
     localPlayTarget?: number
-  ): { plays: number; skip: boolean } {
+  ): { plays: number; skip: boolean; wasRewatched: boolean } {
     const remotePlays =
       typeof remote?.plays === "number" && remote.plays > 0 ? remote.plays : 0;
-    const remoteWatched = !!remote?.watched;
+    const remoteAlreadyWatched = !!remote?.watched && remotePlays >= 1;
+    const hasLocalPrior =
+      typeof localPlayTarget === "number" && localPlayTarget > 0;
+    const isRewatch = allowRewatch && (hasLocalPrior || remoteAlreadyWatched);
 
     if (!isRewatch) {
-      if (remoteWatched && remotePlays >= 1) {
-        return { plays: remotePlays, skip: true };
+      if (remoteAlreadyWatched) {
+        return { plays: remotePlays, skip: true, wasRewatched: false };
       }
-      return { plays: 1, skip: false };
+      return { plays: 1, skip: false, wasRewatched: false };
     }
 
     const localTarget =
@@ -136,6 +144,7 @@ export class BingersClient implements ISyncClient {
     return {
       plays: Math.max(localTarget, remotePlays + 1),
       skip: false,
+      wasRewatched: true,
     };
   }
 

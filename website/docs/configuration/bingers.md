@@ -43,7 +43,7 @@ Scroblarr syncs the following to Bingers:
 
 - **Movies**: When you finish watching a movie
 - **TV Episodes**: When you finish watching an episode
-- **Rewatches** (opt-in): When enabled in Profile → Integrations, watching the same title again increments the play count (shown in the Bingers app as “Watched x2”, etc.)
+- **Rewatches** (opt-in): When enabled in Profile → Integrations, watching a title again increments the play count (shown in the Bingers app as “Watched x2”, etc.). Scroblarr detects prior watches from its own Bingers sync history **or** from an existing watched entry already in Bingers (manual tracking or imports).
 
 Scroblarr does **not** sync:
 
