@@ -548,6 +548,10 @@ paths:
   /api/v1/auth/plex/pin:
     post:
       summary: Create Plex OAuth PIN
+      description: >
+        Creates a Plex PIN with the installation client identifier. The browser
+        polls plex.tv directly with that same identifier, then submits the
+        resulting authToken to the login endpoints.
       tags: [Auth]
       responses:
         '200':
@@ -556,10 +560,13 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [pinId, code, clientIdentifier]
                 properties:
                   pinId:
-                    type: string
+                    type: integer
                   code:
+                    type: string
+                  clientIdentifier:
                     type: string
         '500':
           description: Internal server error
@@ -578,7 +585,7 @@ paths:
                 - pinId
               properties:
                 pinId:
-                  type: string
+                  type: integer
       responses:
         '200':
           description: Token obtained and session created (session cookie set)
@@ -672,7 +679,7 @@ paths:
                 - pinId
               properties:
                 pinId:
-                  type: string
+                  type: integer
       responses:
         '200':
           description: Admin setup successful
