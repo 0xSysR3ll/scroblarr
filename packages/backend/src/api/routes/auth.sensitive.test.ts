@@ -1187,6 +1187,75 @@ describe("auth route sensitive guards", () => {
     expect(response.body).toEqual({ error: "Failed to create OAuth pin" });
   });
 
+  it("shares one in-flight plex client identifier across concurrent first use", async () => {
+    let releaseGet!: () => void;
+    const getGate = new Promise<void>((resolve) => {
+      releaseGet = resolve;
+    });
+    settingsRepositoryMocks.get.mockImplementation(async () => {
+      await getGate;
+      return null;
+    });
+    settingsRepositoryMocks.set.mockResolvedValue(undefined);
+    plexOAuthMocks.createPin.mockResolvedValue({ id: 1, code: "ABCD" });
+
+    let pinRequests = 0;
+    let secondDispatched!: () => void;
+    const secondDispatchedPromise = new Promise<void>((resolve) => {
+      secondDispatched = resolve;
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", (req, _res, next) => {
+      if (req.method === "POST" && req.path === "/plex/pin") {
+        pinRequests += 1;
+        if (pinRequests === 2) {
+          // After this middleware returns, the route handler joins in-flight
+          setImmediate(secondDispatched);
+        }
+      }
+      next();
+    });
+    app.use("/api/v1/auth", authRoutes);
+
+    try {
+      // Supertest only sends once the request is then'd/awaited
+      const firstPromise = request(app).post("/api/v1/auth/plex/pin").send({});
+      void firstPromise.catch(() => undefined);
+
+      await vi.waitFor(() => {
+        expect(settingsRepositoryMocks.get).toHaveBeenCalled();
+      });
+
+      const secondPromise = request(app).post("/api/v1/auth/plex/pin").send({});
+      void secondPromise.catch(() => undefined);
+
+      await secondDispatchedPromise;
+      releaseGet();
+
+      const [firstResponse, secondResponse] = await Promise.all([
+        firstPromise,
+        secondPromise,
+      ]);
+
+      expect(firstResponse.status).toBe(200);
+      expect(secondResponse.status).toBe(200);
+      expect(firstResponse.body.clientIdentifier).toBe(
+        secondResponse.body.clientIdentifier
+      );
+      expect(settingsRepositoryMocks.get).toHaveBeenCalledTimes(1);
+      expect(settingsRepositoryMocks.set).toHaveBeenCalledTimes(1);
+      expect(settingsRepositoryMocks.set).toHaveBeenCalledWith(
+        "plexClientIdentifier",
+        firstResponse.body.clientIdentifier
+      );
+    } finally {
+      // Unblock any gated get so module in-flight state cannot poison later tests
+      releaseGet();
+    }
+  });
+
   it("polls setup-admin with the same client identifier used to create the PIN", async () => {
     settingsRepositoryMocks.get.mockResolvedValue("installation-client-id");
     userRepositoryMocks.findAdmin.mockResolvedValue(null);
