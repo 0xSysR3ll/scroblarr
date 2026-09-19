@@ -26,9 +26,9 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "icon-192.png", "icon-512.png"],
+      // Avoid SW/HMR races during local Vite; production still gets the SW.
       devOptions: {
-        enabled: true,
-        type: "module",
+        enabled: false,
       },
       injectRegister: "auto",
       manifest: {
@@ -57,38 +57,20 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        // Let /api-docs reach the backend Swagger UI instead of the SPA shell.
+        globPatterns: ["**/*.{ico,png,svg,woff2}"],
         navigateFallbackDenylist: [/^\/api-docs/, /^\/swagger-ui/],
         navigationPreload: true,
         skipWaiting: true,
         clientsClaim: true,
+        cleanupOutdatedCaches: true,
+        navigateFallback: undefined,
         runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/api\./i,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "api-cache",
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60,
-              },
-            },
-          },
           {
             urlPattern: ({ request, url }) =>
               request.mode === "navigate" &&
               !url.pathname.startsWith("/api-docs") &&
               !url.pathname.startsWith("/swagger-ui"),
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "pages-cache",
-              networkTimeoutSeconds: 3,
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 24 * 60 * 60, // 24 hours
-              },
-            },
+            handler: "NetworkOnly",
           },
         ],
       },
