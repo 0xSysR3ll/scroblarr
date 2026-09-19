@@ -155,4 +155,71 @@ describe("usePullToRefresh", () => {
 
     expect(result.current.pullDistance).toBe(0);
   });
+
+  it("clears pull distance when the gesture moves upward", () => {
+    const onRefresh = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => usePullToRefresh({ onRefresh }));
+
+    act(() => {
+      result.current.pullHandlers.onTouchStart(touchEvent(100));
+      result.current.pullHandlers.onTouchMove(touchEvent(200));
+    });
+    expect(result.current.pullDistance).toBeGreaterThan(0);
+
+    act(() => {
+      result.current.pullHandlers.onTouchMove(touchEvent(80));
+    });
+
+    expect(result.current.pullDistance).toBe(0);
+  });
+
+  it("defaults missing touch coordinates to zero", () => {
+    const onRefresh = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => usePullToRefresh({ onRefresh }));
+
+    act(() => {
+      result.current.pullHandlers.onTouchStart({
+        touches: [],
+      } as unknown as ReactTouchEvent);
+      result.current.pullHandlers.onTouchMove({
+        touches: [],
+      } as unknown as ReactTouchEvent);
+    });
+
+    expect(result.current.pullDistance).toBe(0);
+  });
+
+  it("ignores a new pull while a refresh is already in flight", async () => {
+    let resolveRefresh!: () => void;
+    const onRefresh = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveRefresh = resolve;
+        })
+    );
+    const { result } = renderHook(() => usePullToRefresh({ onRefresh }));
+    const pullDelta = Math.ceil(PULL_THRESHOLD_PX / 0.45) + 10;
+
+    act(() => {
+      result.current.pullHandlers.onTouchStart(touchEvent(0));
+      result.current.pullHandlers.onTouchMove(touchEvent(pullDelta));
+    });
+
+    let endPromise!: Promise<void>;
+    act(() => {
+      endPromise = result.current.pullHandlers.onTouchEnd();
+    });
+    expect(result.current.refreshing).toBe(true);
+
+    act(() => {
+      result.current.pullHandlers.onTouchStart(touchEvent(0));
+      result.current.pullHandlers.onTouchMove(touchEvent(pullDelta));
+    });
+    expect(result.current.pullDistance).toBe(0);
+
+    await act(async () => {
+      resolveRefresh();
+      await endPromise;
+    });
+  });
 });

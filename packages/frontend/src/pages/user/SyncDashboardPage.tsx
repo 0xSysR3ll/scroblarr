@@ -161,8 +161,6 @@ export function SyncDashboardPage() {
           firstPage.pagination.total
         );
 
-        // Quiet refresh: one cheap probe; skip React updates when unchanged.
-        // force (pull-to-refresh) always reloads remaining pages.
         if (quiet && !force && fingerprintRef.current === nextFingerprint) {
           return;
         }
@@ -192,10 +190,6 @@ export function SyncDashboardPage() {
           responses.forEach((response) => {
             allItems.push(...response.data);
           });
-        }
-
-        if (generation !== loadGenerationRef.current) {
-          return;
         }
 
         fingerprintRef.current = nextFingerprint;

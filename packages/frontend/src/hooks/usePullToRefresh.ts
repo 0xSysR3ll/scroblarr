@@ -13,10 +13,6 @@ interface UsePullToRefreshOptions {
   disabled?: boolean;
 }
 
-/**
- * Lightweight document-scroll pull-to-refresh for touch devices.
- * Only activates when the page is scrolled to the top.
- */
 export function usePullToRefresh({
   onRefresh,
   disabled = false,
@@ -62,7 +58,6 @@ export function usePullToRefresh({
         return;
       }
 
-      // Resistive pull so it does not feel sticky.
       const resisted = Math.min(PULL_MAX_PX, delta * 0.45);
       pullDistanceRef.current = resisted;
       setPullDistance(resisted);

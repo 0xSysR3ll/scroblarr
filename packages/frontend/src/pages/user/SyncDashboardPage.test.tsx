@@ -7,7 +7,7 @@ import {
 import { renderWithProviders } from "@test/render";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { showSuccess } from "@utils/toast";
+import { showError, showSuccess } from "@utils/toast";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SyncDashboardPage } from "./SyncDashboardPage";
@@ -279,7 +279,9 @@ describe("SyncDashboardPage", () => {
     });
 
     await waitFor(() => {
-      expect(getSyncHistory.mock.calls.length).toBeGreaterThan(callsAfterMount);
+      expect(vi.mocked(getSyncHistory).mock.calls.length).toBeGreaterThan(
+        callsAfterMount
+      );
       expect(screen.getByText("Fresh Movie")).toBeVisible();
     });
   });
@@ -297,7 +299,9 @@ describe("SyncDashboardPage", () => {
     });
 
     await waitFor(() => {
-      expect(getSyncHistory.mock.calls.length).toBe(callsAfterMount + 1);
+      expect(vi.mocked(getSyncHistory).mock.calls.length).toBe(
+        callsAfterMount + 1
+      );
     });
     expect(screen.getByText("Example Movie")).toBeVisible();
     expect(screen.getByText("Broken Episode")).toBeVisible();
@@ -415,14 +419,166 @@ describe("SyncDashboardPage", () => {
     });
 
     await waitFor(() => {
-      expect(getSyncHistory.mock.calls.length).toBeGreaterThan(
+      expect(vi.mocked(getSyncHistory).mock.calls.length).toBeGreaterThan(
         callsAfterInitialLoad
       );
-      // Force refresh must request page 2 again even if page 1 fingerprint matched
       const page2Calls = vi
         .mocked(getSyncHistory)
         .mock.calls.filter((call) => call[0] === 2);
       expect(page2Calls.length).toBeGreaterThanOrEqual(2);
     });
+  });
+
+  it("shows an error toast when the initial history load fails", async () => {
+    vi.mocked(getSyncHistory).mockRejectedValue(new Error("network down"));
+
+    renderWithProviders(<SyncDashboardPage />, { route: "/sync" });
+
+    await waitFor(() => {
+      expect(showError).toHaveBeenCalledWith("Failed to load sync history");
+    });
+  });
+
+  it("quietly refreshes when the document becomes visible again", async () => {
+    let hidden = true;
+    Object.defineProperty(document, "hidden", {
+      configurable: true,
+      get: () => hidden,
+    });
+    vi.mocked(getSyncHistory).mockResolvedValue(syncHistoryResponse());
+
+    renderWithProviders(<SyncDashboardPage />, { route: "/sync" });
+    expect(await screen.findByText("Example Movie")).toBeVisible();
+    const callsAfterMount = vi.mocked(getSyncHistory).mock.calls.length;
+
+    hidden = false;
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    await waitFor(() => {
+      expect(vi.mocked(getSyncHistory).mock.calls.length).toBeGreaterThan(
+        callsAfterMount
+      );
+    });
+  });
+
+  it("skips overlapping quiet refreshes while a load is already in flight", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let resolveHang!: (value: SyncHistoryResponse) => void;
+    let hangNext = false;
+
+    vi.mocked(getSyncHistory).mockImplementation(() => {
+      if (!hangNext) {
+        return Promise.resolve(syncHistoryResponse());
+      }
+      return new Promise((resolve) => {
+        resolveHang = resolve;
+      });
+    });
+
+    renderWithProviders(<SyncDashboardPage />, { route: "/sync" });
+    expect(await screen.findByText("Example Movie")).toBeVisible();
+    const callsAfterMount = vi.mocked(getSyncHistory).mock.calls.length;
+
+    hangNext = true;
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+
+    await waitFor(() => {
+      expect(vi.mocked(getSyncHistory).mock.calls.length).toBe(
+        callsAfterMount + 1
+      );
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+
+    expect(vi.mocked(getSyncHistory).mock.calls.length).toBe(
+      callsAfterMount + 1
+    );
+
+    await act(async () => {
+      resolveHang(syncHistoryResponse());
+    });
+  });
+
+  it("ignores stale multi-page results after a newer load starts", async () => {
+    const stalePage2 = Array.from({ length: 20 }, (_, i) =>
+      makeItem(`p2-${i}`, `Later ${i}`)
+    );
+    const filtered = [makeItem("f1", "Filtered Movie")];
+
+    let resolveStalePage2!: (value: SyncHistoryResponse) => void;
+    let hangPage2 = false;
+
+    vi.mocked(getSyncHistory).mockImplementation(async (page = 1, ...rest) => {
+      const filters = rest[1] as { mediaType?: string } | undefined;
+      if (filters?.mediaType === "movie") {
+        return syncHistoryResponse(filtered, {
+          page: 1,
+          total: 1,
+          totalPages: 1,
+        });
+      }
+      if (page === 1) {
+        return syncHistoryResponse(
+          Array.from({ length: 100 }, (_, i) =>
+            makeItem(`p1-${i}`, `Movie ${i}`)
+          ),
+          {
+            page: 1,
+            total: 120,
+            totalPages: 2,
+          }
+        );
+      }
+      if (hangPage2) {
+        return new Promise((resolve) => {
+          resolveStalePage2 = resolve;
+        });
+      }
+      return syncHistoryResponse(stalePage2, {
+        page: 2,
+        total: 120,
+        totalPages: 2,
+      });
+    });
+
+    const user = userEvent.setup();
+    renderWithProviders(<SyncDashboardPage />, { route: "/sync" });
+    expect(await screen.findByText("Movie 0")).toBeVisible();
+
+    hangPage2 = true;
+
+    await user.click(screen.getByRole("button", { name: "Advanced Filters" }));
+    const mediaTypeSelect = screen.getAllByRole("combobox")[0];
+    await user.selectOptions(mediaTypeSelect, "episode");
+
+    await waitFor(() => {
+      expect(resolveStalePage2).toBeTypeOf("function");
+    });
+
+    await user.selectOptions(mediaTypeSelect, "movie");
+
+    await waitFor(() => {
+      expect(screen.getByText("Filtered Movie")).toBeVisible();
+    });
+
+    await act(async () => {
+      resolveStalePage2(
+        syncHistoryResponse(stalePage2, {
+          page: 2,
+          total: 120,
+          totalPages: 2,
+        })
+      );
+    });
+
+    expect(screen.getByText("Filtered Movie")).toBeVisible();
+    expect(screen.queryByText("Later 0")).not.toBeInTheDocument();
   });
 });
