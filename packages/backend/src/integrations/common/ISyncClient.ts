@@ -7,6 +7,10 @@ export interface SyncOptions {
   bingersLocalPlayCount?: number;
 }
 
+export interface ScrobbleResult {
+  wasRewatched: boolean;
+}
+
 export interface SyncResult {
   success: boolean;
   errorMessage?: string;
@@ -17,7 +21,7 @@ export interface ISyncClient {
     event: MediaEvent,
     accessToken: string,
     options?: SyncOptions
-  ): Promise<void>;
+  ): Promise<ScrobbleResult | void>;
 
   getName(): string;
 }

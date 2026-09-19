@@ -9,7 +9,11 @@ import {
 import { BingersClient } from "@integrations/bingers/BingersClient";
 import { BingersSessionManager } from "@integrations/bingers/BingersSessionManager";
 import { cookieHeaderFromJar } from "@integrations/bingers/cookieJar";
-import { ISyncClient, SyncOptions } from "@integrations/common/ISyncClient";
+import {
+  ISyncClient,
+  ScrobbleResult,
+  SyncOptions,
+} from "@integrations/common/ISyncClient";
 import { SimklClient } from "@integrations/simkl/SimklClient";
 import { SimklTokenManager } from "@integrations/simkl/SimklTokenManager";
 import { TmdbClient } from "@integrations/tmdb/TmdbClient";
@@ -404,9 +408,8 @@ export class SyncService {
             event.media.type === "movie"
               ? !!user.bingersMarkMoviesAsRewatched
               : !!user.bingersMarkEpisodesAsRewatched;
-          const shouldRewatch = allowRewatch && priorPlays > 0;
 
-          if (priorPlays > 0 && !shouldRewatch) {
+          if (priorPlays > 0 && !allowRewatch) {
             logger.sync.debug(
               {
                 username: userIdentifier,
@@ -419,23 +422,25 @@ export class SyncService {
             continue;
           }
 
-          bingersWasRewatch = shouldRewatch;
           options = {
-            markMoviesAsRewatched:
-              shouldRewatch && event.media.type === "movie",
+            markMoviesAsRewatched: allowRewatch && event.media.type === "movie",
             markEpisodesAsRewatched:
-              shouldRewatch && event.media.type === "episode",
-            bingersLocalPlayCount: shouldRewatch ? priorPlays + 1 : undefined,
+              allowRewatch && event.media.type === "episode",
+            bingersLocalPlayCount: priorPlays > 0 ? priorPlays + 1 : undefined,
           };
         }
 
-        await this.scrobbleWithOptionalAuthRetry(
+        const scrobbleResult = await this.scrobbleWithOptionalAuthRetry(
           destination,
           user,
           event,
           accessToken,
           options
         );
+
+        if (destination.name === "Bingers" && scrobbleResult?.wasRewatched) {
+          bingersWasRewatch = true;
+        }
 
         const mediaInfo =
           event.media.type === "episode"
@@ -586,9 +591,9 @@ export class SyncService {
     event: MediaEvent,
     accessToken: string,
     options: SyncOptions
-  ): Promise<void> {
+  ): Promise<ScrobbleResult | void> {
     try {
-      await destination.client.scrobble(event, accessToken, options);
+      return await destination.client.scrobble(event, accessToken, options);
     } catch (error) {
       if (!destination.refreshAccessToken) {
         throw error;
@@ -602,7 +607,7 @@ export class SyncService {
       }
 
       const refreshedToken = await destination.refreshAccessToken(user);
-      await destination.client.scrobble(event, refreshedToken, options);
+      return await destination.client.scrobble(event, refreshedToken, options);
     }
   }
 

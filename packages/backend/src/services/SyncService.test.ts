@@ -459,7 +459,7 @@ describe("SyncService", () => {
     bingersSessionManagerMocks.getValidCookieJar.mockResolvedValue({
       session_token: { name: "session_token", value: "x" },
     });
-    bingersClientMocks.scrobble.mockResolvedValue(undefined);
+    bingersClientMocks.scrobble.mockResolvedValue({ wasRewatched: true });
 
     const service = new SyncService();
     await service.syncEvent(makeEvent());
@@ -477,6 +477,46 @@ describe("SyncService", () => {
       "session_token=bingers-cookie",
       expect.objectContaining({
         bingersLocalPlayCount: 3,
+        markMoviesAsRewatched: true,
+      })
+    );
+    expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        destinations: JSON.stringify(["Bingers"]),
+        wasRewatched: true,
+      })
+    );
+  });
+
+  it("passes allow-rewatch on first Bingers sync so remote history can increment plays", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktAccessToken: null,
+      bingersCookieJar:
+        '{"session_token":{"name":"session_token","value":"x"}}',
+      bingersMarkMoviesAsRewatched: true,
+      bingersMarkEpisodesAsRewatched: false,
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    syncHistoryRepositoryMocks.countSuccessfulDestinationSyncs.mockResolvedValue(
+      0
+    );
+    bingersSessionManagerMocks.getValidCookieJar.mockResolvedValue({
+      session_token: { name: "session_token", value: "x" },
+    });
+    bingersClientMocks.scrobble.mockResolvedValue({ wasRewatched: true });
+
+    const service = new SyncService();
+    await service.syncEvent(makeEvent());
+
+    expect(bingersClientMocks.scrobble).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "scrobble" }),
+      "session_token=bingers-cookie",
+      expect.objectContaining({
+        bingersLocalPlayCount: undefined,
         markMoviesAsRewatched: true,
       })
     );

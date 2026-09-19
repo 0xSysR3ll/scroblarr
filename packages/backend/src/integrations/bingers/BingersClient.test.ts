@@ -118,10 +118,54 @@ describe("BingersClient", () => {
     ]);
 
     const client = new BingersClient(catalog);
-    await client.scrobble(makeEvent(), "session_token=abc");
+    const result = await client.scrobble(makeEvent(), "session_token=abc");
 
+    expect(result).toEqual({ wasRewatched: false });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]?.[0]).toContain("/sync/pull");
+  });
+
+  it("increments remote play count when rewatch is allowed and Bingers already has the title", async () => {
+    const catalog = {
+      resolveEntity: vi.fn().mockResolvedValue({
+        entityKind: "movie",
+        entityId: "movie-1",
+        titleId: "movie-1",
+      }),
+    } as unknown as BingersCatalogResolver;
+
+    const fetchMock = mockFetchSequence([
+      () =>
+        new Response(
+          JSON.stringify({
+            entries: [
+              {
+                entityKind: "movie",
+                entityId: "movie-1",
+                watched: true,
+                plays: 3,
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        ),
+      () => new Response(null, { status: 200 }),
+    ]);
+
+    const client = new BingersClient(catalog);
+    const result = await client.scrobble(makeEvent(), "session_token=abc", {
+      markMoviesAsRewatched: true,
+    });
+
+    expect(result).toEqual({ wasRewatched: true });
+    const [, request] = fetchMock.mock.calls[1] as unknown as [
+      string,
+      { body: string },
+    ];
+    expect(JSON.parse(request.body).ops[0].fields.plays).toBe(4);
   });
 
   it("uses the higher of local and remote play counts for rewatches", async () => {
@@ -325,7 +369,7 @@ describe("BingersClient", () => {
     expect(JSON.parse(request.body).ops[0].fields.plays).toBe(2);
   });
 
-  it("defaults rewatch play counts when no local target is provided", async () => {
+  it("treats allow-rewatch without prior history as a first watch", async () => {
     const catalog = {
       resolveEntity: vi.fn().mockResolvedValue({
         entityKind: "movie",
@@ -344,10 +388,54 @@ describe("BingersClient", () => {
     ]);
 
     const client = new BingersClient(catalog);
-    await client.scrobble(makeEvent(), "session_token=abc", {
+    const result = await client.scrobble(makeEvent(), "session_token=abc", {
       markMoviesAsRewatched: true,
     });
 
+    expect(result).toEqual({ wasRewatched: false });
+    const [, request] = fetchMock.mock.calls[1] as unknown as [
+      string,
+      { body: string },
+    ];
+    expect(JSON.parse(request.body).ops[0].fields.plays).toBe(1);
+  });
+
+  it("defaults remote-only rewatch play counts when no local target is provided", async () => {
+    const catalog = {
+      resolveEntity: vi.fn().mockResolvedValue({
+        entityKind: "movie",
+        entityId: "movie-1",
+        titleId: "movie-1",
+      }),
+    } as unknown as BingersCatalogResolver;
+
+    const fetchMock = mockFetchSequence([
+      () =>
+        new Response(
+          JSON.stringify({
+            entries: [
+              {
+                entityKind: "movie",
+                entityId: "movie-1",
+                watched: true,
+                plays: 1,
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        ),
+      () => new Response(null, { status: 200 }),
+    ]);
+
+    const client = new BingersClient(catalog);
+    const result = await client.scrobble(makeEvent(), "session_token=abc", {
+      markMoviesAsRewatched: true,
+    });
+
+    expect(result).toEqual({ wasRewatched: true });
     const [, request] = fetchMock.mock.calls[1] as unknown as [
       string,
       { body: string },
