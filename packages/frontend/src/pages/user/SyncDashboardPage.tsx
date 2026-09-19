@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from "@components/ui/dialog";
 import { Spinner } from "@components/ui/spinner";
+import { usePullToRefresh, PULL_THRESHOLD_PX } from "@hooks/usePullToRefresh";
 import {
   getSyncHistory,
   clearSyncHistory,
@@ -60,6 +61,17 @@ interface GroupedHistory {
   items: SyncHistoryItem[];
 }
 
+const AUTO_REFRESH_INTERVAL_MS = 15_000;
+
+function historyFingerprint(items: SyncHistoryItem[], total: number): string {
+  return `${total}:${items
+    .map(
+      (item) =>
+        `${item.id}:${item.success ? 1 : 0}:${item.retriedAt ?? ""}:${getSyncStatus(item)}`
+    )
+    .join(",")}`;
+}
+
 export function SyncDashboardPage() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
@@ -89,6 +101,9 @@ export function SyncDashboardPage() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const retryInFlightRef = useRef(false);
+  const loadGenerationRef = useRef(0);
+  const inFlightCountRef = useRef(0);
+  const fingerprintRef = useRef<string | null>(null);
 
   useEffect(() => {
     const filter = searchParams.get("filter");
@@ -107,60 +122,156 @@ export function SyncDashboardPage() {
     });
   }, [searchParams]);
 
-  const loadHistory = useCallback(async () => {
-    try {
-      setLoading(true);
+  useEffect(() => {
+    fingerprintRef.current = null;
+  }, [filters, sortBy, sortOrder]);
 
-      // Load first page to get total count
-      const firstPage = await getSyncHistory(
-        1,
-        100, // Max page size allowed by backend
-        filters,
-        sortBy,
-        sortOrder
-      );
-
-      // For client-side search/filtering, load up to 500 items (5 pages)
-      // This allows search and quick filters to work on recent history
-      const maxItemsForClientSide = 500;
-      const maxPages = Math.min(5, Math.ceil(firstPage.pagination.total / 100));
-
-      const allItems = [...firstPage.data];
-
-      if (maxPages > 1 && firstPage.pagination.total <= maxItemsForClientSide) {
-        // Load remaining pages
-        const remainingPages = [];
-        for (let p = 2; p <= maxPages; p++) {
-          remainingPages.push(
-            getSyncHistory(p, 100, filters, sortBy, sortOrder)
-          );
-        }
-        const responses = await Promise.all(remainingPages);
-        responses.forEach((response) => {
-          allItems.push(...response.data);
-        });
+  const loadHistory = useCallback(
+    async ({
+      quiet = false,
+      force = false,
+    }: { quiet?: boolean; force?: boolean } = {}) => {
+      if (quiet && !force && inFlightCountRef.current > 0) {
+        return;
       }
 
-      setAllHistory(allItems);
-      setHistory(allItems);
-    } catch {
-      showError(
-        t("sync.errors.loadFailed", {
-          defaultValue: "Failed to load sync history",
-        })
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [filters, sortBy, sortOrder, t]);
+      const generation = ++loadGenerationRef.current;
+      inFlightCountRef.current += 1;
+
+      try {
+        if (!quiet) {
+          setLoading(true);
+        }
+
+        // Load first page to get total count
+        const firstPage = await getSyncHistory(
+          1,
+          100, // Max page size allowed by backend
+          filters,
+          sortBy,
+          sortOrder
+        );
+
+        if (generation !== loadGenerationRef.current) {
+          return;
+        }
+
+        const nextFingerprint = historyFingerprint(
+          firstPage.data,
+          firstPage.pagination.total
+        );
+
+        if (quiet && fingerprintRef.current === nextFingerprint) {
+          return;
+        }
+
+        // For client-side search/filtering, load up to 500 items (5 pages)
+        // This allows search and quick filters to work on recent history
+        const maxItemsForClientSide = 500;
+        const maxPages = Math.min(
+          5,
+          Math.ceil(firstPage.pagination.total / 100)
+        );
+
+        const allItems = [...firstPage.data];
+
+        if (
+          maxPages > 1 &&
+          firstPage.pagination.total <= maxItemsForClientSide
+        ) {
+          // Load remaining pages
+          const remainingPages = [];
+          for (let p = 2; p <= maxPages; p++) {
+            remainingPages.push(
+              getSyncHistory(p, 100, filters, sortBy, sortOrder)
+            );
+          }
+          const responses = await Promise.all(remainingPages);
+          if (generation !== loadGenerationRef.current) {
+            return;
+          }
+          responses.forEach((response) => {
+            allItems.push(...response.data);
+          });
+        }
+
+        if (generation !== loadGenerationRef.current) {
+          return;
+        }
+
+        fingerprintRef.current = nextFingerprint;
+        setAllHistory(allItems);
+        setHistory(allItems);
+      } catch {
+        if (!quiet && generation === loadGenerationRef.current) {
+          showError(
+            t("sync.errors.loadFailed", {
+              defaultValue: "Failed to load sync history",
+            })
+          );
+        }
+      } finally {
+        inFlightCountRef.current = Math.max(0, inFlightCountRef.current - 1);
+        if (generation === loadGenerationRef.current) {
+          setLoading(false);
+        }
+      }
+    },
+    [filters, sortBy, sortOrder, t]
+  );
 
   useEffect(() => {
     setPage(1);
   }, [filters, sortBy, sortOrder, quickFilter, searchQuery]);
 
   useEffect(() => {
-    loadHistory();
+    void loadHistory();
   }, [loadHistory]);
+
+  const refreshPaused =
+    selectedIds.size > 0 ||
+    showClearModal ||
+    showBulkDeleteModal ||
+    confirmDeleteId !== null ||
+    clearing ||
+    deleting !== null ||
+    retrying !== null;
+
+  useEffect(() => {
+    if (refreshPaused) return;
+
+    const quietRefresh = () => {
+      if (document.hidden) return;
+      void loadHistory({ quiet: true });
+    };
+
+    const interval = setInterval(quietRefresh, AUTO_REFRESH_INTERVAL_MS);
+
+    function onVisibilityChange() {
+      if (!document.hidden) {
+        void loadHistory({ quiet: true });
+      }
+    }
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [loadHistory, refreshPaused]);
+
+  const handlePullRefresh = useCallback(async () => {
+    await loadHistory({ quiet: true, force: true });
+  }, [loadHistory]);
+
+  const {
+    pullDistance,
+    refreshing: pullRefreshing,
+    pullHandlers,
+  } = usePullToRefresh({
+    onRefresh: handlePullRefresh,
+    disabled: refreshPaused || loading,
+  });
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -607,7 +718,20 @@ export function SyncDashboardPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-4 sm:py-8">
+    <div className="container mx-auto px-4 py-4 sm:py-8" {...pullHandlers}>
+      {(pullDistance > 0 || pullRefreshing) && (
+        <div
+          className="pointer-events-none flex justify-center overflow-hidden md:hidden"
+          style={{ height: pullRefreshing ? 40 : pullDistance }}
+          aria-hidden={!pullRefreshing}
+        >
+          <div className="flex items-center justify-center pt-1">
+            {(pullRefreshing || pullDistance >= PULL_THRESHOLD_PX) && (
+              <Spinner size="sm" />
+            )}
+          </div>
+        </div>
+      )}
       <div className="mb-4 sm:mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
