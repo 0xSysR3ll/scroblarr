@@ -9,7 +9,7 @@ Be respectful and constructive. We want Scroblarr to be a welcoming project for 
 ## Tools required
 
 - A code editor with good TypeScript/JavaScript support (for example, VS Code).
-- [Node.js](https://nodejs.org/) `^20.19.0`, `^22.13.0`, or `>=24.11.0` (the repo has a [.node-version](.node-version) file; CI and Docker use Node.js 24.11+).
+- [Node.js](https://nodejs.org/) `^20.19.0`, `^22.13.0`, or `>=24.11.0` (see `package.json` engines; [.node-version](.node-version) is a local pin).
 - [pnpm](https://pnpm.io/cli/install).
 - [Git](https://git-scm.com/downloads).
 
