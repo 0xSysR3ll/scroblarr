@@ -20,7 +20,7 @@ export class SyncHistoryRepository {
 
   async findRecent(limit: number): Promise<SyncHistory[]> {
     return this.repository.find({
-      relations: ["user"],
+      relations: { user: true },
       order: {
         syncedAt: "DESC",
       },
@@ -31,7 +31,7 @@ export class SyncHistoryRepository {
   async findByUser(userId: string, limit: number): Promise<SyncHistory[]> {
     return this.repository.find({
       where: { userId },
-      relations: ["user"],
+      relations: { user: true },
       order: {
         syncedAt: "DESC",
       },
@@ -74,7 +74,7 @@ export class SyncHistoryRepository {
 
     const [data, total] = await this.repository.findAndCount({
       where,
-      relations: ["user"],
+      relations: { user: true },
       order: {
         [sortField]: order,
       },
@@ -126,7 +126,7 @@ export class SyncHistoryRepository {
     }
     return this.repository.findOne({
       where,
-      relations: ["user"],
+      relations: { user: true },
     });
   }
 
@@ -165,7 +165,7 @@ export class SyncHistoryRepository {
       year?: number;
     }
   ): Promise<boolean> {
-    const where: FindOptionsWhere<SyncHistory> = {
+    const baseWhere: FindOptionsWhere<SyncHistory> = {
       userId,
       mediaType,
       success: true,
@@ -173,14 +173,15 @@ export class SyncHistoryRepository {
 
     if (mediaType === "episode") {
       if (identifiers.tvdbEpisodeId) {
-        where.tvdbEpisodeId = identifiers.tvdbEpisodeId;
-        const existing = await this.repository.findOne({ where });
+        const existing = await this.repository.findOne({
+          where: { ...baseWhere, tvdbEpisodeId: identifiers.tvdbEpisodeId },
+        });
         if (existing) return true;
       }
       if (identifiers.imdbEpisodeId) {
-        where.tvdbEpisodeId = undefined;
-        where.imdbEpisodeId = identifiers.imdbEpisodeId;
-        const existing = await this.repository.findOne({ where });
+        const existing = await this.repository.findOne({
+          where: { ...baseWhere, imdbEpisodeId: identifiers.imdbEpisodeId },
+        });
         if (existing) return true;
       }
       if (
@@ -188,12 +189,14 @@ export class SyncHistoryRepository {
         identifiers.seasonNumber !== undefined &&
         identifiers.episodeNumber !== undefined
       ) {
-        where.tvdbEpisodeId = undefined;
-        where.imdbEpisodeId = undefined;
-        where.tmdbSeriesId = identifiers.tmdbSeriesId;
-        where.seasonNumber = identifiers.seasonNumber;
-        where.episodeNumber = identifiers.episodeNumber;
-        const existing = await this.repository.findOne({ where });
+        const existing = await this.repository.findOne({
+          where: {
+            ...baseWhere,
+            tmdbSeriesId: identifiers.tmdbSeriesId,
+            seasonNumber: identifiers.seasonNumber,
+            episodeNumber: identifiers.episodeNumber,
+          },
+        });
         if (existing) return true;
       }
       if (
@@ -201,43 +204,45 @@ export class SyncHistoryRepository {
         identifiers.episodeNumber !== undefined &&
         identifiers.mediaTitle
       ) {
-        where.tvdbEpisodeId = undefined;
-        where.imdbEpisodeId = undefined;
-        where.tmdbSeriesId = undefined;
-        where.seasonNumber = identifiers.seasonNumber;
-        where.episodeNumber = identifiers.episodeNumber;
-        where.mediaTitle = identifiers.mediaTitle;
-        const existing = await this.repository.findOne({ where });
+        const existing = await this.repository.findOne({
+          where: {
+            ...baseWhere,
+            seasonNumber: identifiers.seasonNumber,
+            episodeNumber: identifiers.episodeNumber,
+            mediaTitle: identifiers.mediaTitle,
+          },
+        });
         if (existing) return true;
       }
     }
 
     if (mediaType === "movie") {
       if (identifiers.tvdbMovieId) {
-        where.tvdbMovieId = identifiers.tvdbMovieId;
-        const existing = await this.repository.findOne({ where });
+        const existing = await this.repository.findOne({
+          where: { ...baseWhere, tvdbMovieId: identifiers.tvdbMovieId },
+        });
         if (existing) return true;
       }
       if (identifiers.imdbMovieId) {
-        where.tvdbMovieId = undefined;
-        where.imdbMovieId = identifiers.imdbMovieId;
-        const existing = await this.repository.findOne({ where });
+        const existing = await this.repository.findOne({
+          where: { ...baseWhere, imdbMovieId: identifiers.imdbMovieId },
+        });
         if (existing) return true;
       }
       if (identifiers.tmdbMovieId) {
-        where.tvdbMovieId = undefined;
-        where.imdbMovieId = undefined;
-        where.tmdbMovieId = identifiers.tmdbMovieId;
-        const existing = await this.repository.findOne({ where });
+        const existing = await this.repository.findOne({
+          where: { ...baseWhere, tmdbMovieId: identifiers.tmdbMovieId },
+        });
         if (existing) return true;
       }
       if (identifiers.mediaTitle && identifiers.year !== undefined) {
-        where.tvdbMovieId = undefined;
-        where.imdbMovieId = undefined;
-        where.tmdbMovieId = undefined;
-        where.mediaTitle = identifiers.mediaTitle;
-        where.year = identifiers.year;
-        const existing = await this.repository.findOne({ where });
+        const existing = await this.repository.findOne({
+          where: {
+            ...baseWhere,
+            mediaTitle: identifiers.mediaTitle,
+            year: identifiers.year,
+          },
+        });
         if (existing) return true;
       }
     }
@@ -591,11 +596,11 @@ export class SyncHistoryRepository {
       this.repository.findOne({
         where: { userId, success: false },
         order: { syncedAt: "DESC" },
-        select: ["mediaTitle", "syncedAt"],
+        select: { mediaTitle: true, syncedAt: true },
       }),
       this.repository.find({
         where: { userId },
-        select: ["syncedAt"],
+        select: { syncedAt: true },
         order: { syncedAt: "DESC" },
         take: 2000,
       }),
