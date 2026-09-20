@@ -9,7 +9,7 @@ export async function setPostgresUuidTextColumnDefault(
   tableName: string,
   columnName: string
 ): Promise<void> {
-  if (queryRunner.connection.options.type !== "postgres") {
+  if (queryRunner.dataSource.options.type !== "postgres") {
     return;
   }
   await queryRunner.query(
