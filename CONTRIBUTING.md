@@ -9,7 +9,7 @@ Be respectful and constructive. We want Scroblarr to be a welcoming project for 
 ## Tools required
 
 - A code editor with good TypeScript/JavaScript support (for example, VS Code).
-- [Node.js](https://nodejs.org/) 18+ (20 LTS recommended; the repo has a [.node-version](.node-version) file).
+- [Node.js](https://nodejs.org/) `^20.19.0`, `^22.13.0`, or `>=24.11.0` (the repo has a [.node-version](.node-version) file; CI and Docker use Node.js 24.11+).
 - [pnpm](https://pnpm.io/cli/install).
 - [Git](https://git-scm.com/downloads).
 
@@ -35,7 +35,7 @@ Be respectful and constructive. We want Scroblarr to be a welcoming project for 
    git pull origin develop
    ```
 
-4. **Install dependencies** (Node.js 18+ and pnpm 8+ required):
+4. **Install dependencies** (Node.js `^20.19.0` / `^22.13.0` / `>=24.11.0` and pnpm 8+ required):
 
    ```bash
    pnpm install

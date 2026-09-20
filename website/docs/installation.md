@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 You'll need:
 
-- **Node.js 18+** and **pnpm** if you're building from source (the repo pins versions in `.node-version` and `package.json` — match those if something won't install)
+- **Node.js** `^20.19.0`, `^22.13.0`, or `>=24.11.0` and **pnpm** if you're building from source (the repo pins versions in `.node-version` and `package.json` — match those if something won't install)
 - **Docker** only if you want the container image (no local Node toolchain)
 - **SQLite** by default (nothing to install) or **PostgreSQL** if you prefer it
 - At least one of **Plex** or **Jellyfin** so webhooks exist
