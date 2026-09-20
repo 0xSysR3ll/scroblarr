@@ -142,6 +142,16 @@ describe("SyncHistoryRepository integration", () => {
     expect(result.total).toBe(1);
     expect(result.data.map((item) => item.mediaTitle)).toEqual(["Beta Movie"]);
     expect(result.data[0]?.user.id).toBe(user.id);
+
+    const recent = await repository.findRecent(5);
+    expect(recent.some((item) => item.mediaTitle === "Beta Movie")).toBe(true);
+    expect(
+      recent.find((item) => item.mediaTitle === "Beta Movie")?.user.id
+    ).toBe(user.id);
+
+    const byId = await repository.findById(result.data[0]!.id, user.id);
+    expect(byId?.mediaTitle).toBe("Beta Movie");
+    expect(byId?.user.id).toBe(user.id);
   });
 
   it("keeps the newest rows when clearing old history", async () => {
