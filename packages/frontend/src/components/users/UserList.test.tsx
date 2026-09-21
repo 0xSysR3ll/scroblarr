@@ -178,4 +178,32 @@ describe("UserList", () => {
       within(bobMobileCard as HTMLElement).getByText("Simkl")
     ).toBeInTheDocument();
   });
+
+  it("falls back to plex username or User for avatar labels", () => {
+    renderWithProviders(
+      <UserList
+        users={[
+          {
+            ...users[1],
+            id: "plex-only",
+            displayName: undefined,
+            plexUsername: "plex-bob",
+          },
+          {
+            ...users[1],
+            id: "nameless",
+            displayName: undefined,
+            plexUsername: "",
+          },
+        ]}
+      />
+    );
+
+    expect(
+      screen.getAllByRole("img", { name: "plex-bob" }).length
+    ).toBeGreaterThanOrEqual(1);
+    expect(
+      screen.getAllByRole("img", { name: "User" }).length
+    ).toBeGreaterThanOrEqual(1);
+  });
 });

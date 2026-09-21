@@ -173,4 +173,22 @@ describe("UserImport", () => {
     });
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  it("falls back to username for avatar labels when display name is missing", async () => {
+    vi.mocked(getSettings).mockResolvedValue({
+      plexServerUrl: "https://plex.example.test",
+    });
+    vi.mocked(getServerUsers).mockResolvedValue([
+      {
+        username: "username-only",
+      },
+    ]);
+
+    renderUserImport();
+
+    expect(await screen.findByText("username-only")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: "username-only" })
+    ).toHaveTextContent("US");
+  });
 });
