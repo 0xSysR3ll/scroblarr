@@ -7,6 +7,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FaCheck, FaTimes, FaTrash, FaCrown } from "react-icons/fa";
 
+import { UserAvatar } from "@/components/ui/UserAvatar";
+
 interface UserListProps {
   users: User[];
   onDelete?: (id: string) => Promise<void>;
@@ -175,21 +177,10 @@ export function UserList({
                       })}
                     />
                   )}
-                  <img
-                    src={
-                      user.thumb ||
-                      `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                        user.displayName || user.plexUsername || "User"
-                      )}&background=6366f1&color=fff&size=128`
-                    }
-                    alt={user.displayName || user.plexUsername}
-                    className="h-12 w-12 shrink-0 rounded-full border-2 border-border object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src =
-                        `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                          user.displayName || user.plexUsername || "User"
-                        )}&background=6366f1&color=fff&size=128`;
-                    }}
+                  <UserAvatar
+                    name={user.displayName || user.plexUsername || "User"}
+                    src={user.thumb}
+                    size="xl"
                   />
                   <div className="flex-1 min-w-0">
                     <div className="truncate text-sm font-medium text-foreground">
@@ -429,21 +420,11 @@ export function UserList({
                     )}
                     <td className="px-2 py-4 text-sm whitespace-nowrap text-foreground sm:px-4 md:px-6">
                       <div className="flex items-center gap-2 sm:gap-3">
-                        <img
-                          src={
-                            user.thumb ||
-                            `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                              user.displayName || user.plexUsername || "User"
-                            )}&background=6366f1&color=fff&size=128`
-                          }
-                          alt={user.displayName || user.plexUsername}
-                          className="h-8 w-8 rounded-full border-2 border-border object-cover sm:h-10 sm:w-10"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src =
-                              `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                user.displayName || user.plexUsername || "User"
-                              )}&background=6366f1&color=fff&size=128`;
-                          }}
+                        <UserAvatar
+                          name={user.displayName || user.plexUsername || "User"}
+                          src={user.thumb}
+                          size="sm"
+                          className="sm:h-10 sm:w-10 sm:text-sm"
                         />
                         <span className="truncate">
                           {user.displayName || "-"}

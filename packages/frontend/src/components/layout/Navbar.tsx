@@ -27,6 +27,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { UserAvatar } from "@/components/ui/UserAvatar";
 
 type NavItem = {
   path: string;
@@ -275,17 +276,10 @@ function UserMenu({
     navigate("/login", { replace: true });
   }
 
-  const avatarUrl =
-    user?.thumb ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(
-      user?.displayName ||
-        user?.username ||
-        t("nav.user", { defaultValue: "User" })
-    )}&background=3b82f6&color=fff&size=128`;
-
-  const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-    user?.displayName || user?.username || "User"
-  )}&background=3b82f6&color=fff&size=128`;
+  const avatarName =
+    user?.displayName ||
+    user?.username ||
+    t("nav.user", { defaultValue: "User" });
 
   return (
     <DropdownMenu>
@@ -299,15 +293,11 @@ function UserMenu({
           }`}
         >
           <div className="relative">
-            <img
-              src={avatarUrl}
-              alt={user?.displayName || user?.username}
-              className={`rounded-full border-2 border-border object-cover transition-colors group-hover:border-primary ${
-                compact ? "h-8 w-8" : "h-9 w-9"
-              }`}
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = fallbackAvatar;
-              }}
+            <UserAvatar
+              name={avatarName}
+              src={user?.thumb}
+              size={compact ? "sm" : "md"}
+              className="transition-colors group-hover:border-primary"
             />
             {user?.isAdmin && (
               <div className="absolute -right-1 -top-1 rounded-full bg-primary p-0.5">
@@ -328,14 +318,7 @@ function UserMenu({
       >
         <DropdownMenuLabel className="border-b border-border px-4 py-3 font-normal">
           <div className="flex items-center gap-3">
-            <img
-              src={avatarUrl}
-              alt={user?.displayName || user?.username}
-              className="h-10 w-10 rounded-full border-2 border-border object-cover"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = fallbackAvatar;
-              }}
-            />
+            <UserAvatar name={avatarName} src={user?.thumb} size="lg" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <div className="truncate text-sm font-medium text-foreground">

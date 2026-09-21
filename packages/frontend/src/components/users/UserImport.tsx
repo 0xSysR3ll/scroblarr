@@ -28,6 +28,8 @@ import {
   FaCheckCircle,
 } from "react-icons/fa";
 
+import { UserAvatar } from "@/components/ui/UserAvatar";
+
 interface UserImportProps {
   isOpen: boolean;
   onClose: () => void;
@@ -505,24 +507,12 @@ export function UserImport({
                               })}
                             />
                           </div>
-                          <div className="shrink-0 mr-3">
-                            {user.thumb ? (
-                              <img
-                                src={user.thumb}
-                                alt={user.username}
-                                className="h-12 w-12 rounded-full border-2 border-border object-cover"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src =
-                                    `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username)}&background=6366f1&color=fff&size=128`;
-                                }}
-                              />
-                            ) : (
-                              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/15">
-                                <span className="text-lg font-semibold text-primary">
-                                  {user.username.charAt(0).toUpperCase()}
-                                </span>
-                              </div>
-                            )}
+                          <div className="mr-3 shrink-0">
+                            <UserAvatar
+                              name={user.displayName || user.username}
+                              src={user.thumb}
+                              size="xl"
+                            />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div
