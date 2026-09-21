@@ -49,7 +49,7 @@
     "eslint-plugin-react": "^7.37.3",
     "eslint-plugin-react-hooks": "^7.0.0",
     "i18next-scanner": "^4.6.0",
-    "jsdom": "^29.1.1",
+    "jsdom": "^30.0.0",
     "postcss": "^8.4.32",
     "tailwindcss": "^4.2.4",
     "typescript": "^6.0.0",
