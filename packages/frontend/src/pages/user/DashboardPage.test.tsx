@@ -758,9 +758,11 @@ describe("DashboardPage", () => {
       await screen.findByText("You've synced 12 titles.")
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "View Sync History" }));
+    await user.click(
+      screen.getAllByRole("link", { name: "View Sync History" })[0]!
+    );
     expect(screen.getByTestId("current-path")).toHaveTextContent("/sync");
-    await user.click(screen.getByRole("button", { name: "Profile" }));
+    await user.click(screen.getByRole("link", { name: "Profile" }));
     expect(screen.getByTestId("current-path")).toHaveTextContent("/profile");
   });
 
@@ -784,10 +786,10 @@ describe("DashboardPage", () => {
     expect(screen.queryByText("By Destination")).not.toBeInTheDocument();
 
     await user.click(
-      screen.getByRole("button", { name: "Check profile & links" })
+      screen.getByRole("link", { name: "Check profile & links" })
     );
     expect(screen.getByTestId("current-path")).toHaveTextContent("/profile");
-    await user.click(screen.getByRole("button", { name: "View Sync History" }));
+    await user.click(screen.getByRole("link", { name: "View Sync History" }));
     expect(screen.getByTestId("current-path")).toHaveTextContent("/sync");
   });
 });

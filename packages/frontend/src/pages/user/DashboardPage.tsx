@@ -37,7 +37,7 @@ import {
   FaTimesCircle,
   FaTv,
 } from "react-icons/fa";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 const MEDIA_COLORS = {
   episode: "var(--chart-3)",
@@ -529,7 +529,6 @@ function AveragePaceCard({
 export function DashboardPage() {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [statistics, setStatistics] = useState<SyncStatistics | null>(null);
   const [recentSyncs, setRecentSyncs] = useState<SyncHistoryItem[]>([]);
   const [firstSync, setFirstSync] = useState<SyncHistoryItem | null>(null);
@@ -859,14 +858,12 @@ export function DashboardPage() {
                       "Watch something on Plex or Jellyfin and it will appear here. Make sure webhooks are configured and your Trakt, Simkl, or Bingers account is linked in your profile.",
                   })}
                 </p>
-                <Button
-                  type="button"
-                  className=""
-                  onClick={() => navigate("/profile")}
-                >
-                  {t("dashboard.empty.checkProfile", {
-                    defaultValue: "Check profile & links",
-                  })}
+                <Button asChild>
+                  <Link to="/profile">
+                    {t("dashboard.empty.checkProfile", {
+                      defaultValue: "Check profile & links",
+                    })}
+                  </Link>
                 </Button>
               </div>
             </div>
@@ -876,14 +873,12 @@ export function DashboardPage() {
                   defaultValue: "Quick Actions",
                 })}
               </h3>
-              <Button
-                type="button"
-                className=""
-                onClick={() => navigate("/sync")}
-              >
-                {t("dashboard.viewSyncHistory", {
-                  defaultValue: "View Sync History",
-                })}
+              <Button asChild>
+                <Link to="/sync">
+                  {t("dashboard.viewSyncHistory", {
+                    defaultValue: "View Sync History",
+                  })}
+                </Link>
               </Button>
             </div>
           </>
@@ -1558,24 +1553,19 @@ export function DashboardPage() {
                 })}
               </h3>
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                <Button
-                  type="button"
-                  className=""
-                  onClick={() => navigate("/sync")}
-                >
-                  {t("dashboard.viewSyncHistory", {
-                    defaultValue: "View Sync History",
-                  })}
+                <Button asChild>
+                  <Link to="/sync">
+                    {t("dashboard.viewSyncHistory", {
+                      defaultValue: "View Sync History",
+                    })}
+                  </Link>
                 </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className=""
-                  onClick={() => navigate("/profile")}
-                >
-                  {t("dashboard.profile", {
-                    defaultValue: "Profile",
-                  })}
+                <Button asChild variant="secondary">
+                  <Link to="/profile">
+                    {t("dashboard.profile", {
+                      defaultValue: "Profile",
+                    })}
+                  </Link>
                 </Button>
               </div>
             </div>

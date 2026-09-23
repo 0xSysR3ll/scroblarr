@@ -75,11 +75,9 @@ describe("LogsTab", () => {
     ).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "1" }));
-    await waitFor(() => {
-      expect(getLogs).toHaveBeenCalledWith(
-        expect.objectContaining({ page: 1 })
-      );
-    });
+    expect(
+      await screen.findByText(/Showing 1 to 20 of 60 results/i)
+    ).toBeVisible();
   });
 
   it("shows load errors, severity row styles, and log files", async () => {

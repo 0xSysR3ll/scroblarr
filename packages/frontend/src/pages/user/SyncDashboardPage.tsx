@@ -856,6 +856,7 @@ export function SyncDashboardPage() {
               aria-label={t("sync.toggleGrouping", {
                 defaultValue: "Toggle date grouping",
               })}
+              aria-pressed={groupByDate}
             >
               <FaCalendar className="h-4 w-4" />
             </button>
@@ -1254,7 +1255,12 @@ export function SyncDashboardPage() {
                     })}
               </div>
               <div className="flex w-full min-w-0 justify-center sm:w-auto sm:justify-end">
-                <div className="flex max-w-full flex-nowrap items-center gap-1 overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-2 [&::-webkit-scrollbar]:hidden">
+                <nav
+                  aria-label={t("sync.pagination.nav", {
+                    defaultValue: "Pagination",
+                  })}
+                  className="flex max-w-full flex-nowrap items-center gap-1 overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-2 [&::-webkit-scrollbar]:hidden"
+                >
                   <button
                     type="button"
                     onClick={() => setPage(1)}
@@ -1286,6 +1292,7 @@ export function SyncDashboardPage() {
                         type="button"
                         onClick={() => setPage(p)}
                         disabled={loading}
+                        aria-current={p === page ? "page" : undefined}
                         className={`inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border text-sm font-medium sm:size-10 ${
                           p === page
                             ? "border-primary bg-primary text-primary-foreground"
@@ -1317,7 +1324,7 @@ export function SyncDashboardPage() {
                   >
                     <FaAngleDoubleRight className="h-3 w-3 sm:h-4 sm:w-4" />
                   </button>
-                </div>
+                </nav>
               </div>
             </div>
           )}

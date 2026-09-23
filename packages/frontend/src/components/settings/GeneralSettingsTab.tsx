@@ -69,7 +69,7 @@ function SecretKeyField({
             type={show ? "text" : "password"}
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 pr-10 font-mono text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="w-full rounded-md border border-input bg-background px-3 py-2 pr-12 font-mono text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
             placeholder={placeholder}
           />
           <button
@@ -247,7 +247,7 @@ export function GeneralSettingsTab({
                 type={showTmdbAccessToken ? "text" : "password"}
                 value={tmdbAccessToken}
                 onChange={(e) => onTmdbAccessTokenChange(e.target.value)}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 pr-10 font-mono text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 pr-12 font-mono text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
                 placeholder={t("settings.general.tmdbAccessTokenPlaceholder", {
                   defaultValue: "eyJhbGciOiJIUzI1NiJ9...",
                 })}
