@@ -30,7 +30,7 @@ describe("AboutSettingsTab", () => {
           version: "1.0.0",
           tag: "v1.0.0",
           githubRepository: "0xsysr3ll/scroblarr",
-          releasesError: true,
+          releasesError: "failed to fetch",
         }}
       />
     );
