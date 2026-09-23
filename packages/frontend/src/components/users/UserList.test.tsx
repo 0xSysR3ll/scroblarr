@@ -172,7 +172,7 @@ describe("UserList", () => {
 
     const bobMobileCard = within(mobileView as HTMLElement)
       .getByText("Bob")
-      .closest(".rounded-lg");
+      .closest(".surface-panel");
     expect(bobMobileCard).not.toBeNull();
     expect(
       within(bobMobileCard as HTMLElement).getByText("Simkl")
@@ -205,5 +205,101 @@ describe("UserList", () => {
     expect(
       screen.getAllByRole("img", { name: "User" }).length
     ).toBeGreaterThanOrEqual(1);
+  });
+
+  it("shows jellyfin and trakt badges and selection styles", async () => {
+    const user = userEvent.setup();
+    const onSelectedIdsChange = vi.fn();
+
+    renderWithProviders(
+      <UserList
+        users={[
+          {
+            ...users[1],
+            jellyfinUsername: "bob-jf",
+            traktUsername: "bob-trakt",
+          },
+        ]}
+        onBulkDelete={vi.fn()}
+        selectedIds={new Set(["regular-user"])}
+        onSelectedIdsChange={onSelectedIdsChange}
+        onToggleEnabled={vi.fn()}
+      />
+    );
+
+    const bobRow = getUserTableRow("Bob");
+    expect(within(bobRow).getByText("Jellyfin")).toBeVisible();
+    expect(within(bobRow).getByText("Trakt")).toBeVisible();
+    expect(bobRow).toHaveClass("bg-warning-50");
+    expect(
+      within(bobRow).getByRole("button", { name: "Enabled" })
+    ).toBeVisible();
+
+    const mobileView = document.querySelector(".md\\:hidden");
+    expect(mobileView).not.toBeNull();
+    const bobMobileCard = within(mobileView as HTMLElement)
+      .getByText("Bob")
+      .closest(".surface-panel");
+    expect(bobMobileCard).not.toBeNull();
+    expect(bobMobileCard).toHaveClass("border-warning-500");
+    expect(
+      within(bobMobileCard as HTMLElement).getByText("Jellyfin")
+    ).toBeVisible();
+    expect(
+      within(bobMobileCard as HTMLElement).getByText("Trakt")
+    ).toBeVisible();
+
+    await user.click(
+      within(bobRow).getByRole("checkbox", { name: "Select Bob" })
+    );
+    expect(onSelectedIdsChange).toHaveBeenCalled();
+  });
+
+  it("shows a non-toggleable enabled chip for the current user", () => {
+    renderWithProviders(<UserList users={users} onToggleEnabled={vi.fn()} />);
+
+    const aliceRow = getUserTableRow("Alice");
+    expect(within(aliceRow).getByText("Enabled")).toBeVisible();
+    expect(
+      within(aliceRow).queryByRole("button", { name: "Enabled" })
+    ).toBeNull();
+  });
+
+  it("shows disabled chip styles for inactive users", () => {
+    const disabledUsers: User[] = [
+      {
+        ...users[0],
+        id: "current-disabled",
+        displayName: "Current Disabled",
+        enabled: false,
+      },
+      {
+        ...users[1],
+        id: "other-disabled",
+        displayName: "Other Disabled",
+        enabled: false,
+      },
+    ];
+
+    vi.mocked(useAuth).mockReturnValue({
+      user: { id: "current-disabled", username: "alice", isAdmin: true },
+      loading: false,
+      logout: vi.fn(),
+      checkAuth: vi.fn(),
+      setUserFromLogin: vi.fn(),
+      isAuthenticated: true,
+      isAdmin: true,
+    });
+
+    renderWithProviders(
+      <UserList users={disabledUsers} onToggleEnabled={vi.fn()} />
+    );
+
+    const currentRow = getUserTableRow("Current Disabled");
+    const otherRow = getUserTableRow("Other Disabled");
+    expect(within(currentRow).getByText("Disabled")).toBeVisible();
+    expect(
+      within(otherRow).getByRole("button", { name: "Disabled" })
+    ).toBeVisible();
   });
 });

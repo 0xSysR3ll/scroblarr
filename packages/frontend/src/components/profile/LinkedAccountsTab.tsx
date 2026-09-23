@@ -179,7 +179,7 @@ export function LinkedAccountsTab({
         <div className="space-y-4">
           {/* Plex linking */}
           {(plexConfigured || plexUsername) && (
-            <div className="rounded-lg border border-border p-4">
+            <div className="surface-panel p-4">
               <div className="flex items-center justify-between gap-3 mb-3">
                 <div className="flex items-center gap-3">
                   <img src="/logos/plex.svg" alt="Plex" className="w-6 h-6" />
@@ -196,7 +196,7 @@ export function LinkedAccountsTab({
                 </div>
                 {plexUsername ? (
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                    <div className="flex items-center gap-2 text-success-600 dark:text-success-400">
                       <FaCheckCircle className="w-5 h-5" />
                       <span className="text-sm font-medium">
                         {t("profile.linkedAccounts.linked", {
@@ -207,7 +207,7 @@ export function LinkedAccountsTab({
                     <button
                       onClick={handleUnlinkPlex}
                       disabled={unlinkingPlex}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
                       title={t("profile.linkedAccounts.unlink", {
                         defaultValue: "Unlink Plex Account",
                       })}
@@ -238,16 +238,14 @@ export function LinkedAccountsTab({
                 )}
               </div>
               {plexLinkError && (
-                <p className="text-sm text-red-600 dark:text-red-400 mt-2">
-                  {plexLinkError}
-                </p>
+                <p className="mt-2 text-sm text-destructive">{plexLinkError}</p>
               )}
             </div>
           )}
 
           {/* Jellyfin linking */}
           {(jellyfinConfigured || jellyfinUsername) && (
-            <div className="rounded-lg border border-border p-4">
+            <div className="surface-panel p-4">
               <div className="flex items-center justify-between gap-3 mb-3">
                 <div className="flex items-center gap-3">
                   <img
@@ -268,7 +266,7 @@ export function LinkedAccountsTab({
                 </div>
                 {jellyfinUsername ? (
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                    <div className="flex items-center gap-2 text-success-600 dark:text-success-400">
                       <FaCheckCircle className="w-5 h-5" />
                       <span className="text-sm font-medium">
                         {t("profile.linkedAccounts.linked", {
@@ -279,7 +277,7 @@ export function LinkedAccountsTab({
                     <button
                       onClick={handleUnlinkJellyfin}
                       disabled={unlinkingJellyfin}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
                       title={t("profile.linkedAccounts.unlink", {
                         defaultValue: "Unlink Jellyfin Account",
                       })}
@@ -338,7 +336,7 @@ export function LinkedAccountsTab({
                 )}
               </div>
               {jellyfinLinkError && (
-                <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+                <p className="mt-2 text-sm text-destructive">
                   {jellyfinLinkError}
                 </p>
               )}
@@ -348,8 +346,8 @@ export function LinkedAccountsTab({
       )}
 
       {!plexConfigured && !jellyfinConfigured && (
-        <div className="bg-yellow-50 dark:bg-yellow-950 border-l-4 border-yellow-400 dark:border-yellow-600 p-4 rounded">
-          <p className="text-sm text-yellow-700 dark:text-yellow-300">
+        <div className="bg-warning-50 dark:bg-warning-950 border-l-4 border-warning-400 dark:border-warning-600 p-4 rounded">
+          <p className="text-sm text-warning-700 dark:text-warning-300">
             {t("profile.linkedAccounts.notConfigured", {
               defaultValue:
                 "No media servers are configured. Please ask an admin to configure Plex or Jellyfin in the settings.",
@@ -372,8 +370,8 @@ export function LinkedAccountsTab({
             })}
           </DialogDescription>
           {user?.isAdmin && !jellyfinUsername && (
-            <div className="mb-4 rounded border-l-4 border-yellow-400 bg-yellow-50 p-3 dark:border-yellow-600 dark:bg-yellow-950">
-              <p className="text-sm text-yellow-700 dark:text-yellow-300">
+            <div className="mb-4 rounded border-l-4 border-warning-400 bg-warning-50 p-3 dark:border-warning-600 dark:bg-warning-950">
+              <p className="text-sm text-warning-700 dark:text-warning-300">
                 {t("profile.linkedAccounts.adminWarning", {
                   defaultValue:
                     "As an admin, you must have at least one linked account. If you unlink Plex and only Plex is configured, you may lose access. Please ensure Jellyfin is configured and linked first.",
@@ -385,7 +383,7 @@ export function LinkedAccountsTab({
             <button
               type="button"
               onClick={() => setShowUnlinkPlexModal(false)}
-              className="rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
+              className="cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
             >
               {t("common.cancel", { defaultValue: "Cancel" })}
             </button>
@@ -393,7 +391,7 @@ export function LinkedAccountsTab({
               type="button"
               onClick={confirmUnlinkPlex}
               disabled={unlinkingPlex}
-              className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              className="cursor-pointer rounded-lg bg-destructive px-3 py-2 text-sm font-medium text-white hover:bg-destructive/90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-destructive/40 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {unlinkingPlex
                 ? t("common.loading", { defaultValue: "Loading..." })
@@ -420,8 +418,8 @@ export function LinkedAccountsTab({
             })}
           </DialogDescription>
           {user?.isAdmin && !plexUsername && (
-            <div className="mb-4 rounded border-l-4 border-yellow-400 bg-yellow-50 p-3 dark:border-yellow-600 dark:bg-yellow-950">
-              <p className="text-sm text-yellow-700 dark:text-yellow-300">
+            <div className="mb-4 rounded border-l-4 border-warning-400 bg-warning-50 p-3 dark:border-warning-600 dark:bg-warning-950">
+              <p className="text-sm text-warning-700 dark:text-warning-300">
                 {t("profile.linkedAccounts.adminWarning", {
                   defaultValue:
                     "As an admin, you must have at least one linked account. If you unlink Jellyfin and only Jellyfin is configured, you may lose access. Please ensure Plex is configured and linked first.",
@@ -433,7 +431,7 @@ export function LinkedAccountsTab({
             <button
               type="button"
               onClick={() => setShowUnlinkJellyfinModal(false)}
-              className="rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
+              className="cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
             >
               {t("common.cancel", { defaultValue: "Cancel" })}
             </button>
@@ -441,7 +439,7 @@ export function LinkedAccountsTab({
               type="button"
               onClick={confirmUnlinkJellyfin}
               disabled={unlinkingJellyfin}
-              className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              className="cursor-pointer rounded-lg bg-destructive px-3 py-2 text-sm font-medium text-white hover:bg-destructive/90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-destructive/40 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {unlinkingJellyfin
                 ? t("common.loading", { defaultValue: "Loading..." })

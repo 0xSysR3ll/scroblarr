@@ -23,9 +23,8 @@
     },
     "usernamePasswordRequired": "Please enter your username and password",
     "loginWithJellyfinFailed": "Failed to login with Jellyfin",
-    "welcomeBadge": "Welcome back to Scroblarr",
     "login": "Login",
-    "signInPrompt": "Sign in to access Scroblarr.",
+    "signInPrompt": "Sign in to sync your watches across services.",
     "or": "Or",
     "noServiceConfigured": "No authentication service configured. Please contact an administrator.",
     "setupAdminFailed": "Failed to setup admin",
@@ -202,7 +201,6 @@
   "settings": {
     "title": "Settings",
     "about": {
-      "title": "About Scroblarr",
       "description": "Version information and links related to this Scroblarr instance.",
       "versionSection": "Version",
       "currentTag": "Current version",
@@ -222,8 +220,7 @@
       "tmdbAttribution": "This product uses the TMDB API but is not endorsed or certified by TMDB."
     },
     "general": {
-      "title": "General Settings",
-      "description": "General application settings will be available here.",
+      "description": "API keys, media lookups, and sync history retention.",
       "apiKey": "API Key",
       "apiKeyDescription": "Used for API authentication.",
       "apiKeyPlaceholder": "sk_...",
@@ -247,7 +244,9 @@
       "webhookApiKeyPlaceholder": "sk_...",
       "webhookApiKeyCopied": "Webhook API key copied to clipboard",
       "copyWebhookApiKey": "Copy webhook API key",
-      "generateWebhookApiKey": "Generate new webhook API key"
+      "generateWebhookApiKey": "Generate new webhook API key",
+      "keysSection": "API keys",
+      "mediaSection": "Media & history"
     },
     "jellyfinServerRemoved": "Jellyfin server removed successfully",
     "removeJellyfinServerFailed": "Failed to remove Jellyfin server",

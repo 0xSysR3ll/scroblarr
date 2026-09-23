@@ -1,4 +1,5 @@
 import { SyncHistoryPoster } from "@components/sync/SyncHistoryPoster";
+import { Button } from "@components/ui/button";
 import { Skeleton } from "@components/ui/skeleton";
 import { useAuth } from "@contexts/AuthContext";
 import {
@@ -14,6 +15,7 @@ import {
   useRef,
   useState,
   type ComponentType,
+  type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -26,6 +28,7 @@ import {
   FaCheckCircle,
   FaClock,
   FaDatabase,
+  FaExclamationTriangle,
   FaExternalLinkAlt,
   FaFilm,
   FaListUl,
@@ -160,8 +163,12 @@ function conicGradient(
     : "var(--muted)";
 }
 
-function cardClass(extra = "") {
-  return `min-w-0 rounded-xl border border-border/60 bg-card text-card-foreground shadow-sm ${extra}`;
+function tileClass(extra = "") {
+  return `surface-tile ${extra}`;
+}
+
+function panelClass(extra = "") {
+  return `surface-panel ${extra}`;
 }
 
 const dashboardAlignGrid =
@@ -174,24 +181,28 @@ function StatCard({
   icon: Icon,
   color = "blue",
   subtitle,
+  footer,
 }: {
   title: string;
   value: string | number;
   icon: ComponentType<{ className?: string }>;
   color?: "blue" | "green" | "red" | "purple" | "yellow" | "muted";
   subtitle?: string;
+  footer?: ReactNode;
 }) {
   const colorClasses = {
     blue: "bg-primary/15 text-primary",
-    green: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
-    red: "bg-destructive/15 text-destructive",
-    purple: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
-    yellow: "bg-amber-500/15 text-amber-800 dark:text-amber-300",
+    green:
+      "bg-success-500/15 text-success-700 dark:bg-success-400/15 dark:text-success-300",
+    red: "bg-destructive/15 text-destructive dark:bg-destructive/20",
+    purple: "bg-primary/15 text-primary",
+    yellow:
+      "bg-warning-500/15 text-warning-800 dark:bg-warning-400/15 dark:text-warning-200",
     muted: "bg-muted text-muted-foreground",
   };
 
   return (
-    <div className={cardClass("flex h-full flex-col p-3 sm:p-4")}>
+    <div className={tileClass("flex h-full flex-col p-3 sm:p-4")}>
       <div className="mb-2 flex items-start justify-between gap-2">
         <h3 className="min-w-0 text-xs font-medium leading-tight text-muted-foreground sm:text-sm">
           {title}
@@ -210,13 +221,14 @@ function StatCard({
           {subtitle}
         </p>
       )}
+      {footer}
     </div>
   );
 }
 
 function StatCardSkeleton() {
   return (
-    <div className={cardClass("flex h-full flex-col p-3 sm:p-4")}>
+    <div className={tileClass("flex h-full flex-col p-3 sm:p-4")}>
       <div className="mb-2 flex items-center justify-between">
         <Skeleton className="h-4 w-24" />
         <Skeleton className="h-8 w-8 rounded-lg" />
@@ -252,7 +264,7 @@ function MomentCard({
   item?: SyncHistoryItem;
 }) {
   return (
-    <div className={cardClass("flex h-full items-center gap-3 p-3")}>
+    <div className={tileClass("flex h-full items-center gap-3 p-3")}>
       {item ? (
         <SyncHistoryPoster item={item} size="compact" />
       ) : (
@@ -378,7 +390,7 @@ function ActivityRhythmChart({ last7Days }: { last7Days: number[] }) {
               >
                 <div
                   className={`absolute bottom-0 left-1/2 h-full w-2.5 -translate-x-1/2 rounded-full sm:w-3.5 ${
-                    isToday ? "bg-primary/15" : "bg-muted/70"
+                    isToday ? "bg-primary/20 dark:bg-primary/25" : "bg-muted"
                   }`}
                 />
                 {count > 0 && (
@@ -389,7 +401,7 @@ function ActivityRhythmChart({ last7Days }: { last7Days: number[] }) {
                     <div
                       className={`z-10 size-2.5 shrink-0 rounded-full bg-primary shadow-sm sm:size-3 ${
                         isToday
-                          ? "ring-1 ring-primary/50 ring-offset-1 ring-offset-card sm:ring-2 sm:ring-offset-2"
+                          ? "ring-1 ring-primary/50 ring-offset-1 ring-offset-background sm:ring-2 sm:ring-offset-2"
                           : ""
                       }`}
                     />
@@ -400,7 +412,7 @@ function ActivityRhythmChart({ last7Days }: { last7Days: number[] }) {
                   </div>
                 )}
                 <span
-                  className="pointer-events-none absolute -top-0.5 left-1/2 z-10 -translate-x-1/2 rounded-md bg-foreground px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap text-background opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
+                  className="pointer-events-none absolute -top-0.5 left-1/2 z-10 -translate-x-1/2 rounded-md bg-foreground px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap text-background opacity-100 shadow-sm transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
                   aria-hidden
                 >
                   {count}
@@ -455,8 +467,9 @@ function AveragePaceCard({
   const { t } = useTranslation();
   const colorClasses = {
     blue: "bg-primary/15 text-primary",
-    purple: "bg-purple-500/15 text-purple-700 dark:text-purple-300",
-    green: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+    purple: "bg-primary/15 text-primary",
+    green:
+      "bg-success-500/15 text-success-700 dark:bg-success-400/15 dark:text-success-300",
   };
   const ratio = average > 0 ? actual / average : actual > 0 ? 1 : 0;
   const fillPct = Math.min(100, Math.max(0, ratio * 100));
@@ -465,7 +478,7 @@ function AveragePaceCard({
   const ahead = deltaPct > 0;
 
   return (
-    <div className={cardClass("flex h-full flex-col p-3 sm:p-4")}>
+    <div className={tileClass("flex h-full flex-col p-3 sm:p-4")}>
       <div className="mb-2 flex items-start justify-between gap-2">
         <h3 className="min-w-0 text-xs font-medium leading-tight text-muted-foreground sm:text-sm">
           {title}
@@ -491,7 +504,7 @@ function AveragePaceCard({
             <span
               className={`shrink-0 tabular-nums ${
                 ahead
-                  ? "text-emerald-600 dark:text-emerald-400"
+                  ? "text-success-600 dark:text-success-400"
                   : "text-muted-foreground"
               }`}
             >
@@ -503,7 +516,7 @@ function AveragePaceCard({
         <div className="h-1.5 overflow-hidden rounded-full bg-muted">
           <div
             className={`h-full rounded-full ${
-              ahead ? "bg-emerald-500" : "bg-primary"
+              ahead ? "bg-success-500 dark:bg-success-400" : "bg-primary"
             }`}
             style={{ width: `${fillPct}%` }}
           />
@@ -665,12 +678,12 @@ export function DashboardPage() {
   const healthBadge =
     statistics && statistics.total > 0 ? (
       <span
-        className={`inline-flex shrink-0 items-center rounded-full px-3 py-1 text-sm font-medium ${
+        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${
           statistics.last30Days.failed > 0
-            ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+            ? "bg-warning-500/15 text-warning-800 dark:bg-warning-400/15 dark:text-warning-200"
             : statistics.byPeriod.thisWeek === 0
               ? "bg-muted text-muted-foreground"
-              : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
+              : "bg-success-500/15 text-success-800 dark:bg-success-400/15 dark:text-success-300"
         }`}
         title={
           statistics.last30Days.failed > 0
@@ -686,6 +699,13 @@ export function DashboardPage() {
                 })
         }
       >
+        {statistics.last30Days.failed > 0 ? (
+          <FaExclamationTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        ) : statistics.byPeriod.thisWeek === 0 ? (
+          <FaMinus className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        ) : (
+          <FaCheckCircle className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        )}
         {statistics.last30Days.failed > 0
           ? t("dashboard.health.issues", { defaultValue: "Issues" })
           : statistics.byPeriod.thisWeek === 0
@@ -699,7 +719,7 @@ export function DashboardPage() {
     ) : null;
 
   return (
-    <div className="container mx-auto min-w-0 px-4 py-4 sm:py-8">
+    <div className="container mx-auto min-w-0 px-4 py-4 sm:px-6 sm:py-8 lg:px-8">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
           {t("dashboard.title", { defaultValue: "Dashboard" })}
@@ -735,7 +755,7 @@ export function DashboardPage() {
                 type="button"
                 onClick={() => loadDashboard({ isRefresh: true })}
                 disabled={refreshing || loading}
-                className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex size-10 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
                 title={t("dashboard.refresh", { defaultValue: "Refresh" })}
                 aria-label={t("dashboard.refresh", {
                   defaultValue: "Refresh",
@@ -754,7 +774,7 @@ export function DashboardPage() {
         <div>
           <div>
             <div className={`mb-3 grid-cols-1 ${dashboardAlignGrid}`}>
-              <div className={cardClass(`p-4 sm:p-6 ${dashboardHeroSpan}`)}>
+              <div className={`py-2 sm:py-3 ${dashboardHeroSpan}`}>
                 <Skeleton className="h-10 w-3/4" />
                 <Skeleton className="mt-3 h-4 w-1/2" />
               </div>
@@ -774,22 +794,60 @@ export function DashboardPage() {
           </div>
         </div>
       ) : error ? (
-        <div className={cardClass("p-4 sm:p-6")}>
-          <p className="text-red-600 dark:text-red-400">{error}</p>
-          <button
+        <div className={panelClass("p-4 sm:p-6")}>
+          <p className="text-destructive">{error}</p>
+          <Button
             type="button"
+            className="mt-4"
             onClick={() => loadDashboard()}
-            className="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             {t("errors.tryAgain", { defaultValue: "Try again" })}
-          </button>
+          </Button>
         </div>
       ) : statistics ? (
         statistics.total === 0 ? (
           <>
-            <div className={cardClass("mb-6 p-6 text-center sm:p-8")}>
+            <div
+              className={panelClass(
+                "scroblarr-enter mb-6 p-6 text-center sm:p-8"
+              )}
+            >
               <div className="mx-auto max-w-md">
-                <FaDatabase className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
+                <div className="mb-5 flex items-center justify-center gap-3">
+                  <img
+                    src="/logos/plex.svg"
+                    alt=""
+                    className="h-7 w-7 opacity-80"
+                    aria-hidden
+                  />
+                  <img
+                    src="/logos/jellyfin.svg"
+                    alt=""
+                    className="h-7 w-7 opacity-80"
+                    aria-hidden
+                  />
+                  <span className="text-muted-foreground/40" aria-hidden>
+                    →
+                  </span>
+                  <img
+                    src="/logos/trakt.svg"
+                    alt=""
+                    className="h-7 w-7 opacity-80"
+                    aria-hidden
+                  />
+                  <img
+                    src="/logos/simkl.svg"
+                    alt=""
+                    className="h-7 w-7 opacity-80"
+                    aria-hidden
+                  />
+                  <img
+                    src="/logos/bingers.png"
+                    alt=""
+                    className="h-7 w-7 rounded-sm opacity-80"
+                    aria-hidden
+                  />
+                </div>
                 <h3 className="mb-2 text-base font-semibold text-foreground sm:text-lg">
                   {t("dashboard.empty.title", {
                     defaultValue: "No sync data yet",
@@ -801,39 +859,39 @@ export function DashboardPage() {
                       "Watch something on Plex or Jellyfin and it will appear here. Make sure webhooks are configured and your Trakt, Simkl, or Bingers account is linked in your profile.",
                   })}
                 </p>
-                <button
+                <Button
+                  type="button"
+                  className=""
                   onClick={() => navigate("/profile")}
-                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                 >
                   {t("dashboard.empty.checkProfile", {
                     defaultValue: "Check profile & links",
                   })}
-                </button>
+                </Button>
               </div>
             </div>
-            <div className={cardClass("p-4 sm:p-6")}>
+            <div className={panelClass("p-4 sm:p-6")}>
               <h3 className="mb-4 text-base font-semibold text-foreground sm:text-lg">
                 {t("dashboard.quickActions", {
                   defaultValue: "Quick Actions",
                 })}
               </h3>
-              <button
+              <Button
+                type="button"
+                className=""
                 onClick={() => navigate("/sync")}
-                className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
               >
                 {t("dashboard.viewSyncHistory", {
                   defaultValue: "View Sync History",
                 })}
-              </button>
+              </Button>
             </div>
           </>
         ) : (
           <>
             <div className={`mb-3 grid-cols-1 ${dashboardAlignGrid}`}>
               <div
-                className={cardClass(
-                  `flex flex-col justify-center p-4 sm:p-6 ${dashboardHeroSpan}`
-                )}
+                className={`flex flex-col justify-center py-2 sm:py-3 ${dashboardHeroSpan}`}
               >
                 <h2 className="text-2xl font-bold tracking-tight text-balance text-foreground sm:text-3xl lg:text-4xl">
                   {t("dashboard.hero.title", {
@@ -918,7 +976,7 @@ export function DashboardPage() {
                 })}
                 value={`${formatCount(statistics.successful, locale)} / ${formatCount(statistics.total, locale)}`}
                 icon={FaCheckCircle}
-                color="purple"
+                color="green"
               />
               <StatCard
                 title={t("dashboard.stats.successRate", {
@@ -934,29 +992,24 @@ export function DashboardPage() {
                       : "red"
                 }
               />
-              <div className={cardClass("flex h-full flex-col p-3 sm:p-4")}>
-                <div className="mb-2 flex items-start justify-between gap-2">
-                  <h3 className="min-w-0 text-xs font-medium leading-tight text-muted-foreground sm:text-sm">
-                    {t("dashboard.stats.failed", { defaultValue: "Failed" })}
-                  </h3>
-                  <div className="shrink-0 rounded-lg bg-red-100 p-1.5 text-red-600 sm:p-2 dark:bg-red-900/30 dark:text-red-400">
-                    <FaTimesCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                  </div>
-                </div>
-                <p className="text-xl font-bold leading-tight tracking-tight text-foreground sm:text-2xl">
-                  {formatCount(statistics.failed, locale)}
-                </p>
-                {statistics.failed > 0 && (
-                  <Link
-                    to="/sync?filter=failed"
-                    className="mt-1 inline-block text-xs font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                  >
-                    {t("dashboard.viewFailedSyncs", {
-                      defaultValue: "View failed syncs",
-                    })}
-                  </Link>
-                )}
-              </div>
+              <StatCard
+                title={t("dashboard.stats.failed", { defaultValue: "Failed" })}
+                value={formatCount(statistics.failed, locale)}
+                icon={FaTimesCircle}
+                color="red"
+                footer={
+                  statistics.failed > 0 ? (
+                    <Link
+                      to="/sync?filter=failed"
+                      className="mt-1 inline-flex items-center text-xs font-medium text-destructive hover:text-destructive/80 dark:text-destructive dark:hover:text-destructive/80"
+                    >
+                      {t("dashboard.viewFailedSyncs", {
+                        defaultValue: "View failed syncs",
+                      })}
+                    </Link>
+                  ) : undefined
+                }
+              />
               <StatCard
                 title={t("dashboard.stats.mostActiveDay", {
                   defaultValue: "Most Active Day",
@@ -1031,14 +1084,14 @@ export function DashboardPage() {
                   {statistics.last30Days.total > 0 && (
                     <>
                       {" · "}
-                      <span className="text-green-600 dark:text-green-400">
+                      <span className="text-success-600 dark:text-success-400">
                         {formatCount(statistics.last30Days.successful, locale)}{" "}
                         {t("dashboard.stats.ok", { defaultValue: "ok" })}
                       </span>
                       {statistics.last30Days.failed > 0 && (
                         <>
                           {" · "}
-                          <span className="text-red-600 dark:text-red-400">
+                          <span className="text-destructive">
                             {formatCount(statistics.last30Days.failed, locale)}{" "}
                             {t("dashboard.stats.failedShort", {
                               defaultValue: "failed",
@@ -1052,7 +1105,7 @@ export function DashboardPage() {
                 {statistics.last30Days.total > 0 && (
                   <Link
                     to="/sync"
-                    className="font-medium text-primary hover:text-primary/80"
+                    className="inline-flex items-center font-medium text-primary hover:text-primary/80"
                   >
                     {t("dashboard.viewSyncHistory", {
                       defaultValue: "View Sync History",
@@ -1069,7 +1122,7 @@ export function DashboardPage() {
                   </span>
                   <Link
                     to="/sync?filter=failed"
-                    className="min-w-0 truncate font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                    className="min-w-0 truncate font-medium text-destructive hover:text-destructive/80"
                   >
                     {statistics.lastFailure.mediaTitle}
                   </Link>
@@ -1081,7 +1134,7 @@ export function DashboardPage() {
             </div>
 
             <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <div className={cardClass("overflow-x-clip p-4 sm:p-6")}>
+              <div className={panelClass("overflow-x-clip p-4 sm:p-6")}>
                 <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -1142,7 +1195,7 @@ export function DashboardPage() {
                 )}
               </div>
 
-              <div className={cardClass("p-4 sm:p-6")}>
+              <div className={panelClass("p-4 sm:p-6")}>
                 <h3 className="mb-4 text-base font-semibold text-foreground sm:text-lg">
                   {t("dashboard.stats.byMediaType", {
                     defaultValue: "By Media Type",
@@ -1172,7 +1225,7 @@ export function DashboardPage() {
                     }}
                     aria-hidden
                   >
-                    <div className="absolute inset-4 flex flex-col items-center justify-center rounded-full bg-card text-center">
+                    <div className="absolute inset-4 flex flex-col items-center justify-center rounded-full bg-card text-center ring-1 ring-border/40">
                       <span className="text-lg font-bold text-foreground">
                         {formatCount(mediaTotal, locale)}
                       </span>
@@ -1246,7 +1299,7 @@ export function DashboardPage() {
             </div>
 
             <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className={cardClass("p-4 sm:p-6")}>
+              <div className={panelClass("p-4 sm:p-6")}>
                 <h3 className="mb-4 text-base font-semibold text-foreground sm:text-lg">
                   {t("dashboard.stats.bySource", {
                     defaultValue: "By Source",
@@ -1255,11 +1308,11 @@ export function DashboardPage() {
                 <div className="space-y-4">
                   {(
                     [
-                      ["Plex", statistics.bySource.plex, "var(--chart-1)"],
+                      ["Plex", statistics.bySource.plex, "var(--chart-plex)"],
                       [
                         "Jellyfin",
                         statistics.bySource.jellyfin,
-                        "var(--chart-4)",
+                        "var(--chart-jellyfin)",
                       ],
                     ] as const
                   ).map(([label, value, color]) => (
@@ -1281,7 +1334,7 @@ export function DashboardPage() {
                   ))}
                 </div>
               </div>
-              <div className={cardClass("p-4 sm:p-6")}>
+              <div className={panelClass("p-4 sm:p-6")}>
                 <h3 className="mb-4 text-base font-semibold text-foreground sm:text-lg">
                   {t("dashboard.stats.byDestination", {
                     defaultValue: "By Destination",
@@ -1293,22 +1346,22 @@ export function DashboardPage() {
                       [
                         "Trakt",
                         statistics.byDestination.trakt,
-                        "var(--chart-1)",
+                        "var(--chart-trakt)",
                       ],
                       [
                         "TVTime",
                         statistics.byDestination.tvtime,
-                        "var(--chart-5)",
+                        "var(--chart-tvtime)",
                       ],
                       [
                         "Simkl",
                         statistics.byDestination.simkl,
-                        "var(--chart-2)",
+                        "var(--chart-simkl)",
                       ],
                       [
                         "Bingers",
                         statistics.byDestination.bingers,
-                        "var(--chart-3)",
+                        "var(--chart-bingers)",
                       ],
                     ] as const
                   ).map(([label, value, color]) => (
@@ -1334,7 +1387,7 @@ export function DashboardPage() {
 
             <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
               {statistics.topThisMonth.length > 0 ? (
-                <div className={cardClass("p-4 sm:p-6")}>
+                <div className={panelClass("p-4 sm:p-6")}>
                   <h3 className="mb-4 text-base font-semibold text-foreground sm:text-lg">
                     {t("dashboard.topThisMonth", {
                       defaultValue: "Most synced this month",
@@ -1365,7 +1418,7 @@ export function DashboardPage() {
                   </ul>
                 </div>
               ) : (
-                <div className={cardClass("p-4 sm:p-6")}>
+                <div className={panelClass("p-4 sm:p-6")}>
                   <h3 className="mb-2 text-base font-semibold text-foreground sm:text-lg">
                     {t("dashboard.topThisMonth", {
                       defaultValue: "Most synced this month",
@@ -1380,7 +1433,7 @@ export function DashboardPage() {
               )}
 
               {recentSyncs.length > 0 ? (
-                <div className={cardClass("p-4 sm:p-6")}>
+                <div className={panelClass("p-4 sm:p-6")}>
                   <div className="mb-4 flex min-w-0 items-center justify-between gap-2">
                     <h3 className="min-w-0 truncate text-base font-semibold text-foreground sm:text-lg">
                       {t("dashboard.recentSyncs", {
@@ -1389,7 +1442,7 @@ export function DashboardPage() {
                     </h3>
                     <Link
                       to="/sync"
-                      className="flex shrink-0 items-center gap-1 text-sm font-medium text-primary hover:text-primary/80"
+                      className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-primary hover:text-primary/80"
                     >
                       {t("dashboard.viewAll", { defaultValue: "View all" })}
                       <FaExternalLinkAlt className="h-3 w-3" />
@@ -1412,9 +1465,9 @@ export function DashboardPage() {
                         </div>
                         <span className="flex shrink-0 items-center gap-2">
                           {item.success ? (
-                            <FaCheckCircle className="h-4 w-4 text-green-500" />
+                            <FaCheckCircle className="h-4 w-4 text-success-600 dark:text-success-400" />
                           ) : (
-                            <FaTimesCircle className="h-4 w-4 text-red-500" />
+                            <FaTimesCircle className="h-4 w-4 text-destructive" />
                           )}
                           <span className="hidden text-xs text-muted-foreground sm:inline">
                             {formatRelativeTime(item.syncedAt, t)}
@@ -1425,7 +1478,7 @@ export function DashboardPage() {
                   </ul>
                 </div>
               ) : (
-                <div className={cardClass("p-4 sm:p-6")}>
+                <div className={panelClass("p-4 sm:p-6")}>
                   <h3 className="mb-2 text-base font-semibold text-foreground sm:text-lg">
                     {t("dashboard.recentSyncs", {
                       defaultValue: "Recent syncs",
@@ -1498,29 +1551,32 @@ export function DashboardPage() {
               </div>
             </div>
 
-            <div className={cardClass("p-4 sm:p-6")}>
+            <div className={panelClass("p-4 sm:p-6")}>
               <h3 className="mb-4 text-base font-semibold text-foreground sm:text-lg">
                 {t("dashboard.quickActions", {
                   defaultValue: "Quick Actions",
                 })}
               </h3>
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                <button
+                <Button
+                  type="button"
+                  className=""
                   onClick={() => navigate("/sync")}
-                  className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                 >
                   {t("dashboard.viewSyncHistory", {
                     defaultValue: "View Sync History",
                   })}
-                </button>
-                <button
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className=""
                   onClick={() => navigate("/profile")}
-                  className="rounded-lg bg-muted px-3 py-2 text-sm font-medium text-foreground/90 transition-colors hover:bg-muted/80"
                 >
                   {t("dashboard.profile", {
                     defaultValue: "Profile",
                   })}
-                </button>
+                </Button>
               </div>
             </div>
           </>

@@ -22,7 +22,7 @@ function historyItem(
 }
 
 describe("SyncDestinationBadges", () => {
-  it("renders Bingers destination badges with sky styling", () => {
+  it("renders Bingers destination badges with logo coral styling", () => {
     renderWithProviders(
       <SyncDestinationBadges
         item={historyItem({ destinations: ["Bingers"] })}
@@ -30,7 +30,7 @@ describe("SyncDestinationBadges", () => {
     );
 
     const badge = screen.getByLabelText("Bingers");
-    expect(badge).toHaveClass("bg-sky-100");
+    expect(badge).toHaveClass("bg-(--bingers-chip-bg)");
     expect(screen.getByAltText("Bingers")).toHaveAttribute(
       "src",
       "/logos/bingers.png"

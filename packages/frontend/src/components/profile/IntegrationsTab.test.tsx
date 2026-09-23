@@ -64,14 +64,14 @@ vi.mock("@services/api", () => ({
 
 async function getTraktSection(): Promise<HTMLElement> {
   const heading = await screen.findByRole("heading", { name: /Trakt/i });
-  const section = heading.closest(".rounded-lg.border");
+  const section = heading.closest(".surface-panel");
   expect(section).not.toBeNull();
   return section as HTMLElement;
 }
 
 async function getSimklSection(): Promise<HTMLElement> {
   const heading = await screen.findByRole("heading", { name: /Simkl/i });
-  const section = heading.closest(".rounded-lg.border");
+  const section = heading.closest(".surface-panel");
   expect(section).not.toBeNull();
   return section as HTMLElement;
 }
@@ -102,7 +102,7 @@ async function expandSimklSection(
 
 async function getBingersSection(): Promise<HTMLElement> {
   const heading = await screen.findByRole("heading", { name: /Bingers/i });
-  const section = heading.closest(".rounded-lg.border");
+  const section = heading.closest(".surface-panel");
   expect(section).not.toBeNull();
   return section as HTMLElement;
 }

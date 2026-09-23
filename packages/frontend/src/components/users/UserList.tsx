@@ -115,7 +115,7 @@ export function UserList({
 
   if (users.length === 0) {
     return (
-      <div className="rounded-lg border border-border/60 bg-card p-6 text-card-foreground shadow-sm">
+      <div className="surface-panel p-6">
         <p className="text-muted-foreground">
           {t("users.noUsersFound", { defaultValue: "No users found" })}
         </p>
@@ -134,7 +134,7 @@ export function UserList({
       {/* Mobile Card View */}
       <div className="md:hidden space-y-3">
         {onBulkDelete && deletableUsers.length > 0 && (
-          <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-card p-3 text-card-foreground shadow-sm">
+          <div className="surface-panel flex items-center gap-3 p-3">
             <CustomCheckbox
               checked={allSelected}
               onChange={handleSelectAll}
@@ -156,12 +156,12 @@ export function UserList({
           return (
             <div
               key={user.id}
-              className={`rounded-lg border border-border/60 bg-card p-4 text-card-foreground shadow-sm ${
+              className={`surface-panel p-4 ${
                 confirmDeleteId === user.id
-                  ? "border-red-500 dark:border-red-600"
+                  ? "border-destructive"
                   : isSelected
-                    ? "border-orange-500 dark:border-orange-600"
-                    : "border-border/60"
+                    ? "border-warning-500 dark:border-warning-600"
+                    : ""
               }`}
             >
               <div className="flex items-start justify-between gap-3 mb-3">
@@ -180,7 +180,7 @@ export function UserList({
                   <UserAvatar
                     name={user.displayName || user.plexUsername || "User"}
                     src={user.thumb}
-                    size="xl"
+                    size="lg"
                   />
                   <div className="flex-1 min-w-0">
                     <div className="truncate text-sm font-medium text-foreground">
@@ -197,7 +197,7 @@ export function UserList({
                   <div className="shrink-0">
                     {confirmDeleteId === user.id ? (
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-red-600 dark:text-red-400">
+                        <span className="text-xs text-destructive">
                           {t("users.deleteUser", {
                             defaultValue: "Delete?",
                           })}
@@ -208,7 +208,7 @@ export function UserList({
                           aria-label={t("users.confirmDelete", {
                             defaultValue: "Confirm delete",
                           })}
-                          className="text-red-600 dark:text-red-500 hover:text-red-900 dark:hover:text-red-400 disabled:opacity-50"
+                          className="inline-flex size-8 cursor-pointer items-center justify-center text-destructive hover:text-destructive/80 disabled:opacity-50"
                           title={t("users.confirmDelete", {
                             defaultValue: "Confirm delete",
                           })}
@@ -222,7 +222,7 @@ export function UserList({
                         <button
                           onClick={cancelDelete}
                           disabled={deletingId === user.id}
-                          className="text-muted-foreground hover:text-foreground disabled:opacity-50"
+                          className="inline-flex size-8 cursor-pointer items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-50"
                           title={t("common.cancel", {
                             defaultValue: "Cancel",
                           })}
@@ -236,12 +236,12 @@ export function UserList({
                         aria-label={t("users.deleteUserTitle", {
                           defaultValue: "Delete user",
                         })}
-                        className="text-red-600 dark:text-red-500 hover:text-red-900 dark:hover:text-red-400"
+                        className="inline-flex size-8 cursor-pointer items-center justify-center text-destructive hover:text-destructive/80"
                         title={t("users.deleteUserTitle", {
                           defaultValue: "Delete user",
                         })}
                       >
-                        <FaTrash className="h-5 w-5" />
+                        <FaTrash className="h-4 w-4" />
                       </button>
                     )}
                   </div>
@@ -251,7 +251,7 @@ export function UserList({
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-1.5">
                   {user.isAdmin && (
-                    <div className="flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5">
+                    <div className="chip bg-primary/15">
                       <FaCrown className="h-3 w-3 text-primary" />
                       <span className="text-xs font-medium text-primary">
                         {t("users.admin", { defaultValue: "Admin" })}
@@ -259,7 +259,7 @@ export function UserList({
                     </div>
                   )}
                   {user.plexUsername && (
-                    <div className="flex items-center gap-1 rounded-full bg-(--plex-chip-bg) px-2 py-0.5 text-(--plex-chip-fg)">
+                    <div className="chip bg-(--plex-chip-bg) text-(--plex-chip-fg)">
                       <img
                         src="/logos/plex.svg"
                         alt="Plex"
@@ -271,7 +271,7 @@ export function UserList({
                     </div>
                   )}
                   {user.jellyfinUsername && (
-                    <div className="flex items-center gap-1 px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900 rounded-full">
+                    <div className="chip bg-indigo-100 dark:bg-indigo-900">
                       <img
                         src="/logos/jellyfin.svg"
                         alt="Jellyfin"
@@ -283,7 +283,7 @@ export function UserList({
                     </div>
                   )}
                   {user.traktUsername && (
-                    <div className="flex items-center gap-1 px-2 py-0.5 bg-purple-100 dark:bg-purple-900 rounded-full">
+                    <div className="chip bg-purple-100 dark:bg-purple-900">
                       <img
                         src="/logos/trakt.svg"
                         alt="Trakt"
@@ -295,7 +295,7 @@ export function UserList({
                     </div>
                   )}
                   {user.simklUsername && (
-                    <div className="flex items-center gap-1 px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900 rounded-full">
+                    <div className="chip bg-emerald-100 dark:bg-emerald-900">
                       <img
                         src="/logos/simkl.svg"
                         alt="Simkl"
@@ -310,11 +310,11 @@ export function UserList({
                     <button
                       onClick={() => handleToggleEnabled(user.id, user.enabled)}
                       disabled={togglingId === user.id}
-                      className={`px-2 py-0.5 text-xs font-semibold rounded-full transition-colors ${
+                      className={`chip cursor-pointer font-semibold transition-colors ${
                         user.enabled
-                          ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800"
+                          ? "bg-success-100 text-success-800 hover:bg-success-200 dark:bg-success-900 dark:text-success-200 dark:hover:bg-success-800"
                           : "bg-muted text-muted-foreground hover:bg-muted/80"
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      } disabled:cursor-not-allowed disabled:opacity-50`}
                       title={
                         user.enabled
                           ? t("users.disableUser", {
@@ -335,9 +335,9 @@ export function UserList({
                     </button>
                   ) : (
                     <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
+                      className={`chip font-semibold ${
                         user.enabled
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                          ? "bg-success-100 text-success-800 dark:bg-success-900 dark:text-success-200"
                           : "bg-muted text-muted-foreground"
                       }`}
                     >
@@ -354,7 +354,7 @@ export function UserList({
       </div>
 
       {/* Desktop Table View */}
-      <div className="hidden overflow-hidden rounded-lg border border-border/60 bg-card text-card-foreground shadow-sm md:block">
+      <div className="surface-panel hidden overflow-hidden md:block">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-border">
             <thead className="bg-muted/50">
@@ -399,9 +399,9 @@ export function UserList({
                     key={user.id}
                     className={
                       confirmDeleteId === user.id
-                        ? "bg-red-50 dark:bg-red-950"
+                        ? "bg-destructive/10"
                         : isSelected
-                          ? "bg-orange-50 dark:bg-orange-950"
+                          ? "bg-warning-50 dark:bg-warning-950"
                           : ""
                     }
                   >
@@ -434,7 +434,7 @@ export function UserList({
                     <td className="px-2 sm:px-4 md:px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         {user.isAdmin && (
-                          <div className="flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5">
+                          <div className="chip bg-primary/15">
                             <FaCrown className="h-3 w-3 text-primary" />
                             <span className="text-xs font-medium text-primary">
                               {t("users.admin", { defaultValue: "Admin" })}
@@ -442,7 +442,7 @@ export function UserList({
                           </div>
                         )}
                         {user.plexUsername && (
-                          <div className="flex items-center gap-1 rounded-full bg-(--plex-chip-bg) px-2 py-0.5 text-(--plex-chip-fg)">
+                          <div className="chip bg-(--plex-chip-bg) text-(--plex-chip-fg)">
                             <img
                               src="/logos/plex.svg"
                               alt="Plex"
@@ -454,7 +454,7 @@ export function UserList({
                           </div>
                         )}
                         {user.jellyfinUsername && (
-                          <div className="flex items-center gap-1 px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900 rounded-full">
+                          <div className="chip bg-indigo-100 dark:bg-indigo-900">
                             <img
                               src="/logos/jellyfin.svg"
                               alt="Jellyfin"
@@ -468,7 +468,7 @@ export function UserList({
                           </div>
                         )}
                         {user.traktUsername && (
-                          <div className="flex items-center gap-1 px-2 py-0.5 bg-purple-100 dark:bg-purple-900 rounded-full">
+                          <div className="chip bg-purple-100 dark:bg-purple-900">
                             <img
                               src="/logos/trakt.svg"
                               alt="Trakt"
@@ -482,7 +482,7 @@ export function UserList({
                           </div>
                         )}
                         {user.simklUsername && (
-                          <div className="flex items-center gap-1 px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900 rounded-full">
+                          <div className="chip bg-emerald-100 dark:bg-emerald-900">
                             <img
                               src="/logos/simkl.svg"
                               alt="Simkl"
@@ -510,11 +510,11 @@ export function UserList({
                               handleToggleEnabled(user.id, user.enabled)
                             }
                             disabled={togglingId === user.id}
-                            className={`px-2 py-0.5 text-xs font-semibold rounded-full transition-colors ${
+                            className={`chip cursor-pointer font-semibold transition-colors ${
                               user.enabled
-                                ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800"
+                                ? "bg-success-100 text-success-800 hover:bg-success-200 dark:bg-success-900 dark:text-success-200 dark:hover:bg-success-800"
                                 : "bg-muted text-muted-foreground hover:bg-muted/80"
-                            } disabled:opacity-50 disabled:cursor-not-allowed`}
+                            } disabled:cursor-not-allowed disabled:opacity-50`}
                             title={
                               user.enabled
                                 ? t("users.disableUser", {
@@ -535,9 +535,9 @@ export function UserList({
                           </button>
                         ) : (
                           <span
-                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
+                            className={`chip font-semibold ${
                               user.enabled
-                                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                                ? "bg-success-100 text-success-800 dark:bg-success-900 dark:text-success-200"
                                 : "bg-muted text-muted-foreground"
                             }`}
                           >
@@ -560,7 +560,7 @@ export function UserList({
                         {canDelete ? (
                           confirmDeleteId === user.id ? (
                             <div className="flex items-center justify-end gap-2">
-                              <span className="text-xs text-red-600 dark:text-red-400 mr-2">
+                              <span className="text-xs text-destructive mr-2">
                                 {t("users.deleteUser", {
                                   defaultValue: "Delete this user?",
                                 })}
@@ -571,7 +571,7 @@ export function UserList({
                                 aria-label={t("users.confirmDelete", {
                                   defaultValue: "Confirm delete",
                                 })}
-                                className="text-red-600 dark:text-red-500 hover:text-red-900 dark:hover:text-red-400 disabled:opacity-50"
+                                className="inline-flex size-8 cursor-pointer items-center justify-center text-destructive hover:text-destructive/80 disabled:opacity-50"
                                 title={t("users.confirmDelete", {
                                   defaultValue: "Confirm delete",
                                 })}
@@ -585,7 +585,7 @@ export function UserList({
                               <button
                                 onClick={cancelDelete}
                                 disabled={deletingId === user.id}
-                                className="text-muted-foreground hover:text-foreground disabled:opacity-50"
+                                className="inline-flex size-8 cursor-pointer items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-50"
                                 title={t("common.cancel", {
                                   defaultValue: "Cancel",
                                 })}
@@ -599,12 +599,12 @@ export function UserList({
                               aria-label={t("users.deleteUserTitle", {
                                 defaultValue: "Delete user",
                               })}
-                              className="text-red-600 dark:text-red-500 hover:text-red-900 dark:hover:text-red-400"
+                              className="inline-flex size-8 cursor-pointer items-center justify-center text-destructive hover:text-destructive/80"
                               title={t("users.deleteUserTitle", {
                                 defaultValue: "Delete user",
                               })}
                             >
-                              <FaTrash className="h-5 w-5" />
+                              <FaTrash className="h-4 w-4" />
                             </button>
                           )
                         ) : (

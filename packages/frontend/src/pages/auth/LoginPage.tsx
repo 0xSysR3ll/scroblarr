@@ -9,13 +9,7 @@ import { FaMoon, FaSun, FaDesktop, FaEye, FaEyeSlash } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -112,28 +106,29 @@ export function LoginPage() {
   return (
     <div className="relative flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-8">
       <ThemeToggleButton />
-      <div className="relative z-10 w-full max-w-md">
-        <div className="mb-6 flex flex-col items-center gap-2">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur-sm">
-            <span className="h-2 w-2 rounded-full bg-success-500" />
-            <span>
-              {t("auth.welcomeBadge", {
-                defaultValue: "Welcome back to Scroblarr",
-              })}
-            </span>
-          </div>
+      <div className="scroblarr-enter relative z-10 w-full max-w-md">
+        <div className="mb-8 flex flex-col items-center text-center">
+          <img
+            src="/logo-icon.svg"
+            alt=""
+            className="mb-4 h-16 w-16 sm:h-20 sm:w-20"
+            aria-hidden
+          />
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+            Scroblarr
+          </h1>
+          <p className="mt-2 max-w-sm text-sm text-muted-foreground sm:text-base">
+            {t("auth.signInPrompt", {
+              defaultValue: "Sign in to sync your watches across services.",
+            })}
+          </p>
         </div>
 
-        <Card className="border-border/80 shadow-xl backdrop-blur-md">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl sm:text-3xl">
+        <Card className="border-border/70 bg-card/90 shadow-sm backdrop-blur-sm">
+          <CardHeader className="pb-3 text-center">
+            <CardTitle className="text-base font-medium text-muted-foreground">
               {t("auth.login", { defaultValue: "Login" })}
             </CardTitle>
-            <CardDescription className="text-base">
-              {t("auth.signInPrompt", {
-                defaultValue: "Sign in to access Scroblarr.",
-              })}
-            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             {error && (
@@ -150,7 +145,7 @@ export function LoginPage() {
                 type="button"
                 onClick={plexLogin}
                 disabled={plexLoading}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--auth-plex-oauth-bg)] px-4 py-3 font-semibold text-[var(--auth-plex-oauth-fg)] shadow-sm transition-colors hover:bg-[var(--auth-plex-oauth-hover)] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[var(--auth-plex-oauth-bg)] px-4 py-3 font-semibold text-[var(--auth-plex-oauth-fg)] shadow-sm transition-colors hover:bg-[var(--auth-plex-oauth-hover)] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {plexLoading ? (
                   <span>
@@ -207,7 +202,7 @@ export function LoginPage() {
                           password: e.target.value,
                         })
                       }
-                      className="pr-10"
+                      className="pr-14"
                       autoComplete="current-password"
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
@@ -218,7 +213,7 @@ export function LoginPage() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-hidden"
+                      className="absolute right-1 top-1/2 inline-flex size-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
                       aria-label={
                         showPassword
                           ? t("auth.hidePassword", {
@@ -313,7 +308,7 @@ function ThemeToggleButton() {
       type="button"
       variant="ghost"
       size="icon"
-      className="absolute right-4 top-4"
+      className="absolute right-4 top-4 size-10"
       onClick={toggleTheme}
       aria-label={getAriaLabel()}
       title={getAriaLabel()}

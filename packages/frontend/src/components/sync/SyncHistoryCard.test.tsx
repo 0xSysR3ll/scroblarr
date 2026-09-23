@@ -18,24 +18,33 @@ const baseItem: SyncHistoryItem = {
   syncedAt: new Date().toISOString(),
 };
 
-function renderCard(item: SyncHistoryItem, retrying: string | null = null) {
+function renderCard(
+  item: SyncHistoryItem,
+  options: {
+    retrying?: string | null;
+    isSelected?: boolean;
+    confirmDeleteId?: string | null;
+  } = {}
+) {
   const onRetry = vi.fn();
+  const onDelete = vi.fn();
+  const onCancelDelete = vi.fn();
 
-  renderWithProviders(
+  const { container } = renderWithProviders(
     <SyncHistoryCard
       item={item}
-      isSelected={false}
-      confirmDeleteId={null}
+      isSelected={options.isSelected ?? false}
+      confirmDeleteId={options.confirmDeleteId ?? null}
       deleting={null}
-      retrying={retrying}
+      retrying={options.retrying ?? null}
       onSelect={vi.fn()}
-      onDelete={vi.fn()}
-      onCancelDelete={vi.fn()}
+      onDelete={onDelete}
+      onCancelDelete={onCancelDelete}
       onRetry={onRetry}
     />
   );
 
-  return { onRetry };
+  return { onRetry, onDelete, onCancelDelete, container };
 }
 
 describe("SyncHistoryCard", () => {
@@ -63,10 +72,38 @@ describe("SyncHistoryCard", () => {
   });
 
   it("disables retry while any retry is already in flight", () => {
-    renderCard(baseItem, "another-history-id");
+    renderCard(baseItem, { retrying: "another-history-id" });
 
     expect(
       screen.getByRole("button", { name: "Retry this sync" })
     ).toBeDisabled();
+  });
+
+  it("applies selected and confirming styles", () => {
+    const { container: selected } = renderCard(baseItem, { isSelected: true });
+    expect(selected.firstChild).toHaveClass("border-warning-500");
+
+    const { container: confirming } = renderCard(baseItem, {
+      confirmDeleteId: baseItem.id,
+    });
+    expect(confirming.firstChild).toHaveClass("border-destructive");
+    expect(
+      screen.getByRole("button", { name: "Confirm delete" })
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeVisible();
+  });
+
+  it("shows success and jellyfin source variants", () => {
+    renderCard({
+      ...baseItem,
+      success: true,
+      errorMessage: undefined,
+      source: "jellyfin",
+    });
+
+    expect(screen.getByText("Jellyfin")).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Retry this sync" })
+    ).toBeNull();
   });
 });

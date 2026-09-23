@@ -148,7 +148,7 @@ export function SetupPage() {
     return (
       <div className="relative flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-8">
         <ThemeToggleButton />
-        <Card className="w-full max-w-2xl border-border/80 shadow-xl">
+        <Card className="w-full max-w-2xl border-border/50 shadow-sm">
           <CardHeader className="text-center">
             <CardTitle className="text-3xl">
               {t("auth.setupAdmin", { defaultValue: "Setup Admin Account" })}
@@ -202,7 +202,7 @@ export function SetupPage() {
     return (
       <div className="relative flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-8">
         <ThemeToggleButton />
-        <Card className="w-full max-w-md border-border/80 shadow-xl">
+        <Card className="w-full max-w-md border-border/50 shadow-sm">
           <CardHeader>
             <Button
               type="button"
@@ -258,7 +258,7 @@ export function SetupPage() {
     return (
       <div className="relative flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-8">
         <ThemeToggleButton />
-        <Card className="w-full max-w-md border-border/80 shadow-xl">
+        <Card className="w-full max-w-md border-border/50 shadow-sm">
           <CardHeader>
             <Button
               type="button"

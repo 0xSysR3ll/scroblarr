@@ -54,12 +54,12 @@ export function SyncHistoryCard({
 
   return (
     <div
-      className={`rounded-lg border bg-card p-2.5 text-card-foreground shadow-sm transition-colors ${
+      className={`surface-panel p-2.5 transition-colors ${
         isConfirming
-          ? "border-red-500 dark:border-red-600 bg-red-50 dark:bg-red-950"
+          ? "border-destructive bg-destructive/10"
           : isSelected
-            ? "border-orange-500 dark:border-orange-600 bg-orange-50 dark:bg-orange-950"
-            : "border-border hover:border-muted-foreground/40"
+            ? "border-warning-500 bg-warning-50 dark:border-warning-600 dark:bg-warning-950"
+            : "hover:border-muted-foreground/40"
       }`}
     >
       <div className="flex items-start gap-2.5">
@@ -87,18 +87,18 @@ export function SyncHistoryCard({
               title={item.errorMessage}
             >
               {syncStatus === "success" ? (
-                <FaCheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 shrink-0" />
+                <FaCheckCircle className="h-4 w-4 shrink-0 text-success-500" />
               ) : syncStatus === "partial" ? (
-                <FaExclamationCircle className="h-4 w-4 text-yellow-500 dark:text-yellow-400 shrink-0" />
+                <FaExclamationCircle className="h-4 w-4 shrink-0 text-warning-500" />
               ) : (
-                <FaExclamationCircle className="h-4 w-4 text-red-500 dark:text-red-400 shrink-0" />
+                <FaExclamationCircle className="h-4 w-4 shrink-0 text-destructive" />
               )}
               {isConfirming ? (
                 <div className="flex items-center gap-1">
                   <button
                     onClick={onDelete}
                     disabled={isDeleting}
-                    className="text-red-600 dark:text-red-500 hover:text-red-900 dark:hover:text-red-400 disabled:opacity-50 p-1"
+                    className="inline-flex size-8 cursor-pointer items-center justify-center text-destructive hover:text-destructive/80 disabled:opacity-50"
                     title={t("sync.confirmDelete", {
                       defaultValue: "Confirm delete",
                     })}
@@ -112,7 +112,7 @@ export function SyncHistoryCard({
                   <button
                     onClick={onCancelDelete}
                     disabled={isDeleting}
-                    className="p-1 text-muted-foreground hover:text-foreground disabled:opacity-50"
+                    className="inline-flex size-8 cursor-pointer items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-50"
                     title={t("sync.cancel", {
                       defaultValue: "Cancel",
                     })}
@@ -127,7 +127,7 @@ export function SyncHistoryCard({
                       type="button"
                       onClick={onRetry}
                       disabled={isAnyRetrying}
-                      className="p-1 text-muted-foreground transition-colors hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex size-8 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
                       title={t("sync.retryItemTitle", {
                         defaultValue: "Retry this sync",
                       })}
@@ -145,12 +145,12 @@ export function SyncHistoryCard({
                   <button
                     type="button"
                     onClick={onDelete}
-                    className="p-1 text-muted-foreground transition-colors hover:text-destructive"
+                    className="inline-flex size-8 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:text-destructive"
                     title={t("sync.deleteItemTitle", {
                       defaultValue: "Delete this item",
                     })}
                   >
-                    <FaTrash className="h-3.5 w-3.5" />
+                    <FaTrash className="h-4 w-4" />
                   </button>
                 </div>
               )}
@@ -188,7 +188,7 @@ export function SyncHistoryCard({
           {item.source && (
             <div className="mb-2">
               {item.source === "plex" ? (
-                <div className="inline-flex items-center gap-1 rounded bg-(--plex-chip-bg) px-1.5 py-0.5 text-(--plex-chip-fg)">
+                <div className="chip-dense bg-(--plex-chip-bg) text-(--plex-chip-fg)">
                   <img
                     src="/logos/plex.svg"
                     alt="Plex"
@@ -201,7 +201,7 @@ export function SyncHistoryCard({
                   </span>
                 </div>
               ) : item.source === "jellyfin" ? (
-                <div className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900 rounded">
+                <div className="chip-dense bg-indigo-100 dark:bg-indigo-900">
                   <img
                     src="/logos/jellyfin.svg"
                     alt="Jellyfin"
@@ -256,7 +256,7 @@ export function SyncHistoryCard({
 
           {/* Error Message */}
           {!item.success && item.errorMessage && (
-            <div className="mt-1.5 text-xs dark:text-red-300 text-red-600 bg-red-50 dark:bg-red-950 rounded px-2 py-1.5 border border-red-200 dark:border-red-800">
+            <div className="mt-1.5 rounded border border-destructive/30 bg-destructive/10 px-2 py-1.5 text-xs text-destructive">
               {item.errorMessage}
             </div>
           )}

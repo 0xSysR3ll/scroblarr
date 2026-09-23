@@ -193,7 +193,7 @@ export function PlexSettingsTab({
               type="button"
               onClick={onPlexAuthenticate}
               disabled={plexAuthLoading}
-              className="mt-1 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+              className="mt-1 cursor-pointer rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
             >
               {plexAuthLoading
                 ? t("common.loading", { defaultValue: "Loading..." })
@@ -203,9 +203,7 @@ export function PlexSettingsTab({
             </button>
           </div>
           {plexLinkError && (
-            <p className="text-xs text-red-600 dark:text-red-400">
-              {plexLinkError}
-            </p>
+            <p className="text-xs text-destructive">{plexLinkError}</p>
           )}
         </div>
       </CollapsibleSettingsCard>
@@ -220,7 +218,7 @@ export function PlexSettingsTab({
         icon={icon}
         headerMeta={
           hasUnsavedChanges ? (
-            <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+            <span className="inline-flex items-center gap-1 rounded bg-warning-100 px-2 py-0.5 text-xs font-medium text-warning-800 dark:bg-warning-900 dark:text-warning-200">
               <FaExclamationCircle className="w-3 h-3" />
               {t("settings.unsavedChanges", { defaultValue: "Unsaved" })}
             </span>
@@ -232,7 +230,7 @@ export function PlexSettingsTab({
             type="button"
             onClick={onRefreshPlexServers}
             disabled={plexRefreshLoading}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-muted px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {plexRefreshLoading ? (
               <>
@@ -253,7 +251,7 @@ export function PlexSettingsTab({
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving ? (
                 <>
@@ -273,7 +271,7 @@ export function PlexSettingsTab({
               type="button"
               onClick={() => setShowRemoveModal(true)}
               disabled={!canRemove}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:text-red-300"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-destructive hover:text-destructive/80 disabled:cursor-not-allowed disabled:opacity-50"
               title={
                 !canRemove
                   ? t("settings.cannotRemoveOnlyServer", {
@@ -293,7 +291,7 @@ export function PlexSettingsTab({
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-lg border border-border bg-muted/30 p-4 sm:p-5">
+          <div className="surface-tile p-3 sm:p-4">
             <label
               htmlFor="plex-manual-connection-url"
               className="mb-2 block text-sm font-medium text-foreground"
@@ -322,7 +320,7 @@ export function PlexSettingsTab({
                   }
                 }}
                 placeholder="http://192.168.1.10:32400"
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-base text-foreground placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40 md:text-sm"
               />
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
@@ -345,7 +343,7 @@ export function PlexSettingsTab({
             return (
               <div
                 key={server.machineIdentifier}
-                className="rounded-lg border border-border bg-muted/30 p-4 sm:p-6"
+                className="surface-tile p-3 sm:p-4"
               >
                 <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                   <div className="min-w-0 flex-1">
@@ -364,7 +362,7 @@ export function PlexSettingsTab({
                       onClick={() =>
                         onEditingServerChange(server.machineIdentifier)
                       }
-                      className="shrink-0 whitespace-nowrap rounded px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/10 hover:text-primary/80"
+                      className="inline-flex shrink-0 cursor-pointer items-center whitespace-nowrap rounded px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/10 hover:text-primary/80"
                     >
                       {t("settings.changeConnection", {
                         defaultValue: "Change",
@@ -374,7 +372,7 @@ export function PlexSettingsTab({
                   {isEditing && (
                     <button
                       onClick={onCancelEdit}
-                      className="shrink-0 whitespace-nowrap rounded px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      className="inline-flex shrink-0 cursor-pointer items-center whitespace-nowrap rounded px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
                       {t("common.cancel", { defaultValue: "Cancel" })}
                     </button>
@@ -403,10 +401,10 @@ export function PlexSettingsTab({
                         {connectionsToShow.map((connection) => (
                           <label
                             key={connection.uri}
-                            className={`flex cursor-pointer items-start rounded-lg border-2 p-3 transition-all sm:items-center sm:p-4 ${
+                            className={`flex cursor-pointer items-start rounded-lg border p-2.5 transition-colors sm:items-center sm:p-3 ${
                               selectedServerUrl === connection.uri
                                 ? "border-primary bg-primary/10"
-                                : "border-border bg-card hover:border-muted-foreground/40"
+                                : "border-border/50 bg-background/50 hover:border-muted-foreground/40"
                             }`}
                           >
                             <div className="mr-3 mt-0.5 shrink-0 sm:mt-0">
@@ -431,26 +429,26 @@ export function PlexSettingsTab({
                                     </span>
                                   )}
                                   {connection.reachable === false && (
-                                    <span className="whitespace-nowrap rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800 dark:bg-red-900 dark:text-red-200">
+                                    <span className="whitespace-nowrap rounded bg-destructive/15 px-2 py-0.5 text-xs font-semibold text-destructive">
                                       {t("settings.unreachableConnection", {
                                         defaultValue: "Unreachable",
                                       })}
                                     </span>
                                   )}
                                   {connection.reachable === true && (
-                                    <span className="whitespace-nowrap rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
+                                    <span className="whitespace-nowrap rounded bg-success-100 px-2 py-0.5 text-xs font-semibold text-success-800 dark:bg-success-900 dark:text-success-200">
                                       {t("settings.reachableConnection", {
                                         defaultValue: "Reachable",
                                       })}
                                     </span>
                                   )}
                                   {connection.relay && (
-                                    <span className="whitespace-nowrap rounded bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                    <span className="whitespace-nowrap rounded bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary">
                                       Relay
                                     </span>
                                   )}
                                   {!connection.local && !connection.relay && (
-                                    <span className="whitespace-nowrap rounded bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                    <span className="whitespace-nowrap rounded bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary">
                                       Remote
                                     </span>
                                   )}
@@ -467,8 +465,8 @@ export function PlexSettingsTab({
                     </>
                   )}
                   {!selectedConnection && !isEditing && (
-                    <div className="rounded border-l-4 border-yellow-400 bg-yellow-50 p-4 dark:border-yellow-600 dark:bg-yellow-950">
-                      <p className="mb-2 text-sm text-yellow-700 dark:text-yellow-300">
+                    <div className="rounded border-l-4 border-warning-400 bg-warning-50 p-4 dark:border-warning-600 dark:bg-warning-950">
+                      <p className="mb-2 text-sm text-warning-700 dark:text-warning-300">
                         {t("settings.noConnectionSelected", {
                           defaultValue:
                             "No connection selected for this server.",
@@ -517,8 +515,8 @@ export function PlexSettingsTab({
             })}
           </DialogDescription>
           {isAdmin && !authProviders?.jellyfinConfigured && (
-            <div className="mb-4 rounded border-l-4 border-yellow-400 bg-yellow-50 p-3 dark:border-yellow-600 dark:bg-yellow-950">
-              <p className="text-sm text-yellow-700 dark:text-yellow-300">
+            <div className="mb-4 rounded border-l-4 border-warning-400 bg-warning-50 p-3 dark:border-warning-600 dark:bg-warning-950">
+              <p className="text-sm text-warning-700 dark:text-warning-300">
                 {t("settings.removeServerAdminWarning", {
                   defaultValue:
                     "As an admin, you must have at least one server configured. If you remove Plex and only Plex is configured, you may lose access. Please ensure Jellyfin is configured first.",
@@ -531,7 +529,7 @@ export function PlexSettingsTab({
               type="button"
               onClick={() => setShowRemoveModal(false)}
               disabled={removing}
-              className="rounded-lg bg-muted px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
+              className="cursor-pointer rounded-lg bg-muted px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {t("common.cancel", { defaultValue: "Cancel" })}
             </button>
@@ -539,7 +537,7 @@ export function PlexSettingsTab({
               type="button"
               onClick={handleRemove}
               disabled={removing || !canRemove}
-              className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="cursor-pointer rounded-lg bg-destructive px-3 py-2 text-sm font-medium text-white hover:bg-destructive/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {removing
                 ? t("common.loading", { defaultValue: "Loading..." })

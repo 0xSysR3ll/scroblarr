@@ -6,14 +6,21 @@ interface PageBackgroundProps {
 
 export function PageBackground({ children }: PageBackgroundProps) {
   return (
-    <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
+    <div className="relative min-h-screen bg-background text-foreground">
       <div
-        className="pointer-events-none absolute inset-0 opacity-50 dark:opacity-60"
+        className="pointer-events-none absolute inset-0 overflow-hidden"
         aria-hidden
       >
-        <div className="absolute -top-32 -right-24 h-72 w-72 rounded-full bg-primary/25 blur-3xl dark:bg-primary/15" />
-        <div className="absolute top-1/3 -left-28 h-64 w-64 rounded-full bg-accent/40 blur-3xl dark:bg-accent/20" />
-        <div className="absolute -bottom-36 right-1/4 h-80 w-80 rounded-full bg-primary/15 blur-3xl dark:bg-primary/10" />
+        <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_50%_-10%,_oklch(0.72_0.1_245_/_0.07),_transparent_60%)] dark:bg-[radial-gradient(120%_80%_at_50%_-10%,_oklch(0.5_0.12_245_/_0.1),_transparent_55%)]" />
+        <div
+          className="absolute inset-0 opacity-[0.04] dark:opacity-[0.05]"
+          style={{
+            backgroundImage:
+              "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+            backgroundRepeat: "repeat",
+            backgroundSize: "180px 180px",
+          }}
+        />
       </div>
       <div className="relative z-10 flex min-h-screen flex-col">{children}</div>
     </div>

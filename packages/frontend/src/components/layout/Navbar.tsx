@@ -85,8 +85,8 @@ export function Navbar() {
         <div className="container mx-auto px-4">
           <div className="flex h-14 items-center justify-between gap-2 md:h-16">
             <NavBrand />
-            <div className="flex shrink-0 items-center gap-1 md:hidden">
-              <ThemeToggle />
+            <div className="flex shrink-0 items-center gap-2 md:hidden">
+              <ThemeToggle className="size-10" />
               <UserMenu compact />
             </div>
             <DesktopChrome />
@@ -105,7 +105,7 @@ function NavBrand() {
     <button
       type="button"
       onClick={() => navigate("/")}
-      className="flex items-center gap-2 text-lg font-semibold tracking-tight text-foreground transition-colors hover:text-primary md:text-xl"
+      className="flex items-center gap-2 text-lg font-semibold tracking-tight text-foreground transition-colors hover:text-primary md:text-xl cursor-pointer"
     >
       <img
         src="/logo-icon.svg"
@@ -181,7 +181,7 @@ function MobileBottomNav() {
         defaultValue: "Primary navigation",
       })}
     >
-      <div className="flex max-w-full items-stretch justify-evenly gap-1 px-1">
+      <div className="flex max-w-full items-stretch justify-evenly gap-2 px-1.5">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = isNavActive(item.path, location.pathname);
@@ -191,14 +191,14 @@ function MobileBottomNav() {
               type="button"
               onClick={() => navigate(item.path)}
               aria-current={active ? "page" : undefined}
-              className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-[10px] font-medium leading-tight transition-colors ${
+              className={`flex min-h-12 min-w-0 flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-2 text-xs font-medium leading-tight transition-colors ${
                 active
                   ? "text-primary"
                   : "text-muted-foreground active:bg-muted/80"
               }`}
             >
               <span
-                className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
+                className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
                   active ? "bg-primary/15" : ""
                 }`}
               >
@@ -286,9 +286,9 @@ function UserMenu({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className={`group flex items-center rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50 ${
+          className={`group flex cursor-pointer items-center rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50 ${
             compact
-              ? "p-0"
+              ? "min-w-9 items-center justify-center p-1"
               : "gap-2 rounded-lg [&[data-state=open]_svg]:rotate-180"
           }`}
         >

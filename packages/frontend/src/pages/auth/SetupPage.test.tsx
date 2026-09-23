@@ -115,4 +115,14 @@ describe("SetupPage", () => {
       expect(localStorage.getItem("authSource")).toBe("jellyfin");
     });
   });
+
+  it("shows the Plex setup card when Plex is chosen", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<SetupPage />);
+
+    await user.click(
+      screen.getByRole("button", { name: /Connect using Plex OAuth/i })
+    );
+    expect(await screen.findByText("Setup with Plex")).toBeVisible();
+  });
 });

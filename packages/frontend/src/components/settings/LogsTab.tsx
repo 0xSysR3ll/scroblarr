@@ -20,9 +20,9 @@ const LOG_LEVELS = {
   10: { label: "trace", color: "text-muted-foreground" },
   20: { label: "debug", color: "text-muted-foreground/80" },
   30: { label: "info", color: "text-primary" },
-  40: { label: "warn", color: "text-yellow-500" },
-  50: { label: "error", color: "text-red-500" },
-  60: { label: "fatal", color: "text-red-700 dark:text-red-400" },
+  40: { label: "warn", color: "text-warning-500" },
+  50: { label: "error", color: "text-destructive" },
+  60: { label: "fatal", color: "text-destructive" },
 } as const;
 
 export function LogsTab() {
@@ -152,14 +152,14 @@ export function LogsTab() {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4">
       {error && (
-        <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-          <p className="text-red-800 dark:text-red-200">{error}</p>
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4">
+          <p className="text-destructive">{error}</p>
         </div>
       )}
 
-      <div className="mb-6 rounded-lg border border-border/60 bg-card p-4 text-card-foreground shadow-md sm:p-6">
+      <div className="surface-tile p-4">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
           <div>
             <label className="mb-2 block text-sm font-medium text-foreground">
@@ -299,7 +299,7 @@ export function LogsTab() {
             {t("logs.noLogs", { defaultValue: "No logs available" })}
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="surface-panel overflow-x-auto">
             <table className="min-w-full divide-y divide-border">
               <thead className="bg-muted/50">
                 <tr>
@@ -354,9 +354,9 @@ export function LogsTab() {
                       <tr
                         className={`transition-colors hover:bg-muted/50 ${
                           log.level >= 50
-                            ? "bg-red-50/50 dark:bg-red-900/10"
+                            ? "bg-destructive/10"
                             : log.level >= 40
-                              ? "bg-yellow-50/50 dark:bg-yellow-900/10"
+                              ? "bg-warning-50/50 dark:bg-warning-900/10"
                               : ""
                         }`}
                       >
@@ -456,74 +456,75 @@ export function LogsTab() {
                       "Showing {{from}} to {{to}} of {{total}} results",
                   })}
                 </div>
-                <div className="flex flex-wrap items-center gap-2 justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setPage(1)}
-                    disabled={pagination.page === 1}
-                    aria-label="First page"
-                    className="inline-flex items-center justify-center rounded-md border border-input bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
-                  >
-                    <FaAngleDoubleLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={pagination.page === 1}
-                    aria-label={t("sync.pagination.previous", {
-                      defaultValue: "Previous",
-                    })}
-                    className="inline-flex items-center justify-center rounded-md border border-input bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
-                  >
-                    <FaChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-                  </button>
-                  {/* Page number buttons */}
-                  {Array.from(
-                    { length: pagination.totalPages },
-                    (_, i) => i + 1
-                  )
-                    .filter((p) => {
-                      if (p === 1 || p === pagination.totalPages) return true;
-                      return (
-                        p >= pagination.page - 2 && p <= pagination.page + 2
-                      );
-                    })
-                    .map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => setPage(p)}
-                        className={`rounded-md border px-2 py-1 text-xs font-medium sm:text-sm ${
-                          p === pagination.page
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-input bg-background text-foreground hover:bg-muted"
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    ))}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPage((p) => Math.min(pagination.totalPages, p + 1))
-                    }
-                    disabled={pagination.page === pagination.totalPages}
-                    aria-label={t("sync.pagination.next", {
-                      defaultValue: "Next",
-                    })}
-                    className="inline-flex items-center justify-center rounded-md border border-input bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
-                  >
-                    <FaChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPage(pagination.totalPages)}
-                    disabled={pagination.page === pagination.totalPages}
-                    aria-label="Last page"
-                    className="inline-flex items-center justify-center rounded-md border border-input bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
-                  >
-                    <FaAngleDoubleRight className="h-3 w-3 sm:h-4 sm:w-4" />
-                  </button>
+                <div className="flex w-full min-w-0 justify-center sm:w-auto sm:justify-end">
+                  <div className="flex max-w-full flex-nowrap items-center gap-1 overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-2 [&::-webkit-scrollbar]:hidden">
+                    <button
+                      type="button"
+                      onClick={() => setPage(1)}
+                      disabled={pagination.page === 1}
+                      aria-label="First page"
+                      className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-input bg-background text-sm font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:size-10"
+                    >
+                      <FaAngleDoubleLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={pagination.page === 1}
+                      aria-label={t("sync.pagination.previous", {
+                        defaultValue: "Previous",
+                      })}
+                      className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-input bg-background text-sm font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:size-10"
+                    >
+                      <FaChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                    </button>
+                    {Array.from(
+                      { length: pagination.totalPages },
+                      (_, i) => i + 1
+                    )
+                      .filter((p) => {
+                        if (p === 1 || p === pagination.totalPages) return true;
+                        return (
+                          p >= pagination.page - 1 && p <= pagination.page + 1
+                        );
+                      })
+                      .map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setPage(p)}
+                          className={`inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border text-sm font-medium sm:size-10 ${
+                            p === pagination.page
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-input bg-background text-foreground hover:bg-muted"
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      ))}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPage((p) => Math.min(pagination.totalPages, p + 1))
+                      }
+                      disabled={pagination.page === pagination.totalPages}
+                      aria-label={t("sync.pagination.next", {
+                        defaultValue: "Next",
+                      })}
+                      className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-input bg-background text-sm font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:size-10"
+                    >
+                      <FaChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPage(pagination.totalPages)}
+                      disabled={pagination.page === pagination.totalPages}
+                      aria-label="Last page"
+                      className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-input bg-background text-sm font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:size-10"
+                    >
+                      <FaAngleDoubleRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -540,7 +541,7 @@ export function LogsTab() {
             {t("logs.noLogFiles", { defaultValue: "No log files found" })}
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="surface-panel overflow-x-auto">
             <table className="min-w-full divide-y divide-border">
               <thead className="bg-muted/50">
                 <tr>

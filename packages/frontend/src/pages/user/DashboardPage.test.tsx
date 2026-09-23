@@ -496,6 +496,31 @@ describe("DashboardPage", () => {
     expect(link).toHaveAttribute("href", "/sync?filter=failed");
   });
 
+  it("links the failed count to failed syncs", async () => {
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    const link = await screen.findByRole("link", {
+      name: "View failed syncs",
+    });
+    expect(link).toHaveAttribute("href", "/sync?filter=failed");
+  });
+
+  it("hides the failed syncs link when there are no failures", async () => {
+    vi.mocked(getSyncStatistics).mockResolvedValue({
+      ...statisticsFixture(),
+      failed: 0,
+    });
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(
+      await screen.findByText("You've synced 12 titles.")
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "View failed syncs" })
+    ).not.toBeInTheDocument();
+  });
+
   it("refreshes dashboard data from the toolbar", async () => {
     const user = userEvent.setup();
     renderWithProviders(<DashboardPage />, { route: "/" });
