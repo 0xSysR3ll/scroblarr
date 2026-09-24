@@ -58,8 +58,9 @@ export function UsersPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-muted-foreground">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background px-4">
+        <Spinner size="lg" />
+        <p className="text-sm text-muted-foreground">
           {t("common.loading", { defaultValue: "Loading..." })}
         </p>
       </div>
@@ -68,7 +69,7 @@ export function UsersPage() {
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
         <p className="text-destructive">
           {t("common.error", { defaultValue: "Error" })}: {error.message}
         </p>
@@ -90,7 +91,7 @@ export function UsersPage() {
                   type="button"
                   onClick={() => setShowBulkDeleteModal(true)}
                   disabled={bulkDeleting}
-                  className="flex items-center justify-center gap-1.5 rounded-lg bg-highlight-600 px-3 py-2 text-sm font-medium text-white shadow-md transition-colors hover:bg-highlight-700 disabled:cursor-not-allowed disabled:opacity-50 hover:shadow-lg"
+                  className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-highlight-600 px-3 py-2 text-sm font-medium text-white shadow-md transition-colors hover:bg-highlight-700 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {bulkDeleting ? (
                     <>
@@ -101,7 +102,7 @@ export function UsersPage() {
                     </>
                   ) : (
                     <>
-                      <FaTrash className="h-5 w-5" />
+                      <FaTrash className="h-4 w-4" />
                       {t("users.deleteSelected", {
                         defaultValue: "Delete Selected",
                       })}{" "}
@@ -113,9 +114,9 @@ export function UsersPage() {
               <button
                 type="button"
                 onClick={() => setIsImportModalOpen(true)}
-                className="flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-md transition-colors hover:bg-primary/90 hover:shadow-lg"
+                className="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-md transition-colors hover:bg-primary/90 hover:shadow-lg"
               >
-                <FaPlus className="h-5 w-5" />
+                <FaPlus className="h-4 w-4" />
                 {t("userImport.importUsersButton", {
                   defaultValue: "Import Users",
                 })}
@@ -169,7 +170,7 @@ export function UsersPage() {
               type="button"
               onClick={() => setShowBulkDeleteModal(false)}
               disabled={bulkDeleting}
-              className="rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/80 disabled:opacity-50"
+              className="cursor-pointer rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/80 disabled:opacity-50"
             >
               {t("common.cancel", { defaultValue: "Cancel" })}
             </button>
@@ -177,7 +178,7 @@ export function UsersPage() {
               type="button"
               onClick={handleBulkDelete}
               disabled={bulkDeleting}
-              className="flex items-center gap-1.5 rounded-md bg-highlight-600 px-3 py-2 text-sm font-medium text-white hover:bg-highlight-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex cursor-pointer items-center gap-1.5 rounded-md bg-highlight-600 px-3 py-2 text-sm font-medium text-white hover:bg-highlight-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {bulkDeleting ? (
                 <>

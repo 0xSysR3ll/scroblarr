@@ -70,6 +70,24 @@ describe("SettingsPage", () => {
     });
   });
 
+  it("shows access denied for non-admin users", () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: { id: "user-1", username: "alice", isAdmin: false },
+      loading: false,
+      logout: vi.fn(),
+      checkAuth: vi.fn(),
+      setUserFromLogin: vi.fn(),
+      isAuthenticated: true,
+      isAdmin: false,
+    });
+
+    renderWithProviders(<SettingsPage />);
+
+    expect(
+      screen.getByText("Access denied. Admin privileges required.")
+    ).toBeVisible();
+  });
+
   it("includes the TMDB token in general settings saves when present", async () => {
     const user = userEvent.setup();
     renderWithProviders(<SettingsPage />, { route: "/settings?tab=general" });
@@ -264,5 +282,23 @@ describe("SettingsPage", () => {
     expect(screen.getByLabelText("Webhook URL")).toHaveValue(
       buildPlexWebhookUrl("sk_from_settings")
     );
+  });
+
+  it("denies access when the user is not an admin", () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: { id: "u1", username: "alice", isAdmin: false },
+      loading: false,
+      logout: vi.fn(),
+      checkAuth: vi.fn(),
+      setUserFromLogin: vi.fn(),
+      isAuthenticated: true,
+      isAdmin: false,
+    });
+
+    renderWithProviders(<SettingsPage />, { route: "/settings" });
+
+    expect(
+      screen.getByText(/Access denied. Admin privileges required./i)
+    ).toBeInTheDocument();
   });
 });

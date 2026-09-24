@@ -1,7 +1,6 @@
 import type { AppVersionInfo } from "@services/api/meta";
 import { useTranslation } from "react-i18next";
 import {
-  FaInfoCircle,
   FaExternalLinkAlt,
   FaGithub,
   FaBook,
@@ -37,25 +36,15 @@ export function AboutSettingsTab({ versionInfo }: AboutSettingsTabProps) {
       : undefined);
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="flex items-center gap-3 mb-1 sm:mb-2">
-        <div className="shrink-0 rounded-lg bg-primary/15 p-2">
-          <FaInfoCircle className="h-5 w-5 text-primary" />
-        </div>
-        <div>
-          <h2 className="text-lg font-semibold text-foreground sm:text-xl">
-            {t("settings.about.title", { defaultValue: "About Scroblarr" })}
-          </h2>
-          <p className="text-xs text-muted-foreground sm:text-sm">
-            {t("settings.about.description", {
-              defaultValue:
-                "Version information and links related to this Scroblarr instance.",
-            })}
-          </p>
-        </div>
-      </div>
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        {t("settings.about.description", {
+          defaultValue:
+            "Version information and links related to this Scroblarr instance.",
+        })}
+      </p>
 
-      <div className="rounded-lg border border-border/60 bg-muted/30 p-4 sm:p-5">
+      <div className="surface-tile p-4">
         <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
           {t("settings.about.versionSection", {
             defaultValue: "Version",
@@ -86,7 +75,7 @@ export function AboutSettingsTab({ versionInfo }: AboutSettingsTabProps) {
               {versionInfo.releasesError ? (
                 <span
                   role="status"
-                  className={`${pill} border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-300`}
+                  className={`${pill} border-destructive/50 bg-destructive/10 text-destructive`}
                   title={t("settings.about.releasesErrorHint", {
                     defaultValue: "Details are in the server logs.",
                   })}
@@ -116,7 +105,7 @@ export function AboutSettingsTab({ versionInfo }: AboutSettingsTabProps) {
                   )}
                   {versionInfo.isLatest === true && (
                     <span
-                      className={`${pill} border-green-500/45 bg-green-500/10 text-green-700 dark:text-green-400`}
+                      className={`${pill} border-success-500/45 bg-success-500/10 text-success-700 dark:text-success-400`}
                     >
                       {t("settings.about.badgeUpToDate", {
                         defaultValue: "Up to date",
@@ -125,7 +114,7 @@ export function AboutSettingsTab({ versionInfo }: AboutSettingsTabProps) {
                   )}
                   {versionInfo.isLatest === false && (
                     <span
-                      className={`${pill} border-amber-500/45 bg-amber-500/10 text-amber-800 dark:text-amber-200`}
+                      className={`${pill} border-warning-500/45 bg-warning-500/10 text-warning-800 dark:text-warning-200`}
                     >
                       {t("settings.about.badgeUpdateAvailable", {
                         defaultValue: "Update available",
@@ -151,7 +140,7 @@ export function AboutSettingsTab({ versionInfo }: AboutSettingsTabProps) {
         )}
       </div>
 
-      <div className="rounded-lg border border-border/60 bg-muted/30 p-4 sm:p-5">
+      <div className="surface-tile p-4">
         <h3 className="mb-3 text-sm font-semibold text-foreground">
           {t("settings.about.linksSection", {
             defaultValue: "Links",
@@ -198,7 +187,7 @@ export function AboutSettingsTab({ versionInfo }: AboutSettingsTabProps) {
             rel="noreferrer"
             className={linkClass}
           >
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-amber-500/15 text-amber-800 dark:text-amber-300">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-warning-500/15 text-warning-800 dark:text-warning-300">
               <FaBug className="w-3.5 h-3.5" />
             </span>
             <span className="flex-1 underline underline-offset-2">

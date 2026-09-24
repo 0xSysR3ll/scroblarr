@@ -18,18 +18,25 @@ const baseItem: SyncHistoryItem = {
   syncedAt: new Date().toISOString(),
 };
 
-function renderRow(item: SyncHistoryItem, retrying: string | null = null) {
+function renderRow(
+  item: SyncHistoryItem,
+  options: {
+    retrying?: string | null;
+    isSelected?: boolean;
+    confirmDeleteId?: string | null;
+  } = {}
+) {
   const onRetry = vi.fn();
 
-  renderWithProviders(
+  const { container } = renderWithProviders(
     <table>
       <tbody>
         <SyncHistoryTableRow
           item={item}
-          isSelected={false}
-          confirmDeleteId={null}
+          isSelected={options.isSelected ?? false}
+          confirmDeleteId={options.confirmDeleteId ?? null}
           deleting={null}
-          retrying={retrying}
+          retrying={options.retrying ?? null}
           onSelect={vi.fn()}
           onDelete={vi.fn()}
           onCancelDelete={vi.fn()}
@@ -39,7 +46,7 @@ function renderRow(item: SyncHistoryItem, retrying: string | null = null) {
     </table>
   );
 
-  return { onRetry };
+  return { onRetry, container };
 }
 
 describe("SyncHistoryTableRow", () => {
@@ -67,10 +74,36 @@ describe("SyncHistoryTableRow", () => {
   });
 
   it("disables retry while any retry is already in flight", () => {
-    renderRow(baseItem, "another-history-id");
+    renderRow(baseItem, { retrying: "another-history-id" });
 
     expect(
       screen.getByRole("button", { name: "Retry this sync" })
     ).toBeDisabled();
+  });
+
+  it("applies selected and confirming row styles", () => {
+    const { container: selected } = renderRow(baseItem, { isSelected: true });
+    expect(selected.querySelector("tr")).toHaveClass("bg-warning-50");
+
+    const { container: confirming } = renderRow(baseItem, {
+      confirmDeleteId: baseItem.id,
+    });
+    expect(confirming.querySelector("tr")).toHaveClass("bg-destructive/10");
+    expect(
+      screen.getByRole("button", { name: "Confirm delete" })
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeVisible();
+  });
+
+  it("shows success status and jellyfin source chip", () => {
+    renderRow({
+      ...baseItem,
+      success: true,
+      errorMessage: undefined,
+      source: "jellyfin",
+    });
+
+    expect(screen.getByText("Success")).toBeVisible();
+    expect(screen.getByText("Jellyfin")).toBeVisible();
   });
 });

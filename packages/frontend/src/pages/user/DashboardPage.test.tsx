@@ -496,6 +496,31 @@ describe("DashboardPage", () => {
     expect(link).toHaveAttribute("href", "/sync?filter=failed");
   });
 
+  it("links the failed count to failed syncs", async () => {
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    const link = await screen.findByRole("link", {
+      name: "View failed syncs",
+    });
+    expect(link).toHaveAttribute("href", "/sync?filter=failed");
+  });
+
+  it("hides the failed syncs link when there are no failures", async () => {
+    vi.mocked(getSyncStatistics).mockResolvedValue({
+      ...statisticsFixture(),
+      failed: 0,
+    });
+
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    expect(
+      await screen.findByText("You've synced 12 titles.")
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "View failed syncs" })
+    ).not.toBeInTheDocument();
+  });
+
   it("refreshes dashboard data from the toolbar", async () => {
     const user = userEvent.setup();
     renderWithProviders(<DashboardPage />, { route: "/" });
@@ -733,9 +758,11 @@ describe("DashboardPage", () => {
       await screen.findByText("You've synced 12 titles.")
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "View Sync History" }));
+    await user.click(
+      screen.getAllByRole("link", { name: "View Sync History" })[0]!
+    );
     expect(screen.getByTestId("current-path")).toHaveTextContent("/sync");
-    await user.click(screen.getByRole("button", { name: "Profile" }));
+    await user.click(screen.getByRole("link", { name: "Profile" }));
     expect(screen.getByTestId("current-path")).toHaveTextContent("/profile");
   });
 
@@ -759,10 +786,10 @@ describe("DashboardPage", () => {
     expect(screen.queryByText("By Destination")).not.toBeInTheDocument();
 
     await user.click(
-      screen.getByRole("button", { name: "Check profile & links" })
+      screen.getByRole("link", { name: "Check profile & links" })
     );
     expect(screen.getByTestId("current-path")).toHaveTextContent("/profile");
-    await user.click(screen.getByRole("button", { name: "View Sync History" }));
+    await user.click(screen.getByRole("link", { name: "View Sync History" }));
     expect(screen.getByTestId("current-path")).toHaveTextContent("/sync");
   });
 });

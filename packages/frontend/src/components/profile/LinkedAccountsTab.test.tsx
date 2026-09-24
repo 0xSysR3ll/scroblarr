@@ -150,4 +150,117 @@ describe("LinkedAccountsTab", () => {
     expect(checkAuth).not.toHaveBeenCalled();
     expect(onAccountLinked).not.toHaveBeenCalled();
   });
+
+  it("shows a Plex link error from OAuth failure", async () => {
+    const user = userEvent.setup();
+    vi.mocked(usePlexLogin).mockImplementation((opts) => ({
+      loading: false,
+      login: () => {
+        opts.onError?.("plex oauth failed");
+      },
+    }));
+
+    renderWithProviders(
+      <LinkedAccountsTab
+        plexConfigured
+        jellyfinConfigured={false}
+        onAccountLinked={onAccountLinked}
+      />
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Authenticate with Plex" })
+    );
+
+    expect(await screen.findByText("plex oauth failed")).toBeVisible();
+  });
+
+  it("shows linked Jellyfin state and unlink control", async () => {
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <LinkedAccountsTab
+        jellyfinUsername="alice"
+        plexConfigured={false}
+        jellyfinConfigured
+        onAccountLinked={onAccountLinked}
+      />
+    );
+
+    expect(screen.getByText("Linked")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: /unlink/i }));
+    expect(
+      screen.getByRole("heading", { name: /Unlink Jellyfin Account/i })
+    ).toBeVisible();
+  });
+
+  it("shows a warning when no media servers are configured", () => {
+    renderWithProviders(
+      <LinkedAccountsTab
+        plexConfigured={false}
+        jellyfinConfigured={false}
+        onAccountLinked={onAccountLinked}
+      />
+    );
+
+    expect(screen.getByText(/No media servers are configured/i)).toBeVisible();
+  });
+
+  it("warns admins when unlinking their only Plex account", async () => {
+    const user = userEvent.setup();
+    vi.mocked(useAuth).mockReturnValue({
+      user: { id: "1", username: "admin", isAdmin: true },
+      loading: false,
+      logout: vi.fn(),
+      checkAuth,
+      setUserFromLogin: vi.fn(),
+      isAuthenticated: true,
+      isAdmin: true,
+    });
+
+    renderWithProviders(
+      <LinkedAccountsTab
+        plexUsername="admin"
+        plexConfigured
+        jellyfinConfigured={false}
+        onAccountLinked={onAccountLinked}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /unlink/i }));
+    expect(
+      screen.getByText(
+        /As an admin, you must have at least one linked account/i
+      )
+    ).toBeVisible();
+  });
+
+  it("warns admins when unlinking their only Jellyfin account", async () => {
+    const user = userEvent.setup();
+    vi.mocked(useAuth).mockReturnValue({
+      user: { id: "1", username: "admin", isAdmin: true },
+      loading: false,
+      logout: vi.fn(),
+      checkAuth,
+      setUserFromLogin: vi.fn(),
+      isAuthenticated: true,
+      isAdmin: true,
+    });
+
+    renderWithProviders(
+      <LinkedAccountsTab
+        jellyfinUsername="admin"
+        plexConfigured={false}
+        jellyfinConfigured
+        onAccountLinked={onAccountLinked}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /unlink/i }));
+    expect(
+      screen.getByText(
+        /As an admin, you must have at least one linked account/i
+      )
+    ).toBeVisible();
+  });
 });

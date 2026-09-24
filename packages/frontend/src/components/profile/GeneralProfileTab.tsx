@@ -31,7 +31,7 @@ export function GeneralProfileTab({
           <div className="flex items-center gap-2">
             <p className="text-foreground">{displayName || username || "-"}</p>
             {isAdmin && (
-              <div className="flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5">
+              <div className="chip bg-primary/15">
                 <FaCrown className="h-3 w-3 text-primary" />
                 <span className="text-xs font-medium text-primary">
                   {t("users.admin", { defaultValue: "Admin" })}

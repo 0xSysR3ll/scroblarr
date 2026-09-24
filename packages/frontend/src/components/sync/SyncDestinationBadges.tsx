@@ -37,7 +37,7 @@ const destinationTranslationKeys: Record<SyncDestinationName, string> = {
 
 function getBadgeClasses(destination: SyncDestinationResult): string {
   if (destination.status === "failed") {
-    return "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300";
+    return "bg-destructive/15 text-destructive";
   }
 
   if (destination.name === "TVTime") {
@@ -49,7 +49,7 @@ function getBadgeClasses(destination: SyncDestinationResult): string {
   }
 
   if (destination.name === "Bingers") {
-    return "bg-sky-100 text-sky-700 dark:bg-sky-900 dark:text-sky-300";
+    return "bg-(--bingers-chip-bg) text-(--bingers-chip-fg)";
   }
 
   return "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300";
@@ -85,9 +85,7 @@ export function SyncDestinationBadges({
         return (
           <div
             key={destination.name}
-            className={`flex items-center gap-1 rounded px-1.5 py-0.5 ${getBadgeClasses(
-              destination
-            )}`}
+            className={`chip-dense ${getBadgeClasses(destination)}`}
             title={title}
             aria-label={title}
           >

@@ -581,4 +581,84 @@ describe("SyncDashboardPage", () => {
     expect(screen.getByText("Filtered Movie")).toBeVisible();
     expect(screen.queryByText("Later 0")).not.toBeInTheDocument();
   });
+
+  it("paginates client-side history and keeps a compact page window", async () => {
+    const pages = [
+      Array.from({ length: 100 }, (_, i) => makeItem(`p1-${i}`, `Title ${i}`)),
+      Array.from({ length: 100 }, (_, i) =>
+        makeItem(`p2-${i}`, `Title ${i + 100}`)
+      ),
+      Array.from({ length: 50 }, (_, i) =>
+        makeItem(`p3-${i}`, `Title ${i + 200}`)
+      ),
+    ];
+
+    vi.mocked(getSyncHistory).mockImplementation(async (page = 1) =>
+      syncHistoryResponse(pages[page - 1] ?? [], {
+        page,
+        total: 250,
+        totalPages: 3,
+      })
+    );
+
+    const user = userEvent.setup();
+    renderWithProviders(<SyncDashboardPage />, { route: "/sync" });
+
+    expect(
+      await screen.findByText("Showing 1 to 20 of 250 results")
+    ).toBeVisible();
+    expect(screen.getByText("Title 0")).toBeVisible();
+    expect(screen.queryByText("Title 20")).not.toBeInTheDocument();
+
+    expect(screen.getByRole("button", { name: "1" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "2" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "3" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "13" })).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+
+    expect(
+      await screen.findByText("Showing 21 to 40 of 250 results")
+    ).toBeVisible();
+    expect(screen.getByText("Title 20")).toBeVisible();
+    expect(screen.queryByText("Title 0")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Last page" }));
+
+    expect(
+      await screen.findByText("Showing 241 to 250 of 250 results")
+    ).toBeVisible();
+    expect(screen.getByText("Title 249")).toBeVisible();
+  });
+
+  it("exports history and clears the success filter empty state", async () => {
+    const items = Array.from({ length: 5 }, (_, i) =>
+      makeItem(`ok-${i}`, `Ok ${i}`, { success: true })
+    );
+    vi.mocked(getSyncHistory).mockResolvedValue(syncHistoryResponse(items));
+
+    const user = userEvent.setup();
+    renderWithProviders(<SyncDashboardPage />, { route: "/sync" });
+
+    expect(await screen.findByText("Ok 0")).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: /^Export$/i }));
+    expect(await screen.findByText("Export as CSV")).toBeVisible();
+    expect(screen.getByText("Export as JSON")).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Success Only" }));
+    expect(screen.getByText("Ok 0")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Success Only" })).toHaveClass(
+      "bg-success-600"
+    );
+
+    await user.click(screen.getByRole("button", { name: "Failed Only" }));
+    expect(await screen.findByText("No results found")).toBeVisible();
+
+    const clearButtons = screen.getAllByRole("button", {
+      name: /Clear all filters/i,
+    });
+    await user.click(clearButtons[clearButtons.length - 1]!);
+    expect(await screen.findByText("Ok 0")).toBeVisible();
+  });
 });

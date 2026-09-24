@@ -7,6 +7,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@components/ui/dialog";
+import { Skeleton } from "@components/ui/skeleton";
 import { Spinner } from "@components/ui/spinner";
 import { usePullToRefresh, PULL_THRESHOLD_PX } from "@hooks/usePullToRefresh";
 import {
@@ -690,16 +691,16 @@ export function SyncDashboardPage() {
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="rounded-lg border border-border/60 bg-card text-card-foreground shadow-sm p-4 animate-pulse"
+              className="rounded-lg border border-border/60 bg-card p-4 text-card-foreground shadow-sm"
             >
               <div className="flex items-start gap-3">
-                <div className="w-16 h-24 bg-muted rounded"></div>
+                <Skeleton className="h-24 w-16 rounded" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-muted rounded w-3/4"></div>
-                  <div className="h-3 bg-muted rounded w-1/2"></div>
-                  <div className="flex gap-2 mt-2">
-                    <div className="h-5 bg-muted rounded w-16"></div>
-                    <div className="h-5 bg-muted rounded w-20"></div>
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                  <div className="mt-2 flex gap-2">
+                    <Skeleton className="h-5 w-16" />
+                    <Skeleton className="h-5 w-20" />
                   </div>
                 </div>
               </div>
@@ -711,7 +712,10 @@ export function SyncDashboardPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-4 sm:py-8" {...pullHandlers}>
+    <div
+      className="container mx-auto px-4 py-4 sm:px-6 sm:py-8 lg:px-8"
+      {...pullHandlers}
+    >
       {(pullDistance > 0 || pullRefreshing) && (
         <div
           className="pointer-events-none flex justify-center overflow-hidden md:hidden"
@@ -738,7 +742,7 @@ export function SyncDashboardPage() {
                     <button
                       onClick={handleBulkRetry}
                       disabled={retrying !== null}
-                      className="flex items-center justify-center gap-1.5 px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium w-full sm:w-auto"
+                      className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                     >
                       {retrying === "bulk" ? (
                         <Spinner size="sm" />
@@ -755,7 +759,7 @@ export function SyncDashboardPage() {
                   )}
                   <button
                     onClick={() => setShowBulkDeleteModal(true)}
-                    className="flex items-center justify-center gap-1.5 px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm font-medium w-full sm:w-auto"
+                    className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-warning-600 px-3 py-2 text-sm font-medium text-white hover:bg-warning-700 sm:w-auto"
                   >
                     <FaTrash className="h-4 w-4" />
                     <span>
@@ -770,7 +774,7 @@ export function SyncDashboardPage() {
               <button
                 onClick={() => setShowClearModal(true)}
                 disabled={history.length === 0}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium w-full sm:w-auto"
+                className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-destructive px-3 py-2 text-sm font-medium text-white hover:bg-destructive/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
               >
                 <FaTrash className="h-4 w-4" />
                 <span className="hidden sm:inline">
@@ -785,7 +789,7 @@ export function SyncDashboardPage() {
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
                 disabled={filteredHistory.length === 0}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium w-full sm:w-auto"
+                className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 title={t("sync.export", { defaultValue: "Export" })}
               >
                 <FaDownload className="h-4 w-4" />
@@ -801,7 +805,7 @@ export function SyncDashboardPage() {
                       handleExportCSV();
                       setShowExportMenu(false);
                     }}
-                    className="w-full text-left px-3 py-2 text-sm text-foreground/90 hover:bg-muted flex items-center gap-1.5"
+                    className="flex w-full cursor-pointer items-center gap-1.5 px-3 py-2 text-left text-sm text-foreground/90 hover:bg-muted"
                   >
                     <FaDownload className="h-3 w-3" />
                     {t("sync.exportCSV", { defaultValue: "Export as CSV" })}
@@ -811,7 +815,7 @@ export function SyncDashboardPage() {
                       handleExportJSON();
                       setShowExportMenu(false);
                     }}
-                    className="w-full text-left px-3 py-2 text-sm text-foreground/90 hover:bg-muted flex items-center gap-1.5"
+                    className="flex w-full cursor-pointer items-center gap-1.5 px-3 py-2 text-left text-sm text-foreground/90 hover:bg-muted"
                   >
                     <FaDownload className="h-3 w-3" />
                     {t("sync.exportJSON", { defaultValue: "Export as JSON" })}
@@ -824,7 +828,7 @@ export function SyncDashboardPage() {
       </div>
 
       {/* Search and Quick Filters */}
-      <div className="mb-4 rounded-lg border border-border/60 bg-card text-card-foreground shadow-lg p-4">
+      <div className="surface-panel mb-4 p-4">
         <div className="flex flex-col sm:flex-row gap-4 mb-4">
           <div className="flex-1 relative">
             <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -835,13 +839,13 @@ export function SyncDashboardPage() {
               placeholder={t("sync.searchPlaceholder", {
                 defaultValue: "Search by title, source, or error...",
               })}
-              className="w-full rounded-md border border-input bg-background py-2 pl-10 pr-4 text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
+              className="w-full rounded-md border border-input bg-background py-2 pl-10 pr-4 text-base text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50 md:text-sm"
             />
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setGroupByDate(!groupByDate)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm ${
+              className={`flex size-10 cursor-pointer items-center justify-center rounded-md text-sm ${
                 groupByDate
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-foreground/90"
@@ -849,6 +853,10 @@ export function SyncDashboardPage() {
               title={t("sync.toggleGrouping", {
                 defaultValue: "Toggle date grouping",
               })}
+              aria-label={t("sync.toggleGrouping", {
+                defaultValue: "Toggle date grouping",
+              })}
+              aria-pressed={groupByDate}
             >
               <FaCalendar className="h-4 w-4" />
             </button>
@@ -856,10 +864,10 @@ export function SyncDashboardPage() {
         </div>
 
         {/* Quick Filter Buttons */}
-        <div className="flex flex-wrap gap-2 mb-3">
+        <div className="mb-3 flex flex-wrap gap-2">
           <button
             onClick={() => setQuickFilter("all")}
-            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+            className={`cursor-pointer rounded-md px-3 py-2 text-sm transition-colors ${
               quickFilter === "all"
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-foreground/90 hover:bg-muted/80"
@@ -869,7 +877,7 @@ export function SyncDashboardPage() {
           </button>
           <button
             onClick={() => setQuickFilter("last7days")}
-            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+            className={`cursor-pointer rounded-md px-3 py-2 text-sm transition-colors ${
               quickFilter === "last7days"
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-foreground/90 hover:bg-muted/80"
@@ -879,7 +887,7 @@ export function SyncDashboardPage() {
           </button>
           <button
             onClick={() => setQuickFilter("last30days")}
-            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+            className={`cursor-pointer rounded-md px-3 py-2 text-sm transition-colors ${
               quickFilter === "last30days"
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-foreground/90 hover:bg-muted/80"
@@ -891,9 +899,9 @@ export function SyncDashboardPage() {
           </button>
           <button
             onClick={() => setQuickFilter("failed")}
-            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+            className={`cursor-pointer rounded-md px-3 py-2 text-sm transition-colors ${
               quickFilter === "failed"
-                ? "bg-red-600 text-white"
+                ? "bg-destructive text-white"
                 : "bg-muted text-foreground/90 hover:bg-muted/80"
             }`}
           >
@@ -901,9 +909,9 @@ export function SyncDashboardPage() {
           </button>
           <button
             onClick={() => setQuickFilter("success")}
-            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+            className={`cursor-pointer rounded-md px-3 py-2 text-sm transition-colors ${
               quickFilter === "success"
-                ? "bg-green-600 text-white"
+                ? "bg-success-600 text-white"
                 : "bg-muted text-foreground/90 hover:bg-muted/80"
             }`}
           >
@@ -912,10 +920,10 @@ export function SyncDashboardPage() {
         </div>
 
         {/* Advanced Filters */}
-        <div className="flex items-center justify-between pt-3 border-t border-border">
+        <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2 text-sm text-foreground/90 hover:text-foreground"
+            className="inline-flex cursor-pointer items-center gap-2 text-sm text-foreground/90 hover:text-foreground"
           >
             <FaFilter className="h-4 w-4" />
             {t("sync.filters", { defaultValue: "Advanced Filters" })}
@@ -930,7 +938,7 @@ export function SyncDashboardPage() {
           {hasActiveFilters && (
             <button
               onClick={clearFilters}
-              className="text-sm text-primary hover:text-primary/80"
+              className="inline-flex cursor-pointer items-center text-sm text-primary hover:text-primary/80"
             >
               {t("sync.clearFilters", { defaultValue: "Clear all filters" })}
             </button>
@@ -948,7 +956,7 @@ export function SyncDashboardPage() {
                 onChange={(e) =>
                   handleFilterChange("mediaType", e.target.value)
                 }
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
               >
                 <option value="all">
                   {t("sync.all", { defaultValue: "All" })}
@@ -975,7 +983,7 @@ export function SyncDashboardPage() {
                       : "false"
                 }
                 onChange={(e) => handleFilterChange("success", e.target.value)}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
               >
                 <option value="all">
                   {t("sync.all", { defaultValue: "All" })}
@@ -993,13 +1001,13 @@ export function SyncDashboardPage() {
       </div>
 
       {allHistory.length >= 500 && (
-        <div className="mb-4 bg-yellow-50 dark:bg-yellow-950 border-l-4 border-yellow-400 dark:border-yellow-600 p-4 rounded">
+        <div className="mb-4 rounded border-l-4 border-warning-400 bg-warning-50 p-4 dark:border-warning-600 dark:bg-warning-950">
           <div className="flex">
             <div className="shrink-0">
-              <FaTimesCircle className="h-5 w-5 text-yellow-400 dark:text-yellow-500" />
+              <FaTimesCircle className="h-5 w-5 text-warning-500" />
             </div>
             <div className="ml-3">
-              <p className="text-sm text-yellow-700 dark:text-yellow-300">
+              <p className="text-sm text-warning-700 dark:text-warning-300">
                 {t("sync.largeHistoryNotice", {
                   defaultValue:
                     "You have more than 500 sync history items. Search and quick filters work on the most recent 500 items. Use advanced filters and pagination to view older items.",
@@ -1011,8 +1019,42 @@ export function SyncDashboardPage() {
       )}
 
       {displayHistory.length === 0 && !loading ? (
-        <div className="rounded-lg border border-border/60 bg-card text-card-foreground shadow-lg p-12 text-center">
-          <FaTimesCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+        <div className="surface-panel scroblarr-enter p-8 text-center sm:p-12">
+          <div className="mb-5 flex items-center justify-center gap-3">
+            <img
+              src="/logos/plex.svg"
+              alt=""
+              className="h-6 w-6 opacity-80"
+              aria-hidden
+            />
+            <img
+              src="/logos/jellyfin.svg"
+              alt=""
+              className="h-6 w-6 opacity-80"
+              aria-hidden
+            />
+            <span className="text-muted-foreground/40" aria-hidden>
+              →
+            </span>
+            <img
+              src="/logos/trakt.svg"
+              alt=""
+              className="h-6 w-6 opacity-80"
+              aria-hidden
+            />
+            <img
+              src="/logos/simkl.svg"
+              alt=""
+              className="h-6 w-6 opacity-80"
+              aria-hidden
+            />
+            <img
+              src="/logos/bingers.png"
+              alt=""
+              className="h-6 w-6 rounded-sm opacity-80"
+              aria-hidden
+            />
+          </div>
           <h3 className="text-lg font-medium text-foreground mb-2">
             {hasActiveFilters
               ? t("sync.noResults", {
@@ -1036,7 +1078,7 @@ export function SyncDashboardPage() {
           {hasActiveFilters && (
             <button
               onClick={clearFilters}
-              className="mt-4 px-3 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium"
+              className="mt-4 cursor-pointer rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
             >
               {t("sync.clearFilters", { defaultValue: "Clear all filters" })}
             </button>
@@ -1047,7 +1089,7 @@ export function SyncDashboardPage() {
           {/* Mobile Card View */}
           <div className="md:hidden space-y-3">
             {displayHistory.length > 0 && (
-              <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-card p-3 text-card-foreground shadow-sm">
+              <div className="surface-panel flex items-center gap-3 p-3">
                 <CustomCheckbox
                   checked={
                     displayHistory.length > 0 &&
@@ -1093,7 +1135,7 @@ export function SyncDashboardPage() {
           </div>
 
           {/* Desktop Table View */}
-          <div className="hidden md:block rounded-lg border border-border/60 bg-card text-card-foreground shadow-lg overflow-hidden">
+          <div className="surface-panel hidden overflow-hidden md:block">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-border">
                 <thead className="bg-muted/50">
@@ -1212,70 +1254,77 @@ export function SyncDashboardPage() {
                       defaultValue: "No results",
                     })}
               </div>
-              <div className="flex flex-wrap items-center gap-2 justify-end">
-                <button
-                  type="button"
-                  onClick={() => setPage(1)}
-                  disabled={page === 1 || loading}
-                  aria-label="First page"
-                  className="inline-flex items-center justify-center rounded-md border border-input bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
-                >
-                  <FaAngleDoubleLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1 || loading}
-                  aria-label={t("sync.pagination.previous", {
-                    defaultValue: "Previous",
+              <div className="flex w-full min-w-0 justify-center sm:w-auto sm:justify-end">
+                <nav
+                  aria-label={t("sync.pagination.nav", {
+                    defaultValue: "Pagination",
                   })}
-                  className="inline-flex items-center justify-center rounded-md border border-input bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+                  className="flex max-w-full flex-nowrap items-center gap-1 overflow-x-auto overscroll-x-contain [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-2 [&::-webkit-scrollbar]:hidden"
                 >
-                  <FaChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
-                </button>
-                {/* Page number buttons */}
-                {Array.from({ length: displayTotalPages }, (_, i) => i + 1)
-                  .filter((p) => {
-                    if (p === 1 || p === displayTotalPages) return true;
-                    return p >= page - 2 && p <= page + 2;
-                  })
-                  .map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => setPage(p)}
-                      disabled={loading}
-                      className={`rounded-md border px-2 py-1 text-xs font-medium sm:text-sm ${
-                        p === page
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-input bg-background text-foreground hover:bg-muted"
-                      } disabled:cursor-not-allowed disabled:opacity-50`}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPage((p) => Math.min(displayTotalPages, p + 1))
-                  }
-                  disabled={page === displayTotalPages || loading}
-                  aria-label={t("sync.pagination.next", {
-                    defaultValue: "Next",
-                  })}
-                  className="inline-flex items-center justify-center rounded-md border border-input bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
-                >
-                  <FaChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPage(displayTotalPages)}
-                  disabled={page === displayTotalPages || loading}
-                  aria-label="Last page"
-                  className="inline-flex items-center justify-center rounded-md border border-input bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
-                >
-                  <FaAngleDoubleRight className="h-3 w-3 sm:h-4 sm:w-4" />
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setPage(1)}
+                    disabled={page === 1 || loading}
+                    aria-label="First page"
+                    className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-input bg-background text-sm font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:size-10"
+                  >
+                    <FaAngleDoubleLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1 || loading}
+                    aria-label={t("sync.pagination.previous", {
+                      defaultValue: "Previous",
+                    })}
+                    className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-input bg-background text-sm font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:size-10"
+                  >
+                    <FaChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                  </button>
+                  {Array.from({ length: displayTotalPages }, (_, i) => i + 1)
+                    .filter((p) => {
+                      if (p === 1 || p === displayTotalPages) return true;
+                      return p >= page - 1 && p <= page + 1;
+                    })
+                    .map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPage(p)}
+                        disabled={loading}
+                        aria-current={p === page ? "page" : undefined}
+                        className={`inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border text-sm font-medium sm:size-10 ${
+                          p === page
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-input bg-background text-foreground hover:bg-muted"
+                        } disabled:cursor-not-allowed disabled:opacity-50`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPage((p) => Math.min(displayTotalPages, p + 1))
+                    }
+                    disabled={page === displayTotalPages || loading}
+                    aria-label={t("sync.pagination.next", {
+                      defaultValue: "Next",
+                    })}
+                    className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-input bg-background text-sm font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:size-10"
+                  >
+                    <FaChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPage(displayTotalPages)}
+                    disabled={page === displayTotalPages || loading}
+                    aria-label="Last page"
+                    className="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-input bg-background text-sm font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 sm:size-10"
+                  >
+                    <FaAngleDoubleRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                  </button>
+                </nav>
               </div>
             </div>
           )}
@@ -1300,7 +1349,7 @@ export function SyncDashboardPage() {
               type="button"
               onClick={() => setShowClearModal(false)}
               disabled={clearing}
-              className="rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/80 disabled:opacity-50"
+              className="cursor-pointer rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/80 disabled:opacity-50"
             >
               {t("sync.cancel", { defaultValue: "Cancel" })}
             </button>
@@ -1308,7 +1357,7 @@ export function SyncDashboardPage() {
               type="button"
               onClick={handleClear}
               disabled={clearing}
-              className="flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex cursor-pointer items-center gap-1.5 rounded-md bg-destructive px-3 py-2 text-sm font-medium text-white hover:bg-destructive/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {clearing ? (
                 <>
@@ -1345,7 +1394,7 @@ export function SyncDashboardPage() {
               type="button"
               onClick={() => setShowBulkDeleteModal(false)}
               disabled={deleting === "bulk"}
-              className="rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/80 disabled:opacity-50"
+              className="cursor-pointer rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/80 disabled:opacity-50"
             >
               {t("sync.cancel", { defaultValue: "Cancel" })}
             </button>
@@ -1353,7 +1402,7 @@ export function SyncDashboardPage() {
               type="button"
               onClick={handleBulkDelete}
               disabled={deleting === "bulk"}
-              className="flex items-center gap-1.5 rounded-md bg-orange-600 px-3 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex cursor-pointer items-center gap-1.5 rounded-md bg-warning-600 px-3 py-2 text-sm font-medium text-white hover:bg-warning-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {deleting === "bulk" ? (
                 <>

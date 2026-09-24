@@ -832,14 +832,14 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         headerMeta={
           traktStatus?.linked ? (
             traktStatus.needsReauthorization ? (
-              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-600 dark:text-amber-400">
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-warning-600 dark:text-warning-400">
                 <FaExclamationTriangle className="h-4 w-4" />
                 {t("profile.linkedAccounts.reauthRequired", {
                   defaultValue: "Re-authorization required",
                 })}
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-green-600 dark:text-green-400">
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-success-600 dark:text-success-400">
                 <FaCheckCircle className="h-4 w-4" />
                 {t("profile.linkedAccounts.linked", {
                   defaultValue: "Linked",
@@ -852,17 +852,15 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         {traktStatus?.linked ? (
           <div className="space-y-4">
             {traktError && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3">
                 <div className="flex items-start gap-2">
-                  <FaTimesCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
-                  <p className="text-sm text-red-800 dark:text-red-200">
-                    {traktError}
-                  </p>
+                  <FaTimesCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+                  <p className="text-sm text-destructive">{traktError}</p>
                 </div>
               </div>
             )}
             {traktStatus.needsReauthorization && (
-              <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-amber-700 dark:text-amber-300">
+              <div className="flex items-start gap-2 rounded-lg border border-warning-500/30 bg-warning-500/10 px-3 py-2 text-warning-700 dark:text-warning-300">
                 <FaExclamationTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                 <p className="text-sm">
                   {t("trakt.needsReauthorization", {
@@ -899,7 +897,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
               type="button"
               onClick={handleUnlinkTrakt}
               disabled={traktSaving}
-              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950 dark:hover:text-red-300"
+              className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
               title={t("trakt.unlink", {
                 defaultValue: "Unlink",
               })}
@@ -933,11 +931,11 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
               })}
             </p>
             {traktError && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3">
                 <div className="flex items-start gap-2">
-                  <FaTimesCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
+                  <FaTimesCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
                   <div className="flex-1">
-                    <p className="mb-2 text-sm text-red-800 dark:text-red-200">
+                    <p className="mb-2 text-sm text-destructive">
                       {traktError}
                     </p>
                     {traktAuthUrl && (
@@ -945,7 +943,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                         href={traktAuthUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="break-all text-sm text-red-800 underline hover:text-red-900 dark:text-red-200 dark:hover:text-red-100"
+                        className="break-all text-sm text-destructive underline hover:text-destructive/80"
                       >
                         {traktAuthUrl}
                       </a>
@@ -987,12 +985,12 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                         placeholder={t("trakt.clientSecretPlaceholder", {
                           defaultValue: "Enter your Trakt Client Secret",
                         })}
-                        className="w-full rounded-lg border border-input bg-background px-3 py-2 pr-10 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
+                        className="w-full rounded-lg border border-input bg-background px-3 py-2 pr-12 text-base text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50 md:text-sm"
                       />
                       <button
                         type="button"
                         onClick={() => setShowTraktSecret(!showTraktSecret)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
+                        className="absolute right-1 top-1/2 inline-flex size-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
                         aria-label={
                           showTraktSecret
                             ? t("auth.hidePassword", { defaultValue: "Hide" })
@@ -1026,7 +1024,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                     (!traktStatus?.hasCredentials &&
                       (!traktClientId.trim() || !traktClientSecret.trim()))
                   }
-                  className="w-full rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                  className="w-full cursor-pointer rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
                   {t("trakt.authorize", { defaultValue: "Authorize" })}
                 </button>
@@ -1052,7 +1050,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                       href={traktAuthUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex w-fit items-center rounded-md border border-purple-300 bg-background px-2.5 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:text-purple-300 dark:hover:bg-purple-950"
+                      className="inline-flex w-fit cursor-pointer items-center rounded-md border border-purple-300 bg-background px-2.5 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:text-purple-300 dark:hover:bg-purple-950"
                     >
                       {t("trakt.openAuthPage", {
                         defaultValue: "Open Trakt activation page",
@@ -1074,7 +1072,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                       (!traktStatus?.hasCredentials &&
                         (!traktClientId.trim() || !traktClientSecret.trim()))
                     }
-                    className="mt-3 w-full rounded-md border border-purple-300 bg-background px-2.5 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto dark:border-purple-800 dark:text-purple-300 dark:hover:bg-purple-950"
+                    className="mt-3 w-full cursor-pointer rounded-md border border-purple-300 bg-background px-2.5 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto dark:border-purple-800 dark:text-purple-300 dark:hover:bg-purple-950"
                   >
                     {traktSaving
                       ? t("trakt.checkingPin", {
@@ -1110,7 +1108,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         }
         headerMeta={
           simklStatus?.linked ? (
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-green-600 dark:text-green-400">
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-success-600 dark:text-success-400">
               <FaCheckCircle className="h-4 w-4" />
               {t("profile.linkedAccounts.linked", {
                 defaultValue: "Linked",
@@ -1122,12 +1120,10 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         {simklStatus?.linked ? (
           <div className="space-y-4">
             {simklError && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3">
                 <div className="flex items-start gap-2">
-                  <FaTimesCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
-                  <p className="text-sm text-red-800 dark:text-red-200">
-                    {simklError}
-                  </p>
+                  <FaTimesCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+                  <p className="text-sm text-destructive">{simklError}</p>
                 </div>
               </div>
             )}
@@ -1158,7 +1154,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
               type="button"
               onClick={handleUnlinkSimkl}
               disabled={simklSaving}
-              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950 dark:hover:text-red-300"
+              className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
               title={t("simkl.unlink", {
                 defaultValue: "Unlink",
               })}
@@ -1180,11 +1176,11 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
               })}
             </p>
             {simklError && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3">
                 <div className="flex items-start gap-2">
-                  <FaTimesCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
+                  <FaTimesCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
                   <div className="flex-1">
-                    <p className="mb-2 text-sm text-red-800 dark:text-red-200">
+                    <p className="mb-2 text-sm text-destructive">
                       {simklError}
                     </p>
                     {simklAuthUrl && (
@@ -1192,7 +1188,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                         href={simklAuthUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="break-all text-sm text-red-800 underline hover:text-red-900 dark:text-red-200 dark:hover:text-red-100"
+                        className="break-all text-sm text-destructive underline hover:text-destructive/80"
                       >
                         {simklAuthUrl}
                       </a>
@@ -1237,7 +1233,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                     simklLoading ||
                     (!simklStatus?.hasCredentials && !simklClientId.trim())
                   }
-                  className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                  className="w-full cursor-pointer rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
                   {t("simkl.authorize", { defaultValue: "Authorize" })}
                 </button>
@@ -1260,7 +1256,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                       href={simklAuthUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex w-fit items-center rounded-md border border-emerald-300 bg-background px-2.5 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950"
+                      className="inline-flex w-fit cursor-pointer items-center rounded-md border border-emerald-300 bg-background px-2.5 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950"
                     >
                       {t("simkl.openPinPage", {
                         defaultValue: "Open Simkl PIN page",
@@ -1281,7 +1277,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                       !simklCode.trim() ||
                       (!simklStatus?.hasCredentials && !simklClientId.trim())
                     }
-                    className="mt-3 w-full rounded-md border border-emerald-300 bg-background px-2.5 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950"
+                    className="mt-3 w-full cursor-pointer rounded-md border border-emerald-300 bg-background px-2.5 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950"
                   >
                     {simklSaving
                       ? t("simkl.checkingPin", {
@@ -1317,14 +1313,14 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         defaultOpen={!!bingersStatus?.needsReauthorization}
         headerMeta={
           bingersStatus?.linked ? (
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-green-600 dark:text-green-400">
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-success-600 dark:text-success-400">
               <FaCheckCircle className="h-4 w-4" />
               {t("profile.linkedAccounts.linked", {
                 defaultValue: "Linked",
               })}
             </span>
           ) : bingersStatus?.needsReauthorization ? (
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-600 dark:text-amber-400">
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-warning-600 dark:text-warning-400">
               <FaExclamationTriangle className="h-4 w-4" />
               {t("profile.linkedAccounts.reauthRequired", {
                 defaultValue: "Re-authorization required",
@@ -1336,12 +1332,10 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         {bingersStatus?.linked ? (
           <div className="space-y-4">
             {bingersError && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3">
                 <div className="flex items-start gap-2">
-                  <FaTimesCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
-                  <p className="text-sm text-red-800 dark:text-red-200">
-                    {bingersError}
-                  </p>
+                  <FaTimesCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+                  <p className="text-sm text-destructive">{bingersError}</p>
                 </div>
               </div>
             )}
@@ -1372,7 +1366,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
               type="button"
               onClick={handleUnlinkBingers}
               disabled={bingersSaving || bingersSavingSettings}
-              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950 dark:hover:text-red-300"
+              className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
               title={t("bingers.unlink", { defaultValue: "Unlink" })}
             >
               <FaUnlink className="h-3.5 w-3.5" />
@@ -1494,17 +1488,15 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
               })}
             </p>
             {bingersError && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3">
                 <div className="flex items-start gap-2">
-                  <FaTimesCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
-                  <p className="text-sm text-red-800 dark:text-red-200">
-                    {bingersError}
-                  </p>
+                  <FaTimesCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+                  <p className="text-sm text-destructive">{bingersError}</p>
                 </div>
               </div>
             )}
             {bingersStatus?.needsReauthorization && (
-              <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-amber-700 dark:text-amber-300">
+              <div className="flex items-start gap-2 rounded-lg border border-warning-500/30 bg-warning-500/10 px-3 py-2 text-warning-700 dark:text-warning-300">
                 <FaExclamationTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                 <p className="text-sm">
                   {t("bingers.needsReauthorization", {
@@ -1519,7 +1511,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
               type="button"
               onClick={handleOpenBingersSignIn}
               disabled={bingersLoading}
-              className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+              className="w-full cursor-pointer rounded-lg bg-(--bingers-cta-bg) px-3 py-2 text-sm font-medium text-(--bingers-cta-fg) hover:bg-(--bingers-cta-hover) disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
             >
               {t("bingers.openSignIn", {
                 defaultValue: "Open Bingers sign-in",
@@ -1547,7 +1539,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                 type="button"
                 onClick={handleLinkBingers}
                 disabled={bingersSaving || !bingersMagicLink.trim()}
-                className="w-full rounded-lg border border-emerald-300 bg-background px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950"
+                className="w-full cursor-pointer rounded-lg border border-(--bingers-border) bg-background px-3 py-2 text-sm font-medium text-(--bingers-chip-fg) hover:bg-(--bingers-chip-bg) disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
               >
                 {bingersSaving
                   ? t("common.loading", { defaultValue: "Loading..." })
@@ -1580,7 +1572,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
             <button
               type="button"
               onClick={() => setShowTraktUnlinkModal(false)}
-              className="rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
+              className="cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
             >
               {t("trakt.cancel", { defaultValue: "Cancel" })}
             </button>
@@ -1588,7 +1580,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
               type="button"
               onClick={confirmUnlinkTrakt}
               disabled={traktSaving}
-              className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              className="cursor-pointer rounded-lg bg-destructive px-3 py-2 text-sm font-medium text-white hover:bg-destructive/90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-destructive/40 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {traktSaving
                 ? t("common.loading", { defaultValue: "Loading..." })
@@ -1618,7 +1610,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
             <button
               type="button"
               onClick={() => setShowSimklUnlinkModal(false)}
-              className="rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
+              className="cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
             >
               {t("simkl.cancel", { defaultValue: "Cancel" })}
             </button>
@@ -1626,7 +1618,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
               type="button"
               onClick={confirmUnlinkSimkl}
               disabled={simklSaving}
-              className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              className="cursor-pointer rounded-lg bg-destructive px-3 py-2 text-sm font-medium text-white hover:bg-destructive/90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-destructive/40 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {simklSaving
                 ? t("common.loading", { defaultValue: "Loading..." })
@@ -1656,7 +1648,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
             <button
               type="button"
               onClick={() => setShowBingersUnlinkModal(false)}
-              className="rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
+              className="cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
             >
               {t("bingers.cancel", { defaultValue: "Cancel" })}
             </button>
@@ -1664,7 +1656,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
               type="button"
               onClick={confirmUnlinkBingers}
               disabled={bingersSaving || bingersSavingSettings}
-              className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              className="cursor-pointer rounded-lg bg-destructive px-3 py-2 text-sm font-medium text-white hover:bg-destructive/90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-destructive/40 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {bingersSaving
                 ? t("common.loading", { defaultValue: "Loading..." })

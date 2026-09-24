@@ -99,12 +99,12 @@ export function ProfilePage() {
   }, [activeTab, user, authProviders, checkAuth]);
 
   return (
-    <div className="container mx-auto px-4 py-4 sm:py-8">
+    <div className="container mx-auto px-4 py-4 sm:px-6 sm:py-8 lg:px-8">
       <h1 className="mb-4 text-2xl font-bold text-foreground sm:mb-6 sm:text-3xl">
         {t("profile.title", { defaultValue: "Profile" })}
       </h1>
 
-      <div className="overflow-hidden rounded-xl border border-border/60 bg-card text-card-foreground shadow-lg">
+      <div className="surface-shell">
         <div className="border-b border-border">
           <nav className="-mb-px flex" aria-label="Tabs">
             {tabs.map((tab) => (
@@ -112,7 +112,7 @@ export function ProfilePage() {
                 key={tab.id}
                 type="button"
                 onClick={() => changeTab(tab.id)}
-                className={`border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+                className={`flex-1 cursor-pointer border-b-2 px-3 py-2.5 text-sm font-medium transition-colors sm:flex-none sm:px-4 ${
                   activeTab === tab.id
                     ? "border-primary text-primary"
                     : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
@@ -124,7 +124,7 @@ export function ProfilePage() {
           </nav>
         </div>
 
-        <div className="p-6">{tabContent}</div>
+        <div className="p-4 sm:p-6">{tabContent}</div>
       </div>
     </div>
   );

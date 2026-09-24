@@ -3,14 +3,7 @@ import { testTmdbConnection } from "@services/api/settings";
 import { showSuccess, showError } from "@utils/toast";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  FaHistory,
-  FaEye,
-  FaEyeSlash,
-  FaSync,
-  FaCopy,
-  FaPlug,
-} from "react-icons/fa";
+import { FaEye, FaEyeSlash, FaSync, FaCopy, FaPlug } from "react-icons/fa";
 
 interface GeneralSettingsTabProps {
   syncHistoryLimit: number;
@@ -76,13 +69,13 @@ function SecretKeyField({
             type={show ? "text" : "password"}
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 pr-10 font-mono text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
+            className="w-full rounded-md border border-input bg-background px-3 py-2 pr-12 font-mono text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
             placeholder={placeholder}
           />
           <button
             type="button"
             onClick={() => setShow(!show)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-muted-foreground transition-colors hover:text-foreground"
+            className="absolute right-1 top-1/2 inline-flex size-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
             aria-label={show ? hideLabel : showLabel}
           >
             {show ? (
@@ -103,7 +96,7 @@ function SecretKeyField({
             }
           }}
           disabled={!value}
-          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-input bg-muted px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md border border-input bg-muted px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
           title={copyLabel}
           aria-label={copyLabel}
         >
@@ -118,7 +111,7 @@ function SecretKeyField({
             onChange(generateSkKey());
             setShow(true);
           }}
-          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-input bg-muted px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/80"
+          className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md border border-input bg-muted px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/80"
           title={generateLabel}
           aria-label={generateLabel}
         >
@@ -149,27 +142,19 @@ export function GeneralSettingsTab({
   const [testingTmdb, setTestingTmdb] = useState(false);
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="flex items-center gap-3 mb-2 sm:mb-4">
-        <div className="shrink-0 rounded-lg bg-primary/15 p-2">
-          <FaHistory className="h-5 w-5 text-primary" />
-        </div>
-        <div>
-          <h2 className="text-lg font-semibold text-foreground sm:text-xl">
-            {t("settings.general.title", {
-              defaultValue: "General Settings",
-            })}
-          </h2>
-          <p className="text-xs text-muted-foreground sm:text-sm">
-            {t("settings.general.description", {
-              defaultValue:
-                "General application settings will be available here.",
-            })}
-          </p>
-        </div>
-      </div>
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        {t("settings.general.description", {
+          defaultValue: "API keys, media lookups, and sync history retention.",
+        })}
+      </p>
 
-      <div className="space-y-3">
+      <div className="surface-tile space-y-4 p-4">
+        <h3 className="text-sm font-semibold text-foreground">
+          {t("settings.general.keysSection", {
+            defaultValue: "API keys",
+          })}
+        </h3>
         <SecretKeyField
           id="apiKey"
           label={t("settings.general.apiKey", {
@@ -222,7 +207,14 @@ export function GeneralSettingsTab({
           showLabel="Show webhook API key"
           hideLabel="Hide webhook API key"
         />
+      </div>
 
+      <div className="surface-tile space-y-4 p-4">
+        <h3 className="text-sm font-semibold text-foreground">
+          {t("settings.general.mediaSection", {
+            defaultValue: "Media & history",
+          })}
+        </h3>
         <div>
           <label
             htmlFor="tmdbAccessToken"
@@ -255,7 +247,7 @@ export function GeneralSettingsTab({
                 type={showTmdbAccessToken ? "text" : "password"}
                 value={tmdbAccessToken}
                 onChange={(e) => onTmdbAccessTokenChange(e.target.value)}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 pr-10 font-mono text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 pr-12 font-mono text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
                 placeholder={t("settings.general.tmdbAccessTokenPlaceholder", {
                   defaultValue: "eyJhbGciOiJIUzI1NiJ9...",
                 })}
@@ -263,7 +255,7 @@ export function GeneralSettingsTab({
               <button
                 type="button"
                 onClick={() => setShowTmdbAccessToken(!showTmdbAccessToken)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-muted-foreground transition-colors hover:text-foreground"
+                className="absolute right-1 top-1/2 inline-flex size-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
                 aria-label={
                   showTmdbAccessToken
                     ? "Hide TMDB access token"
@@ -303,7 +295,7 @@ export function GeneralSettingsTab({
                 }
               }}
               disabled={testingTmdb}
-              className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-input bg-muted px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-input bg-muted px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {testingTmdb ? (
                 <Spinner size="sm" />

@@ -204,7 +204,7 @@ export function JellyfinSettingsTab({
         icon={icon}
       >
         {showEmptyState ? (
-          <div className="rounded-lg border border-border bg-muted/30 p-6 text-center">
+          <div className="surface-tile p-6 text-center">
             <p className="mb-4 text-sm text-muted-foreground">
               {t("settings.jellyfinNotConfigured", {
                 defaultValue: "No Jellyfin server has been configured yet.",
@@ -213,7 +213,7 @@ export function JellyfinSettingsTab({
             <button
               type="button"
               onClick={() => setShowForm(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
             >
               <FaPlus className="w-4 h-4" />
               {t("settings.addJellyfinServer", {
@@ -229,7 +229,7 @@ export function JellyfinSettingsTab({
                   type="button"
                   onClick={() => setShowRemoveModal(true)}
                   disabled={!canRemove}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-red-400 dark:hover:text-red-300"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-destructive hover:text-destructive/80 disabled:cursor-not-allowed disabled:opacity-50"
                   title={
                     !canRemove
                       ? t("settings.cannotRemoveOnlyServer", {
@@ -357,12 +357,12 @@ export function JellyfinSettingsTab({
                           placeholder={t("auth.password", {
                             defaultValue: "Password",
                           })}
-                          className="w-full rounded-md border border-input bg-background px-3 py-2 pr-10 text-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 pr-12 text-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
+                          className="absolute right-1 top-1/2 inline-flex size-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
                           aria-label={
                             showPassword
                               ? t("auth.hidePassword", {
@@ -423,7 +423,7 @@ export function JellyfinSettingsTab({
                         !jellyfinPassword ||
                         !hostname
                       }
-                      className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="cursor-pointer rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {linkingJellyfin
                         ? t("common.loading", { defaultValue: "Loading..." })
@@ -448,7 +448,7 @@ export function JellyfinSettingsTab({
                     type={showApiKey ? "text" : "password"}
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 pr-10 font-mono text-sm text-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 pr-12 font-mono text-sm text-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
                     placeholder={t("settings.noApiKey", {
                       defaultValue: "No API key configured",
                     })}
@@ -456,7 +456,7 @@ export function JellyfinSettingsTab({
                   <button
                     type="button"
                     onClick={() => setShowApiKey(!showApiKey)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
+                    className="absolute right-1 top-1/2 inline-flex size-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
                     aria-label={
                       showApiKey
                         ? t("settings.hideApiKey", {
@@ -526,8 +526,8 @@ export function JellyfinSettingsTab({
             })}
           </DialogDescription>
           {isAdmin && !authProviders?.plexConfigured && (
-            <div className="mb-4 rounded border-l-4 border-yellow-400 bg-yellow-50 p-3 dark:border-yellow-600 dark:bg-yellow-950">
-              <p className="text-sm text-yellow-700 dark:text-yellow-300">
+            <div className="mb-4 rounded border-l-4 border-warning-400 bg-warning-50 p-3 dark:border-warning-600 dark:bg-warning-950">
+              <p className="text-sm text-warning-700 dark:text-warning-300">
                 {t("settings.removeServerAdminWarning", {
                   defaultValue:
                     "As an admin, you must have at least one server configured. If you remove Jellyfin and only Jellyfin is configured, you may lose access. Please ensure Plex is configured first.",
@@ -540,7 +540,7 @@ export function JellyfinSettingsTab({
               type="button"
               onClick={() => setShowRemoveModal(false)}
               disabled={removing}
-              className="rounded-lg bg-muted px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
+              className="cursor-pointer rounded-lg bg-muted px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {t("common.cancel", { defaultValue: "Cancel" })}
             </button>
@@ -548,7 +548,7 @@ export function JellyfinSettingsTab({
               type="button"
               onClick={handleRemove}
               disabled={removing || !canRemove}
-              className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="cursor-pointer rounded-lg bg-destructive px-3 py-2 text-sm font-medium text-white hover:bg-destructive/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {removing
                 ? t("common.loading", { defaultValue: "Loading..." })

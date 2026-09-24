@@ -68,7 +68,7 @@ function CopyField({
             readOnly
             value={value}
             rows={12}
-            className="min-h-[16rem] w-full flex-1 rounded-md border border-input bg-background px-3 py-2 font-mono text-xs leading-5 text-foreground whitespace-pre"
+            className="min-h-[16rem] w-full flex-1 rounded-md border border-input bg-background px-3 py-2 font-mono text-xs leading-5 text-foreground whitespace-pre focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
           />
         ) : (
           <input
@@ -76,7 +76,7 @@ function CopyField({
             type="text"
             readOnly
             value={value}
-            className="w-full flex-1 rounded-md border border-input bg-background px-3 py-2 font-mono text-xs text-foreground sm:text-sm"
+            className="w-full flex-1 rounded-md border border-input bg-background px-3 py-2 font-mono text-xs text-foreground sm:text-sm focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
           />
         )}
         <button
@@ -98,7 +98,7 @@ function CopyField({
               );
             }
           }}
-          className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-input bg-muted px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md border border-input bg-muted px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
           title={copyLabel}
           aria-label={copyLabel}
         >
@@ -213,13 +213,13 @@ export function WebhookSetupPanel({
           ];
 
   return (
-    <div className="rounded-lg border border-border bg-card">
+    <div className="surface-tile">
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
         aria-controls={panelId}
-        className="flex w-full items-start gap-3 p-4 text-left transition-colors hover:bg-muted/40 sm:p-5"
+        className="flex w-full cursor-pointer items-start gap-2.5 p-3 text-left transition-colors hover:bg-muted/30 sm:p-3.5"
       >
         <FaChevronDown
           className={`mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${
@@ -228,7 +228,7 @@ export function WebhookSetupPanel({
           aria-hidden
         />
         <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-2 text-sm font-semibold text-foreground sm:text-base">
+          <span className="flex items-center gap-2 text-sm font-medium text-foreground">
             {source === "tautulli" && (
               <img
                 src="/logos/tautulli.png"
@@ -247,14 +247,14 @@ export function WebhookSetupPanel({
       {open && (
         <div
           id={panelId}
-          className="space-y-4 border-t border-border p-4 sm:p-5"
+          className="space-y-3 border-t border-border/50 p-3 sm:p-4"
         >
           <div className="flex justify-end">
             <a
               href={docsHref}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 sm:text-sm"
+              className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 sm:text-sm"
             >
               <FaBook className="w-3.5 h-3.5" />
               {t("settings.webhook.docs", { defaultValue: "Setup docs" })}
@@ -262,9 +262,9 @@ export function WebhookSetupPanel({
           </div>
 
           {!hasApiKey && (
-            <div className="flex gap-2 rounded border-l-4 border-amber-400 bg-amber-50 p-3 dark:border-amber-600 dark:bg-amber-950">
-              <FaExclamationTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
-              <p className="text-sm text-amber-800 dark:text-amber-200">
+            <div className="flex gap-2 rounded border-l-4 border-warning-400 bg-warning-50 p-3 dark:border-warning-600 dark:bg-warning-950">
+              <FaExclamationTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning-700 dark:text-warning-300" />
+              <p className="text-sm text-warning-800 dark:text-warning-200">
                 {t("settings.webhook.apiKeyRequired", {
                   defaultValue:
                     "Set and save an API key under Settings → General first. Webhooks are rejected without it.",

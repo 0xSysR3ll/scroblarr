@@ -328,8 +328,8 @@ export function SettingsPage() {
   if (!isAdmin) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="bg-red-50 dark:bg-red-950 border-l-4 border-red-400 dark:border-red-600 p-4 rounded">
-          <p className="text-sm text-red-700 dark:text-red-300">
+        <div className="rounded border-l-4 border-destructive bg-destructive/10 p-4">
+          <p className="text-sm text-destructive">
             {t("settings.accessDenied", {
               defaultValue: "Access denied. Admin privileges required.",
             })}
@@ -353,19 +353,19 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-4 sm:py-8">
+    <div className="container mx-auto px-4 py-4 sm:px-6 sm:py-8 lg:px-8">
       <h1 className="mb-4 text-2xl font-bold text-foreground sm:mb-6 sm:text-3xl">
         {t("settings.title", { defaultValue: "Settings" })}
       </h1>
 
-      <div className="overflow-hidden rounded-xl border border-border/60 bg-card text-card-foreground shadow-lg">
+      <div className="surface-shell">
         {/* Tabs */}
         <div className="overflow-x-auto overflow-y-hidden border-b border-border [-ms-overflow-style:none] scrollbar-none [&::-webkit-scrollbar]:hidden">
           <nav className="-mb-px flex flex-nowrap" aria-label="Tabs">
             <button
               type="button"
               onClick={() => changeTab("general")}
-              className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+              className={`flex shrink-0 cursor-pointer items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
                 activeTab === "general"
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-foreground"
@@ -380,7 +380,7 @@ export function SettingsPage() {
             <button
               type="button"
               onClick={() => changeTab("mediaServer")}
-              className={`flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+              className={`flex shrink-0 cursor-pointer items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
                 activeTab === "mediaServer"
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-foreground"
@@ -401,7 +401,7 @@ export function SettingsPage() {
             <button
               type="button"
               onClick={() => changeTab("logs")}
-              className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+              className={`flex shrink-0 cursor-pointer items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
                 activeTab === "logs"
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-foreground"
@@ -416,7 +416,7 @@ export function SettingsPage() {
             <button
               type="button"
               onClick={() => changeTab("about")}
-              className={`flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+              className={`flex shrink-0 cursor-pointer items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
                 activeTab === "about"
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-foreground"
@@ -497,35 +497,34 @@ export function SettingsPage() {
           {activeTab === "about" && (
             <AboutSettingsTab versionInfo={versionInfo} />
           )}
-
-          {/* Save Button */}
-          {(activeTab === "general" || activeTab === "mediaServer") && (
-            <div className="mt-6 border-t border-border pt-4 sm:mt-8 sm:pt-6">
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-                >
-                  {saving ? (
-                    <>
-                      <Spinner size="md" variant="onPrimary" />
-                      <span>
-                        {t("common.loading", { defaultValue: "Loading..." })}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <FaCheckCircle className="w-4 h-4" />
-                      <span>{t("common.save", { defaultValue: "Save" })}</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
         </div>
+
+        {(activeTab === "general" || activeTab === "mediaServer") && (
+          <div className="sticky bottom-[calc(5.75rem+env(safe-area-inset-bottom,0px))] z-40 border-t border-border/40 bg-card/95 px-4 py-3 backdrop-blur-md sm:px-6 md:bottom-0">
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+              >
+                {saving ? (
+                  <>
+                    <Spinner size="md" variant="onPrimary" />
+                    <span>
+                      {t("common.loading", { defaultValue: "Loading..." })}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <FaCheckCircle className="h-4 w-4" />
+                    <span>{t("common.save", { defaultValue: "Save" })}</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
