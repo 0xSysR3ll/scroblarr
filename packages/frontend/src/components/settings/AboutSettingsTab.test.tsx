@@ -95,4 +95,48 @@ describe("AboutSettingsTab", () => {
     expect(screen.queryByText("Up to Date")).not.toBeInTheDocument();
     expect(screen.queryByText(/Out of Date/i)).not.toBeInTheDocument();
   });
+
+  it("shows unavailable copy when version info is missing", () => {
+    renderWithProviders(<AboutSettingsTab versionInfo={null} />);
+
+    expect(
+      screen.getByText("Version information is currently unavailable.")
+    ).toBeInTheDocument();
+  });
+
+  it("links develop badges to the compare URL and stable badges to latestUrl", () => {
+    const { rerender } = renderWithProviders(
+      <AboutSettingsTab
+        versionInfo={{
+          version: "develop-abc123def",
+          commitTag: "abc123def",
+          updateAvailable: true,
+          githubRepository: "0xsysr3ll/scroblarr",
+        }}
+      />
+    );
+
+    expect(screen.getByRole("link", { name: /Out of Date/i })).toHaveAttribute(
+      "href",
+      "https://github.com/0xsysr3ll/scroblarr/compare/abc123def...develop"
+    );
+
+    rerender(
+      <AboutSettingsTab
+        versionInfo={{
+          version: "v1.0.0",
+          commitTag: "abc123",
+          updateAvailable: true,
+          latestUrl:
+            "https://github.com/0xsysr3ll/scroblarr/releases/tag/v2.0.0",
+          githubRepository: "0xsysr3ll/scroblarr",
+        }}
+      />
+    );
+
+    expect(screen.getByRole("link", { name: /Out of Date/i })).toHaveAttribute(
+      "href",
+      "https://github.com/0xsysr3ll/scroblarr/releases/tag/v2.0.0"
+    );
+  });
 });

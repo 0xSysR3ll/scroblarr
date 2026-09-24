@@ -54,4 +54,20 @@ describe("appVersion", () => {
 
     expect(getAppVersion()).toBe("v0.9.0");
   });
+
+  it("ignores non-semver GIT_TAG values", () => {
+    process.env.GIT_TAG = "latest";
+    process.env.COMMIT_TAG = "deadbeef";
+
+    expect(getAppVersion()).toBe("develop-deadbeef");
+    expect(isDevelopVersion("v1.0.0")).toBe(false);
+  });
+
+  it("treats blank COMMIT_TAG as local", () => {
+    delete process.env.GIT_TAG;
+    process.env.COMMIT_TAG = "   ";
+
+    expect(getCommitTag()).toBe("local");
+    expect(getAppVersion()).toBe("develop-local");
+  });
 });
