@@ -84,6 +84,7 @@ jobs:
           push: true
           build-args: |
             GIT_TAG=${{ github.ref_name }}
+            COMMIT_TAG=${{ github.sha }}
           tags: |
             ${{ env.REGISTRY }}/${{ steps.meta.outputs.repo }}:${{ github.ref_name }}
             ${{ env.REGISTRY }}/${{ steps.meta.outputs.repo }}:latest

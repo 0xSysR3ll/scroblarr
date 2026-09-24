@@ -9,8 +9,8 @@ describe("AboutSettingsTab", () => {
     renderWithProviders(
       <AboutSettingsTab
         versionInfo={{
-          version: "1.0.0",
-          tag: "v1.0.0",
+          version: "v1.0.0",
+          commitTag: "abc123",
           githubRepository: "0xsysr3ll/scroblarr",
         }}
       />
@@ -23,12 +23,31 @@ describe("AboutSettingsTab", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows unavailable, up-to-date, and update-available badges", () => {
+  it("warns when running a develop build and strips the develop- prefix", () => {
+    renderWithProviders(
+      <AboutSettingsTab
+        versionInfo={{
+          version: "develop-abc123def",
+          commitTag: "abc123def",
+          updateAvailable: false,
+          githubRepository: "0xsysr3ll/scroblarr",
+        }}
+      />
+    );
+
+    expect(
+      screen.getByText(/running the develop branch of Scroblarr/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText("abc123def")).toBeInTheDocument();
+    expect(screen.queryByText(/develop-abc123def/)).not.toBeInTheDocument();
+  });
+
+  it("shows unavailable, up-to-date, and out-of-date badges", () => {
     const { rerender } = renderWithProviders(
       <AboutSettingsTab
         versionInfo={{
-          version: "1.0.0",
-          tag: "v1.0.0",
+          version: "v1.0.0",
+          commitTag: "abc123",
           githubRepository: "0xsysr3ll/scroblarr",
           releasesError: "failed to fetch",
         }}
@@ -39,27 +58,41 @@ describe("AboutSettingsTab", () => {
     rerender(
       <AboutSettingsTab
         versionInfo={{
-          version: "1.0.0",
-          tag: "v1.0.0",
+          version: "v1.0.0",
+          commitTag: "abc123",
           githubRepository: "0xsysr3ll/scroblarr",
-          latestTag: "v1.0.0",
-          isLatest: true,
+          updateAvailable: false,
         }}
       />
     );
-    expect(screen.getByText("Up to date")).toBeInTheDocument();
+    expect(screen.getByText("Up to Date")).toBeInTheDocument();
 
     rerender(
       <AboutSettingsTab
         versionInfo={{
-          version: "1.0.0",
-          tag: "v1.0.0",
+          version: "v1.0.0",
+          commitTag: "abc123",
           githubRepository: "0xsysr3ll/scroblarr",
-          latestTag: "v2.0.0",
-          isLatest: false,
+          updateAvailable: true,
         }}
       />
     );
-    expect(screen.getByText(/Update available/i)).toBeInTheDocument();
+    expect(screen.getByText(/Out of Date/i)).toBeInTheDocument();
+  });
+
+  it("hides update badges for local builds", () => {
+    renderWithProviders(
+      <AboutSettingsTab
+        versionInfo={{
+          version: "develop-local",
+          commitTag: "local",
+          updateAvailable: false,
+          githubRepository: "0xsysr3ll/scroblarr",
+        }}
+      />
+    );
+
+    expect(screen.queryByText("Up to Date")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Out of Date/i)).not.toBeInTheDocument();
   });
 });

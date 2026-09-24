@@ -32,7 +32,9 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 FROM ${NODE_IMAGE} AS runner
 
 ARG GIT_TAG=
+ARG COMMIT_TAG=
 ENV GIT_TAG=${GIT_TAG}
+ENV COMMIT_TAG=${COMMIT_TAG}
 ENV NODE_ENV=production
 ENV PUBLIC_DIR=/app/public
 ENV DATA_DIR=/app/data
@@ -49,7 +51,8 @@ COPY --from=builder /app/packages/frontend/dist ./public
 LABEL org.opencontainers.image.title="scroblarr" \
   org.opencontainers.image.description="Media scrobbling service for Plex, Jellyfin, and Emby" \
   org.opencontainers.image.source="https://github.com/0xsysr3ll/scroblarr" \
-  org.opencontainers.image.version="${GIT_TAG}"
+  org.opencontainers.image.version="${GIT_TAG}" \
+  org.opencontainers.image.revision="${COMMIT_TAG}"
 
 EXPOSE 3000
 
