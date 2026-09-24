@@ -36,65 +36,81 @@ type MockResponse = EventEmitter & {
   resume: ReturnType<typeof vi.fn>;
 };
 
+type HttpsGetMock = (...args: unknown[]) => MockRequest;
+
+function mockHttpsGet(impl: HttpsGetMock) {
+  vi.mocked(https.get).mockImplementation(impl as unknown as typeof https.get);
+}
+
+function getCallback(
+  args: unknown[]
+): ((res: MockResponse) => void) | undefined {
+  const maybeCb = args.find((arg) => typeof arg === "function");
+  return maybeCb as ((res: MockResponse) => void) | undefined;
+}
+
 function mockHttpsSuccess(payload: unknown) {
-  vi.mocked(https.get).mockImplementation(((_url, _opts, cb) => {
+  mockHttpsGet((...args) => {
+    const cb = getCallback(args);
     const req = new EventEmitter() as MockRequest;
     const res = new EventEmitter() as MockResponse;
     res.statusCode = 200;
     res.resume = vi.fn();
 
     queueMicrotask(() => {
-      cb(res as never);
+      cb?.(res);
       res.emit("data", Buffer.from(JSON.stringify(payload)));
       res.emit("end");
     });
 
-    return req as never;
-  }) as typeof https.get);
+    return req;
+  });
 }
 
 function mockHttpsStatus(statusCode: number | undefined) {
-  vi.mocked(https.get).mockImplementation(((_url, _opts, cb) => {
+  mockHttpsGet((...args) => {
+    const cb = getCallback(args);
     const req = new EventEmitter() as MockRequest;
     const res = new EventEmitter() as MockResponse;
     res.statusCode = statusCode;
     res.resume = vi.fn();
 
     queueMicrotask(() => {
-      cb(res as never);
+      cb?.(res);
     });
 
-    return req as never;
-  }) as typeof https.get);
+    return req;
+  });
 }
 
 function mockHttpsRequestError(error: Error) {
-  vi.mocked(https.get).mockImplementation(((_url, _opts, _cb) => {
+  mockHttpsGet(() => {
     const req = new EventEmitter() as MockRequest;
 
     queueMicrotask(() => {
       req.emit("error", error);
     });
 
-    return req as never;
-  }) as typeof https.get);
+    return req;
+  });
 }
 
 function mockHttpsInvalidJson() {
-  vi.mocked(https.get).mockImplementation(((_url, _opts, cb) => {
+  mockHttpsGet((...args) => {
+    const cb = getCallback(args);
     const req = new EventEmitter() as MockRequest;
     const res = new EventEmitter() as MockResponse;
     res.statusCode = 200;
     res.resume = vi.fn();
 
     queueMicrotask(() => {
-      cb(res as never);
+      cb?.(res);
       res.emit("data", Buffer.from("not-json"));
       res.emit("end");
     });
 
-    return req as never;
-  }) as typeof https.get);
+    return req;
+  });
 }
 
 describe("versionCheck", () => {
@@ -366,13 +382,13 @@ describe("versionCheck", () => {
     });
 
     it("maps non-Error failures to a generic message", async () => {
-      vi.mocked(https.get).mockImplementation(((_url, _opts, _cb) => {
+      mockHttpsGet(() => {
         const req = new EventEmitter() as MockRequest;
         queueMicrotask(() => {
           req.emit("error", "string-failure");
         });
-        return req as never;
-      }) as typeof https.get);
+        return req;
+      });
 
       const result = await getVersionCheck("v1.0.0", "abc123");
       expect(result.error).toContain("Unknown error");
