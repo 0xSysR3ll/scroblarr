@@ -6,6 +6,7 @@ import { logger } from "@utils/logger";
 const GITHUB_REPOSITORY = "0xsysr3ll/scroblarr";
 const DEVELOP_BRANCH = "develop";
 const CACHE_TTL_MS = 10 * 60 * 1000;
+const REQUEST_TIMEOUT_MS = 5000;
 
 type GitHubRelease = {
   tag_name?: string;
@@ -46,6 +47,7 @@ export function fetchJson<T>(
       url,
       {
         headers,
+        timeout: REQUEST_TIMEOUT_MS,
       },
       (res) => {
         const { statusCode } = res;
@@ -70,6 +72,12 @@ export function fetchJson<T>(
         });
       }
     );
+
+    request.on("timeout", () => {
+      request.destroy(
+        new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms`)
+      );
+    });
 
     request.on("error", (err) => {
       reject(err);
@@ -143,13 +151,8 @@ export async function checkStableUpdates(
   const latest = releases[0];
   const latestTag = latest.tag_name?.trim() || null;
   const latestUrl = latest.html_url?.trim() || null;
-  const releaseName = latest.name ?? "";
 
-  const updateAvailable = Boolean(
-    latestTag &&
-    latestTag !== currentVersion &&
-    !releaseName.includes(currentVersion)
-  );
+  const updateAvailable = Boolean(latestTag && latestTag !== currentVersion);
 
   return {
     updateAvailable,

@@ -95,6 +95,27 @@ function mockHttpsRequestError(error: Error) {
   });
 }
 
+function mockHttpsTimeout() {
+  mockHttpsGet(() => {
+    const req = new EventEmitter() as MockRequest & {
+      destroy: (err?: Error) => void;
+    };
+    req.destroy = (err?: Error) => {
+      queueMicrotask(() => {
+        if (err) {
+          req.emit("error", err);
+        }
+      });
+    };
+
+    queueMicrotask(() => {
+      req.emit("timeout");
+    });
+
+    return req;
+  });
+}
+
 function mockHttpsInvalidJson() {
   mockHttpsGet((...args) => {
     const cb = getCallback(args);
@@ -156,6 +177,13 @@ describe("versionCheck", () => {
       mockHttpsRequestError(new Error("network down"));
       await expect(fetchJson("https://example.test", {})).rejects.toThrow(
         "network down"
+      );
+    });
+
+    it("rejects when the request times out", async () => {
+      mockHttpsTimeout();
+      await expect(fetchJson("https://example.test", {})).rejects.toThrow(
+        /timed out after 5000ms/
       );
     });
   });
@@ -292,10 +320,10 @@ describe("versionCheck", () => {
       });
     });
 
-    it("treats matching tag or name as up to date", async () => {
+    it("treats matching tags as up to date", async () => {
       mockHttpsSuccess([
         {
-          tag_name: "release-build",
+          tag_name: "v1.0.0",
           name: "Scroblarr v1.0.0",
           html_url: "https://example.test/release",
         },
@@ -304,7 +332,25 @@ describe("versionCheck", () => {
       await expect(checkStableUpdates("v1.0.0")).resolves.toMatchObject({
         updateAvailable: false,
         commitsBehind: 0,
-        latestTag: "release-build",
+        latestTag: "v1.0.0",
+      });
+    });
+
+    it("does not treat version substrings in release names as up to date", async () => {
+      mockHttpsSuccess([
+        {
+          tag_name: "v1.0.10",
+          name: "Scroblarr v1.0.10",
+          html_url: "https://example.test/v1.0.10",
+        },
+      ]);
+
+      await expect(checkStableUpdates("v1.0.1")).resolves.toEqual({
+        updateAvailable: true,
+        commitsBehind: -1,
+        latestTag: "v1.0.10",
+        latestUrl: "https://example.test/v1.0.10",
+        error: null,
       });
     });
 
