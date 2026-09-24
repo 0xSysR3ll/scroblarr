@@ -29,7 +29,7 @@ export class SessionRepository {
   async findUserByToken(token: string): Promise<User | null> {
     const session = await this.repository.findOne({
       where: { token },
-      relations: ["user"],
+      relations: { user: true },
     });
     if (!session || !session.user || Date.now() > session.expiresAt) {
       return null;
