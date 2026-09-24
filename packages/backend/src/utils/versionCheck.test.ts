@@ -238,6 +238,27 @@ describe("versionCheck", () => {
         error: null,
       });
     });
+
+    it("treats an all-skip-ci window as having no usable HEAD", async () => {
+      mockHttpsSuccess([
+        {
+          sha: "skipsha0000000000000000000000000000001",
+          commit: { message: "chore: a [skip ci]" },
+        },
+        {
+          sha: "skipsha0000000000000000000000000000002",
+          commit: { message: "chore: b [skip ci]" },
+        },
+      ]);
+
+      await expect(checkDevelopUpdates("abc")).resolves.toEqual({
+        updateAvailable: false,
+        commitsBehind: 0,
+        latestTag: null,
+        latestUrl: "https://github.com/0xsysr3ll/scroblarr/commits/develop",
+        error: null,
+      });
+    });
   });
 
   describe("checkStableUpdates", () => {
@@ -295,6 +316,23 @@ describe("versionCheck", () => {
         commitsBehind: 0,
         latestTag: null,
         latestUrl: null,
+        error: null,
+      });
+    });
+
+    it("compares tags when the release name is missing", async () => {
+      mockHttpsSuccess([
+        {
+          tag_name: "v2.0.0",
+          html_url: "https://example.test/v2.0.0",
+        },
+      ]);
+
+      await expect(checkStableUpdates("v1.0.0")).resolves.toEqual({
+        updateAvailable: true,
+        commitsBehind: -1,
+        latestTag: "v2.0.0",
+        latestUrl: "https://example.test/v2.0.0",
         error: null,
       });
     });
