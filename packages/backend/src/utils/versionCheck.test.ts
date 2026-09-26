@@ -380,7 +380,7 @@ describe("versionCheck", () => {
         commitsBehind: 0,
         latestTag: null,
         latestUrl: null,
-        error: null,
+        error: "GitHub latest release response had no tag name.",
       });
     });
 
