@@ -180,9 +180,17 @@ export async function checkStableUpdates(
   const latestTag = latest.tag_name?.trim() || null;
   const latestUrl = latest.html_url?.trim() || null;
 
-  const updateAvailable = Boolean(
-    latestTag && isNewerVersion(latestTag, currentVersion)
-  );
+  if (!latestTag) {
+    return {
+      updateAvailable: false,
+      commitsBehind: 0,
+      latestTag: null,
+      latestUrl: null,
+      error: "GitHub latest release response had no tag name.",
+    };
+  }
+
+  const updateAvailable = isNewerVersion(latestTag, currentVersion);
 
   return {
     updateAvailable,
