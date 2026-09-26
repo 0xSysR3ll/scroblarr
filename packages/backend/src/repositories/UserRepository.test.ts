@@ -6,6 +6,8 @@ const createMock = vi.hoisted(() => vi.fn());
 const saveMock = vi.hoisted(() => vi.fn());
 const updateMock = vi.hoisted(() => vi.fn());
 const getOneMock = vi.hoisted(() => vi.fn());
+const getManyMock = vi.hoisted(() => vi.fn());
+const takeMock = vi.hoisted(() => vi.fn());
 const andWhereMock = vi.hoisted(() => vi.fn());
 const whereMock = vi.hoisted(() => vi.fn());
 const createQueryBuilderMock = vi.hoisted(() => vi.fn());
@@ -32,7 +34,9 @@ describe("UserRepository", () => {
     andWhereMock.mockReturnValue({
       andWhere: andWhereMock,
       getOne: getOneMock,
+      take: takeMock,
     });
+    takeMock.mockReturnValue({ getMany: getManyMock });
     createQueryBuilderMock.mockReturnValue({ where: whereMock });
   });
 
@@ -116,10 +120,12 @@ describe("UserRepository", () => {
   });
 
   it("finds users by normalized Jellyfin user id", async () => {
-    getOneMock.mockResolvedValue({
-      id: "user-id",
-      jellyfinUserId: "aa-bb-cc",
-    });
+    getManyMock.mockResolvedValue([
+      {
+        id: "user-id",
+        jellyfinUserId: "aa-bb-cc",
+      },
+    ]);
 
     const repository = new UserRepository();
     await expect(repository.findByJellyfinUserId("AA-BB-CC")).resolves.toEqual({
@@ -135,6 +141,28 @@ describe("UserRepository", () => {
       "LOWER(REPLACE(user.jellyfinUserId, '-', '')) = :normalizedId",
       { normalizedId: "aabbcc" }
     );
+    expect(takeMock).toHaveBeenCalledWith(2);
+  });
+
+  it("returns null when no enabled user matches the normalized Jellyfin user id", async () => {
+    getManyMock.mockResolvedValue([]);
+
+    const repository = new UserRepository();
+    await expect(
+      repository.findByJellyfinUserId("AA-BB-CC")
+    ).resolves.toBeNull();
+  });
+
+  it("returns null when multiple enabled users share the normalized Jellyfin user id", async () => {
+    getManyMock.mockResolvedValue([
+      { id: "user-a", jellyfinUserId: "aa-bb-cc" },
+      { id: "user-b", jellyfinUserId: "AABBCC" },
+    ]);
+
+    const repository = new UserRepository();
+    await expect(
+      repository.findByJellyfinUserId("AA-BB-CC")
+    ).resolves.toBeNull();
   });
 
   it("normalizes jellyfinUserId when creating users", async () => {

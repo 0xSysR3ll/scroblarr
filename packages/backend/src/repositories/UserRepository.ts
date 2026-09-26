@@ -45,14 +45,17 @@ export class UserRepository {
     const normalizedId =
       UserRepository.normalizeMediaBrowserUserId(jellyfinUserId);
 
-    return this.repository
+    const matches = await this.repository
       .createQueryBuilder("user")
       .where("user.enabled = :enabled", { enabled: true })
       .andWhere(
         "LOWER(REPLACE(user.jellyfinUserId, '-', '')) = :normalizedId",
         { normalizedId }
       )
-      .getOne();
+      .take(2)
+      .getMany();
+
+    return matches.length === 1 ? matches[0] : null;
   }
 
   async findByBingersUserId(bingersUserId: string): Promise<User | null> {
