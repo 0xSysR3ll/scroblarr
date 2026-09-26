@@ -1,4 +1,8 @@
 import {
+  EmbyWebhookParser,
+  EmbyWebhookPayload,
+} from "@integrations/jellyfin/EmbyWebhookParser";
+import {
   JellyfinWebhookParser,
   JellyfinWebhookPayload,
 } from "@integrations/jellyfin/JellyfinWebhookParser";
@@ -227,6 +231,120 @@ router.post("/jellyfin", async (req: Request, res: Response) => {
       { error, payload: req.body },
       "Jellyfin webhook error"
     );
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+function extractEmbyPayload(req: Request): EmbyWebhookPayload | null {
+  const body = req.body;
+
+  if (body && typeof body === "object" && !Array.isArray(body)) {
+    if (typeof (body as { data?: unknown }).data === "string") {
+      try {
+        return JSON.parse(
+          (body as { data: string }).data
+        ) as EmbyWebhookPayload;
+      } catch {
+        return null;
+      }
+    }
+    if (
+      typeof (body as { data?: unknown }).data === "object" &&
+      (body as { data: unknown }).data !== null
+    ) {
+      return (body as { data: EmbyWebhookPayload }).data;
+    }
+    if (
+      (body as EmbyWebhookPayload).Event ||
+      (body as EmbyWebhookPayload).Item
+    ) {
+      return body as EmbyWebhookPayload;
+    }
+  }
+
+  if (typeof body === "string" && body.trim()) {
+    try {
+      return JSON.parse(body) as EmbyWebhookPayload;
+    } catch {
+      return null;
+    }
+  }
+
+  const rawBody = (req as Request & { rawBody?: string }).rawBody;
+  if (rawBody && typeof rawBody === "string" && rawBody.trim()) {
+    try {
+      return JSON.parse(rawBody) as EmbyWebhookPayload;
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+router.post("/emby", upload.any(), async (req: Request, res: Response) => {
+  try {
+    const payload = extractEmbyPayload(req);
+    if (!payload) {
+      logger.webhook.error(
+        { body: req.body, contentType: req.headers["content-type"] },
+        "Emby webhook body is empty or invalid"
+      );
+      return res.status(400).json({ error: "Empty or invalid payload" });
+    }
+
+    let apiKey =
+      typeof req.headers["x-api-key"] === "string"
+        ? req.headers["x-api-key"]
+        : undefined;
+    if (!apiKey && typeof req.query.apiKey === "string") {
+      apiKey = req.query.apiKey;
+    }
+    if (!apiKey) {
+      const k = (payload as Record<string, unknown>).apiKey;
+      apiKey = typeof k === "string" ? k : undefined;
+    }
+
+    const storedWebhookApiKey = await getStoredWebhookApiKey();
+    if (!storedWebhookApiKey) {
+      return rejectMissingWebhookKey(res);
+    }
+
+    if (!apiKey || !timingSafeStringEqual(apiKey, storedWebhookApiKey)) {
+      return rejectInvalidWebhookKey(res, !!apiKey, !!storedWebhookApiKey);
+    }
+
+    const payloadWithApiKey = payload as Record<string, unknown>;
+    if (payloadWithApiKey.apiKey) {
+      delete payloadWithApiKey.apiKey;
+    }
+
+    const settings = await settingsRepository.getAll();
+    const event = EmbyWebhookParser.parse(payload, settings.jellyfinHost);
+
+    if (!event) {
+      return res
+        .status(200)
+        .json({ success: true, message: "Event not supported" });
+    }
+
+    if (event.event === "scrobble") {
+      logger.webhook.info(
+        {
+          eventType: event.event,
+          mediaType: event.media.type,
+          mediaTitle: event.media.title,
+          userId: event.userId,
+          source: "emby",
+        },
+        "Received Emby webhook"
+      );
+    }
+
+    await syncService.syncEvent(event);
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    logger.webhook.error({ error, payload: req.body }, "Emby webhook error");
     return res.status(500).json({ error: "Internal server error" });
   }
 });

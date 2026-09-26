@@ -169,7 +169,7 @@ export class SyncService {
     }
 
     let user: User | null;
-    if (event.source === "jellyfin") {
+    if (event.source === "jellyfin" || event.source === "emby") {
       user = await this.userRepository.findByJellyfinUserId(event.userId);
     } else {
       user = await this.userRepository.findBySourceUsername(
@@ -203,7 +203,7 @@ export class SyncService {
       throw new Error("User not found for sync history item");
     }
 
-    if (source !== "plex" && source !== "jellyfin") {
+    if (source !== "plex" && source !== "jellyfin" && source !== "emby") {
       throw new Error("Sync history item source cannot be retried");
     }
 
@@ -212,7 +212,9 @@ export class SyncService {
     }
 
     const sourceUserId =
-      source === "jellyfin" ? user.jellyfinUserId : user.plexUsername;
+      source === "jellyfin" || source === "emby"
+        ? user.jellyfinUserId
+        : user.plexUsername;
     if (!sourceUserId) {
       throw new Error("User is missing the linked media server account");
     }
@@ -512,7 +514,7 @@ export class SyncService {
     try {
       let posterUrl = event.media.posterUrl;
       if (
-        event.source === "jellyfin" &&
+        (event.source === "jellyfin" || event.source === "emby") &&
         event.media.type === "episode" &&
         event.metadata?.itemId
       ) {
@@ -521,16 +523,21 @@ export class SyncService {
           try {
             const { JellyfinClient } =
               await import("@integrations/jellyfin/JellyfinClient");
-            const jellyfinClient = new JellyfinClient(settings.jellyfinHost);
+            const jellyfinClient = new JellyfinClient(
+              settings.jellyfinHost,
+              undefined,
+              event.source === "emby" || settings.mediaBrowserType === "emby"
+                ? "emby"
+                : "jellyfin"
+            );
             const user = await this.userRepository.findById(userId);
+            const accessToken =
+              user?.jellyfinAccessToken || settings.jellyfinApiKey || undefined;
 
-            if (
-              user?.jellyfinAccessToken &&
-              event.media.seasonNumber !== undefined
-            ) {
+            if (accessToken && event.media.seasonNumber !== undefined) {
               const itemId = event.metadata.itemId as string;
               const seasonPosterUrl = await jellyfinClient.getSeasonPosterUrl(
-                user.jellyfinAccessToken,
+                accessToken,
                 itemId,
                 event.media.seasonNumber
               );
@@ -539,7 +546,7 @@ export class SyncService {
               }
             }
           } catch {
-            // Fall back to episode poster
+            void 0;
           }
         }
       }

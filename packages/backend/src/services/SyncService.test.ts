@@ -135,6 +135,27 @@ vi.mock("./MediaIdEnricher", async (importOriginal) => {
   };
 });
 
+const jellyfinClientMocks = vi.hoisted(() => ({
+  getSeasonPosterUrl: vi.fn(),
+  constructedConfigs: [] as Array<{
+    baseUrl: string;
+    serverKind?: "jellyfin" | "emby";
+  }>,
+}));
+
+vi.mock("@integrations/jellyfin/JellyfinClient", () => ({
+  JellyfinClient: class {
+    constructor(
+      baseUrl: string,
+      _deviceId?: string,
+      serverKind?: "jellyfin" | "emby"
+    ) {
+      jellyfinClientMocks.constructedConfigs.push({ baseUrl, serverKind });
+    }
+    getSeasonPosterUrl = jellyfinClientMocks.getSeasonPosterUrl;
+  },
+}));
+
 vi.mock("@utils/logger", () => ({
   logger: {
     sync: {
@@ -170,6 +191,7 @@ describe("SyncService", () => {
   beforeEach(() => {
     bingersClientCtorThrows.value = false;
     vi.clearAllMocks();
+    jellyfinClientMocks.constructedConfigs.length = 0;
     settingsRepositoryMocks.get.mockResolvedValue("100");
     settingsRepositoryMocks.getAll.mockResolvedValue({});
     syncHistoryRepositoryMocks.clearOldByUser.mockResolvedValue(0);
@@ -177,6 +199,7 @@ describe("SyncService", () => {
       0
     );
     mediaIdEnricherMocks.enrich.mockImplementation(async (media) => media);
+    jellyfinClientMocks.getSeasonPosterUrl.mockReset();
   });
 
   it("ignores non-scrobble events", async () => {
@@ -184,6 +207,36 @@ describe("SyncService", () => {
     await service.syncEvent(makeEvent({ event: "playing" }));
     expect(userRepositoryMocks.findBySourceUsername).not.toHaveBeenCalled();
     expect(syncHistoryRepositoryMocks.create).not.toHaveBeenCalled();
+  });
+
+  it("resolves Emby events by jellyfinUserId", async () => {
+    userRepositoryMocks.findByJellyfinUserId.mockResolvedValue({
+      id: "u-emby",
+      enabled: true,
+      jellyfinUserId: "emby-user-guid",
+      traktAccessToken: null,
+    });
+
+    const service = new SyncService();
+    await service.syncEvent(
+      makeEvent({
+        source: "emby",
+        userId: "emby-user-guid",
+      })
+    );
+
+    expect(userRepositoryMocks.findByJellyfinUserId).toHaveBeenCalledWith(
+      "emby-user-guid"
+    );
+    expect(userRepositoryMocks.findBySourceUsername).not.toHaveBeenCalled();
+    expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "u-emby",
+        source: "emby",
+        success: false,
+        errorMessage: "No sync destinations configured",
+      })
+    );
   });
 
   it("records failed history when user is disabled", async () => {
@@ -833,6 +886,54 @@ describe("SyncService", () => {
     );
   });
 
+  it("retries Emby history items with the linked Jellyfin user id", async () => {
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    traktTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "trakt-valid-token"
+    );
+    traktClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    const result = await service.retryHistoryItem({
+      id: "emby-history-id",
+      userId: "u-emby",
+      user: {
+        id: "u-emby",
+        enabled: true,
+        jellyfinUserId: "emby-user-guid",
+        traktClientId: "trakt-client-id",
+        traktClientSecret: "trakt-secret",
+        traktAccessToken: "trakt-token",
+      },
+      mediaType: "movie",
+      mediaTitle: "Emby Movie",
+      source: "emby",
+      originalMediaId: "emby-media-id",
+      tmdbMovieId: "456",
+      success: false,
+      syncedAt: new Date("2026-01-01T00:00:00.000Z"),
+    } as never);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        destinations: ["Trakt"],
+      })
+    );
+    expect(traktClientMocks.scrobble).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: "emby",
+        userId: "emby-user-guid",
+        media: expect.objectContaining({
+          id: "emby-media-id",
+          tmdbMovieId: 456,
+        }),
+      }),
+      "trakt-valid-token",
+      expect.any(Object)
+    );
+  });
+
   it("does not create another history item when a retry fails completely", async () => {
     syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
     traktTokenManagerMocks.getValidAccessToken.mockResolvedValue(
@@ -1163,6 +1264,180 @@ describe("SyncService", () => {
       }),
       "simkl-valid-token",
       expect.any(Object)
+    );
+  });
+  it("uses jellyfinApiKey for Emby season poster enrichment", async () => {
+    userRepositoryMocks.findByJellyfinUserId.mockResolvedValue({
+      id: "u-emby",
+      enabled: true,
+      jellyfinUserId: "emby-user-guid",
+      jellyfinAccessToken: undefined,
+      traktClientId: "trakt-client",
+      traktClientSecret: "trakt-secret",
+      traktAccessToken: "trakt-token",
+    });
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "u-emby",
+      jellyfinAccessToken: undefined,
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://emby.local",
+      jellyfinApiKey: "server-api-key",
+      mediaBrowserType: "emby",
+      tmdbAccessToken: undefined,
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    traktTokenManagerMocks.getValidAccessToken.mockResolvedValue("trakt-token");
+    traktClientMocks.scrobble.mockResolvedValue(undefined);
+    jellyfinClientMocks.getSeasonPosterUrl.mockResolvedValue(
+      "https://emby.local/Items/season-9/Images/Primary"
+    );
+
+    const service = new SyncService();
+    await service.syncEvent(
+      makeEvent({
+        source: "emby",
+        userId: "emby-user-guid",
+        media: {
+          id: "episode-Show-1-2",
+          type: "episode",
+          title: "Show",
+          seasonNumber: 1,
+          episodeNumber: 2,
+          posterUrl: "https://emby.local/Items/ep-1/Images/Primary",
+        },
+        metadata: { itemId: "ep-1" },
+      })
+    );
+
+    expect(jellyfinClientMocks.getSeasonPosterUrl).toHaveBeenCalledWith(
+      "server-api-key",
+      "ep-1",
+      1
+    );
+    expect(jellyfinClientMocks.constructedConfigs).toEqual([
+      {
+        baseUrl: "https://emby.local",
+        serverKind: "emby",
+      },
+    ]);
+    expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: "emby",
+        posterUrl: "https://emby.local/Items/season-9/Images/Primary",
+        success: true,
+      })
+    );
+  });
+
+  it("uses jellyfin client kind for Jellyfin season poster enrichment", async () => {
+    userRepositoryMocks.findByJellyfinUserId.mockResolvedValue({
+      id: "u-jf",
+      enabled: true,
+      jellyfinUserId: "jf-user",
+      jellyfinAccessToken: "jf-token",
+      traktClientId: "trakt-client",
+      traktClientSecret: "trakt-secret",
+      traktAccessToken: "trakt-token",
+    });
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "u-jf",
+      jellyfinAccessToken: "jf-token",
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://jellyfin.local",
+      mediaBrowserType: "jellyfin",
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    traktTokenManagerMocks.getValidAccessToken.mockResolvedValue("trakt-token");
+    traktClientMocks.scrobble.mockResolvedValue(undefined);
+    jellyfinClientMocks.getSeasonPosterUrl.mockResolvedValue(
+      "https://jellyfin.local/Items/season-1/Images/Primary"
+    );
+
+    const service = new SyncService();
+    await service.syncEvent(
+      makeEvent({
+        source: "jellyfin",
+        userId: "jf-user",
+        media: {
+          id: "episode-Show-1-1",
+          type: "episode",
+          title: "Show",
+          seasonNumber: 1,
+          episodeNumber: 1,
+          posterUrl: "https://jellyfin.local/Items/ep/Images/Primary",
+        },
+        metadata: { itemId: "ep" },
+      })
+    );
+
+    expect(jellyfinClientMocks.getSeasonPosterUrl).toHaveBeenCalledWith(
+      "jf-token",
+      "ep",
+      1
+    );
+    expect(jellyfinClientMocks.constructedConfigs).toEqual([
+      {
+        baseUrl: "https://jellyfin.local",
+        serverKind: "jellyfin",
+      },
+    ]);
+    expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: "jellyfin",
+        posterUrl: "https://jellyfin.local/Items/season-1/Images/Primary",
+        success: true,
+      })
+    );
+  });
+
+  it("falls back when Emby season poster lookup throws", async () => {
+    userRepositoryMocks.findByJellyfinUserId.mockResolvedValue({
+      id: "u-emby",
+      enabled: true,
+      jellyfinUserId: "emby-user-guid",
+      jellyfinAccessToken: "emby-token",
+      traktClientId: "trakt-client",
+      traktClientSecret: "trakt-secret",
+      traktAccessToken: "trakt-token",
+    });
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "u-emby",
+      jellyfinAccessToken: "emby-token",
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://emby.local",
+      mediaBrowserType: "emby",
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    traktTokenManagerMocks.getValidAccessToken.mockResolvedValue("trakt-token");
+    traktClientMocks.scrobble.mockResolvedValue(undefined);
+    jellyfinClientMocks.getSeasonPosterUrl.mockRejectedValue(new Error("boom"));
+
+    const service = new SyncService();
+    await service.syncEvent(
+      makeEvent({
+        source: "emby",
+        userId: "emby-user-guid",
+        media: {
+          id: "episode-Show-1-2",
+          type: "episode",
+          title: "Show",
+          seasonNumber: 1,
+          episodeNumber: 2,
+          posterUrl: "https://emby.local/Items/ep-1/Images/Primary",
+        },
+        metadata: { itemId: "ep-1" },
+      })
+    );
+
+    expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: "emby",
+        posterUrl: "https://emby.local/Items/ep-1/Images/Primary",
+        success: true,
+      })
     );
   });
 });

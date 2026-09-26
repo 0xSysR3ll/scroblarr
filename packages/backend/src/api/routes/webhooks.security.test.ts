@@ -186,6 +186,309 @@ describe("webhook security", () => {
     });
   });
 
+  it("rejects Emby webhook when webhook API key is missing from the request", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/emby")
+      .send({ Event: "playback.start" });
+
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({ error: "Invalid API key" });
+  });
+
+  it("rejects Emby webhook when webhook API key is not configured", async () => {
+    settingsRepositoryMocks.get.mockResolvedValue(null);
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/emby?apiKey=any-key")
+      .send({ Event: "playback.start" });
+
+    expect(response.status).toBe(503);
+    expect(response.body).toEqual({
+      error: "Webhook authentication not ready",
+    });
+  });
+
+  it("rejects Emby webhook when only the admin API key is provided", async () => {
+    settingsRepositoryMocks.get.mockImplementation(async (key: string) => {
+      if (key === "webhookApiKey") {
+        return "webhook-only-key";
+      }
+      if (key === "apiKey") {
+        return "admin-api-key";
+      }
+      return null;
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/emby?apiKey=admin-api-key")
+      .send({ Event: "playback.start" });
+
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({ error: "Invalid API key" });
+  });
+
+  it("accepts Emby webhook when webhook API key matches query string", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/emby?apiKey=expected-webhook-key")
+      .send({ Event: "playback.start" });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      message: "Event not supported",
+    });
+  });
+
+  it("accepts Emby scrobble webhook and syncs the parsed event", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://emby.local:8096",
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/emby?apiKey=expected-webhook-key")
+      .send({
+        Event: "playback.stop",
+        Date: "2026-01-01T00:00:00.000Z",
+        User: { Name: "alice", Id: "emby-user-id" },
+        Item: {
+          Id: "item-1",
+          Type: "Movie",
+          Name: "Interstellar",
+          ProductionYear: 2014,
+          RunTimeTicks: 10_000_000_000,
+          ProviderIds: { Imdb: "tt0816692" },
+        },
+        PlaybackInfo: {
+          PlayedToCompletion: true,
+          PositionTicks: 10_000_000_000,
+        },
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ success: true });
+    expect(syncServiceMocks.syncEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "scrobble",
+        source: "emby",
+        userId: "emby-user-id",
+      })
+    );
+  });
+
+  it("rejects Emby webhook with empty payload", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/emby?apiKey=expected-webhook-key")
+      .send({});
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "Empty or invalid payload" });
+  });
+
+  it("accepts Emby webhook when API key is in the JSON body", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/emby")
+      .send({ Event: "playback.start", apiKey: "expected-webhook-key" });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      message: "Event not supported",
+    });
+  });
+
+  it("accepts Emby webhook when webhook API key matches header", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/emby")
+      .set("x-api-key", "expected-webhook-key")
+      .send({ Event: "playback.start" });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      message: "Event not supported",
+    });
+  });
+
+  it("parses Emby payload from multipart data string field", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+
+    const app = express();
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/emby?apiKey=expected-webhook-key")
+      .field(
+        "data",
+        JSON.stringify({ Event: "playback.start", User: { Id: "u1" } })
+      );
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      message: "Event not supported",
+    });
+  });
+
+  it("parses Emby JSON string body", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+
+    const app = express();
+    app.use(express.text({ type: "*/*" }));
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/emby?apiKey=expected-webhook-key")
+      .set("content-type", "text/plain")
+      .send(JSON.stringify({ Event: "playback.start" }));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      message: "Event not supported",
+    });
+  });
+
+  it("parses Emby payload from nested data object", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/emby?apiKey=expected-webhook-key")
+      .send({ data: { Event: "playback.start", Item: { Type: "Movie" } } });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      message: "Event not supported",
+    });
+  });
+
+  it("parses Emby payload from req.rawBody when body is empty", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+
+    const app = express();
+    app.use((req, _res, next) => {
+      (req as { rawBody?: string }).rawBody = JSON.stringify({
+        Event: "playback.start",
+      });
+      next();
+    });
+    app.use(express.json());
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/emby?apiKey=expected-webhook-key")
+      .set("content-type", "application/json")
+      .send();
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      message: "Event not supported",
+    });
+  });
+
+  it("returns 500 when Emby sync throws", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://emby.local:8096",
+    });
+    syncServiceMocks.syncEvent.mockRejectedValue(new Error("sync boom"));
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/emby?apiKey=expected-webhook-key")
+      .send({
+        Event: "playback.stop",
+        User: { Name: "alice", Id: "emby-user-id" },
+        Item: {
+          Id: "item-1",
+          Type: "Movie",
+          Name: "Interstellar",
+          ProductionYear: 2014,
+          RunTimeTicks: 10_000_000_000,
+        },
+        PlaybackInfo: {
+          PlayedToCompletion: true,
+          PositionTicks: 10_000_000_000,
+        },
+      });
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: "Internal server error" });
+  });
+
+  it("rejects Emby webhook when multipart data string is invalid JSON", async () => {
+    const app = express();
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/emby?apiKey=expected-webhook-key")
+      .field("data", "not-json");
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "Empty or invalid payload" });
+  });
+
+  it("parses Emby payload from invalid rawBody as empty", async () => {
+    const app = express();
+    app.use((req, _res, next) => {
+      (req as { rawBody?: string }).rawBody = "not-json";
+      next();
+    });
+    app.use(express.json());
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/emby?apiKey=expected-webhook-key")
+      .send();
+
+    expect(response.status).toBe(400);
+  });
+
   it("rejects Tautulli webhook when webhook API key is missing from the request", async () => {
     const app = express();
     app.use(express.json());
@@ -591,5 +894,18 @@ describe("webhook security", () => {
         bodyLength: expect.any(Number),
       })
     );
+  });
+  it("rejects Emby webhook when string body is invalid JSON", async () => {
+    const app = express();
+    app.use(express.text({ type: "*/*" }));
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/emby?apiKey=expected-webhook-key")
+      .set("content-type", "text/plain")
+      .send("not-json");
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "Empty or invalid payload" });
   });
 });

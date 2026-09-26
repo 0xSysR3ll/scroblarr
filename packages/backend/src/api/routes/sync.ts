@@ -56,7 +56,11 @@ async function retryHistoryItemForUser(
     };
   }
 
-  if (historyItem.source !== "plex" && historyItem.source !== "jellyfin") {
+  if (
+    historyItem.source !== "plex" &&
+    historyItem.source !== "jellyfin" &&
+    historyItem.source !== "emby"
+  ) {
     return {
       status: 400,
       body: {
@@ -96,7 +100,7 @@ async function retryHistoryItemForUser(
   }
 
   const linkedMediaUser =
-    historyItem.source === "jellyfin"
+    historyItem.source === "jellyfin" || historyItem.source === "emby"
       ? historyItem.user.jellyfinUserId
       : historyItem.user.plexUsername;
   if (!linkedMediaUser) {
@@ -156,7 +160,10 @@ router.get("/history", auth, async (req: Request, res: Response) => {
     if (success !== undefined) {
       filters.success = success;
     }
-    if (source && (source === "plex" || source === "jellyfin")) {
+    if (
+      source &&
+      (source === "plex" || source === "jellyfin" || source === "emby")
+    ) {
       filters.source = source;
     }
 

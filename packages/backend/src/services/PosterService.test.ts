@@ -339,7 +339,7 @@ describe("PosterService", () => {
     });
   });
 
-  it("returns Jellyfin auth and configuration errors", async () => {
+  it("returns media server auth and configuration errors", async () => {
     const service = new PosterService();
 
     expect(
@@ -353,7 +353,7 @@ describe("PosterService", () => {
       )
     ).toEqual({
       status: 403,
-      message: "Jellyfin authentication required",
+      message: "Media server authentication required",
     });
 
     expect(
@@ -367,8 +367,39 @@ describe("PosterService", () => {
       )
     ).toEqual({
       status: 500,
-      message: "Jellyfin server not configured",
+      message: "Media server not configured",
     });
+  });
+
+  it("proxies Emby posters with API key when user has no access token", async () => {
+    jellyfinClientMocks.fetchImage.mockResolvedValue({
+      buffer: new Uint8Array([9, 9]).buffer,
+      contentType: "image/jpeg",
+    });
+
+    const service = new PosterService();
+    const result = await service.fetchPoster(
+      createSyncHistory({
+        posterUrl: "https://emby.local/Items/1/Images/Primary",
+        source: "emby",
+      }),
+      createUser({ jellyfinAccessToken: undefined }),
+      {
+        jellyfinHost: "https://emby.local",
+        jellyfinApiKey: "server-api-key",
+        mediaBrowserType: "emby",
+      }
+    );
+
+    expect(result).toEqual({
+      buffer: Buffer.from(new Uint8Array([9, 9])),
+      contentType: "image/jpeg",
+    });
+    expect(jellyfinClientMocks.fetchImage).toHaveBeenCalledWith(
+      "server-api-key",
+      "https://emby.local/Items/1/Images/Primary",
+      expect.any(AbortSignal)
+    );
   });
 
   it("handles Jellyfin and generic fetch failures", async () => {

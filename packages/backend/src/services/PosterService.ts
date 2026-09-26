@@ -156,11 +156,15 @@ export class PosterService {
     if (posterUrl) {
       if (isPlexServerUrl(posterUrl)) {
         mediaServerResult = await this.fetchFromPlex(posterUrl, user, settings);
-      } else if (syncHistory.source === "jellyfin") {
+      } else if (
+        syncHistory.source === "jellyfin" ||
+        syncHistory.source === "emby"
+      ) {
         mediaServerResult = await this.fetchFromJellyfin(
           posterUrl,
           user,
-          settings
+          settings,
+          syncHistory.source
         );
       } else {
         mediaServerResult = await this.fetchFromUrl(posterUrl);
@@ -400,26 +404,37 @@ export class PosterService {
   private async fetchFromJellyfin(
     posterUrl: string,
     user: User,
-    settings: Record<string, string | undefined>
+    settings: Record<string, string | undefined>,
+    source: "jellyfin" | "emby" = "jellyfin"
   ): Promise<PosterFetchResult> {
-    if (!user.jellyfinAccessToken) {
+    const accessToken =
+      user.jellyfinAccessToken || settings.jellyfinApiKey || undefined;
+    if (!accessToken) {
       return {
         status: 403,
-        message: "Jellyfin authentication required",
+        message: "Media server authentication required",
       };
     }
 
     if (!settings.jellyfinHost) {
       return {
         status: 500,
-        message: "Jellyfin server not configured",
+        message: "Media server not configured",
       };
     }
 
     try {
-      const jellyfinClient = new JellyfinClient(settings.jellyfinHost);
+      const serverKind =
+        source === "emby" || settings.mediaBrowserType === "emby"
+          ? "emby"
+          : "jellyfin";
+      const jellyfinClient = new JellyfinClient(
+        settings.jellyfinHost,
+        undefined,
+        serverKind
+      );
       const { buffer, contentType } = await jellyfinClient.fetchImage(
-        user.jellyfinAccessToken,
+        accessToken,
         posterUrl,
         posterFetchSignal()
       );
@@ -429,7 +444,10 @@ export class PosterService {
         contentType,
       };
     } catch (error) {
-      logger.api.error({ error, posterUrl }, "Error proxying Jellyfin poster");
+      logger.api.error(
+        { error, posterUrl },
+        "Error proxying media server poster"
+      );
       return {
         status: 500,
         message: "Failed to fetch poster image",

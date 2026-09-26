@@ -63,7 +63,9 @@ export class SyncHistoryRepository {
 
     if (
       filters?.source &&
-      (filters.source === "plex" || filters.source === "jellyfin")
+      (filters.source === "plex" ||
+        filters.source === "jellyfin" ||
+        filters.source === "emby")
     ) {
       where.source = filters.source;
     }
@@ -378,6 +380,7 @@ export class SyncHistoryRepository {
     bySource: {
       plex: number;
       jellyfin: number;
+      emby: number;
     };
     byDestination: {
       trakt: number;
@@ -445,6 +448,7 @@ export class SyncHistoryRepository {
       seriesRaw,
       plexCount,
       jellyfinCount,
+      embyCount,
       traktCount,
       tvtimeCount,
       simklCount,
@@ -484,6 +488,9 @@ export class SyncHistoryRepository {
       }),
       this.repository.count({
         where: { userId, source: "jellyfin" },
+      }),
+      this.repository.count({
+        where: { userId, source: "emby" },
       }),
       this.repository
         .createQueryBuilder("sync_history")
@@ -649,6 +656,7 @@ export class SyncHistoryRepository {
       bySource: {
         plex: plexCount,
         jellyfin: jellyfinCount,
+        emby: embyCount,
       },
       byDestination: {
         trakt: traktCount,
