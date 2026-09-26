@@ -221,6 +221,7 @@ export type LogLabel =
   | "bingers"
   | "plex"
   | "jellyfin"
+  | "emby"
   | "system"
   | "migration";
 
@@ -255,6 +256,7 @@ const logger = {
   bingers: labeled("bingers"),
   plex: labeled("plex"),
   jellyfin: labeled("jellyfin"),
+  emby: labeled("emby"),
   system: labeled("system"),
   migration: labeled("migration"),
   flush: () => Promise.resolve(),

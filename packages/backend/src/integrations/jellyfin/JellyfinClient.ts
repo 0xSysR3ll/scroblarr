@@ -1,5 +1,7 @@
 import { logger } from "@utils/logger";
 
+export type MediaBrowserServerKind = "jellyfin" | "emby";
+
 export interface JellyfinUser {
   Id: string;
   Name: string;
@@ -33,23 +35,62 @@ export class JellyfinClient {
   private baseUrl: string;
   private deviceId: string;
   private clientName: string;
+  private serverKind: MediaBrowserServerKind;
 
-  constructor(baseUrl: string, deviceId?: string) {
+  constructor(
+    baseUrl: string,
+    deviceId?: string,
+    serverKind: MediaBrowserServerKind = "jellyfin"
+  ) {
     this.baseUrl = baseUrl.replace(/\/$/, "");
     this.deviceId = deviceId || this.generateDeviceId();
     this.clientName = "Scroblarr";
+    this.serverKind = serverKind;
+  }
+
+  private get log() {
+    return this.serverKind === "emby" ? logger.emby : logger.jellyfin;
   }
 
   private generateDeviceId(): string {
     return Buffer.from("scroblarr").toString("base64");
   }
 
-  getAuthHeader(token?: string): string {
+  getAuthHeader(token?: string, userId?: string): string {
     const version = "1.0.0";
+    if (this.serverKind === "emby") {
+      // https://dev.emby.media/doc/restapi/User-Authentication.html
+      // Scheme: Emby UserId="…", Client="…", Device="…", DeviceId="…", Version="…"
+      const userPart = userId ? `UserId="${userId}", ` : "";
+      return `Emby ${userPart}Client="${this.clientName}", Device="Scroblarr", DeviceId="${this.deviceId}", Version="${version}"`;
+    }
     if (token) {
       return `MediaBrowser Client="${this.clientName}", Device="Scroblarr", DeviceId="${this.deviceId}", Version="${version}", Token="${token}"`;
     }
     return `MediaBrowser Client="${this.clientName}", Device="Scroblarr", DeviceId="${this.deviceId}", Version="${version}"`;
+  }
+
+  /**
+   * Jellyfin: Authorization MediaBrowser + Token in header string.
+   * Emby: Authorization Emby … + X-Emby-Token for session/API key
+   * (https://dev.emby.media/doc/restapi/API-Key-Authentication.html).
+   */
+  getAuthHeaders(token?: string, userId?: string): Record<string, string> {
+    const authHeader = this.getAuthHeader(token, userId);
+    const headers: Record<string, string> = {
+      Authorization: authHeader,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    };
+
+    if (this.serverKind === "emby") {
+      headers["X-Emby-Authorization"] = authHeader;
+      if (token) {
+        headers["X-Emby-Token"] = token;
+      }
+    }
+
+    return headers;
   }
 
   async login(
@@ -59,11 +100,7 @@ export class JellyfinClient {
     try {
       const response = await fetch(`${this.baseUrl}/Users/AuthenticateByName`, {
         method: "POST",
-        headers: {
-          Authorization: this.getAuthHeader(),
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
+        headers: this.getAuthHeaders(),
         body: JSON.stringify({
           Username: username,
           Pw: password,
@@ -75,22 +112,24 @@ export class JellyfinClient {
         const statusCode = response.status;
 
         if (statusCode === 401) {
-          logger.jellyfin.warn(
+          this.log.warn(
             {
               username,
               errorText: errorText.substring(0, 500),
+              serverKind: this.serverKind,
             },
             "Jellyfin login failed: invalid credentials (401)"
           );
           throw new Error("Invalid credentials");
         }
 
-        logger.jellyfin.error(
+        this.log.error(
           {
             status: statusCode,
             statusText: response.statusText,
             errorText: errorText.substring(0, 500),
             username,
+            serverKind: this.serverKind,
           },
           "Jellyfin login failed"
         );
@@ -111,19 +150,14 @@ export class JellyfinClient {
 
   async getUsers(accessToken: string): Promise<JellyfinUser[]> {
     try {
-      const authHeader = this.getAuthHeader(accessToken);
       const response = await fetch(`${this.baseUrl}/Users`, {
-        headers: {
-          Authorization: authHeader,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
+        headers: this.getAuthHeaders(accessToken),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
         const statusCode = response.status;
-        logger.jellyfin.error(
+        this.log.error(
           {
             status: statusCode,
             statusText: response.statusText,
@@ -138,7 +172,7 @@ export class JellyfinClient {
       }
 
       const users = (await response.json()) as JellyfinUser[];
-      logger.jellyfin.debug(
+      this.log.debug(
         {
           userCount: users.length,
           baseUrl: this.baseUrl.replace(/\/\/.*@/, "//***@"),
@@ -147,7 +181,7 @@ export class JellyfinClient {
       );
       return users;
     } catch (error) {
-      logger.jellyfin.error({ error }, "Error fetching Jellyfin users");
+      this.log.error({ error }, "Error fetching Jellyfin users");
       throw error;
     }
   }
@@ -157,19 +191,14 @@ export class JellyfinClient {
     userId: string
   ): Promise<JellyfinUserInfo> {
     try {
-      const authHeader = this.getAuthHeader(accessToken);
       const response = await fetch(`${this.baseUrl}/Users/${userId}`, {
-        headers: {
-          Authorization: authHeader,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
+        headers: this.getAuthHeaders(accessToken, userId),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
         const statusCode = response.status;
-        logger.jellyfin.error(
+        this.log.error(
           {
             status: statusCode,
             statusText: response.statusText,
@@ -196,7 +225,7 @@ export class JellyfinClient {
         thumb,
         isAdmin: user.Policy?.IsAdministrator || false,
       };
-      logger.jellyfin.debug(
+      this.log.debug(
         {
           userId: user.Id,
           username: user.Name,
@@ -206,10 +235,7 @@ export class JellyfinClient {
       );
       return userInfo;
     } catch (error) {
-      logger.jellyfin.error(
-        { error, userId },
-        "Error fetching Jellyfin user info"
-      );
+      this.log.error({ error, userId }, "Error fetching Jellyfin user info");
       throw error;
     }
   }
@@ -219,18 +245,13 @@ export class JellyfinClient {
     Version: string;
   }> {
     try {
-      const authHeader = this.getAuthHeader(accessToken);
       const response = await fetch(`${this.baseUrl}/System/Info`, {
-        headers: {
-          Authorization: authHeader,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
+        headers: this.getAuthHeaders(accessToken),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        logger.jellyfin.error(
+        this.log.error(
           {
             status: response.status,
             errorText,
@@ -246,7 +267,7 @@ export class JellyfinClient {
         ServerName: string;
         Version: string;
       };
-      logger.jellyfin.debug(
+      this.log.debug(
         {
           serverName: systemInfo.ServerName,
           version: systemInfo.Version,
@@ -255,32 +276,29 @@ export class JellyfinClient {
       );
       return systemInfo;
     } catch (error) {
-      logger.jellyfin.error({ error }, "Error fetching Jellyfin system info");
+      this.log.error({ error }, "Error fetching Jellyfin system info");
       throw error;
     }
   }
 
   async createApiKey(accessToken: string, appName: string): Promise<string> {
     try {
-      const authHeader = this.getAuthHeader(accessToken);
+      const authHeaders = this.getAuthHeaders(accessToken);
       const createResponse = await fetch(
         `${this.baseUrl}/Auth/Keys?App=${encodeURIComponent(appName)}`,
         {
           method: "POST",
-          headers: {
-            Authorization: authHeader,
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
+          headers: authHeaders,
         }
       );
 
       if (!createResponse.ok) {
         const errorText = await createResponse.text();
-        logger.jellyfin.error(
+        this.log.error(
           {
             status: createResponse.status,
             errorText,
+            serverKind: this.serverKind,
           },
           "Failed to create Jellyfin API key"
         );
@@ -290,11 +308,7 @@ export class JellyfinClient {
       }
 
       const keysResponse = await fetch(`${this.baseUrl}/Auth/Keys`, {
-        headers: {
-          Authorization: authHeader,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
+        headers: authHeaders,
       });
 
       if (!keysResponse.ok) {
@@ -314,7 +328,7 @@ export class JellyfinClient {
 
       return apiKey.AccessToken;
     } catch (error) {
-      logger.jellyfin.error({ error }, "Error creating Jellyfin API key");
+      this.log.error({ error }, "Error creating Jellyfin API key");
       throw error;
     }
   }
@@ -325,15 +339,12 @@ export class JellyfinClient {
     seasonNumber: number
   ): Promise<string | null> {
     try {
-      const authHeader = this.getAuthHeader(accessToken);
+      const authHeaders = this.getAuthHeaders(accessToken);
 
       const ancestorsResponse = await fetch(
         `${this.baseUrl}/Items/${episodeItemId}/Ancestors`,
         {
-          headers: {
-            Authorization: authHeader,
-            Accept: "application/json",
-          },
+          headers: authHeaders,
         }
       );
 
@@ -354,10 +365,7 @@ export class JellyfinClient {
       const seasonsResponse = await fetch(
         `${this.baseUrl}/Shows/${series.Id}/Seasons`,
         {
-          headers: {
-            Authorization: authHeader,
-            Accept: "application/json",
-          },
+          headers: authHeaders,
         }
       );
 
@@ -385,7 +393,7 @@ export class JellyfinClient {
         `${this.baseUrl}/`
       ).toString();
     } catch (error) {
-      logger.jellyfin.error(
+      this.log.error(
         { error, episodeItemId, seasonNumber },
         "Error fetching season poster URL"
       );
@@ -409,17 +417,17 @@ export class JellyfinClient {
       throw new Error("Jellyfin image URL must match configured server");
     }
 
-    const authHeader = this.getAuthHeader(accessToken);
+    const headers = this.getAuthHeaders(accessToken);
+    delete headers["Content-Type"];
+    headers.Accept = "image/*";
+
     const response = await fetch(imageUrl, {
-      headers: {
-        Authorization: authHeader,
-        Accept: "image/*",
-      },
+      headers,
       signal,
     });
 
     if (!response.ok) {
-      logger.jellyfin.warn(
+      this.log.warn(
         {
           status: response.status,
           imageUrl,

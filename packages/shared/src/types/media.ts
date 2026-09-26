@@ -23,7 +23,7 @@ export interface MediaItem {
   posterUrl?: string;
 }
 
-export type MediaSource = "plex" | "jellyfin";
+export type MediaSource = "plex" | "jellyfin" | "emby";
 
 export interface MediaEvent {
   event: MediaStatus;

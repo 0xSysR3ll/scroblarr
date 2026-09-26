@@ -1,10 +1,28 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const loggerMocks = vi.hoisted(() => ({
+  jellyfin: {
+    debug: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+  emby: {
+    debug: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
+vi.mock("@utils/logger", () => ({
+  logger: loggerMocks,
+}));
+
 import { JellyfinClient } from "./JellyfinClient";
 
 describe("JellyfinClient", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
   it("fetches images with the provided abort signal", async () => {
@@ -129,5 +147,386 @@ describe("JellyfinClient", () => {
     await expect(
       client.getSeasonPosterUrl("access-token", "episode-1", 1)
     ).resolves.toBeNull();
+  });
+
+  it("uses official Emby Authorization and X-Emby-Token headers", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        User: { Id: "u1", Name: "admin" },
+        AccessToken: "tok",
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new JellyfinClient("https://emby.local", undefined, "emby");
+    await client.login("admin", "secret");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://emby.local/Users/AuthenticateByName",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: expect.stringMatching(/^Emby Client="/),
+          "X-Emby-Authorization": expect.stringMatching(/^Emby Client="/),
+        }),
+      })
+    );
+
+    const headers = client.getAuthHeaders("tok", "u1");
+    expect(headers.Authorization).toContain('UserId="u1"');
+    expect(headers["X-Emby-Token"]).toBe("tok");
+  });
+
+  it("maps 401 login failures to invalid credentials", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        statusText: "Unauthorized",
+        text: async () => "bad password",
+      })
+    );
+
+    const client = new JellyfinClient("https://jellyfin.local");
+    await expect(client.login("admin", "bad-secret")).rejects.toThrow(
+      "Invalid credentials"
+    );
+    expect(loggerMocks.jellyfin.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: "admin",
+        errorText: "bad password",
+        serverKind: "jellyfin",
+      }),
+      "Jellyfin login failed: invalid credentials (401)"
+    );
+  });
+
+  it("logs non-401 login failures", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        statusText: "Service Unavailable",
+        text: async () => "upstream down",
+      })
+    );
+
+    const client = new JellyfinClient("https://jellyfin.local");
+    await expect(client.login("admin", "secret")).rejects.toThrow(
+      "Jellyfin authentication failed: 503 Service Unavailable"
+    );
+    expect(loggerMocks.jellyfin.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 503,
+        statusText: "Service Unavailable",
+        errorText: "upstream down",
+        username: "admin",
+        serverKind: "jellyfin",
+      }),
+      "Jellyfin login failed"
+    );
+  });
+
+  it("wraps non-Error login failures", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue("network down"));
+
+    const client = new JellyfinClient("https://jellyfin.local");
+    await expect(client.login("admin", "secret")).rejects.toThrow(
+      "Failed to authenticate with Jellyfin"
+    );
+  });
+
+  it("returns users and logs debug details", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => [{ Id: "u1", Name: "Alice" }],
+      })
+    );
+
+    const client = new JellyfinClient("https://jellyfin.local");
+    await expect(client.getUsers("api-key")).resolves.toEqual([
+      { Id: "u1", Name: "Alice" },
+    ]);
+    expect(loggerMocks.jellyfin.debug).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userCount: 1,
+        baseUrl: "https://jellyfin.local",
+      }),
+      "Fetched Jellyfin users"
+    );
+  });
+
+  it("logs getUsers failures before throwing", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: "Server Error",
+        text: async () => "boom",
+      })
+    );
+
+    const client = new JellyfinClient("https://user:pass@jellyfin.local");
+    await expect(client.getUsers("api-key")).rejects.toThrow(
+      "Failed to get Jellyfin users: 500 Server Error"
+    );
+    expect(loggerMocks.jellyfin.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 500,
+        statusText: "Server Error",
+        errorText: "boom",
+        baseUrl: "https://***@jellyfin.local",
+      }),
+      "Failed to get Jellyfin users"
+    );
+    expect(loggerMocks.jellyfin.error).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.any(Error) }),
+      "Error fetching Jellyfin users"
+    );
+  });
+
+  it("returns Jellyfin user info and derived thumb urls", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          Id: "u1",
+          Name: "Alice",
+          PrimaryImageTag: "tag-1",
+          Policy: { IsAdministrator: true },
+        }),
+      })
+    );
+
+    const client = new JellyfinClient("https://jellyfin.local");
+    await expect(client.getUserInfo("api-key", "u1")).resolves.toEqual({
+      id: "u1",
+      username: "Alice",
+      displayName: "Alice",
+      email: undefined,
+      thumb: "/api/v1/avatars/jellyfin/u1",
+      isAdmin: true,
+    });
+    expect(loggerMocks.jellyfin.debug).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "u1",
+        username: "Alice",
+        isAdmin: true,
+      }),
+      "Fetched Jellyfin user info"
+    );
+  });
+
+  it("logs getUserInfo failures before throwing", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        statusText: "Not Found",
+        text: async () => "missing",
+      })
+    );
+
+    const client = new JellyfinClient("https://jellyfin.local");
+    await expect(client.getUserInfo("api-key", "u404")).rejects.toThrow(
+      "Failed to get Jellyfin user info: 404 Not Found"
+    );
+    expect(loggerMocks.jellyfin.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 404,
+        statusText: "Not Found",
+        errorText: "missing",
+        userId: "u404",
+      }),
+      "Failed to get Jellyfin user info"
+    );
+    expect(loggerMocks.jellyfin.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: expect.any(Error),
+        userId: "u404",
+      }),
+      "Error fetching Jellyfin user info"
+    );
+  });
+
+  it("returns Jellyfin system info and logs debug details", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          ServerName: "Media Server",
+          Version: "10.8.13",
+        }),
+      })
+    );
+
+    const client = new JellyfinClient("https://jellyfin.local");
+    await expect(client.getSystemInfo("api-key")).resolves.toEqual({
+      ServerName: "Media Server",
+      Version: "10.8.13",
+    });
+    expect(loggerMocks.jellyfin.debug).toHaveBeenCalledWith(
+      expect.objectContaining({
+        serverName: "Media Server",
+        version: "10.8.13",
+      }),
+      "Fetched Jellyfin system info"
+    );
+  });
+
+  it("logs Jellyfin system info failures", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        statusText: "Bad Gateway",
+        text: async () => "bad gateway",
+      })
+    );
+
+    const client = new JellyfinClient("https://jellyfin.local");
+    await expect(client.getSystemInfo("api-key")).rejects.toThrow(
+      "Failed to get Jellyfin system info: 502 Bad Gateway"
+    );
+    expect(loggerMocks.jellyfin.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 502,
+        errorText: "bad gateway",
+      }),
+      "Failed to get Jellyfin system info"
+    );
+    expect(loggerMocks.jellyfin.error).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.any(Error) }),
+      "Error fetching Jellyfin system info"
+    );
+  });
+
+  it("creates Jellyfin API keys from the newest matching app entry", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            Items: [
+              { AppName: "Other", AccessToken: "other-token" },
+              { AppName: "Scroblarr", AccessToken: "old-token" },
+              { AppName: "Scroblarr", AccessToken: "new-token" },
+            ],
+          }),
+        })
+    );
+
+    const client = new JellyfinClient("https://jellyfin.local");
+    await expect(client.createApiKey("api-key", "Scroblarr")).resolves.toBe(
+      "new-token"
+    );
+  });
+
+  it("logs API key creation failures from the create step", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        statusText: "Forbidden",
+        text: async () => "denied",
+      })
+    );
+
+    const client = new JellyfinClient("https://emby.local", undefined, "emby");
+    await expect(client.createApiKey("api-key", "Scroblarr")).rejects.toThrow(
+      "Failed to create API key: 403 Forbidden"
+    );
+    expect(loggerMocks.emby.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 403,
+        errorText: "denied",
+        serverKind: "emby",
+      }),
+      "Failed to create Jellyfin API key"
+    );
+    expect(loggerMocks.emby.error).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.any(Error) }),
+      "Error creating Jellyfin API key"
+    );
+  });
+
+  it("throws when created API keys cannot be listed", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+        })
+    );
+
+    const client = new JellyfinClient("https://jellyfin.local");
+    await expect(client.createApiKey("api-key", "Scroblarr")).rejects.toThrow(
+      "Failed to fetch API keys"
+    );
+  });
+
+  it("throws when the created API key cannot be found", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            Items: [{ AppName: "Other", AccessToken: "other-token" }],
+          }),
+        })
+    );
+
+    const client = new JellyfinClient("https://jellyfin.local");
+    await expect(client.createApiKey("api-key", "Scroblarr")).rejects.toThrow(
+      "API key not found after creation"
+    );
+  });
+
+  it("logs Emby image fetch failures under the emby label", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        statusText: "Unauthorized",
+      })
+    );
+
+    const client = new JellyfinClient("https://emby.local", undefined, "emby");
+    await expect(
+      client.fetchImage("tok", "https://emby.local/Items/1/Images/Primary")
+    ).rejects.toThrow(/Failed to fetch image/);
+    expect(loggerMocks.emby.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 401,
+        imageUrl: "https://emby.local/Items/1/Images/Primary",
+      }),
+      "Failed to fetch Jellyfin image"
+    );
+    expect(loggerMocks.jellyfin.warn).not.toHaveBeenCalled();
   });
 });
