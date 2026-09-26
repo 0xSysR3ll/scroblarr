@@ -60,8 +60,9 @@ describe("SettingsPage", () => {
       tmdbAccessToken: "saved-token",
     });
     vi.mocked(getAppVersion).mockResolvedValue({
-      version: "1.0.0",
-      tag: "v1.0.0",
+      version: "v1.0.0",
+      commitTag: "abc123",
+      updateAvailable: false,
       githubRepository: "0xsysr3ll/scroblarr",
     });
     vi.mocked(updateSettings).mockResolvedValue({

@@ -7,6 +7,7 @@ import {
   FaBug,
   FaTags,
   FaBalanceScale,
+  FaExclamationTriangle,
 } from "react-icons/fa";
 
 interface AboutSettingsTabProps {
@@ -29,11 +30,26 @@ export function AboutSettingsTab({ versionInfo }: AboutSettingsTabProps) {
   const pill =
     "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium";
 
-  const latestReleaseUrl =
-    versionInfo?.latestUrl ??
-    (versionInfo?.latestTag && versionInfo.githubRepository
-      ? `https://github.com/${versionInfo.githubRepository}/releases/tag/${versionInfo.latestTag}`
-      : undefined);
+  const DEVELOP_BRANCH = "develop";
+  const rawVersion = versionInfo?.version ?? "unknown";
+  const isDevelop = rawVersion.startsWith("develop-");
+  const displayVersion = rawVersion.replace(/^develop-/, "");
+  const commitTag = versionInfo?.commitTag ?? "local";
+  const showUpdateBadge = Boolean(versionInfo) && commitTag !== "local";
+  const badgeHref = isDevelop
+    ? `https://github.com/${repoSlug}/compare/${commitTag}...${DEVELOP_BRANCH}`
+    : (versionInfo?.latestUrl ?? releasesUrl);
+  const updateAvailable = Boolean(versionInfo?.updateAvailable);
+  const badgeClass = updateAvailable
+    ? `${pill} border-warning-500/45 bg-warning-500/10 text-warning-800 hover:bg-warning-500/15 dark:text-warning-200`
+    : `${pill} border-success-500/45 bg-success-500/10 text-success-700 hover:bg-success-500/15 dark:text-success-400`;
+  const badgeLabel = updateAvailable
+    ? t("settings.about.badgeOutOfDate", {
+        defaultValue: "Out of Date",
+      })
+    : t("settings.about.badgeUpToDate", {
+        defaultValue: "Up to Date",
+      });
 
   return (
     <div className="space-y-4">
@@ -44,6 +60,21 @@ export function AboutSettingsTab({ versionInfo }: AboutSettingsTabProps) {
         })}
       </p>
 
+      {isDevelop && (
+        <div
+          role="status"
+          className="flex gap-2 rounded border-l-4 border-warning-400 bg-warning-50 p-3 dark:border-warning-600 dark:bg-warning-950"
+        >
+          <FaExclamationTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning-700 dark:text-warning-300" />
+          <p className="text-xs text-warning-900 dark:text-warning-100 sm:text-sm">
+            {t("settings.about.runningDevelop", {
+              defaultValue:
+                "You are running the develop branch of Scroblarr, which is only recommended for those contributing to development or assisting with bleeding-edge testing.",
+            })}
+          </p>
+        </div>
+      )}
+
       <div className="surface-tile p-4">
         <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
           {t("settings.about.versionSection", {
@@ -52,84 +83,33 @@ export function AboutSettingsTab({ versionInfo }: AboutSettingsTabProps) {
         </h3>
 
         {versionInfo ? (
-          <div className="space-y-2.5 text-xs sm:text-sm">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-muted-foreground">
-                {t("settings.about.currentTag", {
-                  defaultValue: "Current version",
-                })}
-              </span>
+          <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+            <span className="font-mono text-foreground">{displayVersion}</span>
+            {versionInfo.releasesError ? (
               <span
-                className={`${pill} border-border bg-background font-mono text-foreground`}
+                role="status"
+                className={`${pill} border-destructive/50 bg-destructive/10 text-destructive`}
+                title={t("settings.about.releasesErrorHint", {
+                  defaultValue: "Details are in the server logs.",
+                })}
               >
-                {versionInfo.tag ?? versionInfo.version ?? "unknown"}
-              </span>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-muted-foreground">
-                {t("settings.about.latestVersionLabel", {
-                  defaultValue: "Latest version",
+                {t("settings.about.latestUnavailableBadge", {
+                  defaultValue: "Unavailable",
                 })}
               </span>
-              {versionInfo.releasesError ? (
-                <span
-                  role="status"
-                  className={`${pill} border-destructive/50 bg-destructive/10 text-destructive`}
-                  title={t("settings.about.releasesErrorHint", {
-                    defaultValue: "Details are in the server logs.",
-                  })}
+            ) : (
+              showUpdateBadge && (
+                <a
+                  href={badgeHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={badgeClass}
                 >
-                  {t("settings.about.latestUnavailableBadge", {
-                    defaultValue: "Unavailable",
-                  })}
-                </span>
-              ) : versionInfo.latestTag ? (
-                <>
-                  {latestReleaseUrl ? (
-                    <a
-                      href={latestReleaseUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={`${pill} border-primary/40 bg-primary/10 text-primary hover:bg-primary/15`}
-                    >
-                      <span className="font-mono">{versionInfo.latestTag}</span>
-                      <FaExternalLinkAlt className="h-3 w-3 opacity-80" />
-                    </a>
-                  ) : (
-                    <span
-                      className={`${pill} border-border bg-background font-mono text-foreground`}
-                    >
-                      {versionInfo.latestTag}
-                    </span>
-                  )}
-                  {versionInfo.isLatest === true && (
-                    <span
-                      className={`${pill} border-success-500/45 bg-success-500/10 text-success-700 dark:text-success-400`}
-                    >
-                      {t("settings.about.badgeUpToDate", {
-                        defaultValue: "Up to date",
-                      })}
-                    </span>
-                  )}
-                  {versionInfo.isLatest === false && (
-                    <span
-                      className={`${pill} border-warning-500/45 bg-warning-500/10 text-warning-800 dark:text-warning-200`}
-                    >
-                      {t("settings.about.badgeUpdateAvailable", {
-                        defaultValue: "Update available",
-                      })}
-                    </span>
-                  )}
-                </>
-              ) : (
-                <span
-                  className={`${pill} border-border bg-muted/50 text-muted-foreground`}
-                >
-                  —
-                </span>
-              )}
-            </div>
+                  {badgeLabel}
+                  <FaExternalLinkAlt className="h-3 w-3 opacity-80" />
+                </a>
+              )
+            )}
           </div>
         ) : (
           <p className="text-xs text-muted-foreground sm:text-sm">

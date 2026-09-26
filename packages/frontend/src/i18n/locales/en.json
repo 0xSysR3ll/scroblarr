@@ -203,12 +203,11 @@
     "about": {
       "description": "Version information and links related to this Scroblarr instance.",
       "versionSection": "Version",
-      "currentTag": "Current version",
-      "latestVersionLabel": "Latest version",
+      "runningDevelop": "You are running the develop branch of Scroblarr, which is only recommended for those contributing to development or assisting with bleeding-edge testing.",
       "releasesErrorHint": "Details are in the server logs.",
       "latestUnavailableBadge": "Unavailable",
-      "badgeUpToDate": "Up to date",
-      "badgeUpdateAvailable": "Update available",
+      "badgeUpToDate": "Up to Date",
+      "badgeOutOfDate": "Out of Date",
       "versionUnavailable": "Version information is currently unavailable.",
       "linksSection": "Links",
       "githubRepo": "GitHub repository",
@@ -438,7 +437,8 @@
       "showing": "Showing {{from}} to {{to}} of {{total}} results",
       "previous": "Previous",
       "next": "Next",
-      "noResults": "No results"
+      "noResults": "No results",
+      "nav": "Pagination"
     },
     "selectHistoryItem": "Select {{title}}",
     "confirmDelete": "Confirm delete",

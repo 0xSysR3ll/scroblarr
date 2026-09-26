@@ -13,9 +13,10 @@ describe("meta api", () => {
 
   it("fetches app version metadata", async () => {
     const version = {
-      version: "1.2.3",
-      tag: "v1.2.3",
-      isLatest: false,
+      version: "v1.2.3",
+      commitTag: "abc123",
+      updateAvailable: true,
+      commitsBehind: -1,
       latestTag: "v1.2.4",
       latestUrl: "https://github.com/sysr3ll/scroblarr/releases/tag/v1.2.4",
       releasesError: null,

@@ -2,12 +2,11 @@ import { API_BASE_URL } from "./common";
 
 export interface AppVersionInfo {
   version: string;
-  tag?: string | null;
-  /** `true` / `false` when GitHub latest was loaded and could be compared to this build; `null` otherwise. */
-  isLatest?: boolean | null;
+  commitTag?: string;
+  updateAvailable?: boolean;
+  commitsBehind?: number;
   latestTag?: string | null;
   latestUrl?: string | null;
-  /** Set when the server could not load GitHub's latest release (network, rate limit, etc.). */
   releasesError?: string | null;
   githubRepository?: string;
 }
