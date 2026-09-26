@@ -131,7 +131,7 @@ describe("UsersPage", () => {
         {
           ...users[1],
           jellyfinUsername: "bob-emby",
-          plexUsername: undefined,
+          plexUsername: "",
         },
       ],
     });
@@ -149,7 +149,7 @@ describe("UsersPage", () => {
         {
           ...users[1],
           jellyfinUsername: "bob-jf",
-          plexUsername: undefined,
+          plexUsername: "",
         },
       ],
     });
