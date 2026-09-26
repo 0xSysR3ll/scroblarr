@@ -255,6 +255,32 @@ describe("UserList", () => {
     expect(onSelectedIdsChange).toHaveBeenCalled();
   });
 
+  it("shows Emby badge when mediaBrowserType is emby", () => {
+    renderWithProviders(
+      <UserList
+        mediaBrowserType="emby"
+        users={[
+          {
+            ...users[1],
+            jellyfinUsername: "bob-emby",
+          },
+        ]}
+      />
+    );
+
+    const bobRow = getUserTableRow("Bob");
+    expect(within(bobRow).getByText("Emby")).toBeVisible();
+    expect(within(bobRow).queryByText("Jellyfin")).toBeNull();
+    expect(within(bobRow).getByRole("img", { name: "Emby" })).toHaveAttribute(
+      "src",
+      "/logos/emby.svg"
+    );
+    expect(within(bobRow).getByText("Emby").closest(".chip")).toHaveClass(
+      "bg-(--emby-chip-bg)",
+      "text-(--emby-chip-fg)"
+    );
+  });
+
   it("shows a non-toggleable enabled chip for the current user", () => {
     renderWithProviders(<UserList users={users} onToggleEnabled={vi.fn()} />);
 

@@ -137,15 +137,24 @@ export function SyncHistoryTableRow({
                 </span>
               </div>
             ) : item.source === "jellyfin" ? (
-              <div className="chip-dense bg-indigo-100 dark:bg-indigo-900">
+              <div className="chip-dense bg-(--jellyfin-chip-bg) text-(--jellyfin-chip-fg)">
                 <img
                   src="/logos/jellyfin.svg"
                   alt="Jellyfin"
                   className="w-3 h-3"
                 />
-                <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">
+                <span className="text-xs font-medium">
                   {t("sync.sources.jellyfin", {
                     defaultValue: "Jellyfin",
+                  })}
+                </span>
+              </div>
+            ) : item.source === "emby" ? (
+              <div className="chip-dense bg-(--emby-chip-bg) text-(--emby-chip-fg)">
+                <img src="/logos/emby.svg" alt="Emby" className="w-3 h-3" />
+                <span className="text-xs font-medium">
+                  {t("sync.sources.emby", {
+                    defaultValue: "Emby",
                   })}
                 </span>
               </div>

@@ -467,7 +467,10 @@ export function SyncDashboardPage() {
     );
   }
 
-  function handleFilterChange(key: "mediaType" | "success", value: string) {
+  function handleFilterChange(
+    key: "mediaType" | "success" | "source",
+    value: string
+  ) {
     if (value === "all") {
       const newFilters = { ...filters };
       delete newFilters[key];
@@ -996,6 +999,30 @@ export function SyncDashboardPage() {
                 </option>
               </select>
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground/90 mb-1">
+                {t("sync.source", { defaultValue: "Source" })}
+              </label>
+              <select
+                value={filters.source || "all"}
+                onChange={(e) => handleFilterChange("source", e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
+              >
+                <option value="all">
+                  {t("sync.all", { defaultValue: "All" })}
+                </option>
+                <option value="plex">
+                  {t("sync.sources.plex", { defaultValue: "Plex" })}
+                </option>
+                <option value="jellyfin">
+                  {t("sync.sources.jellyfin", { defaultValue: "Jellyfin" })}
+                </option>
+                <option value="emby">
+                  {t("sync.sources.emby", { defaultValue: "Emby" })}
+                </option>
+              </select>
+            </div>
           </div>
         )}
       </div>
@@ -1029,6 +1056,12 @@ export function SyncDashboardPage() {
             />
             <img
               src="/logos/jellyfin.svg"
+              alt=""
+              className="h-6 w-6 opacity-80"
+              aria-hidden
+            />
+            <img
+              src="/logos/emby.svg"
               alt=""
               className="h-6 w-6 opacity-80"
               aria-hidden

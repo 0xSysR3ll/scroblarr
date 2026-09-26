@@ -827,6 +827,12 @@ export function DashboardPage() {
                     className="h-7 w-7 opacity-80"
                     aria-hidden
                   />
+                  <img
+                    src="/logos/emby.svg"
+                    alt=""
+                    className="h-7 w-7 opacity-80"
+                    aria-hidden
+                  />
                   <span className="text-muted-foreground/40" aria-hidden>
                     →
                   </span>

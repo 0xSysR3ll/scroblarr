@@ -113,7 +113,11 @@ router.get("/jellyfin-users", async (req: Request, res: Response) => {
       });
     }
 
-    const jellyfinClient = new JellyfinClient(jellyfinHost);
+    const jellyfinClient = new JellyfinClient(
+      jellyfinHost,
+      undefined,
+      allSettings.mediaBrowserType === "emby" ? "emby" : "jellyfin"
+    );
 
     let jellyfinUsers: JellyfinUser[];
     try {
@@ -259,7 +263,11 @@ router.post("/import-jellyfin", async (req: Request, res: Response) => {
       });
     }
 
-    const jellyfinClient = new JellyfinClient(jellyfinHost);
+    const jellyfinClient = new JellyfinClient(
+      jellyfinHost,
+      undefined,
+      allSettings.mediaBrowserType === "emby" ? "emby" : "jellyfin"
+    );
     const jellyfinUsers = await jellyfinClient.getUsers(jellyfinApiKey);
 
     const importedUsers = [];
@@ -271,7 +279,8 @@ router.post("/import-jellyfin", async (req: Request, res: Response) => {
       }
 
       const existingUser =
-        await userRepository.findByJellyfinUsername(username);
+        (await userRepository.findByJellyfinUsername(username)) ??
+        (await userRepository.findOrphanedMediaBrowserUser(username));
       if (!existingUser) {
         const userInfo = await jellyfinClient.getUserInfo(
           jellyfinApiKey,
@@ -280,11 +289,24 @@ router.post("/import-jellyfin", async (req: Request, res: Response) => {
 
         const newUser = await userRepository.create({
           jellyfinUsername: username,
+          jellyfinUserId: jellyfinUser.Id,
           displayName: userInfo.displayName || username,
           email: userInfo.email,
           enabled: true,
         });
         importedUsers.push(newUser);
+      } else if (!existingUser.jellyfinUsername) {
+        const userInfo = await jellyfinClient.getUserInfo(
+          jellyfinApiKey,
+          jellyfinUser.Id
+        );
+        const relinked = await userRepository.update(existingUser.id, {
+          jellyfinUsername: username,
+          jellyfinUserId: jellyfinUser.Id,
+          displayName: userInfo.displayName || username,
+          email: userInfo.email ?? existingUser.email,
+        });
+        importedUsers.push(relinked);
       }
     }
 

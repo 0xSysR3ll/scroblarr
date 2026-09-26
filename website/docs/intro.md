@@ -5,7 +5,7 @@ slug: /
 
 # Welcome to Scroblarr
 
-**Scroblarr** is a self-hosted service that syncs watch history from **Plex** and **Jellyfin** to **Trakt**, **Simkl**, and **Bingers** using webhooks—no manual logging. For badges, releases, and repo-wide info, see the [README on GitHub](https://github.com/0xsysr3ll/scroblarr/blob/main/README.md).
+**Scroblarr** is a self-hosted service that syncs watch history from **Plex**, **Jellyfin**, and **Emby** to **Trakt**, **Simkl**, and **Bingers** using webhooks—no manual logging. For badges, releases, and repo-wide info, see the [README on GitHub](https://github.com/0xsysr3ll/scroblarr/blob/main/README.md).
 
 :::info TVTime support removed
 TVTime ended after **July 15, 2026** (see the official notice: https://whipmedia.freshdesk.com/support/solutions/articles/68000029988-tv-time-is-shutting-down). Scroblarr no longer syncs to TVTime. Past sync history that included TVTime is still visible in your dashboard. Link **Trakt**, **Simkl**, or **Bingers** in Profile → Integrations instead.
@@ -18,7 +18,7 @@ TVTime ended after **July 15, 2026** (see the official notice: https://whipmedia
 3. **Watch something** — Scroblarr processes scrobble events and updates your destinations
 
 ```
-Plex/Jellyfin → Webhook → Scroblarr → Trakt/Simkl/Bingers
+Plex/Jellyfin/Emby → Webhook → Scroblarr → Trakt/Simkl/Bingers
 ```
 
 ## Documentation

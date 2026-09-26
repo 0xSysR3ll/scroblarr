@@ -631,6 +631,29 @@ describe("SyncDashboardPage", () => {
     expect(screen.getByText("Title 249")).toBeVisible();
   });
 
+  it("forwards Emby source advanced filter to getSyncHistory", async () => {
+    vi.mocked(getSyncHistory).mockResolvedValue(syncHistoryResponse([]));
+
+    const user = userEvent.setup();
+    renderWithProviders(<SyncDashboardPage />, { route: "/sync" });
+    await screen.findByRole("button", { name: "Advanced Filters" });
+
+    await user.click(screen.getByRole("button", { name: "Advanced Filters" }));
+    const comboboxes = screen.getAllByRole("combobox");
+    const sourceSelect = comboboxes[2];
+    await user.selectOptions(sourceSelect, "emby");
+
+    await waitFor(() => {
+      expect(getSyncHistory).toHaveBeenCalledWith(
+        1,
+        100,
+        expect.objectContaining({ source: "emby" }),
+        expect.anything(),
+        expect.anything()
+      );
+    });
+  });
+
   it("exports history and clears the success filter empty state", async () => {
     const items = Array.from({ length: 5 }, (_, i) =>
       makeItem(`ok-${i}`, `Ok ${i}`, { success: true })

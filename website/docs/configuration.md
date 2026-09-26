@@ -13,6 +13,7 @@ Scroblarr needs two types of configuration:
 1. **Media servers** (sources) - Where your watch history comes from
    - [Plex](/docs/configuration/plex) - Configure Plex server and webhooks (or Tautulli if you don't have Plex Pass)
    - [Jellyfin](/docs/configuration/jellyfin) - Configure Jellyfin server and webhooks
+   - [Emby](/docs/configuration/emby) - Configure Emby server and webhooks
 
 2. **Destination services** - Where your watch history syncs to
    - [Trakt](/docs/configuration/trakt) - Link your Trakt account
@@ -24,7 +25,7 @@ Scroblarr needs two types of configuration:
 In **Settings > General**, you can configure:
 
 - **API Key**: Used for programmatic API access via the `X-API-Key` header.
-- **Webhook API Key**: Required for **webhook** authentication (Plex query string; Tautulli header, JSON field, or `?apiKey=` query string; Jellyfin header or JSON field). Generate or set a key before configuring Plex/Tautulli/Jellyfin webhooks, or deliveries will fail with **503** / **401**.
+- **Webhook API Key**: Required for **webhook** authentication (Plex/Emby query string; Tautulli header, JSON field, or `?apiKey=` query string; Jellyfin header or JSON field). Generate or set a key before configuring Plex/Tautulli/Jellyfin/Emby webhooks, or deliveries will fail with **503** / **401**.
 - **Sync History Limit**: How many sync history entries to keep (default: 1000)
 
 :::warning
@@ -45,7 +46,7 @@ Users can manage their own account linking in the **Profile** section, but admin
 
 After configuring everything, test it:
 
-1. Watch something on Plex or Jellyfin
+1. Watch something on Plex, Jellyfin, or Emby
 2. Check the **Dashboard** in Scroblarr - you should see the sync appear
 3. Check your linked destination accounts - the watch should be synced there too
 

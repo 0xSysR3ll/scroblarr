@@ -49,4 +49,28 @@ describe("SyncDestinationBadges", () => {
     expect(screen.getByLabelText(name)).toBeInTheDocument();
     expect(screen.getByAltText(name)).toHaveAttribute("src", logo);
   });
+
+  it("renders Simkl labels for failed destination badges", () => {
+    renderWithProviders(
+      <SyncDestinationBadges
+        item={
+          historyItem({
+            success: false,
+            destinationResults: {
+              Simkl: {
+                status: "failed",
+                error: "rate limited",
+              },
+            },
+          }) as SyncHistoryItem
+        }
+      />
+    );
+
+    expect(screen.getByLabelText("Simkl: rate limited")).toBeVisible();
+    expect(screen.getByAltText("Simkl")).toHaveAttribute(
+      "src",
+      "/logos/simkl.svg"
+    );
+  });
 });

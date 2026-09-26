@@ -37,7 +37,7 @@ interface UserImportProps {
   onUsersImported?: () => void;
 }
 
-type ServiceType = "plex" | "jellyfin";
+type ServiceType = "plex" | "jellyfin" | "emby";
 
 interface ServiceConfig {
   type: ServiceType;
@@ -101,7 +101,9 @@ export function UserImport({
           services.push({ type: "plex", configured: true });
         }
         if (loadedSettings.jellyfinHost) {
-          services.push({ type: "jellyfin", configured: true });
+          const mediaType =
+            loadedSettings.mediaBrowserType === "emby" ? "emby" : "jellyfin";
+          services.push({ type: mediaType, configured: true });
         }
         setConfiguredServices(services);
 
@@ -172,7 +174,7 @@ export function UserImport({
     if (!isOpen) return;
 
     async function fetchJellyfinUsers() {
-      if (activeTab !== "jellyfin") {
+      if (activeTab !== "jellyfin" && activeTab !== "emby") {
         return;
       }
 
@@ -286,7 +288,7 @@ export function UserImport({
       } finally {
         setLoading(false);
       }
-    } else if (activeTab === "jellyfin") {
+    } else if (activeTab === "jellyfin" || activeTab === "emby") {
       if (selectedJellyfinUsernames.size === 0) {
         showError(
           t("userImport.selectUsers", {
@@ -362,10 +364,19 @@ export function UserImport({
                   defaultValue: "Import Users from Plex Server",
                 })
               : configuredServices.length === 1 &&
-                  configuredServices[0].type === "jellyfin"
-                ? t("userImport.importFromJellyfin", {
-                    defaultValue: "Import Users from Jellyfin Server",
-                  })
+                  (configuredServices[0].type === "jellyfin" ||
+                    configuredServices[0].type === "emby")
+                ? t(
+                    configuredServices[0].type === "emby"
+                      ? "userImport.importFromEmby"
+                      : "userImport.importFromJellyfin",
+                    {
+                      defaultValue:
+                        configuredServices[0].type === "emby"
+                          ? "Import Users from Emby Server"
+                          : "Import Users from Jellyfin Server",
+                    }
+                  )
                 : t("userImport.importUsersTitle", {
                     defaultValue: "Import Users",
                   })}
@@ -423,9 +434,11 @@ export function UserImport({
                       >
                         {service.type === "plex"
                           ? t("userImport.plex", { defaultValue: "Plex" })
-                          : t("userImport.jellyfin", {
-                              defaultValue: "Jellyfin",
-                            })}
+                          : service.type === "emby"
+                            ? t("userImport.emby", { defaultValue: "Emby" })
+                            : t("userImport.jellyfin", {
+                                defaultValue: "Jellyfin",
+                              })}
                       </button>
                     ))}
                   </nav>
@@ -551,7 +564,8 @@ export function UserImport({
               {!currentLoadingUsers &&
                 activeTab &&
                 ((activeTab === "plex" && selectedServerUrl) ||
-                  activeTab === "jellyfin") &&
+                  activeTab === "jellyfin" ||
+                  activeTab === "emby") &&
                 currentAvailableUsers.length === 0 && (
                   <div className="rounded-lg border border-border bg-muted/40 p-6 text-center">
                     <FaUsers className="mx-auto h-12 w-12 text-muted-foreground/60" />
