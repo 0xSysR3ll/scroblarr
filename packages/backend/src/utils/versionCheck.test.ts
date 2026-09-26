@@ -354,6 +354,24 @@ describe("versionCheck", () => {
       });
     });
 
+    it("does not flag an update when current is newer than latest", async () => {
+      mockHttpsSuccess([
+        {
+          tag_name: "v1.9.0",
+          name: "v1.9.0",
+          html_url: "https://example.test/v1.9.0",
+        },
+      ]);
+
+      await expect(checkStableUpdates("v1.10.0")).resolves.toEqual({
+        updateAvailable: false,
+        commitsBehind: 0,
+        latestTag: "v1.9.0",
+        latestUrl: "https://example.test/v1.9.0",
+        error: null,
+      });
+    });
+
     it("handles missing tag_name on the latest release", async () => {
       mockHttpsSuccess([{ name: "untitled", html_url: "  " }]);
 

@@ -92,6 +92,34 @@ function githubHeaders(): Record<string, string> {
   };
 }
 
+function parseSemverParts(version: string): [number, number, number] | null {
+  const match = version
+    .trim()
+    .replace(/^v/i, "")
+    .match(/^(\d+)\.(\d+)\.(\d+)/);
+  if (!match) {
+    return null;
+  }
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
+function isNewerVersion(latest: string, current: string): boolean {
+  const latestParts = parseSemverParts(latest);
+  const currentParts = parseSemverParts(current);
+  if (!latestParts || !currentParts) {
+    return latest !== current;
+  }
+  for (let i = 0; i < 3; i++) {
+    if (latestParts[i] > currentParts[i]) {
+      return true;
+    }
+    if (latestParts[i] < currentParts[i]) {
+      return false;
+    }
+  }
+  return false;
+}
+
 export async function checkDevelopUpdates(
   commitTag: string
 ): Promise<VersionCheckResult> {
@@ -152,7 +180,9 @@ export async function checkStableUpdates(
   const latestTag = latest.tag_name?.trim() || null;
   const latestUrl = latest.html_url?.trim() || null;
 
-  const updateAvailable = Boolean(latestTag && latestTag !== currentVersion);
+  const updateAvailable = Boolean(
+    latestTag && isNewerVersion(latestTag, currentVersion)
+  );
 
   return {
     updateAvailable,
