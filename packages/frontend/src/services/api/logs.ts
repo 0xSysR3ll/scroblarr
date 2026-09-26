@@ -43,6 +43,7 @@ export async function getLogs(params?: {
     | "trakt"
     | "plex"
     | "jellyfin"
+    | "emby"
     | "system"
     | "migration";
   search?: string;

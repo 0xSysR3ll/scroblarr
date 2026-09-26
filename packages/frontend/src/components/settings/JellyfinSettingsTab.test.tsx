@@ -50,6 +50,7 @@ const configuredSettings: Settings = {
 function renderJellyfin(
   overrides: Partial<{
     settings: Settings;
+    mediaBrowserType: "jellyfin" | "emby";
     webhookApiKey?: string;
     onJellyfinSettingsChange?: ReturnType<typeof vi.fn>;
     onSettingsUpdated?: ReturnType<typeof vi.fn>;
@@ -58,6 +59,7 @@ function renderJellyfin(
   return renderWithProviders(
     <JellyfinSettingsTab
       settings={overrides.settings ?? {}}
+      mediaBrowserType={overrides.mediaBrowserType}
       onJellyfinSettingsChange={overrides.onJellyfinSettingsChange ?? vi.fn()}
       onSettingsUpdated={overrides.onSettingsUpdated}
       webhookApiKey={overrides.webhookApiKey ?? "sk_test"}
@@ -265,7 +267,8 @@ describe("JellyfinSettingsTab", () => {
         "jf",
         8096,
         false,
-        ""
+        "",
+        "jellyfin"
       );
       expect(showSuccess).toHaveBeenCalled();
       expect(onSettingsUpdated).toHaveBeenCalled();
@@ -350,6 +353,101 @@ describe("JellyfinSettingsTab", () => {
 
     await waitFor(() => {
       expect(showError).toHaveBeenCalledWith("delete blocked");
+    });
+  });
+
+  it("renders Emby-specific form copy and generates an API key", async () => {
+    const user = userEvent.setup();
+    const onSettingsUpdated = vi.fn();
+
+    renderJellyfin({
+      settings: {},
+      mediaBrowserType: "emby",
+      onSettingsUpdated,
+    });
+
+    await user.click(screen.getByRole("button", { name: /Emby Server/i }));
+    await user.click(screen.getByRole("button", { name: "Add Emby Server" }));
+
+    expect(screen.getByPlaceholderText("emby.example.com")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("/emby")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Login with your Emby credentials to automatically generate an API key/i
+      )
+    ).toBeVisible();
+    expect(
+      screen.getAllByText(/Emby Dashboard → Advanced → Security/i).length
+    ).toBeGreaterThan(0);
+    expect(screen.getByText("API Key")).toBeVisible();
+
+    await user.type(
+      screen.getByPlaceholderText("emby.example.com"),
+      "emby.local"
+    );
+    await user.type(screen.getByPlaceholderText("Username"), "admin");
+    await user.type(screen.getByPlaceholderText("Password"), "secret");
+    await user.click(
+      screen.getByRole("button", { name: "Login & Generate API Key" })
+    );
+
+    await waitFor(() => {
+      expect(linkJellyfinAccount).toHaveBeenCalledWith(
+        "admin",
+        "secret",
+        "emby.local",
+        8096,
+        false,
+        "",
+        "emby"
+      );
+      expect(showSuccess).toHaveBeenCalledWith(
+        "API key generated successfully!"
+      );
+      expect(onSettingsUpdated).toHaveBeenCalled();
+    });
+  });
+
+  it("shows saved Emby API key guidance and removes the Emby server", async () => {
+    const user = userEvent.setup();
+    const onSettingsUpdated = vi.fn();
+
+    renderJellyfin({
+      settings: {
+        jellyfinHost: "http://emby.local:8096",
+        jellyfinPort: "8096",
+        jellyfinUseSsl: "false",
+        jellyfinUrlBase: "/emby",
+        jellyfinApiKey: "emby-key",
+        mediaBrowserType: "emby",
+      },
+      mediaBrowserType: "emby",
+      onSettingsUpdated,
+    });
+
+    await user.click(screen.getByRole("button", { name: /Emby Server/i }));
+
+    expect(
+      screen.getByText(
+        /API key is automatically generated during setup when possible/i
+      )
+    ).toBeVisible();
+    expect(
+      screen.getByText(/Emby Dashboard → Advanced → Security if needed/i)
+    ).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Remove Server" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Remove Server" })
+    );
+
+    await waitFor(() => {
+      expect(removeJellyfinServer).toHaveBeenCalled();
+      expect(showSuccess).toHaveBeenCalledWith(
+        "Emby server removed successfully"
+      );
+      expect(onSettingsUpdated).toHaveBeenCalled();
     });
   });
 });

@@ -24,6 +24,7 @@ export function ProfilePage() {
   const [authProviders, setAuthProviders] = useState<{
     hasAdmin: boolean;
     jellyfinConfigured: boolean;
+    embyConfigured?: boolean;
     plexConfigured: boolean;
   } | null>(null);
 
@@ -90,6 +91,7 @@ export function ProfilePage() {
             jellyfinUsername={user?.jellyfinUsername}
             plexConfigured={authProviders?.plexConfigured ?? false}
             jellyfinConfigured={authProviders?.jellyfinConfigured ?? false}
+            embyConfigured={authProviders?.embyConfigured ?? false}
             onAccountLinked={checkAuth}
           />
         );

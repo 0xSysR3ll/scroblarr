@@ -15,7 +15,6 @@ const settingsRepository = new SettingsRepository();
 
 const updateSettingsSchema = z.object({
   plexServerUrl: z.string().url().optional(),
-  /** Plex Media Server machine identifier; must match webhook `Server.uuid` when set. Empty string clears it. */
   plexServerMachineIdentifier: z
     .union([z.string().min(1), z.literal("")])
     .optional(),
@@ -25,6 +24,7 @@ const updateSettingsSchema = z.object({
   jellyfinUseSsl: z.boolean().optional(),
   jellyfinUrlBase: z.string().optional(),
   jellyfinApiKey: z.string().optional(),
+  mediaBrowserType: z.enum(["jellyfin", "emby"]).optional(),
   apiKey: z.string().min(1).optional(),
   webhookApiKey: z.string().trim().min(1).optional(),
   tmdbAccessToken: z.union([z.string().min(1), z.literal("")]).optional(),
@@ -99,6 +99,13 @@ router.patch("/", async (req: Request, res: Response): Promise<void> => {
       await settingsRepository.set(
         "jellyfinApiKey",
         validated.jellyfinApiKey.trim()
+      );
+    }
+
+    if (validated.mediaBrowserType !== undefined) {
+      await settingsRepository.set(
+        "mediaBrowserType",
+        validated.mediaBrowserType
       );
     }
 
@@ -213,6 +220,7 @@ router.delete(
         "jellyfinUseSsl",
         "jellyfinUrlBase",
         "jellyfinApiKey",
+        "mediaBrowserType",
       ]);
 
       logger.api.info(

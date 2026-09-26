@@ -8,6 +8,22 @@
     "plexAuth": "Authenticate with Plex",
     "password": "Password",
     "jellyfinAuth": "Authenticate with Jellyfin",
+    "embyAuth": "Authenticate with Emby",
+    "usernamePasswordRequired": "Please enter your username and password",
+    "login": "Login",
+    "signInPrompt": "Sign in to sync your watches across services.",
+    "or": "Or",
+    "noServiceConfigured": "No authentication service configured. Please contact an administrator.",
+    "setupAdminFailed": "Failed to setup admin",
+    "setupAdmin": "Setup Admin Account",
+    "welcome": "Welcome to Scroblarr! Choose how you'd like to set up your admin account.",
+    "plex": "Plex",
+    "plexDescription": "Connect using Plex OAuth",
+    "jellyfinService": "Jellyfin",
+    "jellyfinDescription": "Connect using Jellyfin credentials",
+    "back": "Back",
+    "setupWithPlex": "Setup with Plex",
+    "plexConnectPrompt": "Connect your Plex account to get started",
     "jellyfin": {
       "serverHostname": "Server Hostname",
       "hostnamePlaceholder": "jellyfin.example.com",
@@ -21,25 +37,31 @@
       "password": "Password",
       "setupAdmin": "Setup Admin"
     },
-    "usernamePasswordRequired": "Please enter your username and password",
-    "loginWithJellyfinFailed": "Failed to login with Jellyfin",
-    "login": "Login",
-    "signInPrompt": "Sign in to sync your watches across services.",
-    "or": "Or",
-    "noServiceConfigured": "No authentication service configured. Please contact an administrator.",
-    "setupAdminFailed": "Failed to setup admin",
+    "embyService": "Emby",
+    "embyDescription": "Connect using Emby credentials",
+    "setupWithEmby": "Setup with Emby",
+    "embyConnectPrompt": "Enter your Emby server details",
+    "loginWithEmbyFailed": "Failed to login with Emby",
+    "setupEmbyAdminFailed": "Failed to setup Emby admin",
+    "embyLogin": "Emby Login",
+    "emby": {
+      "serverHostname": "Server Hostname",
+      "hostnamePlaceholder": "emby.example.com",
+      "port": "Port",
+      "useSsl": "Use SSL",
+      "urlBase": "URL Base (optional)",
+      "urlBasePlaceholder": "/emby",
+      "username": "Username",
+      "password": "Password",
+      "hostnameRequired": "Server hostname is required",
+      "hostnameInvalid": "Please enter a valid hostname (for example: emby.local, localhost or 192.168.0.10)",
+      "setupAdmin": "Setup Admin"
+    },
     "setupJellyfinAdminFailed": "Failed to setup Jellyfin admin",
-    "setupAdmin": "Setup Admin Account",
-    "welcome": "Welcome to Scroblarr! Choose how you'd like to set up your admin account.",
-    "plex": "Plex",
-    "plexDescription": "Connect using Plex OAuth",
-    "jellyfinService": "Jellyfin",
-    "jellyfinDescription": "Connect using Jellyfin credentials",
-    "back": "Back",
-    "setupWithPlex": "Setup with Plex",
-    "plexConnectPrompt": "Connect your Plex account to get started",
     "setupWithJellyfin": "Setup with Jellyfin",
-    "jellyfinConnectPrompt": "Enter your Jellyfin server details"
+    "jellyfinConnectPrompt": "Enter your Jellyfin server details",
+    "loginWithJellyfinFailed": "Failed to login with Jellyfin",
+    "jellyfinLogin": "Jellyfin Login"
   },
   "common": {
     "loading": "Loading...",
@@ -72,7 +94,7 @@
     "refresh": "Refresh",
     "empty": {
       "title": "No sync data yet",
-      "description": "Watch something on Plex or Jellyfin and it will appear here. Make sure webhooks are configured and your Trakt, Simkl, or Bingers account is linked in your profile.",
+      "description": "Watch something on Plex, Jellyfin, or Emby and it will appear here. Make sure webhooks are configured and your Trakt, Simkl, or Bingers account is linked in your profile.",
       "checkProfile": "Check profile & links",
       "topThisMonth": "No syncs this month yet",
       "recentSyncs": "No recent syncs to show"
@@ -165,6 +187,8 @@
     "email": "Email",
     "jellyfinCredentialsRequired": "Jellyfin username and password are required",
     "jellyfinUsername": "Jellyfin username",
+    "embyCredentialsRequired": "Emby username and password are required",
+    "embyUsername": "Emby username",
     "deleteSuccess": "User deleted successfully",
     "deleteFailed": "Failed to delete user",
     "toggleEnabledFailed": "Failed to update user status",
@@ -177,6 +201,7 @@
     "deleteUserTitle": "Delete user",
     "plex": "Plex",
     "jellyfin": "Jellyfin",
+    "emby": "Emby",
     "trakt": "Trakt",
     "disableUser": "Disable user",
     "enableUser": "Enable user",
@@ -247,15 +272,9 @@
       "keysSection": "API keys",
       "mediaSection": "Media & history"
     },
-    "jellyfinServerRemoved": "Jellyfin server removed successfully",
     "removeJellyfinServerFailed": "Failed to remove Jellyfin server",
-    "jellyfinServer": "Jellyfin Server",
-    "jellyfinServerDescription": "Configure your Jellyfin server connection settings.",
-    "jellyfinNotConfigured": "No Jellyfin server has been configured yet.",
-    "addJellyfinServer": "Add Jellyfin Server",
     "cannotRemoveOnlyServer": "Cannot remove the only configured server. Configure Jellyfin first.",
     "removeJellyfinServer": "Remove Server",
-    "jellyfinLoginRequired": "Login with your Jellyfin credentials to automatically generate an API key.",
     "jellyfinApiKeyGenerated": "API key generated successfully!",
     "jellyfinLoginAndGenerateKey": "Login & Generate API Key",
     "jellyfinApiKey": "API Key",
@@ -263,8 +282,6 @@
     "jellyfinApiKeyDescription": "API key is automatically generated during setup. You can manually update it here if needed.",
     "jellyfinApiKeyDescriptionNoKey": "Login with your Jellyfin credentials above to automatically generate an API key, or enter one manually.",
     "currentConnection": "Current Connection",
-    "removeJellyfinServerTitle": "Remove Jellyfin Server",
-    "removeJellyfinServerMessage": "Are you sure you want to remove the Jellyfin server configuration? This will:\n\n• Clear all Jellyfin server settings\n• Prevent importing new users from Jellyfin\n• Prevent syncing for existing Jellyfin users\n• Keep existing users and their sync history\n\nThis action cannot be undone.",
     "removeServerAdminWarning": "As an admin, you must have at least one server configured. If you remove Plex and only Plex is configured, you may lose access. Please ensure Jellyfin is configured first.",
     "plexServerSaved": "Plex server saved successfully",
     "savePlexServerFailed": "Failed to save Plex server",
@@ -298,6 +315,7 @@
       "copied": "Copied to clipboard",
       "plexDescription": "Copy this URL into Plex so completed watches sync to Scroblarr. Requires Plex Pass.",
       "jellyfinDescription": "Configure a Generic webhook destination in Jellyfin with these values.",
+      "embyDescription": "Configure an Emby webhook under your Emby notification preferences (not server settings).",
       "plexChecklist": {
         "pass": "Plex Pass is required for Plex webhooks (or use Tautulli below)",
         "paste": "Paste the URL in Plex → Settings → Webhooks → Add Webhook",
@@ -308,6 +326,11 @@
         "events": "Enable Playback Start/Stop and Movies/Episodes only",
         "template": "Paste the template (leave Send All Properties unchecked)",
         "headers": "Add Content-Type: application/json and X-API-Key headers"
+      },
+      "embyChecklist": {
+        "events": "Enable playback start/stop for Movies/Episodes",
+        "url": "Add a Webhook under Emby → your notification preferences",
+        "users": "Optional: Limit user events to the Emby accounts that should scrobble"
       },
       "title": "Webhooks",
       "docs": "Setup docs",
@@ -335,7 +358,24 @@
       "copyJsonData": "Copy JSON data"
     },
     "hideApiKey": "Hide API key",
-    "showApiKey": "Show API key"
+    "showApiKey": "Show API key",
+    "embyServer": "Emby Server",
+    "embyServerDescription": "Configure your Emby server connection for importing users and poster lookups.",
+    "embyNotConfigured": "Emby is not configured yet.",
+    "embyServerRemoved": "Emby server removed successfully",
+    "embyLoginRequired": "Login with your Emby credentials to automatically generate an API key. If key creation fails, paste one from Emby Dashboard → Advanced → Security.",
+    "embyApiKeyGenerated": "API key generated successfully!",
+    "embyLoginAndGenerateKey": "Login & Generate API Key",
+    "embyApiKey": "API Key",
+    "embyApiKeyDescription": "API key is automatically generated during setup when possible. You can paste one from Emby Dashboard → Advanced → Security if needed.",
+    "embyApiKeyDescriptionNoKey": "Login with your Emby credentials above to generate an API key, or paste one from Emby Dashboard → Advanced → Security.",
+    "jellyfinServerRemoved": "Jellyfin server removed successfully",
+    "jellyfinServer": "Jellyfin Server",
+    "jellyfinServerDescription": "Configure your Jellyfin server connection for importing users and poster lookups.",
+    "jellyfinNotConfigured": "Jellyfin is not configured yet.",
+    "addEmbyServer": "Add Emby Server",
+    "addJellyfinServer": "Add Jellyfin Server",
+    "jellyfinLoginRequired": "Login with your Jellyfin credentials to automatically generate an API key."
   },
   "theme": {
     "auto": "Auto (system)",
@@ -353,15 +393,15 @@
     },
     "linkedAccounts": {
       "linked": "Linked",
-      "unlinkSuccess": "Jellyfin account unlinked successfully!",
-      "unlinkFailed": "Failed to unlink Jellyfin account",
+      "unlinkSuccess": " account unlinked successfully!",
+      "unlinkFailed": "Failed to unlink  account",
       "title": "Linked Accounts",
       "description": "Link your media server accounts to enable syncing.",
       "unlink": "Unlink",
-      "notConfigured": "No media servers are configured. Please ask an admin to configure Plex or Jellyfin in the settings.",
-      "unlinkConfirmTitle": "Unlink Jellyfin Account",
-      "unlinkConfirmMessage": "This will remove your Jellyfin account connection. You will need to link your account again to sync watched media.",
-      "adminWarning": "As an admin, you must have at least one linked account. If you unlink Jellyfin and only Jellyfin is configured, you may lose access. Please ensure Plex is configured and linked first.",
+      "notConfigured": "No media servers are configured. Please ask an admin to configure Plex, Jellyfin, or Emby in the settings.",
+      "unlinkConfirmTitle": "Unlink  Account",
+      "unlinkConfirmMessage": "This will remove your  account connection. You will need to link your account again to sync watched media.",
+      "adminWarning": "As an admin, you must have at least one linked account. If you unlink  and only  is configured, you may lose access. Please ensure Plex is configured and linked first.",
       "reauthRequired": "Re-authorization required"
     },
     "tabs": {
@@ -448,7 +488,8 @@
     "rewatched": "Rewatched",
     "sources": {
       "plex": "Plex",
-      "jellyfin": "Jellyfin"
+      "jellyfin": "Jellyfin",
+      "emby": "Emby"
     },
     "posterPlaceholder": "No poster available",
     "statuses": {
@@ -546,8 +587,10 @@
     "destinations": {
       "trakt": "Trakt",
       "simkl": "Simkl",
-      "bingers": "Bingers"
-    }
+      "bingers": "Bingers",
+      "tvtime": "TVTime"
+    },
+    "source": "Source"
   },
   "errors": {
     "routeLoadTitle": "Could not load this screen",
@@ -567,10 +610,10 @@
     "importFailed": "Failed to import users",
     "importUsersTitle": "Import Users",
     "importFromPlex": "Import Users from Plex Server",
-    "importFromJellyfin": "Import Users from Jellyfin Server",
     "noServerConfigured": "No server configured. Please configure Plex or Jellyfin in Settings.",
     "plex": "Plex",
     "jellyfin": "Jellyfin",
+    "emby": "Emby",
     "loadingUsers": "Loading users from server...",
     "selectUsersLabel": "Select Users to Import ({{available}} available)",
     "deselectAll": "Deselect All",
@@ -644,6 +687,5 @@
       "markEpisodesAsRewatched": "Mark episodes as rewatched",
       "markEpisodesAsRewatchedDescription": "When enabled, episodes already watched in Bingers (via Scroblarr sync, manual tracking, or import) will increment the play count on the next sync."
     }
-  },
-  "key": ""
+  }
 }

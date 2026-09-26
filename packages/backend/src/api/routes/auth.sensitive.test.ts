@@ -51,6 +51,10 @@ const jellyfinClientMocks = vi.hoisted(() => ({
   getUserInfo: vi.fn(),
   createApiKey: vi.fn(),
   constructedWith: [] as string[],
+  constructedConfigs: [] as Array<{
+    baseUrl: string;
+    serverKind?: "jellyfin" | "emby";
+  }>,
 }));
 
 vi.mock("../middleware/auth", () => ({
@@ -63,6 +67,8 @@ vi.mock("../middleware/auth", () => ({
 
     const plexHeader = req.headers["x-test-plex-username"];
     const jellyfinHeader = req.headers["x-test-jellyfin-username"];
+    const jellyfinTokenHeader = req.headers["x-test-jellyfin-access-token"];
+    const jellyfinUserIdHeader = req.headers["x-test-jellyfin-user-id"];
     const plexUsername =
       plexHeader !== undefined ? String(plexHeader) : "plex-user";
     const jellyfinUsername =
@@ -73,6 +79,14 @@ vi.mock("../middleware/auth", () => ({
       isAdmin: req.headers["x-test-admin"] === "true",
       plexUsername,
       jellyfinUsername,
+      jellyfinAccessToken:
+        jellyfinTokenHeader !== undefined
+          ? String(jellyfinTokenHeader)
+          : undefined,
+      jellyfinUserId:
+        jellyfinUserIdHeader !== undefined
+          ? String(jellyfinUserIdHeader)
+          : undefined,
     } as never;
     next();
   },
@@ -126,8 +140,13 @@ vi.mock("@integrations/plex/PlexOAuth", () => ({
 
 vi.mock("@integrations/jellyfin/JellyfinClient", () => ({
   JellyfinClient: class {
-    constructor(baseUrl: string) {
+    constructor(
+      baseUrl: string,
+      _deviceId?: string,
+      serverKind?: "jellyfin" | "emby"
+    ) {
       jellyfinClientMocks.constructedWith.push(baseUrl);
+      jellyfinClientMocks.constructedConfigs.push({ baseUrl, serverKind });
     }
     login = jellyfinClientMocks.login;
     getUserInfo = jellyfinClientMocks.getUserInfo;
@@ -166,6 +185,7 @@ describe("auth route sensitive guards", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     jellyfinClientMocks.constructedWith.length = 0;
+    jellyfinClientMocks.constructedConfigs.length = 0;
     plexOAuthMocks.constructedWith.length = 0;
     getEnvMock.mockReturnValue({
       NODE_ENV: "test",
@@ -652,7 +672,7 @@ describe("auth route sensitive guards", () => {
     expect(response.body).toEqual({ error: "Unable to authenticate" });
   });
 
-  it("prevents admin from unlinking their last remaining Plex account", async () => {
+  it("prevents unlinking the last remaining Plex account", async () => {
     const app = express();
     app.use(express.json());
     app.use("/api/v1/auth", authRoutes);
@@ -664,14 +684,13 @@ describe("auth route sensitive guards", () => {
       .send({});
 
     expect(response.status).toBe(400);
-    expect(response.body).toEqual({
-      error:
-        "Cannot unlink Plex account. As an admin, you must have at least one linked account. Please link a Jellyfin account first before unlinking Plex.",
-    });
+    expect(response.body.error).toContain(
+      "keep at least one media server account linked"
+    );
     expect(sessionRepositoryMocks.deleteAllForUser).not.toHaveBeenCalled();
   });
 
-  it("prevents admin from unlinking their last remaining Jellyfin account", async () => {
+  it("prevents unlinking the last remaining Jellyfin account", async () => {
     const app = express();
     app.use(express.json());
     app.use("/api/v1/auth", authRoutes);
@@ -684,14 +703,32 @@ describe("auth route sensitive guards", () => {
       .send({});
 
     expect(response.status).toBe(400);
-    expect(response.body).toEqual({
-      error:
-        "Cannot unlink Jellyfin account. As an admin, you must have at least one linked account. Please link a Plex account first before unlinking Jellyfin.",
-    });
+    expect(response.body.error).toContain(
+      "keep at least one media server account linked"
+    );
     expect(sessionRepositoryMocks.deleteAllForUser).not.toHaveBeenCalled();
   });
 
-  it("unlinks Plex for non-admin and clears Plex credentials", async () => {
+  it("prevents non-admin from unlinking their only Emby/Jellyfin account", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/emby/unlink")
+      .set("x-test-admin", "false")
+      .set("x-test-plex-username", "")
+      .set("x-test-jellyfin-username", "user-emby")
+      .send({});
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain(
+      "keep at least one media server account linked"
+    );
+    expect(sessionRepositoryMocks.deleteAllForUser).not.toHaveBeenCalled();
+  });
+
+  it("unlinks Plex when another media account remains", async () => {
     userRepositoryMocks.update.mockResolvedValue({
       id: "current-user-id",
     });
@@ -704,6 +741,7 @@ describe("auth route sensitive guards", () => {
       .post("/api/v1/auth/plex/unlink")
       .set("x-test-admin", "false")
       .set("x-test-plex-username", "user-plex")
+      .set("x-test-jellyfin-username", "user-jellyfin")
       .send({});
 
     expect(response.status).toBe(200);
@@ -718,7 +756,7 @@ describe("auth route sensitive guards", () => {
     });
   });
 
-  it("unlinks Jellyfin for non-admin and clears Jellyfin credentials", async () => {
+  it("unlinks Jellyfin when another media account remains", async () => {
     userRepositoryMocks.update.mockResolvedValue({
       id: "current-user-id",
     });
@@ -730,6 +768,7 @@ describe("auth route sensitive guards", () => {
     const response = await request(app)
       .post("/api/v1/auth/jellyfin/unlink")
       .set("x-test-admin", "false")
+      .set("x-test-plex-username", "user-plex")
       .set("x-test-jellyfin-username", "user-jellyfin")
       .send({});
 
@@ -767,6 +806,120 @@ describe("auth route sensitive guards", () => {
       })
     );
     expect(response.body).not.toHaveProperty("hasTVTime");
+  });
+
+  it("returns jellyfin mediaBrowserType when host is jellyfin", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue({
+      id: "admin-id",
+      isAdmin: true,
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "http://jellyfin.local:8096",
+      mediaBrowserType: "jellyfin",
+    });
+
+    const app = express();
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app).get("/api/v1/auth/providers");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      hasAdmin: true,
+      jellyfinConfigured: true,
+      embyConfigured: false,
+      plexConfigured: false,
+      mediaBrowserType: "jellyfin",
+    });
+  });
+
+  it("returns configured auth providers for Emby installations", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue({
+      id: "admin-id",
+      isAdmin: true,
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "http://emby.local:8096",
+      mediaBrowserType: "emby",
+      plexServerUrl: "https://plex.local:32400",
+    });
+
+    const app = express();
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app).get("/api/v1/auth/providers");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      hasAdmin: true,
+      jellyfinConfigured: false,
+      embyConfigured: true,
+      plexConfigured: true,
+      mediaBrowserType: "emby",
+    });
+  });
+
+  it("omits mediaBrowserType from providers when no media server is configured", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue(null);
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+
+    const app = express();
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app).get("/api/v1/auth/providers");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      hasAdmin: false,
+      jellyfinConfigured: false,
+      embyConfigured: false,
+      plexConfigured: false,
+    });
+    expect(response.body).not.toHaveProperty("mediaBrowserType");
+  });
+
+  it("refreshes /me Jellyfin thumbs with the Emby client kind", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://emby.local",
+      mediaBrowserType: "emby",
+    });
+    jellyfinClientMocks.getUserInfo.mockResolvedValue({
+      id: "emby-user-id",
+      username: "user-emby",
+      displayName: "user-emby",
+      thumb: "/api/v1/avatars/jellyfin/emby-user-id",
+    });
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "current-user-id",
+      isAdmin: false,
+      jellyfinUsername: "user-emby",
+      jellyfinAccessToken: "emby-token",
+      jellyfinUserId: "emby-user-id",
+      jellyfinThumb: "/api/v1/avatars/jellyfin/emby-user-id",
+      displayName: "user-emby",
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .get("/api/v1/auth/me")
+      .set("x-test-plex-username", "")
+      .set("x-test-jellyfin-username", "user-emby")
+      .set("x-test-jellyfin-access-token", "emby-token")
+      .set("x-test-jellyfin-user-id", "emby-user-id");
+
+    expect(response.status).toBe(200);
+    expect(jellyfinClientMocks.constructedConfigs).toEqual([
+      {
+        baseUrl: "https://emby.local",
+        serverKind: "emby",
+      },
+    ]);
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith("current-user-id", {
+      jellyfinThumb: "/api/v1/avatars/jellyfin/emby-user-id",
+    });
   });
 
   it("ignores client hostname on Jellyfin login when admin and host are configured", async () => {
@@ -846,6 +999,57 @@ describe("auth route sensitive guards", () => {
     });
     expect(jellyfinClientMocks.constructedWith).toEqual([]);
     expect(jellyfinClientMocks.login).not.toHaveBeenCalled();
+  });
+
+  it("uses the /emby alias to log in first admin users as Emby", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue(null);
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+    jellyfinClientMocks.login.mockResolvedValue({
+      AccessToken: "emby-token",
+      User: { Id: "emby-admin-id", Name: "first-emby-admin" },
+    });
+    jellyfinClientMocks.getUserInfo.mockResolvedValue({
+      id: "emby-admin-id",
+      username: "first-emby-admin",
+      displayName: "First Emby Admin",
+      thumb: null,
+    });
+    jellyfinClientMocks.createApiKey.mockResolvedValue("emby-api-key");
+    userRepositoryMocks.findByJellyfinUsernameOrCreate.mockResolvedValue({
+      id: "new-admin-id",
+      jellyfinUsername: "first-emby-admin",
+    });
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "new-admin-id",
+      jellyfinUsername: "first-emby-admin",
+      displayName: "First Emby Admin",
+      isAdmin: true,
+    });
+    userRepositoryMocks.createSession.mockResolvedValue("session-token");
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app).post("/api/v1/auth/emby").send({
+      username: "first-emby-admin",
+      password: "secret",
+      hostname: "emby.bootstrap",
+      port: 8096,
+      useSsl: false,
+    });
+
+    expect(response.status).toBe(200);
+    expect(jellyfinClientMocks.constructedConfigs).toEqual([
+      {
+        baseUrl: "http://emby.bootstrap:8096",
+        serverKind: "emby",
+      },
+    ]);
+    expect(settingsRepositoryMocks.set).toHaveBeenCalledWith(
+      "mediaBrowserType",
+      "emby"
+    );
   });
 
   it("ignores client hostname on Jellyfin link for non-admin users", async () => {
@@ -1010,6 +1214,247 @@ describe("auth route sensitive guards", () => {
     expect(jellyfinClientMocks.login).not.toHaveBeenCalled();
   });
 
+  it("rejects Jellyfin setup-admin when an admin already exists", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue({
+      id: "admin-id",
+      isAdmin: true,
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/jellyfin/setup-admin")
+      .send({
+        username: "admin",
+        password: "secret",
+        hostname: "jellyfin.local",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "Admin already configured" });
+    expect(jellyfinClientMocks.login).not.toHaveBeenCalled();
+  });
+
+  it("requires a hostname for Jellyfin setup-admin", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue(null);
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/jellyfin/setup-admin")
+      .send({
+        username: "admin",
+        password: "secret",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "Jellyfin hostname is required" });
+    expect(jellyfinClientMocks.login).not.toHaveBeenCalled();
+  });
+
+  it("requires Jellyfin setup-admin credentials", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue(null);
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/jellyfin/setup-admin")
+      .send({
+        username: "admin",
+        hostname: "jellyfin.local",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: "Username and password are required",
+    });
+  });
+
+  it("creates an Emby admin via /emby/setup-admin", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue(null);
+    jellyfinClientMocks.login.mockResolvedValue({
+      AccessToken: "emby-token",
+      User: { Id: "emby-admin-id", Name: "emby-admin" },
+    });
+    jellyfinClientMocks.getUserInfo.mockResolvedValue({
+      id: "emby-admin-id",
+      username: "emby-admin",
+      displayName: "Emby Admin",
+      thumb: null,
+    });
+    jellyfinClientMocks.createApiKey.mockResolvedValue("emby-api-key");
+    userRepositoryMocks.findByJellyfinUsernameOrCreate.mockResolvedValue({
+      id: "new-admin-id",
+      jellyfinUsername: "emby-admin",
+      jellyfinAccessToken: null,
+    });
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "new-admin-id",
+      jellyfinUsername: "emby-admin",
+      displayName: "Emby Admin",
+      isAdmin: true,
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/emby/setup-admin")
+      .send({
+        username: "emby-admin",
+        password: "secret",
+        hostname: "emby.local",
+        port: 8096,
+        useSsl: false,
+        urlBase: "/emby",
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      user: {
+        id: "new-admin-id",
+        username: "emby-admin",
+        displayName: "Emby Admin",
+        email: undefined,
+        isAdmin: true,
+      },
+      accessToken: "emby-token",
+    });
+    expect(jellyfinClientMocks.constructedConfigs).toEqual([
+      {
+        baseUrl: "http://emby.local:8096/emby",
+        serverKind: "emby",
+      },
+    ]);
+    expect(settingsRepositoryMocks.set).toHaveBeenCalledWith(
+      "jellyfinApiKey",
+      "emby-api-key"
+    );
+    expect(settingsRepositoryMocks.set).toHaveBeenCalledWith(
+      "jellyfinHost",
+      "http://emby.local:8096/emby"
+    );
+    expect(settingsRepositoryMocks.set).toHaveBeenCalledWith(
+      "mediaBrowserType",
+      "emby"
+    );
+    expect(settingsRepositoryMocks.set).toHaveBeenCalledWith(
+      "jellyfinPort",
+      "8096"
+    );
+    expect(settingsRepositoryMocks.set).toHaveBeenCalledWith(
+      "jellyfinUseSsl",
+      "false"
+    );
+    expect(settingsRepositoryMocks.set).toHaveBeenCalledWith(
+      "jellyfinUrlBase",
+      "/emby"
+    );
+  });
+
+  it("defaults Jellyfin setup-admin to jellyfin and tolerates API key failures", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue(null);
+    jellyfinClientMocks.login.mockResolvedValue({
+      AccessToken: "jf-token",
+      User: { Id: "jf-admin-id", Name: "jf-admin" },
+    });
+    jellyfinClientMocks.getUserInfo.mockResolvedValue({
+      id: "jf-admin-id",
+      username: "jf-admin",
+      displayName: "Jellyfin Admin",
+      thumb: null,
+    });
+    jellyfinClientMocks.createApiKey.mockRejectedValue(new Error("no api key"));
+    userRepositoryMocks.findByJellyfinUsernameOrCreate.mockResolvedValue({
+      id: "new-admin-id",
+      jellyfinUsername: "jf-admin",
+      jellyfinAccessToken: null,
+    });
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "new-admin-id",
+      jellyfinUsername: "jf-admin",
+      displayName: "Jellyfin Admin",
+      isAdmin: true,
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/jellyfin/setup-admin")
+      .send({
+        username: "jf-admin",
+        password: "secret",
+        hostname: "jellyfin.local",
+      });
+
+    expect(response.status).toBe(200);
+    expect(jellyfinClientMocks.constructedConfigs).toEqual([
+      {
+        baseUrl: "http://jellyfin.local:8096",
+        serverKind: "jellyfin",
+      },
+    ]);
+    expect(settingsRepositoryMocks.set).not.toHaveBeenCalledWith(
+      "jellyfinApiKey",
+      expect.anything()
+    );
+    expect(settingsRepositoryMocks.set).toHaveBeenCalledWith(
+      "mediaBrowserType",
+      "jellyfin"
+    );
+  });
+
+  it("maps Jellyfin setup-admin invalid credentials to 401", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue(null);
+    jellyfinClientMocks.login.mockRejectedValue(
+      new Error("Invalid credentials")
+    );
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/jellyfin/setup-admin")
+      .send({
+        username: "admin",
+        password: "bad-secret",
+        hostname: "jellyfin.local",
+      });
+
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({ error: "Invalid credentials" });
+  });
+
+  it("returns generic Jellyfin setup-admin failures", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue(null);
+    jellyfinClientMocks.login.mockRejectedValue(new Error("server exploded"));
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/jellyfin/setup-admin")
+      .send({
+        username: "admin",
+        password: "secret",
+        hostname: "jellyfin.local",
+      });
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: "server exploded" });
+  });
+
   it("allows admin Jellyfin link to supply hostname and update settings", async () => {
     settingsRepositoryMocks.getAll.mockResolvedValue({
       jellyfinHost: "https://jellyfin.stale:8920",
@@ -1152,6 +1597,233 @@ describe("auth route sensitive guards", () => {
       error: "Jellyfin server not configured. Please provide server details.",
     });
     expect(jellyfinClientMocks.login).not.toHaveBeenCalled();
+  });
+
+  it("requires an authenticated user for Jellyfin link", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/jellyfin/link")
+      .set("x-test-auth-mode", "no-user")
+      .send({
+        username: "link-user",
+        password: "secret",
+      });
+
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({ error: "Invalid token" });
+  });
+
+  it("requires Jellyfin link credentials", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/jellyfin/link")
+      .send({
+        username: "link-user",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: "Username and password are required",
+    });
+  });
+
+  it("rejects Jellyfin link when the account is linked elsewhere", async () => {
+    userRepositoryMocks.findByJellyfinUsername.mockResolvedValue({
+      id: "other-user-id",
+      jellyfinUsername: "shared-user",
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/jellyfin/link")
+      .send({
+        username: "shared-user",
+        password: "secret",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: "This Jellyfin account is already linked to another user",
+    });
+  });
+
+  it("maps Jellyfin link invalid credentials to 401", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://jellyfin.real:8920",
+    });
+    userRepositoryMocks.findByJellyfinUsername.mockResolvedValue(null);
+    jellyfinClientMocks.login.mockRejectedValue(
+      new Error("Invalid credentials")
+    );
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/jellyfin/link")
+      .set("x-test-admin", "true")
+      .send({
+        username: "link-user",
+        password: "wrong-secret",
+      });
+
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({ error: "Invalid credentials" });
+  });
+
+  it("uses stored Emby settings for Jellyfin link when body omits mediaBrowserType", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://emby.real:8096",
+      mediaBrowserType: "emby",
+    });
+    userRepositoryMocks.findByJellyfinUsername.mockResolvedValue(null);
+    jellyfinClientMocks.login.mockResolvedValue({
+      AccessToken: "emby-token",
+      User: { Id: "emby-user-id", Name: "emby-link" },
+    });
+    jellyfinClientMocks.getUserInfo.mockResolvedValue({
+      id: "emby-user-id",
+      username: "emby-link",
+      displayName: "Emby Link",
+      email: "emby@example.com",
+      thumb: null,
+    });
+    jellyfinClientMocks.createApiKey.mockResolvedValue("emby-api-key");
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "current-user-id",
+      jellyfinUsername: "emby-link",
+      displayName: "Emby Link",
+      email: "emby@example.com",
+      isAdmin: true,
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/jellyfin/link")
+      .set("x-test-admin", "true")
+      .send({
+        username: "emby-link",
+        password: "secret",
+      });
+
+    expect(response.status).toBe(200);
+    expect(jellyfinClientMocks.constructedConfigs).toEqual([
+      {
+        baseUrl: "https://emby.real:8096",
+        serverKind: "emby",
+      },
+    ]);
+  });
+
+  it("returns generic Jellyfin link failures", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://jellyfin.real:8920",
+    });
+    userRepositoryMocks.findByJellyfinUsername.mockResolvedValue(null);
+    jellyfinClientMocks.login.mockRejectedValue(new Error("server exploded"));
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/jellyfin/link")
+      .set("x-test-admin", "true")
+      .send({
+        username: "link-user",
+        password: "secret",
+      });
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: "server exploded" });
+  });
+
+  it("returns generic link error when thrown value is not an Error", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://jellyfin.local:8920",
+    });
+    jellyfinClientMocks.login.mockRejectedValue("boom-string");
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/jellyfin/link")
+      .set("x-test-admin", "true")
+      .send({
+        username: "link-user",
+        password: "secret",
+      });
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: "Unable to link Jellyfin account" });
+  });
+
+  it("uses the /emby/link alias to persist Emby media browser type", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://emby.old:8096",
+    });
+    userRepositoryMocks.findByJellyfinUsername.mockResolvedValue(null);
+    jellyfinClientMocks.login.mockResolvedValue({
+      AccessToken: "emby-token",
+      User: { Id: "emby-user-id", Name: "emby-link" },
+    });
+    jellyfinClientMocks.getUserInfo.mockResolvedValue({
+      id: "emby-user-id",
+      username: "emby-link",
+      displayName: "Emby Link",
+      email: "emby@example.com",
+      thumb: null,
+    });
+    jellyfinClientMocks.createApiKey.mockResolvedValue("emby-api-key");
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "current-user-id",
+      jellyfinUsername: "emby-link",
+      displayName: "Emby Link",
+      email: "emby@example.com",
+      isAdmin: true,
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/emby/link")
+      .set("x-test-admin", "true")
+      .send({
+        username: "emby-link",
+        password: "secret",
+        hostname: "emby.admin",
+        port: 8096,
+        useSsl: false,
+      });
+
+    expect(response.status).toBe(200);
+    expect(jellyfinClientMocks.constructedConfigs).toEqual([
+      {
+        baseUrl: "http://emby.admin:8096",
+        serverKind: "emby",
+      },
+    ]);
+    expect(settingsRepositoryMocks.set).toHaveBeenCalledWith(
+      "mediaBrowserType",
+      "emby"
+    );
   });
 
   it("creates a Plex OAuth pin", async () => {
@@ -1300,5 +1972,59 @@ describe("auth route sensitive guards", () => {
     expect(setupResponse.status).toBe(200);
     expect(plexOAuthMocks.constructedWith).toEqual(["installation-client-id"]);
     expect(plexOAuthMocks.getTokenFromPin).toHaveBeenCalledWith(99);
+  });
+
+  it("requires an authenticated user for Emby unlink", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/emby/unlink")
+      .set("x-test-auth-mode", "no-user")
+      .send({});
+
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({ error: "Unauthorized" });
+  });
+
+  it("returns 500 when Jellyfin unlink cleanup fails", async () => {
+    sessionRepositoryMocks.deleteAllForUser.mockRejectedValue(
+      new Error("delete failed")
+    );
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/jellyfin/unlink")
+      .set("x-test-admin", "false")
+      .set("x-test-plex-username", "user-plex")
+      .set("x-test-jellyfin-username", "user-jellyfin")
+      .send({});
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: "delete failed" });
+  });
+
+  it("uses a generic message when Jellyfin unlink throws a non-Error", async () => {
+    sessionRepositoryMocks.deleteAllForUser.mockRejectedValue("unlink failed");
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/jellyfin/unlink")
+      .set("x-test-admin", "false")
+      .set("x-test-plex-username", "user-plex")
+      .set("x-test-jellyfin-username", "user-jellyfin")
+      .send({});
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({
+      error: "Failed to unlink Jellyfin account",
+    });
   });
 });

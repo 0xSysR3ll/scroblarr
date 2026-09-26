@@ -168,4 +168,50 @@ describe("avatar sensitive access", () => {
 
     expect(response.body).toEqual({ error: "Failed to fetch Simkl avatar" });
   });
+
+  it("uses Emby auth headers when proxying Jellyfin avatars for Emby", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: {
+        get: vi.fn().mockReturnValue("image/jpeg"),
+      },
+      arrayBuffer: vi.fn().mockResolvedValue(Buffer.from("image-bytes").buffer),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    userRepositoryMocks.findBySessionToken.mockResolvedValue({
+      id: "owner-id",
+      isAdmin: false,
+    });
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "owner-id",
+      jellyfinThumb: "/api/v1/avatars/jellyfin/emby-user-id",
+      jellyfinUserId: "emby-user-id",
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://emby.local",
+      jellyfinApiKey: "emby-api-key",
+      mediaBrowserType: "emby",
+    });
+
+    const app = express();
+    app.use("/api/v1/avatars", avatarRoutes);
+
+    const response = await request(app)
+      .get("/api/v1/avatars/jellyfin/owner-id")
+      .set("authorization", "Bearer owner-token")
+      .expect(200);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://emby.local/Users/emby-user-id/Images/Primary",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: expect.stringMatching(/^Emby /),
+          "X-Emby-Authorization": expect.stringMatching(/^Emby /),
+          "X-Emby-Token": "emby-api-key",
+          Accept: "image/*",
+        }),
+      })
+    );
+    expect(response.headers["content-type"]).toContain("image/jpeg");
+  });
 });

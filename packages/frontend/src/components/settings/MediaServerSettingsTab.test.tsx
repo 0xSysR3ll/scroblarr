@@ -108,4 +108,37 @@ describe("MediaServerSettingsTab", () => {
       buildPlexWebhookUrl("sk_webhook")
     );
   });
+
+  it("renders the Emby card instead of Jellyfin when Emby is configured", () => {
+    renderWithProviders(
+      <MediaServerSettingsTab
+        servers={[plexServer]}
+        selectedServerUrl={plexServer.url}
+        savedServerUrl={plexServer.url}
+        editingServer={null}
+        onSelectedServerUrlChange={vi.fn()}
+        onEditingServerChange={vi.fn()}
+        onCancelEdit={vi.fn()}
+        hasPlexAccount
+        onPlexAuthenticate={vi.fn()}
+        plexAuthLoading={false}
+        plexRefreshLoading={false}
+        onRefreshPlexServers={vi.fn()}
+        plexLinkError={null}
+        settings={{
+          ...settings,
+          mediaBrowserType: "emby",
+        }}
+        onJellyfinSettingsChange={vi.fn()}
+        webhookApiKey="sk_webhook"
+      />
+    );
+
+    expect(
+      screen.getByRole("button", { name: /Emby Server/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Jellyfin Server/i })
+    ).not.toBeInTheDocument();
+  });
 });

@@ -10,6 +10,7 @@ export interface Settings {
   jellyfinUseSsl?: string;
   jellyfinUrlBase?: string;
   jellyfinApiKey?: string;
+  mediaBrowserType?: "jellyfin" | "emby";
   apiKey?: string;
   webhookApiKey?: string;
   tmdbAccessToken?: string;

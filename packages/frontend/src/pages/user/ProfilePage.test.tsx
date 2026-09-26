@@ -47,4 +47,31 @@ describe("ProfilePage", () => {
     ).toBeVisible();
     expect(screen.getByRole("heading", { name: /Simkl/i })).toBeVisible();
   });
+
+  it("passes Emby auth-provider state into the linked accounts tab", async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: {
+        id: "user-1",
+        username: "alice",
+        jellyfinUsername: "alice-emby",
+        isAdmin: false,
+      },
+      loading: false,
+      logout: vi.fn(),
+      checkAuth: vi.fn(),
+      setUserFromLogin: vi.fn(),
+      isAuthenticated: true,
+      isAdmin: false,
+    });
+    vi.mocked(getAuthProviders).mockResolvedValue({
+      hasAdmin: true,
+      jellyfinConfigured: false,
+      embyConfigured: true,
+      plexConfigured: false,
+    });
+
+    renderWithProviders(<ProfilePage />, { route: "/profile/linkedAccounts" });
+
+    expect(await screen.findByText("Emby")).toBeVisible();
+  });
 });

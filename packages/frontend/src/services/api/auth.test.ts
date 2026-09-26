@@ -4,9 +4,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getCurrentUser,
   getAuthProviders,
+  linkEmbyAccount,
   linkJellyfinAccount,
+  loginWithEmby,
   loginWithPlex,
+  setupEmbyAdmin,
   setupJellyfinAdmin,
+  unlinkEmbyAccount,
 } from "./auth";
 
 describe("auth api", () => {
@@ -76,7 +80,11 @@ describe("auth api", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/v1/auth/jellyfin/link", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: "alice", password: "secret" }),
+      body: JSON.stringify({
+        username: "alice",
+        password: "secret",
+        mediaBrowserType: "jellyfin",
+      }),
     });
   });
 
@@ -103,8 +111,101 @@ describe("auth api", () => {
           port: 443,
           useSsl: true,
           urlBase: "/jf",
+          mediaBrowserType: "jellyfin",
         }),
       }
     );
+  });
+
+  it("logs in with Emby credentials against the Emby endpoint", async () => {
+    const user = { id: "1", username: "emby-user", isAdmin: false };
+    fetchMock.mockResolvedValueOnce(jsonResponse(user));
+
+    await expect(
+      loginWithEmby("alice", "secret", "emby.local", 8920, true, "/emby")
+    ).resolves.toEqual(user);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/auth/emby",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      username: "alice",
+      password: "secret",
+      hostname: "emby.local",
+      port: 8920,
+      useSsl: true,
+      urlBase: "/emby",
+      mediaBrowserType: "emby",
+    });
+  });
+
+  it("links Emby accounts with auth headers and server details", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ id: "1", isAdmin: false }));
+
+    await linkEmbyAccount("alice", "secret", "emby.local", 8920, true, "/emby");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/auth/emby/link",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      username: "alice",
+      password: "secret",
+      hostname: "emby.local",
+      port: 8920,
+      useSsl: true,
+      urlBase: "/emby",
+      mediaBrowserType: "emby",
+    });
+  });
+
+  it("uses the Emby setup-admin endpoint for Emby admin setup", async () => {
+    const response = {
+      user: { id: "1", username: "admin", isAdmin: true },
+      accessToken: "token",
+    };
+    fetchMock.mockResolvedValueOnce(jsonResponse(response));
+
+    await expect(
+      setupEmbyAdmin("admin", "secret", "emby.local", 8920, true, "/emby")
+    ).resolves.toEqual(response);
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/auth/emby/setup-admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: "admin",
+        password: "secret",
+        hostname: "emby.local",
+        port: 8920,
+        useSsl: true,
+        urlBase: "/emby",
+        mediaBrowserType: "emby",
+      }),
+    });
+  });
+
+  it("falls back to the default Emby unlink error", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: vi.fn().mockRejectedValue(new Error("bad json")),
+    });
+
+    await expect(unlinkEmbyAccount()).rejects.toThrow(
+      "Failed to unlink Emby account"
+    );
+  });
+
+  it("unlinks Emby accounts successfully", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ success: true }));
+
+    await expect(unlinkEmbyAccount()).resolves.toEqual({ success: true });
   });
 });

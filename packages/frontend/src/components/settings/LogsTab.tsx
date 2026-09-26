@@ -53,6 +53,7 @@ export function LogsTab() {
     | "trakt"
     | "plex"
     | "jellyfin"
+    | "emby"
     | "system"
     | "migration"
     | ""
@@ -216,6 +217,7 @@ export function LogsTab() {
                     | "trakt"
                     | "plex"
                     | "jellyfin"
+                    | "emby"
                     | "system"
                     | "migration"
                     | ""
@@ -235,6 +237,7 @@ export function LogsTab() {
               <option value="trakt">Trakt</option>
               <option value="plex">Plex</option>
               <option value="jellyfin">Jellyfin</option>
+              <option value="emby">Emby</option>
               <option value="system">System</option>
               <option value="migration">Migration</option>
             </select>

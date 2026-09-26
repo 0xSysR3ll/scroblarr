@@ -18,7 +18,6 @@ interface MediaServerSettingsTabProps {
   plexRefreshLoading: boolean;
   onRefreshPlexServers: () => void;
   plexLinkError: string | null;
-  // Jellyfin props
   settings: Settings;
   onJellyfinSettingsChange: (settings: {
     hostname: string;
@@ -26,6 +25,7 @@ interface MediaServerSettingsTabProps {
     useSsl: boolean;
     urlBase: string;
     apiKey: string;
+    mediaBrowserType: "jellyfin" | "emby";
   }) => void;
   onSettingsUpdated?: () => void;
   webhookApiKey?: string;
@@ -50,6 +50,14 @@ export function MediaServerSettingsTab({
   onSettingsUpdated,
   webhookApiKey,
 }: MediaServerSettingsTabProps) {
+  const configuredType = settings.jellyfinHost
+    ? settings.mediaBrowserType === "emby"
+      ? "emby"
+      : "jellyfin"
+    : null;
+  const showJellyfin = configuredType === null || configuredType === "jellyfin";
+  const showEmby = configuredType === null || configuredType === "emby";
+
   return (
     <div className="space-y-4">
       <PlexSettingsTab
@@ -70,12 +78,25 @@ export function MediaServerSettingsTab({
         webhookApiKey={webhookApiKey}
       />
 
-      <JellyfinSettingsTab
-        settings={settings}
-        onJellyfinSettingsChange={onJellyfinSettingsChange}
-        onSettingsUpdated={onSettingsUpdated}
-        webhookApiKey={webhookApiKey}
-      />
+      {showJellyfin && (
+        <JellyfinSettingsTab
+          settings={settings}
+          mediaBrowserType="jellyfin"
+          onJellyfinSettingsChange={onJellyfinSettingsChange}
+          onSettingsUpdated={onSettingsUpdated}
+          webhookApiKey={webhookApiKey}
+        />
+      )}
+
+      {showEmby && (
+        <JellyfinSettingsTab
+          settings={settings}
+          mediaBrowserType="emby"
+          onJellyfinSettingsChange={onJellyfinSettingsChange}
+          onSettingsUpdated={onSettingsUpdated}
+          webhookApiKey={webhookApiKey}
+        />
+      )}
     </div>
   );
 }

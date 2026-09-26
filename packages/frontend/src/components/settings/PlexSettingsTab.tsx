@@ -72,11 +72,15 @@ export function PlexSettingsTab({
     hasAdmin: boolean;
     plexConfigured: boolean;
     jellyfinConfigured: boolean;
+    embyConfigured?: boolean;
   } | null>(null);
 
   const isConfigured =
     hasPlexAccount && servers.length > 0 && !!selectedServerUrl;
-  const canRemove = !isAdmin || !!authProviders?.jellyfinConfigured;
+  const canRemove =
+    !isAdmin ||
+    !!authProviders?.jellyfinConfigured ||
+    !!authProviders?.embyConfigured;
   const hasUnsavedChanges =
     selectedServerUrl !== savedServerUrl && !!selectedServerUrl;
 
@@ -514,16 +518,18 @@ export function PlexSettingsTab({
                 "Are you sure you want to remove the Plex server configuration? This will:\n\n• Clear the Plex server URL setting\n• Prevent importing new users from Plex\n• Prevent syncing for existing Plex users\n• Keep existing users and their sync history\n\nThis action cannot be undone.",
             })}
           </DialogDescription>
-          {isAdmin && !authProviders?.jellyfinConfigured && (
-            <div className="mb-4 rounded border-l-4 border-warning-400 bg-warning-50 p-3 dark:border-warning-600 dark:bg-warning-950">
-              <p className="text-sm text-warning-700 dark:text-warning-300">
-                {t("settings.removeServerAdminWarning", {
-                  defaultValue:
-                    "As an admin, you must have at least one server configured. If you remove Plex and only Plex is configured, you may lose access. Please ensure Jellyfin is configured first.",
-                })}
-              </p>
-            </div>
-          )}
+          {isAdmin &&
+            !authProviders?.jellyfinConfigured &&
+            !authProviders?.embyConfigured && (
+              <div className="mb-4 rounded border-l-4 border-warning-400 bg-warning-50 p-3 dark:border-warning-600 dark:bg-warning-950">
+                <p className="text-sm text-warning-700 dark:text-warning-300">
+                  {t("settings.removeServerAdminWarning", {
+                    defaultValue:
+                      "As an admin, you must have at least one server configured. If you remove Plex and only Plex is configured, you may lose access. Please ensure Jellyfin is configured first.",
+                  })}
+                </p>
+              </div>
+            )}
           <div className="flex justify-end gap-3">
             <button
               type="button"

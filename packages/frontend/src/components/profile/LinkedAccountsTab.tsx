@@ -9,8 +9,10 @@ import { usePlexLogin } from "@hooks/auth/usePlexLogin";
 import {
   linkPlexAccount,
   linkJellyfinAccount,
+  linkEmbyAccount,
   unlinkPlexAccount,
   unlinkJellyfinAccount,
+  unlinkEmbyAccount,
 } from "@services/api";
 import { showSuccess, showError } from "@utils/toast";
 import { useState } from "react";
@@ -22,6 +24,7 @@ interface LinkedAccountsTabProps {
   jellyfinUsername?: string;
   plexConfigured: boolean;
   jellyfinConfigured: boolean;
+  embyConfigured?: boolean;
   onAccountLinked: () => void;
 }
 
@@ -30,10 +33,17 @@ export function LinkedAccountsTab({
   jellyfinUsername,
   plexConfigured,
   jellyfinConfigured,
+  embyConfigured = false,
   onAccountLinked,
 }: LinkedAccountsTabProps) {
   const { t } = useTranslation();
   const { checkAuth, user } = useAuth();
+  const isEmby = embyConfigured;
+  const mediaBrowserName = isEmby ? "Emby" : "Jellyfin";
+  const mediaBrowserLogo = isEmby ? "/logos/emby.svg" : "/logos/jellyfin.svg";
+  const mediaBrowserConfigured = jellyfinConfigured || embyConfigured;
+  const canUnlinkPlex = !!plexUsername && !!jellyfinUsername;
+  const canUnlinkMediaBrowser = !!jellyfinUsername && !!plexUsername;
   const [linkingPlex, setLinkingPlex] = useState(false);
   const [linkingJellyfin, setLinkingJellyfin] = useState(false);
   const [jellyfinUsernameInput, setJellyfinUsernameInput] = useState("");
@@ -77,14 +87,22 @@ export function LinkedAccountsTab({
 
       if (!jellyfinUsernameInput || !jellyfinPassword) {
         setJellyfinLinkError(
-          t("users.jellyfinCredentialsRequired", {
-            defaultValue: "Jellyfin username and password are required",
-          })
+          isEmby
+            ? t("users.embyCredentialsRequired", {
+                defaultValue: "Emby username and password are required",
+              })
+            : t("users.jellyfinCredentialsRequired", {
+                defaultValue: "Jellyfin username and password are required",
+              })
         );
         return;
       }
 
-      await linkJellyfinAccount(jellyfinUsernameInput, jellyfinPassword);
+      if (isEmby) {
+        await linkEmbyAccount(jellyfinUsernameInput, jellyfinPassword);
+      } else {
+        await linkJellyfinAccount(jellyfinUsernameInput, jellyfinPassword);
+      }
       setJellyfinPassword("");
       await checkAuth();
       onAccountLinked();
@@ -136,10 +154,14 @@ export function LinkedAccountsTab({
     setShowUnlinkJellyfinModal(false);
     try {
       setUnlinkingJellyfin(true);
-      await unlinkJellyfinAccount();
+      if (isEmby) {
+        await unlinkEmbyAccount();
+      } else {
+        await unlinkJellyfinAccount();
+      }
       showSuccess(
         t("profile.linkedAccounts.unlinkSuccess", {
-          defaultValue: "Jellyfin account unlinked successfully!",
+          defaultValue: `${mediaBrowserName} account unlinked successfully!`,
         })
       );
       await checkAuth();
@@ -149,7 +171,7 @@ export function LinkedAccountsTab({
         err instanceof Error
           ? err.message
           : t("profile.linkedAccounts.unlinkFailed", {
-              defaultValue: "Failed to unlink Jellyfin account",
+              defaultValue: `Failed to unlink ${mediaBrowserName} account`,
             })
       );
     } finally {
@@ -173,7 +195,7 @@ export function LinkedAccountsTab({
       </div>
 
       {(plexConfigured ||
-        jellyfinConfigured ||
+        mediaBrowserConfigured ||
         plexUsername ||
         jellyfinUsername) && (
         <div className="space-y-4">
@@ -204,21 +226,23 @@ export function LinkedAccountsTab({
                         })}
                       </span>
                     </div>
-                    <button
-                      onClick={handleUnlinkPlex}
-                      disabled={unlinkingPlex}
-                      className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
-                      title={t("profile.linkedAccounts.unlink", {
-                        defaultValue: "Unlink Plex Account",
-                      })}
-                    >
-                      <FaUnlink className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">
-                        {t("profile.linkedAccounts.unlink", {
-                          defaultValue: "Unlink",
+                    {canUnlinkPlex && (
+                      <button
+                        onClick={handleUnlinkPlex}
+                        disabled={unlinkingPlex}
+                        className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
+                        title={t("profile.linkedAccounts.unlink", {
+                          defaultValue: "Unlink Plex Account",
                         })}
-                      </span>
-                    </button>
+                      >
+                        <FaUnlink className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">
+                          {t("profile.linkedAccounts.unlink", {
+                            defaultValue: "Unlink",
+                          })}
+                        </span>
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <button
@@ -243,19 +267,19 @@ export function LinkedAccountsTab({
             </div>
           )}
 
-          {/* Jellyfin linking */}
-          {(jellyfinConfigured || jellyfinUsername) && (
+          {/* Jellyfin / Emby linking */}
+          {(mediaBrowserConfigured || jellyfinUsername) && (
             <div className="surface-panel p-4">
               <div className="flex items-center justify-between gap-3 mb-3">
                 <div className="flex items-center gap-3">
                   <img
-                    src="/logos/jellyfin.svg"
-                    alt="Jellyfin"
+                    src={mediaBrowserLogo}
+                    alt={mediaBrowserName}
                     className="w-6 h-6"
                   />
                   <div>
                     <h3 className="text-base font-semibold text-foreground">
-                      Jellyfin
+                      {mediaBrowserName}
                     </h3>
                     {jellyfinUsername && (
                       <p className="text-sm text-muted-foreground">
@@ -274,21 +298,23 @@ export function LinkedAccountsTab({
                         })}
                       </span>
                     </div>
-                    <button
-                      onClick={handleUnlinkJellyfin}
-                      disabled={unlinkingJellyfin}
-                      className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
-                      title={t("profile.linkedAccounts.unlink", {
-                        defaultValue: "Unlink Jellyfin Account",
-                      })}
-                    >
-                      <FaUnlink className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">
-                        {t("profile.linkedAccounts.unlink", {
-                          defaultValue: "Unlink",
+                    {canUnlinkMediaBrowser && (
+                      <button
+                        onClick={handleUnlinkJellyfin}
+                        disabled={unlinkingJellyfin}
+                        className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
+                        title={t("profile.linkedAccounts.unlink", {
+                          defaultValue: `Unlink ${mediaBrowserName} Account`,
                         })}
-                      </span>
-                    </button>
+                      >
+                        <FaUnlink className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">
+                          {t("profile.linkedAccounts.unlink", {
+                            defaultValue: "Unlink",
+                          })}
+                        </span>
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div className="flex flex-col items-end gap-2">
@@ -300,9 +326,15 @@ export function LinkedAccountsTab({
                           setJellyfinUsernameInput(e.target.value)
                         }
                         className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
-                        placeholder={t("users.jellyfinUsername", {
-                          defaultValue: "Jellyfin username",
-                        })}
+                        placeholder={
+                          isEmby
+                            ? t("users.embyUsername", {
+                                defaultValue: "Emby username",
+                              })
+                            : t("users.jellyfinUsername", {
+                                defaultValue: "Jellyfin username",
+                              })
+                        }
                       />
                       <input
                         type="password"
@@ -328,9 +360,13 @@ export function LinkedAccountsTab({
                         ? t("common.loading", {
                             defaultValue: "Loading...",
                           })
-                        : t("auth.jellyfinAuth", {
-                            defaultValue: "Authenticate with Jellyfin",
-                          })}
+                        : isEmby
+                          ? t("auth.embyAuth", {
+                              defaultValue: "Authenticate with Emby",
+                            })
+                          : t("auth.jellyfinAuth", {
+                              defaultValue: "Authenticate with Jellyfin",
+                            })}
                     </button>
                   </div>
                 )}
@@ -345,12 +381,12 @@ export function LinkedAccountsTab({
         </div>
       )}
 
-      {!plexConfigured && !jellyfinConfigured && (
+      {!plexConfigured && !mediaBrowserConfigured && (
         <div className="bg-warning-50 dark:bg-warning-950 border-l-4 border-warning-400 dark:border-warning-600 p-4 rounded">
           <p className="text-sm text-warning-700 dark:text-warning-300">
             {t("profile.linkedAccounts.notConfigured", {
               defaultValue:
-                "No media servers are configured. Please ask an admin to configure Plex or Jellyfin in the settings.",
+                "No media servers are configured. Please ask an admin to configure Plex, Jellyfin, or Emby in the settings.",
             })}
           </p>
         </div>
@@ -374,7 +410,7 @@ export function LinkedAccountsTab({
               <p className="text-sm text-warning-700 dark:text-warning-300">
                 {t("profile.linkedAccounts.adminWarning", {
                   defaultValue:
-                    "As an admin, you must have at least one linked account. If you unlink Plex and only Plex is configured, you may lose access. Please ensure Jellyfin is configured and linked first.",
+                    "As an admin, you must have at least one linked account. If you unlink Plex and only Plex is configured, you may lose access. Please ensure Jellyfin or Emby is configured and linked first.",
                 })}
               </p>
             </div>
@@ -408,21 +444,19 @@ export function LinkedAccountsTab({
         <DialogContent className="max-w-md">
           <DialogTitle>
             {t("profile.linkedAccounts.unlinkConfirmTitle", {
-              defaultValue: "Unlink Jellyfin Account",
+              defaultValue: `Unlink ${mediaBrowserName} Account`,
             })}
           </DialogTitle>
           <DialogDescription>
             {t("profile.linkedAccounts.unlinkConfirmMessage", {
-              defaultValue:
-                "This will remove your Jellyfin account connection. You will need to link your account again to sync watched media.",
+              defaultValue: `This will remove your ${mediaBrowserName} account connection. You will need to link your account again to sync watched media.`,
             })}
           </DialogDescription>
           {user?.isAdmin && !plexUsername && (
             <div className="mb-4 rounded border-l-4 border-warning-400 bg-warning-50 p-3 dark:border-warning-600 dark:bg-warning-950">
               <p className="text-sm text-warning-700 dark:text-warning-300">
                 {t("profile.linkedAccounts.adminWarning", {
-                  defaultValue:
-                    "As an admin, you must have at least one linked account. If you unlink Jellyfin and only Jellyfin is configured, you may lose access. Please ensure Plex is configured and linked first.",
+                  defaultValue: `As an admin, you must have at least one linked account. If you unlink ${mediaBrowserName} and only ${mediaBrowserName} is configured, you may lose access. Please ensure Plex is configured and linked first.`,
                 })}
               </p>
             </div>

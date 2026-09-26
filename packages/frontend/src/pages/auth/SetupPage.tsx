@@ -20,7 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-type SetupMethod = "choose" | "plex" | "jellyfin";
+type SetupMethod = "choose" | "plex" | "jellyfin" | "emby";
 
 export function SetupPage() {
   const { t } = useTranslation();
@@ -78,12 +78,17 @@ export function SetupPage() {
       setError(null);
       setHostnameError(null);
 
+      const isEmby = setupMethod === "emby";
       const hostname = jellyfinFormData.hostname.trim();
       if (!hostname) {
         setHostnameError(
-          t("auth.jellyfin.hostnameRequired", {
-            defaultValue: "Server hostname is required",
-          })
+          isEmby
+            ? t("auth.emby.hostnameRequired", {
+                defaultValue: "Server hostname is required",
+              })
+            : t("auth.jellyfin.hostnameRequired", {
+                defaultValue: "Server hostname is required",
+              })
         );
         return;
       }
@@ -98,24 +103,33 @@ export function SetupPage() {
 
       if (!isValidHostname) {
         setHostnameError(
-          t("auth.jellyfin.hostnameInvalid", {
-            defaultValue:
-              "Please enter a valid hostname (for example: jellyfin.local, localhost or 192.168.0.10)",
-          })
+          isEmby
+            ? t("auth.emby.hostnameInvalid", {
+                defaultValue:
+                  "Please enter a valid hostname (for example: emby.local, localhost or 192.168.0.10)",
+              })
+            : t("auth.jellyfin.hostnameInvalid", {
+                defaultValue:
+                  "Please enter a valid hostname (for example: jellyfin.local, localhost or 192.168.0.10)",
+              })
         );
         return;
       }
       setJellyfinLoading(true);
+      const mediaBrowserType = isEmby
+        ? ("emby" as const)
+        : ("jellyfin" as const);
       const response = await setupJellyfinAdmin(
         jellyfinFormData.username,
         jellyfinFormData.password,
         hostname,
         jellyfinFormData.port,
         jellyfinFormData.useSsl,
-        jellyfinFormData.urlBase
+        jellyfinFormData.urlBase,
+        mediaBrowserType
       );
       if (response) {
-        localStorage.setItem("authSource", "jellyfin");
+        localStorage.setItem("authSource", mediaBrowserType);
         setUserFromLogin({
           id: response.user.id,
           username: response.user.username,
@@ -131,9 +145,13 @@ export function SetupPage() {
       setError(
         error instanceof Error
           ? error.message
-          : t("auth.setupJellyfinAdminFailed", {
-              defaultValue: "Failed to setup Jellyfin admin",
-            })
+          : setupMethod === "emby"
+            ? t("auth.setupEmbyAdminFailed", {
+                defaultValue: "Failed to setup Emby admin",
+              })
+            : t("auth.setupJellyfinAdminFailed", {
+                defaultValue: "Failed to setup Jellyfin admin",
+              })
       );
     } finally {
       setJellyfinLoading(false);
@@ -161,7 +179,7 @@ export function SetupPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <button
                 type="button"
                 onClick={() => setSetupMethod("plex")}
@@ -188,6 +206,21 @@ export function SetupPage() {
                 <p className="text-sm text-muted-foreground">
                   {t("auth.jellyfinDescription", {
                     defaultValue: "Connect using Jellyfin credentials",
+                  })}
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSetupMethod("emby")}
+                className="rounded-xl border-2 border-primary/40 bg-card p-6 text-left transition-colors hover:border-primary hover:bg-primary/5"
+              >
+                <h2 className="mb-2 text-xl font-semibold text-foreground">
+                  {t("auth.embyService", { defaultValue: "Emby" })}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {t("auth.embyDescription", {
+                    defaultValue: "Connect using Emby credentials",
                   })}
                 </p>
               </button>
@@ -254,7 +287,11 @@ export function SetupPage() {
     );
   }
 
-  if (setupMethod === "jellyfin") {
+  if (setupMethod === "jellyfin" || setupMethod === "emby") {
+    const isEmby = setupMethod === "emby";
+    const brandName = isEmby ? "Emby" : "Jellyfin";
+    const brandLogo = isEmby ? "/logos/emby.svg" : "/logos/jellyfin.svg";
+    const fieldId = isEmby ? "emby" : "jf";
     return (
       <div className="relative flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-8">
         <ThemeToggleButton />
@@ -269,14 +306,20 @@ export function SetupPage() {
               ← {t("auth.back", { defaultValue: "Back" })}
             </Button>
             <CardTitle className="text-center text-3xl">
-              {t("auth.setupWithJellyfin", {
-                defaultValue: "Setup with Jellyfin",
-              })}
+              {isEmby
+                ? t("auth.setupWithEmby", { defaultValue: "Setup with Emby" })
+                : t("auth.setupWithJellyfin", {
+                    defaultValue: "Setup with Jellyfin",
+                  })}
             </CardTitle>
             <CardDescription className="text-center text-base">
-              {t("auth.jellyfinConnectPrompt", {
-                defaultValue: "Enter your Jellyfin server details",
-              })}
+              {isEmby
+                ? t("auth.embyConnectPrompt", {
+                    defaultValue: "Enter your Emby server details",
+                  })
+                : t("auth.jellyfinConnectPrompt", {
+                    defaultValue: "Enter your Jellyfin server details",
+                  })}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
@@ -290,17 +333,21 @@ export function SetupPage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="jf-hostname">
-                {t("auth.jellyfin.serverHostname", {
-                  defaultValue: "Server Hostname",
-                })}
+              <Label htmlFor={`${fieldId}-hostname`}>
+                {isEmby
+                  ? t("auth.emby.serverHostname", {
+                      defaultValue: "Server Hostname",
+                    })
+                  : t("auth.jellyfin.serverHostname", {
+                      defaultValue: "Server Hostname",
+                    })}
               </Label>
               <div className="flex overflow-hidden rounded-lg border border-input shadow-sm">
                 <span className="inline-flex cursor-default items-center border-r border-border bg-muted px-3 text-sm text-muted-foreground">
                   {jellyfinFormData.useSsl ? "https://" : "http://"}
                 </span>
                 <Input
-                  id="jf-hostname"
+                  id={`${fieldId}-hostname`}
                   type="text"
                   value={jellyfinFormData.hostname}
                   onChange={(e) =>
@@ -309,9 +356,15 @@ export function SetupPage() {
                       hostname: e.target.value,
                     })
                   }
-                  placeholder={t("auth.jellyfin.hostnamePlaceholder", {
-                    defaultValue: "jellyfin.example.com",
-                  })}
+                  placeholder={
+                    isEmby
+                      ? t("auth.emby.hostnamePlaceholder", {
+                          defaultValue: "emby.example.com",
+                        })
+                      : t("auth.jellyfin.hostnamePlaceholder", {
+                          defaultValue: "jellyfin.example.com",
+                        })
+                  }
                   className="rounded-none border-0 shadow-none focus-visible:ring-0 md:text-sm"
                 />
               </div>
@@ -322,11 +375,13 @@ export function SetupPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="jf-port">
-                  {t("auth.jellyfin.port", { defaultValue: "Port" })}
+                <Label htmlFor={`${fieldId}-port`}>
+                  {isEmby
+                    ? t("auth.emby.port", { defaultValue: "Port" })
+                    : t("auth.jellyfin.port", { defaultValue: "Port" })}
                 </Label>
                 <Input
-                  id="jf-port"
+                  id={`${fieldId}-port`}
                   type="number"
                   value={jellyfinFormData.port}
                   onChange={(e) =>
@@ -348,25 +403,33 @@ export function SetupPage() {
                         port: !jellyfinFormData.useSsl ? 443 : 8096,
                       })
                     }
-                    ariaLabel={t("auth.jellyfin.useSsl", {
-                      defaultValue: "Use SSL",
-                    })}
+                    ariaLabel={
+                      isEmby
+                        ? t("auth.emby.useSsl", { defaultValue: "Use SSL" })
+                        : t("auth.jellyfin.useSsl", { defaultValue: "Use SSL" })
+                    }
                   />
                   <span className="ml-2">
-                    {t("auth.jellyfin.useSsl", { defaultValue: "Use SSL" })}
+                    {isEmby
+                      ? t("auth.emby.useSsl", { defaultValue: "Use SSL" })
+                      : t("auth.jellyfin.useSsl", { defaultValue: "Use SSL" })}
                   </span>
                 </label>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="jf-urlbase">
-                {t("auth.jellyfin.urlBase", {
-                  defaultValue: "URL Base (optional)",
-                })}
+              <Label htmlFor={`${fieldId}-urlbase`}>
+                {isEmby
+                  ? t("auth.emby.urlBase", {
+                      defaultValue: "URL Base (optional)",
+                    })
+                  : t("auth.jellyfin.urlBase", {
+                      defaultValue: "URL Base (optional)",
+                    })}
               </Label>
               <Input
-                id="jf-urlbase"
+                id={`${fieldId}-urlbase`}
                 type="text"
                 value={jellyfinFormData.urlBase}
                 onChange={(e) =>
@@ -375,18 +438,26 @@ export function SetupPage() {
                     urlBase: e.target.value,
                   })
                 }
-                placeholder={t("auth.jellyfin.urlBasePlaceholder", {
-                  defaultValue: "/jellyfin",
-                })}
+                placeholder={
+                  isEmby
+                    ? t("auth.emby.urlBasePlaceholder", {
+                        defaultValue: "/emby",
+                      })
+                    : t("auth.jellyfin.urlBasePlaceholder", {
+                        defaultValue: "/jellyfin",
+                      })
+                }
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="jf-user">
-                {t("auth.jellyfin.username", { defaultValue: "Username" })}
+              <Label htmlFor={`${fieldId}-user`}>
+                {isEmby
+                  ? t("auth.emby.username", { defaultValue: "Username" })
+                  : t("auth.jellyfin.username", { defaultValue: "Username" })}
               </Label>
               <Input
-                id="jf-user"
+                id={`${fieldId}-user`}
                 type="text"
                 value={jellyfinFormData.username}
                 onChange={(e) =>
@@ -399,12 +470,14 @@ export function SetupPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="jf-pass">
-                {t("auth.jellyfin.password", { defaultValue: "Password" })}
+              <Label htmlFor={`${fieldId}-pass`}>
+                {isEmby
+                  ? t("auth.emby.password", { defaultValue: "Password" })
+                  : t("auth.jellyfin.password", { defaultValue: "Password" })}
               </Label>
               <div className="relative">
                 <Input
-                  id="jf-pass"
+                  id={`${fieldId}-pass`}
                   type={showPassword ? "text" : "password"}
                   value={jellyfinFormData.password}
                   onChange={(e) =>
@@ -456,15 +529,15 @@ export function SetupPage() {
                 </span>
               ) : (
                 <>
-                  <img
-                    src="/logos/jellyfin.svg"
-                    alt="Jellyfin"
-                    className="h-4 w-4"
-                  />
+                  <img src={brandLogo} alt={brandName} className="h-4 w-4" />
                   <span>
-                    {t("auth.jellyfin.setupAdmin", {
-                      defaultValue: "Setup Admin",
-                    })}
+                    {isEmby
+                      ? t("auth.emby.setupAdmin", {
+                          defaultValue: "Setup Admin",
+                        })
+                      : t("auth.jellyfin.setupAdmin", {
+                          defaultValue: "Setup Admin",
+                        })}
                   </span>
                 </>
               )}
