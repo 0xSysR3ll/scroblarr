@@ -35,6 +35,11 @@ export function buildJellyfinWebhookUrl(origin?: string): string {
   return `${base}/api/v1/webhooks/jellyfin`;
 }
 
+export function buildEmbyWebhookUrl(apiKey: string, origin?: string): string {
+  const base = getScroblarrOrigin(origin);
+  return `${base}/api/v1/webhooks/emby?apiKey=${encodeURIComponent(apiKey)}`;
+}
+
 /** JSON body Tautulli substitutes and POSTs to Scroblarr's Tautulli webhook. */
 export const TAUTULLI_WEBHOOK_TEMPLATE = `{
   "action": "{action}",

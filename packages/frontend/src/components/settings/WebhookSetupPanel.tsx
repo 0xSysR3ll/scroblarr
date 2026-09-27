@@ -1,5 +1,6 @@
 import { showError, showSuccess } from "@utils/toast";
 import {
+  buildEmbyWebhookUrl,
   buildJellyfinWebhookUrl,
   buildPlexWebhookUrl,
   buildTautulliWebhookHeaders,
@@ -20,7 +21,7 @@ const DOCS_URL =
   (import.meta as { env?: { VITE_DOCS_URL?: string } }).env?.VITE_DOCS_URL ||
   "https://0xsysr3ll.github.io/scroblarr/docs";
 
-export type WebhookSource = "plex" | "jellyfin" | "tautulli";
+export type WebhookSource = "plex" | "jellyfin" | "emby" | "tautulli";
 
 interface WebhookSetupPanelProps {
   source: WebhookSource;
@@ -123,9 +124,11 @@ export function WebhookSetupPanel({
   const docsHref =
     source === "jellyfin"
       ? `${DOCS_URL}/configuration/jellyfin`
-      : source === "tautulli"
-        ? `${DOCS_URL}/configuration/plex#tautulli-no-plex-pass`
-        : `${DOCS_URL}/configuration/plex`;
+      : source === "emby"
+        ? `${DOCS_URL}/configuration/emby`
+        : source === "tautulli"
+          ? `${DOCS_URL}/configuration/plex#tautulli-no-plex-pass`
+          : `${DOCS_URL}/configuration/plex`;
 
   const webhookUrl =
     source === "plex"
@@ -134,7 +137,11 @@ export function WebhookSetupPanel({
         : buildPlexWebhookUrl("YOUR_WEBHOOK_API_KEY")
       : source === "tautulli"
         ? buildTautulliWebhookUrl()
-        : buildJellyfinWebhookUrl();
+        : source === "emby"
+          ? hasApiKey
+            ? buildEmbyWebhookUrl(webhookApiKey!.trim())
+            : buildEmbyWebhookUrl("YOUR_WEBHOOK_API_KEY")
+          : buildJellyfinWebhookUrl();
 
   const title =
     source === "tautulli"
@@ -154,10 +161,15 @@ export function WebhookSetupPanel({
             defaultValue:
               "Use Tautulli notification agents if you don't have Plex Pass.",
           })
-        : t("settings.webhook.jellyfinDescription", {
-            defaultValue:
-              "Configure a Generic webhook destination in Jellyfin with these values.",
-          });
+        : source === "emby"
+          ? t("settings.webhook.embyDescription", {
+              defaultValue:
+                "Configure an Emby webhook under your Emby notification preferences (not server settings).",
+            })
+          : t("settings.webhook.jellyfinDescription", {
+              defaultValue:
+                "Configure a Generic webhook destination in Jellyfin with these values.",
+            });
 
   const checklist =
     source === "plex"
@@ -194,23 +206,38 @@ export function WebhookSetupPanel({
                 "Paste the JSON data template into each enabled trigger",
             }),
           ]
-        : [
-            t("settings.webhook.jellyfinChecklist.plugin", {
-              defaultValue: "Install the Jellyfin Webhooks plugin and restart",
-            }),
-            t("settings.webhook.jellyfinChecklist.events", {
-              defaultValue:
-                "Enable Playback Start/Stop and Movies/Episodes only",
-            }),
-            t("settings.webhook.jellyfinChecklist.template", {
-              defaultValue:
-                "Paste the template (leave Send All Properties unchecked)",
-            }),
-            t("settings.webhook.jellyfinChecklist.headers", {
-              defaultValue:
-                "Add Content-Type: application/json and X-API-Key headers",
-            }),
-          ];
+        : source === "emby"
+          ? [
+              t("settings.webhook.embyChecklist.events", {
+                defaultValue: "Enable playback start/stop for Movies/Episodes",
+              }),
+              t("settings.webhook.embyChecklist.url", {
+                defaultValue:
+                  "Add a Webhook under Emby → your notification preferences",
+              }),
+              t("settings.webhook.embyChecklist.users", {
+                defaultValue:
+                  "Optional: Limit user events to the Emby accounts that should scrobble",
+              }),
+            ]
+          : [
+              t("settings.webhook.jellyfinChecklist.plugin", {
+                defaultValue:
+                  "Install the Jellyfin Webhooks plugin and restart",
+              }),
+              t("settings.webhook.jellyfinChecklist.events", {
+                defaultValue:
+                  "Enable Playback Start/Stop and Movies/Episodes only",
+              }),
+              t("settings.webhook.jellyfinChecklist.template", {
+                defaultValue:
+                  "Paste the template (leave Send All Properties unchecked)",
+              }),
+              t("settings.webhook.jellyfinChecklist.headers", {
+                defaultValue:
+                  "Add Content-Type: application/json and X-API-Key headers",
+              }),
+            ];
 
   return (
     <div className="surface-tile">
@@ -277,7 +304,7 @@ export function WebhookSetupPanel({
             id={`${source}-webhook-url`}
             label={t("settings.webhook.url", { defaultValue: "Webhook URL" })}
             value={webhookUrl}
-            disabled={source === "plex" && !hasApiKey}
+            disabled={(source === "plex" || source === "emby") && !hasApiKey}
             copyLabel={t("settings.webhook.copyUrl", {
               defaultValue: "Copy webhook URL",
             })}

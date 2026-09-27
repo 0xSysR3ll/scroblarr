@@ -3,6 +3,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { showError, showSuccess } from "@utils/toast";
 import {
+  buildEmbyWebhookUrl,
   buildJellyfinWebhookUrl,
   buildPlexWebhookUrl,
   buildTautulliWebhookHeaders,
@@ -214,6 +215,33 @@ describe("WebhookSetupPanel", () => {
     );
     expect(
       screen.getByRole("button", { name: "Copy JSON headers" })
+    ).toBeDisabled();
+  });
+
+  it("shows Emby webhook instructions and a placeholder API-key URL", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<WebhookSetupPanel source="emby" />);
+    await expandWebhooks(user);
+
+    expect(screen.getByRole("link", { name: "Setup docs" })).toHaveAttribute(
+      "href",
+      "https://0xsysr3ll.github.io/scroblarr/docs/configuration/emby"
+    );
+    expect(screen.getByLabelText("Webhook URL")).toHaveValue(
+      buildEmbyWebhookUrl("YOUR_WEBHOOK_API_KEY")
+    );
+    expect(
+      screen.getByText(
+        /Configure an Emby webhook under your Emby notification preferences/i
+      )
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        /Optional: Limit user events to the Emby accounts that should scrobble/i
+      )
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Copy webhook URL" })
     ).toBeDisabled();
   });
 });

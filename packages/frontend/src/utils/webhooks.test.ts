@@ -1,4 +1,5 @@
 import {
+  buildEmbyWebhookUrl,
   buildJellyfinWebhookUrl,
   buildPlexWebhookUrl,
   buildTautulliWebhookHeaders,
@@ -27,6 +28,12 @@ describe("webhooks utils", () => {
   it("builds a Jellyfin webhook URL without a query key", () => {
     expect(buildJellyfinWebhookUrl("http://192.168.1.10:3000")).toBe(
       "http://192.168.1.10:3000/api/v1/webhooks/jellyfin"
+    );
+  });
+
+  it("builds an Emby webhook URL with an encoded apiKey", () => {
+    expect(buildEmbyWebhookUrl("sk_test+key", "http://192.168.1.10:3000")).toBe(
+      "http://192.168.1.10:3000/api/v1/webhooks/emby?apiKey=sk_test%2Bkey"
     );
   });
 
