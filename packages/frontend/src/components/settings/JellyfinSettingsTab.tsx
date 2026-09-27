@@ -23,6 +23,8 @@ import { WebhookSetupPanel } from "./WebhookSetupPanel";
 interface JellyfinSettingsTabProps {
   settings: Settings;
   mediaBrowserType?: "jellyfin" | "emby";
+  formOpen?: boolean;
+  onFormOpenChange?: (open: boolean) => void;
   onJellyfinSettingsChange: (settings: {
     hostname: string;
     port: number;
@@ -38,6 +40,8 @@ interface JellyfinSettingsTabProps {
 export function JellyfinSettingsTab({
   settings,
   mediaBrowserType = "jellyfin",
+  formOpen,
+  onFormOpenChange,
   onJellyfinSettingsChange,
   onSettingsUpdated,
   webhookApiKey,
@@ -110,6 +114,7 @@ export function JellyfinSettingsTab({
 
     if (parsedHostname && parsedApiKey) {
       setShowForm(true);
+      onFormOpenChange?.(true);
     }
   }, [
     settings.jellyfinHost,
@@ -118,6 +123,12 @@ export function JellyfinSettingsTab({
     settings.jellyfinUrlBase,
     settings.jellyfinApiKey,
   ]);
+
+  useEffect(() => {
+    if (formOpen === false && !(hostname && apiKey)) {
+      setShowForm(false);
+    }
+  }, [formOpen, hostname, apiKey]);
 
   useEffect(() => {
     if (showForm) {
@@ -240,7 +251,10 @@ export function JellyfinSettingsTab({
             </p>
             <button
               type="button"
-              onClick={() => setShowForm(true)}
+              onClick={() => {
+                onFormOpenChange?.(true);
+                setShowForm(true);
+              }}
               className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
             >
               <FaPlus className="w-4 h-4" />

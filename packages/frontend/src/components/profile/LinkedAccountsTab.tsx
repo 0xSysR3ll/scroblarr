@@ -128,7 +128,8 @@ export function LinkedAccountsTab({
       await unlinkPlexAccount();
       showSuccess(
         t("profile.linkedAccounts.unlinkSuccess", {
-          defaultValue: "Plex account unlinked successfully!",
+          service: "Plex",
+          defaultValue: "{{service}} account unlinked successfully!",
         })
       );
       await checkAuth();
@@ -138,7 +139,8 @@ export function LinkedAccountsTab({
         err instanceof Error
           ? err.message
           : t("profile.linkedAccounts.unlinkFailed", {
-              defaultValue: "Failed to unlink Plex account",
+              service: "Plex",
+              defaultValue: "Failed to unlink {{service}} account",
             })
       );
     } finally {
@@ -161,7 +163,8 @@ export function LinkedAccountsTab({
       }
       showSuccess(
         t("profile.linkedAccounts.unlinkSuccess", {
-          defaultValue: `${mediaBrowserName} account unlinked successfully!`,
+          service: mediaBrowserName,
+          defaultValue: "{{service}} account unlinked successfully!",
         })
       );
       await checkAuth();
@@ -171,7 +174,8 @@ export function LinkedAccountsTab({
         err instanceof Error
           ? err.message
           : t("profile.linkedAccounts.unlinkFailed", {
-              defaultValue: `Failed to unlink ${mediaBrowserName} account`,
+              service: mediaBrowserName,
+              defaultValue: "Failed to unlink {{service}} account",
             })
       );
     } finally {
@@ -396,21 +400,25 @@ export function LinkedAccountsTab({
         <DialogContent className="max-w-md">
           <DialogTitle>
             {t("profile.linkedAccounts.unlinkConfirmTitle", {
-              defaultValue: "Unlink Plex Account",
+              service: "Plex",
+              defaultValue: "Unlink {{service}} Account",
             })}
           </DialogTitle>
           <DialogDescription>
             {t("profile.linkedAccounts.unlinkConfirmMessage", {
+              service: "Plex",
               defaultValue:
-                "This will remove your Plex account connection. You will need to link your account again to sync watched media.",
+                "This will remove your {{service}} account connection. You will need to link your account again to sync watched media.",
             })}
           </DialogDescription>
           {user?.isAdmin && !jellyfinUsername && (
             <div className="mb-4 rounded border-l-4 border-warning-400 bg-warning-50 p-3 dark:border-warning-600 dark:bg-warning-950">
               <p className="text-sm text-warning-700 dark:text-warning-300">
                 {t("profile.linkedAccounts.adminWarning", {
+                  service: "Plex",
+                  other: "Jellyfin or Emby",
                   defaultValue:
-                    "As an admin, you must have at least one linked account. If you unlink Plex and only Plex is configured, you may lose access. Please ensure Jellyfin or Emby is configured and linked first.",
+                    "As an admin, you must have at least one linked account. If you unlink {{service}} and only {{service}} is configured, you may lose access. Please ensure {{other}} is configured and linked first.",
                 })}
               </p>
             </div>
@@ -444,19 +452,25 @@ export function LinkedAccountsTab({
         <DialogContent className="max-w-md">
           <DialogTitle>
             {t("profile.linkedAccounts.unlinkConfirmTitle", {
-              defaultValue: `Unlink ${mediaBrowserName} Account`,
+              service: mediaBrowserName,
+              defaultValue: "Unlink {{service}} Account",
             })}
           </DialogTitle>
           <DialogDescription>
             {t("profile.linkedAccounts.unlinkConfirmMessage", {
-              defaultValue: `This will remove your ${mediaBrowserName} account connection. You will need to link your account again to sync watched media.`,
+              service: mediaBrowserName,
+              defaultValue:
+                "This will remove your {{service}} account connection. You will need to link your account again to sync watched media.",
             })}
           </DialogDescription>
           {user?.isAdmin && !plexUsername && (
             <div className="mb-4 rounded border-l-4 border-warning-400 bg-warning-50 p-3 dark:border-warning-600 dark:bg-warning-950">
               <p className="text-sm text-warning-700 dark:text-warning-300">
                 {t("profile.linkedAccounts.adminWarning", {
-                  defaultValue: `As an admin, you must have at least one linked account. If you unlink ${mediaBrowserName} and only ${mediaBrowserName} is configured, you may lose access. Please ensure Plex is configured and linked first.`,
+                  service: mediaBrowserName,
+                  other: "Plex",
+                  defaultValue:
+                    "As an admin, you must have at least one linked account. If you unlink {{service}} and only {{service}} is configured, you may lose access. Please ensure {{other}} is configured and linked first.",
                 })}
               </p>
             </div>

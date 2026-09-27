@@ -393,15 +393,15 @@
     },
     "linkedAccounts": {
       "linked": "Linked",
-      "unlinkSuccess": " account unlinked successfully!",
-      "unlinkFailed": "Failed to unlink  account",
+      "unlinkSuccess": "{{service}} account unlinked successfully!",
+      "unlinkFailed": "Failed to unlink {{service}} account",
       "title": "Linked Accounts",
       "description": "Link your media server accounts to enable syncing.",
       "unlink": "Unlink",
       "notConfigured": "No media servers are configured. Please ask an admin to configure Plex, Jellyfin, or Emby in the settings.",
-      "unlinkConfirmTitle": "Unlink  Account",
-      "unlinkConfirmMessage": "This will remove your  account connection. You will need to link your account again to sync watched media.",
-      "adminWarning": "As an admin, you must have at least one linked account. If you unlink  and only  is configured, you may lose access. Please ensure Plex is configured and linked first.",
+      "unlinkConfirmTitle": "Unlink {{service}} Account",
+      "unlinkConfirmMessage": "This will remove your {{service}} account connection. You will need to link your account again to sync watched media.",
+      "adminWarning": "As an admin, you must have at least one linked account. If you unlink {{service}} and only {{service}} is configured, you may lose access. Please ensure {{other}} is configured and linked first.",
       "reauthRequired": "Re-authorization required"
     },
     "tabs": {
@@ -589,8 +589,7 @@
       "simkl": "Simkl",
       "bingers": "Bingers",
       "tvtime": "TVTime"
-    },
-    "source": "Source"
+    }
   },
   "errors": {
     "routeLoadTitle": "Could not load this screen",
@@ -627,7 +626,8 @@
     "importUsers_other": "Import {{count}} User{{plural}}",
     "importUsersButton": "Import Users",
     "usersSelected": "{{count}} user{{plural}} selected",
-    "importUsers": "Import {{count}} User{{plural}}"
+    "importUsers": "Import {{count}} User{{plural}}",
+    "importFromJellyfin": "Import Users from Jellyfin Server"
   },
   "simkl": {
     "getAuthUrlFailed": "Failed to get Simkl PIN code",

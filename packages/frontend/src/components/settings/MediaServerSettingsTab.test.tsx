@@ -141,4 +141,57 @@ describe("MediaServerSettingsTab", () => {
       screen.queryByRole("button", { name: /Jellyfin Server/i })
     ).not.toBeInTheDocument();
   });
+
+  it("keeps Jellyfin and Emby draft forms mutually exclusive when unconfigured", async () => {
+    const user = userEvent.setup();
+    const onJellyfinSettingsChange = vi.fn();
+
+    renderWithProviders(
+      <MediaServerSettingsTab
+        servers={[]}
+        selectedServerUrl=""
+        editingServer={null}
+        onSelectedServerUrlChange={vi.fn()}
+        onEditingServerChange={vi.fn()}
+        onCancelEdit={vi.fn()}
+        hasPlexAccount={false}
+        onPlexAuthenticate={vi.fn()}
+        plexAuthLoading={false}
+        plexRefreshLoading={false}
+        onRefreshPlexServers={vi.fn()}
+        plexLinkError={null}
+        settings={{}}
+        onJellyfinSettingsChange={onJellyfinSettingsChange}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /Jellyfin Server/i }));
+    await user.click(
+      screen.getByRole("button", { name: /Add Jellyfin Server/i })
+    );
+
+    expect(screen.getByLabelText(/Server Hostname/i)).toBeInTheDocument();
+    expect(
+      onJellyfinSettingsChange.mock.calls[
+        onJellyfinSettingsChange.mock.calls.length - 1
+      ]?.[0]
+    ).toMatchObject({
+      mediaBrowserType: "jellyfin",
+    });
+
+    await user.click(screen.getByRole("button", { name: /Emby Server/i }));
+    await user.click(screen.getByRole("button", { name: /Add Emby Server/i }));
+
+    expect(screen.getByLabelText(/Server Hostname/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Add Jellyfin Server/i })
+    ).toBeInTheDocument();
+    expect(
+      onJellyfinSettingsChange.mock.calls[
+        onJellyfinSettingsChange.mock.calls.length - 1
+      ]?.[0]
+    ).toMatchObject({
+      mediaBrowserType: "emby",
+    });
+  });
 });

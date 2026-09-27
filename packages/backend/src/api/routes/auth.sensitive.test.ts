@@ -1013,6 +1013,57 @@ describe("auth route sensitive guards", () => {
     expect(userRepositoryMocks.createSession).toHaveBeenCalled();
   });
 
+  it("ignores conflicting body mediaBrowserType when logging into a stored server", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue({
+      id: "admin-id",
+      isAdmin: true,
+    });
+    userRepositoryMocks.findByJellyfinUsername.mockResolvedValue({
+      id: "imported-id",
+      jellyfinUsername: "imported-user",
+      isAdmin: false,
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://jellyfin.real:8920",
+      mediaBrowserType: "jellyfin",
+    });
+    jellyfinClientMocks.login.mockResolvedValue({
+      AccessToken: "jf-token",
+      User: { Id: "jf-user-id", Name: "imported-user" },
+    });
+    jellyfinClientMocks.getUserInfo.mockResolvedValue({
+      id: "jf-user-id",
+      username: "imported-user",
+      displayName: "Imported",
+      thumb: null,
+    });
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "imported-id",
+      jellyfinUsername: "imported-user",
+      displayName: "Imported",
+      isAdmin: false,
+    });
+    userRepositoryMocks.createSession.mockResolvedValue("session-token");
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app).post("/api/v1/auth/jellyfin").send({
+      username: "imported-user",
+      password: "any-password",
+      mediaBrowserType: "emby",
+    });
+
+    expect(response.status).toBe(200);
+    expect(jellyfinClientMocks.constructedConfigs).toEqual([
+      {
+        baseUrl: "https://jellyfin.real:8920",
+        serverKind: "jellyfin",
+      },
+    ]);
+  });
+
   it("rejects Jellyfin login host override when admin exists but jellyfinHost is unset", async () => {
     userRepositoryMocks.findAdmin.mockResolvedValue({
       id: "admin-id",
@@ -1856,6 +1907,53 @@ describe("auth route sensitive guards", () => {
       {
         baseUrl: "https://emby.real:8096",
         serverKind: "emby",
+      },
+    ]);
+  });
+
+  it("ignores conflicting body mediaBrowserType when linking without a hostname", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://jellyfin.real:8920",
+      mediaBrowserType: "jellyfin",
+    });
+    userRepositoryMocks.findByJellyfinUsername.mockResolvedValue(null);
+    jellyfinClientMocks.login.mockResolvedValue({
+      AccessToken: "jf-token",
+      User: { Id: "jf-user-id", Name: "jf-link" },
+    });
+    jellyfinClientMocks.getUserInfo.mockResolvedValue({
+      id: "jf-user-id",
+      username: "jf-link",
+      displayName: "JF Link",
+      email: "jf@example.com",
+      thumb: null,
+    });
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "current-user-id",
+      jellyfinUsername: "jf-link",
+      displayName: "JF Link",
+      email: "jf@example.com",
+      isAdmin: false,
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/auth/jellyfin/link")
+      .set("x-test-admin", "false")
+      .send({
+        username: "jf-link",
+        password: "secret",
+        mediaBrowserType: "emby",
+      });
+
+    expect(response.status).toBe(200);
+    expect(jellyfinClientMocks.constructedConfigs).toEqual([
+      {
+        baseUrl: "https://jellyfin.real:8920",
+        serverKind: "jellyfin",
       },
     ]);
   });

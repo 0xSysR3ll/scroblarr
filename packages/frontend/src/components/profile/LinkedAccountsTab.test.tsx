@@ -386,7 +386,7 @@ describe("LinkedAccountsTab", () => {
     await user.click(screen.getByRole("button", { name: "Confirm" }));
 
     await waitFor(() => {
-      expect(showError).toHaveBeenCalledWith("Failed to unlink  account");
+      expect(showError).toHaveBeenCalledWith("Failed to unlink Emby account");
     });
   });
 

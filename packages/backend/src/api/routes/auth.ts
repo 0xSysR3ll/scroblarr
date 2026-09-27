@@ -745,10 +745,7 @@ async function handleJellyfinLogin(req: Request, res: Response) {
 
     let baseUrl: string;
     const settings = await settingsRepository.getAll();
-    const mediaBrowserType = resolveMediaBrowserType(
-      req.body.mediaBrowserType,
-      settings.mediaBrowserType
-    );
+    let allowBodyMediaBrowserType = false;
 
     if (existingAdmin) {
       if (!settings.jellyfinHost) {
@@ -760,6 +757,7 @@ async function handleJellyfinLogin(req: Request, res: Response) {
       baseUrl = settings.jellyfinHost;
     } else if (hostname) {
       baseUrl = buildJellyfinBaseUrl(hostname, port, useSsl, urlBase);
+      allowBodyMediaBrowserType = true;
     } else if (settings.jellyfinHost) {
       baseUrl = settings.jellyfinHost;
     } else {
@@ -767,6 +765,11 @@ async function handleJellyfinLogin(req: Request, res: Response) {
         error: "Jellyfin server not configured. Please provide server details.",
       });
     }
+
+    const mediaBrowserType = resolveMediaBrowserType(
+      allowBodyMediaBrowserType ? req.body.mediaBrowserType : undefined,
+      settings.mediaBrowserType
+    );
 
     const jellyfinClient = new JellyfinClient(
       baseUrl,
@@ -1054,9 +1057,10 @@ async function handleJellyfinLink(req: Request, res: Response): Promise<void> {
     }
 
     const { username, password, hostname, port, useSsl, urlBase } = req.body;
+    const settings = await settingsRepository.getAll();
     const mediaBrowserType = resolveMediaBrowserType(
-      req.body.mediaBrowserType,
-      (await settingsRepository.getAll()).mediaBrowserType
+      currentUser.isAdmin && hostname ? req.body.mediaBrowserType : undefined,
+      settings.mediaBrowserType
     );
 
     if (!username || !password) {
@@ -1072,8 +1076,6 @@ async function handleJellyfinLink(req: Request, res: Response): Promise<void> {
       });
       return;
     }
-
-    const settings = await settingsRepository.getAll();
 
     let baseUrl: string;
 

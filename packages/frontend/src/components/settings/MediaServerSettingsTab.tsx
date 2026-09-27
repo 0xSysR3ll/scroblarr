@@ -1,4 +1,5 @@
 import type { PlexServer, Settings } from "@services/api";
+import { useState } from "react";
 
 import { JellyfinSettingsTab } from "./JellyfinSettingsTab";
 import { PlexSettingsTab } from "./PlexSettingsTab";
@@ -57,6 +58,9 @@ export function MediaServerSettingsTab({
     : null;
   const showJellyfin = configuredType === null || configuredType === "jellyfin";
   const showEmby = configuredType === null || configuredType === "emby";
+  const [draftProvider, setDraftProvider] = useState<
+    "jellyfin" | "emby" | null
+  >(null);
 
   return (
     <div className="space-y-4">
@@ -82,6 +86,15 @@ export function MediaServerSettingsTab({
         <JellyfinSettingsTab
           settings={settings}
           mediaBrowserType="jellyfin"
+          formOpen={
+            configuredType !== null ? true : draftProvider === "jellyfin"
+          }
+          onFormOpenChange={(open) => {
+            if (configuredType !== null) {
+              return;
+            }
+            setDraftProvider(open ? "jellyfin" : null);
+          }}
           onJellyfinSettingsChange={onJellyfinSettingsChange}
           onSettingsUpdated={onSettingsUpdated}
           webhookApiKey={webhookApiKey}
@@ -92,6 +105,13 @@ export function MediaServerSettingsTab({
         <JellyfinSettingsTab
           settings={settings}
           mediaBrowserType="emby"
+          formOpen={configuredType !== null ? true : draftProvider === "emby"}
+          onFormOpenChange={(open) => {
+            if (configuredType !== null) {
+              return;
+            }
+            setDraftProvider(open ? "emby" : null);
+          }}
           onJellyfinSettingsChange={onJellyfinSettingsChange}
           onSettingsUpdated={onSettingsUpdated}
           webhookApiKey={webhookApiKey}
