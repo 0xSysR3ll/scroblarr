@@ -214,4 +214,48 @@ describe("avatar sensitive access", () => {
     );
     expect(response.headers["content-type"]).toContain("image/jpeg");
   });
+
+  it("uses Jellyfin auth headers when mediaBrowserType is jellyfin", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: {
+        get: vi.fn().mockReturnValue("image/jpeg"),
+      },
+      arrayBuffer: vi.fn().mockResolvedValue(Buffer.from("image-bytes").buffer),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    userRepositoryMocks.findBySessionToken.mockResolvedValue({
+      id: "owner-id",
+      isAdmin: false,
+    });
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "owner-id",
+      jellyfinThumb: "/api/v1/avatars/jellyfin/jf-user-id",
+      jellyfinUserId: "jf-user-id",
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://jellyfin.local",
+      jellyfinApiKey: "jf-api-key",
+      mediaBrowserType: "jellyfin",
+    });
+
+    const app = express();
+    app.use("/api/v1/avatars", avatarRoutes);
+
+    const response = await request(app)
+      .get("/api/v1/avatars/jellyfin/owner-id")
+      .set("authorization", "Bearer owner-token")
+      .expect(200);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://jellyfin.local/Users/jf-user-id/Images/Primary",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: expect.stringMatching(/^MediaBrowser /),
+          Accept: "image/*",
+        }),
+      })
+    );
+    expect(response.headers["content-type"]).toContain("image/jpeg");
+  });
 });

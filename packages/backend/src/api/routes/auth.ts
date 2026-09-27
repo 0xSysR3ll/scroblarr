@@ -1269,7 +1269,7 @@ async function handleJellyfinUnlink(
     logger.auth.info(
       {
         userId: user.id,
-        username: user.plexUsername || user.jellyfinUsername,
+        username: user.plexUsername,
         isAdmin: user.isAdmin,
       },
       "Jellyfin account unlinked"

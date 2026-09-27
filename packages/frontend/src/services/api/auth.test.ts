@@ -7,6 +7,7 @@ import {
   linkEmbyAccount,
   linkJellyfinAccount,
   loginWithEmby,
+  loginWithJellyfin,
   loginWithPlex,
   setupEmbyAdmin,
   setupJellyfinAdmin,
@@ -85,6 +86,32 @@ describe("auth api", () => {
         password: "secret",
         mediaBrowserType: "jellyfin",
       }),
+    });
+  });
+
+  it("logs in with Jellyfin credentials against the Jellyfin endpoint", async () => {
+    const user = { id: "1", username: "jf-user", isAdmin: false };
+    fetchMock.mockResolvedValueOnce(jsonResponse(user));
+
+    await expect(
+      loginWithJellyfin("alice", "secret", "jellyfin.local", 8096, false, "/jf")
+    ).resolves.toEqual(user);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/auth/jellyfin",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+    );
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      username: "alice",
+      password: "secret",
+      hostname: "jellyfin.local",
+      port: 8096,
+      useSsl: false,
+      urlBase: "/jf",
+      mediaBrowserType: "jellyfin",
     });
   });
 
@@ -197,6 +224,24 @@ describe("auth api", () => {
       ok: false,
       json: vi.fn().mockRejectedValue(new Error("bad json")),
     });
+
+    await expect(unlinkEmbyAccount()).rejects.toThrow(
+      "Failed to unlink Emby account"
+    );
+  });
+
+  it("surfaces server Emby unlink errors", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "Emby account is still linked elsewhere" }, false)
+    );
+
+    await expect(unlinkEmbyAccount()).rejects.toThrow(
+      "Emby account is still linked elsewhere"
+    );
+  });
+
+  it("falls back when Emby unlink error payload omits a message", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, false));
 
     await expect(unlinkEmbyAccount()).rejects.toThrow(
       "Failed to unlink Emby account"

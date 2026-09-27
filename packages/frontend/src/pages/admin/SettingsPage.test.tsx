@@ -342,4 +342,21 @@ describe("SettingsPage", () => {
       );
     });
   });
+
+  it("defaults media browser type to jellyfin when loading Jellyfin settings", async () => {
+    vi.mocked(getSettings).mockResolvedValue({
+      syncHistoryLimit: "100",
+      jellyfinHost: "http://jellyfin.local:8096",
+      jellyfinPort: "8096",
+      jellyfinUseSsl: "false",
+      jellyfinUrlBase: "/jellyfin",
+      jellyfinApiKey: "jf-key",
+    });
+
+    renderWithProviders(<SettingsPage />, { route: "/settings/mediaServer" });
+
+    expect(
+      await screen.findByRole("button", { name: /Jellyfin Server/i })
+    ).toBeVisible();
+  });
 });
