@@ -128,11 +128,16 @@ export function JellyfinSettingsTab({
     if (formOpen !== false) {
       return;
     }
-    if (hostname && apiKey) {
+    if (settings.jellyfinHost && settings.jellyfinApiKey) {
       return;
     }
     setShowForm(false);
-  }, [formOpen, hostname, apiKey]);
+    setHostname("");
+    setPort(8096);
+    setUseSsl(false);
+    setUrlBase("");
+    setApiKey("");
+  }, [formOpen, settings.jellyfinHost, settings.jellyfinApiKey]);
 
   useEffect(() => {
     if (showForm) {
@@ -609,9 +614,13 @@ export function JellyfinSettingsTab({
                 </div>
               )}
 
-              {!!(settings.jellyfinHost && settings.jellyfinApiKey) && (
+              {!!(
+                settings.jellyfinHost &&
+                settings.jellyfinApiKey &&
+                !isEmby
+              ) && (
                 <WebhookSetupPanel
-                  source={isEmby ? "emby" : "jellyfin"}
+                  source="jellyfin"
                   webhookApiKey={webhookApiKey}
                 />
               )}

@@ -1062,6 +1062,13 @@ describe("auth route sensitive guards", () => {
         serverKind: "jellyfin",
       },
     ]);
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith(
+      "imported-id",
+      expect.objectContaining({
+        jellyfinAccessToken: "jf-token",
+        jellyfinUserId: "jf-user-id",
+      })
+    );
   });
 
   it("rejects Jellyfin login host override when admin exists but jellyfinHost is unset", async () => {
@@ -1956,6 +1963,14 @@ describe("auth route sensitive guards", () => {
         serverKind: "jellyfin",
       },
     ]);
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith(
+      "current-user-id",
+      expect.objectContaining({
+        jellyfinUsername: "jf-link",
+        jellyfinAccessToken: "jf-token",
+        jellyfinUserId: "jf-user-id",
+      })
+    );
   });
 
   it("returns generic Jellyfin link failures", async () => {

@@ -137,6 +137,44 @@ describe("JellyfinSettingsTab", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("collapses a filled unsaved draft when formOpen becomes false", async () => {
+    const user = userEvent.setup();
+    const onFormOpenChange = vi.fn();
+    const view = renderJellyfin({
+      settings: {},
+      formOpen: true,
+      onFormOpenChange,
+    });
+
+    await expandJellyfin(user);
+    await user.click(
+      screen.getByRole("button", { name: "Add Jellyfin Server" })
+    );
+    await user.type(
+      screen.getByPlaceholderText("jellyfin.example.com"),
+      "draft.local"
+    );
+    await user.type(
+      screen.getByPlaceholderText("No API key configured"),
+      "draft-key"
+    );
+
+    view.rerender(
+      <JellyfinSettingsTab
+        settings={{}}
+        formOpen={false}
+        onFormOpenChange={onFormOpenChange}
+        onJellyfinSettingsChange={vi.fn()}
+        webhookApiKey="sk_test"
+      />
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Add Jellyfin Server" })
+    ).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("draft.local")).not.toBeInTheDocument();
+  });
+
   it("keeps a configured server form open even when formOpen is false", async () => {
     const user = userEvent.setup();
     renderJellyfin({
@@ -176,6 +214,25 @@ describe("JellyfinSettingsTab", () => {
     await expandJellyfin(user);
 
     expect(await screen.findByText("Webhooks")).toBeInTheDocument();
+  });
+
+  it("hides the webhook panel for saved Emby until the Emby handler ships", async () => {
+    const user = userEvent.setup();
+    renderJellyfin({
+      settings: {
+        jellyfinHost: "http://emby.local:8096",
+        jellyfinPort: "8096",
+        jellyfinUseSsl: "false",
+        jellyfinUrlBase: "/emby",
+        jellyfinApiKey: "emby-key",
+        mediaBrowserType: "emby",
+      },
+      mediaBrowserType: "emby",
+    });
+
+    await user.click(screen.getByRole("button", { name: /Emby Server/i }));
+
+    expect(screen.queryByText("Webhooks")).not.toBeInTheDocument();
   });
 
   it("updates connection fields and notifies the parent", async () => {
