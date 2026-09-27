@@ -51,6 +51,8 @@ function renderJellyfin(
   overrides: Partial<{
     settings: Settings;
     mediaBrowserType: "jellyfin" | "emby";
+    formOpen?: boolean;
+    onFormOpenChange?: ReturnType<typeof vi.fn>;
     webhookApiKey?: string;
     onJellyfinSettingsChange?: ReturnType<typeof vi.fn>;
     onSettingsUpdated?: ReturnType<typeof vi.fn>;
@@ -60,6 +62,8 @@ function renderJellyfin(
     <JellyfinSettingsTab
       settings={overrides.settings ?? {}}
       mediaBrowserType={overrides.mediaBrowserType}
+      formOpen={overrides.formOpen}
+      onFormOpenChange={overrides.onFormOpenChange}
       onJellyfinSettingsChange={overrides.onJellyfinSettingsChange ?? vi.fn()}
       onSettingsUpdated={overrides.onSettingsUpdated}
       webhookApiKey={overrides.webhookApiKey ?? "sk_test"}
@@ -96,6 +100,58 @@ describe("JellyfinSettingsTab", () => {
     await waitFor(() => {
       expect(getAuthProviders).toHaveBeenCalled();
     });
+  });
+
+  it("collapses an unsaved draft when formOpen becomes false", async () => {
+    const user = userEvent.setup();
+    const onFormOpenChange = vi.fn();
+    const view = renderJellyfin({
+      settings: {},
+      formOpen: true,
+      onFormOpenChange,
+    });
+
+    await expandJellyfin(user);
+    await user.click(
+      screen.getByRole("button", { name: "Add Jellyfin Server" })
+    );
+    expect(
+      screen.getByPlaceholderText("jellyfin.example.com")
+    ).toBeInTheDocument();
+
+    view.rerender(
+      <JellyfinSettingsTab
+        settings={{}}
+        formOpen={false}
+        onFormOpenChange={onFormOpenChange}
+        onJellyfinSettingsChange={vi.fn()}
+        webhookApiKey="sk_test"
+      />
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Add Jellyfin Server" })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText("jellyfin.example.com")
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps a configured server form open even when formOpen is false", async () => {
+    const user = userEvent.setup();
+    renderJellyfin({
+      settings: configuredSettings,
+      formOpen: false,
+    });
+
+    await expandJellyfin(user);
+
+    expect(
+      await screen.findByDisplayValue("jellyfin.local")
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Add Jellyfin Server" })
+    ).not.toBeInTheDocument();
   });
 
   it("hides the webhook panel when Jellyfin is not saved", async () => {

@@ -218,6 +218,29 @@ describe("LinkedAccountsTab", () => {
     expect(onAccountLinked).not.toHaveBeenCalled();
   });
 
+  it("falls back to the default Plex unlink error", async () => {
+    const user = userEvent.setup();
+    vi.mocked(unlinkPlexAccount).mockRejectedValueOnce("offline");
+
+    renderWithProviders(
+      <LinkedAccountsTab
+        plexUsername="alice"
+        jellyfinUsername="alice-jf"
+        plexConfigured
+        jellyfinConfigured
+        onAccountLinked={onAccountLinked}
+      />
+    );
+
+    const unlinkButtons = screen.getAllByRole("button", { name: /unlink/i });
+    await user.click(unlinkButtons[0]);
+    await user.click(screen.getByRole("button", { name: "Confirm" }));
+
+    await waitFor(() => {
+      expect(showError).toHaveBeenCalledWith("Failed to unlink Plex account");
+    });
+  });
+
   it("shows a Plex link error from OAuth failure", async () => {
     const user = userEvent.setup();
     vi.mocked(usePlexLogin).mockImplementation((opts) => ({

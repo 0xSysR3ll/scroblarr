@@ -89,11 +89,10 @@ export function MediaServerSettingsTab({
           formOpen={
             configuredType !== null ? true : draftProvider === "jellyfin"
           }
-          onFormOpenChange={(open) => {
-            if (configuredType !== null) {
-              return;
+          onFormOpenChange={() => {
+            if (configuredType === null) {
+              setDraftProvider("jellyfin");
             }
-            setDraftProvider(open ? "jellyfin" : null);
           }}
           onJellyfinSettingsChange={onJellyfinSettingsChange}
           onSettingsUpdated={onSettingsUpdated}
@@ -106,11 +105,10 @@ export function MediaServerSettingsTab({
           settings={settings}
           mediaBrowserType="emby"
           formOpen={configuredType !== null ? true : draftProvider === "emby"}
-          onFormOpenChange={(open) => {
-            if (configuredType !== null) {
-              return;
+          onFormOpenChange={() => {
+            if (configuredType === null) {
+              setDraftProvider("emby");
             }
-            setDraftProvider(open ? "emby" : null);
           }}
           onJellyfinSettingsChange={onJellyfinSettingsChange}
           onSettingsUpdated={onSettingsUpdated}

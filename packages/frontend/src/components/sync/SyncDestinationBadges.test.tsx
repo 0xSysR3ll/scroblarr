@@ -36,4 +36,17 @@ describe("SyncDestinationBadges", () => {
       "/logos/bingers.png"
     );
   });
+
+  it.each([
+    ["Trakt", "/logos/trakt.svg"],
+    ["Simkl", "/logos/simkl.svg"],
+    ["TVTime", "/logos/tvtime.svg"],
+  ] as const)("renders the %s destination badge", (name, logo) => {
+    renderWithProviders(
+      <SyncDestinationBadges item={historyItem({ destinations: [name] })} />
+    );
+
+    expect(screen.getByLabelText(name)).toBeInTheDocument();
+    expect(screen.getByAltText(name)).toHaveAttribute("src", logo);
+  });
 });

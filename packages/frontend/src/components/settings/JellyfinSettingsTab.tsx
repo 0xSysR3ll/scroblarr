@@ -125,9 +125,13 @@ export function JellyfinSettingsTab({
   ]);
 
   useEffect(() => {
-    if (formOpen === false && !(hostname && apiKey)) {
-      setShowForm(false);
+    if (formOpen !== false) {
+      return;
     }
+    if (hostname && apiKey) {
+      return;
+    }
+    setShowForm(false);
   }, [formOpen, hostname, apiKey]);
 
   useEffect(() => {
