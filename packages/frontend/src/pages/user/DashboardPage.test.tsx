@@ -36,7 +36,7 @@ function statisticsFixture() {
     failed: 2,
     successRate: 83,
     byMediaType: { episode: 8, movie: 4, series: 0 },
-    bySource: { plex: 10, jellyfin: 2, emby: 3 },
+    bySource: { plex: 7, jellyfin: 2, emby: 3 },
     byDestination: { trakt: 5, tvtime: 4, simkl: 3, bingers: 0 },
     byPeriod: { today: 1, thisWeek: 4, thisMonth: 12, lastMonth: 8 },
     topThisMonth: [],

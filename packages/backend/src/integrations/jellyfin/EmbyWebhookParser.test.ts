@@ -244,6 +244,17 @@ describe("EmbyWebhookParser", () => {
     expect(impossibleDate?.timestamp.toISOString()).not.toBe(
       "2026-03-02T19:30:00.000Z"
     );
+
+    const offsetCrossingUtcDay = EmbyWebhookParser.parse({
+      Event: "playback.stop",
+      Date: "2026-03-14T01:00:00.000+05:00",
+      User: { Id: "u1" },
+      Item: { Id: "1", Type: "Movie", Name: "X" },
+      PlaybackInfo: { PlayedToCompletion: true },
+    });
+    expect(offsetCrossingUtcDay?.timestamp.toISOString()).toBe(
+      "2026-03-13T20:00:00.000Z"
+    );
   });
 
   it("omits blank provider ids and invalid movie numeric ids", () => {

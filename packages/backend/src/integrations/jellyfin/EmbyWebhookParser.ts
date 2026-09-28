@@ -112,10 +112,11 @@ export class EmbyWebhookParser {
       const year = Number(match[1]);
       const month = Number(match[2]);
       const day = Number(match[3]);
+      const calendarDate = new Date(Date.UTC(year, month - 1, day));
       if (
-        parsed.getUTCFullYear() !== year ||
-        parsed.getUTCMonth() + 1 !== month ||
-        parsed.getUTCDate() !== day
+        calendarDate.getUTCFullYear() !== year ||
+        calendarDate.getUTCMonth() + 1 !== month ||
+        calendarDate.getUTCDate() !== day
       ) {
         return new Date();
       }
