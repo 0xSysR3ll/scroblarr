@@ -244,4 +244,33 @@ describe("WebhookSetupPanel", () => {
       screen.getByRole("button", { name: "Copy webhook URL" })
     ).toBeDisabled();
   });
+
+  it("shows the Emby webhook URL when an API key is set", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    renderWithProviders(
+      <WebhookSetupPanel source="emby" webhookApiKey="sk_emby" />
+    );
+    await expandWebhooks(user);
+
+    const expected = buildEmbyWebhookUrl("sk_emby");
+    expect(screen.getByLabelText("Webhook URL")).toHaveValue(expected);
+    expect(
+      screen.queryByText(
+        /Set and save an API key under Settings → General first/
+      )
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Copy webhook URL" }));
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith(expected);
+      expect(showSuccess).toHaveBeenCalledWith("Copied to clipboard");
+    });
+  });
 });
