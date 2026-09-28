@@ -947,5 +947,42 @@ describe("webhook security", () => {
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ error: "Empty or invalid payload" });
+    const metadata = vi.mocked(logger.webhook.error).mock.calls[0][0] as Record<
+      string,
+      unknown
+    >;
+    expect(metadata).not.toHaveProperty("body");
+    expect(metadata.bodyLength).toBe("not-json".length);
+  });
+
+  it("logs Emby string bodyLength when sync fails without content-type", async () => {
+    syncServiceMocks.syncEvent.mockRejectedValue(new Error("sync failed"));
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+
+    const app = express();
+    app.use(express.text({ type: "*/*" }));
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const body = JSON.stringify({
+      Event: "playback.stop",
+      User: { Id: "emby-user-id" },
+      Item: { Id: "1", Type: "Movie", Name: "Example" },
+      PlaybackInfo: { PlayedToCompletion: true },
+      apiKey: "expected-webhook-key",
+    });
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/emby")
+      .set("content-type", "text/plain")
+      .send(body);
+
+    expect(response.status).toBe(500);
+    const metadata = vi.mocked(logger.webhook.error).mock.calls[0][0] as Record<
+      string,
+      unknown
+    >;
+    expect(metadata).not.toHaveProperty("body");
+    expect(metadata).not.toHaveProperty("payload");
+    expect(metadata.bodyLength).toBe(body.length);
   });
 });

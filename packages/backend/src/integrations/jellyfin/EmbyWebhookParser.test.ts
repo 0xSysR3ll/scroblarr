@@ -236,7 +236,7 @@ describe("EmbyWebhookParser", () => {
         Type: "Movie",
         Name: "X",
         ProviderIds: {
-          Tvdb: "  ",
+          Tvdb: "not-a-number",
           Imdb: "",
           Tmdb: "not-a-number",
         },
