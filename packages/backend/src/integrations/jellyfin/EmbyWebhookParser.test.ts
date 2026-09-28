@@ -249,6 +249,56 @@ describe("EmbyWebhookParser", () => {
     expect(event?.media.tmdbMovieId).toBeUndefined();
   });
 
+  it("parses movie Tvdb ids and Unknown fallbacks for missing titles", () => {
+    const withTvdb = EmbyWebhookParser.parse({
+      Event: "playback.stop",
+      User: { Id: "u1" },
+      Item: {
+        Id: "1",
+        Type: "Movie",
+        Name: "Named",
+        ProductionYear: 2020,
+        ProviderIds: { Tvdb: "12345", Tmdb: "678" },
+      },
+      PlaybackInfo: { PlayedToCompletion: true },
+    });
+    expect(withTvdb?.media).toMatchObject({
+      tvdbMovieId: 12345,
+      tmdbMovieId: 678,
+    });
+
+    const missingLabels = EmbyWebhookParser.parse({
+      Event: "playback.stop",
+      User: { Id: "u1" },
+      Item: {
+        Id: "1",
+        Type: "Movie",
+      },
+      PlaybackInfo: { PlayedToCompletion: true },
+    });
+    expect(missingLabels?.media).toMatchObject({
+      id: "movie-Unknown-unknown",
+      title: "Unknown",
+    });
+  });
+
+  it("uses Unknown episode fallbacks when series metadata is missing", () => {
+    const event = EmbyWebhookParser.parse({
+      Event: "playback.stop",
+      User: { Id: "u1" },
+      Item: {
+        Id: "1",
+        Type: "Episode",
+      },
+      PlaybackInfo: { PlayedToCompletion: true },
+    });
+
+    expect(event?.media).toMatchObject({
+      id: "episode-Unknown-unknown-unknown",
+      title: "Unknown",
+    });
+  });
+
   it("ignores unsupported events, item types, and missing users", () => {
     expect(
       EmbyWebhookParser.parse({
