@@ -1493,7 +1493,7 @@ describe("SyncService", () => {
     ]);
   });
 
-  it("does not use jellyfinApiKey for season posters on HTTP hosts", async () => {
+  it("uses jellyfinApiKey for season posters on HTTP hosts", async () => {
     userRepositoryMocks.findByJellyfinUserId.mockResolvedValue({
       id: "u-emby",
       enabled: true,
@@ -1516,6 +1516,9 @@ describe("SyncService", () => {
     syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
     traktTokenManagerMocks.getValidAccessToken.mockResolvedValue("trakt-token");
     traktClientMocks.scrobble.mockResolvedValue(undefined);
+    jellyfinClientMocks.getSeasonPosterUrl.mockResolvedValue(
+      "http://emby.local/Items/season-9/Images/Primary"
+    );
 
     const service = new SyncService();
     await service.syncEvent(
@@ -1534,11 +1537,16 @@ describe("SyncService", () => {
       })
     );
 
-    expect(jellyfinClientMocks.getSeasonPosterUrl).not.toHaveBeenCalled();
+    expect(jellyfinClientMocks.getSeasonPosterUrl).toHaveBeenCalledWith(
+      "server-api-key",
+      "ep-1",
+      1,
+      expect.any(AbortSignal)
+    );
     expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
       expect.objectContaining({
         source: "emby",
-        posterUrl: "http://emby.local/Items/ep-1/Images/Primary",
+        posterUrl: "http://emby.local/Items/season-9/Images/Primary",
         success: true,
       })
     );
