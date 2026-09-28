@@ -164,6 +164,91 @@ describe("EmbyWebhookParser", () => {
     );
   });
 
+  it("keeps a trailing slash on the Emby host when building poster URLs", () => {
+    const event = EmbyWebhookParser.parse(
+      playbackStopEpisodeFixture,
+      "https://emby.local:8096/"
+    );
+
+    expect(event?.media.posterUrl).toBe(
+      "https://emby.local:8096/Items/608/Images/Primary"
+    );
+  });
+
+  it("falls back to Session.PlayState.PositionTicks when PlaybackInfo omits it", () => {
+    const event = EmbyWebhookParser.parse({
+      Event: "playback.stop",
+      User: { Id: "user-1" },
+      Item: {
+        Id: "movie-1",
+        Type: "Movie",
+        Name: "Example Movie",
+        ProductionYear: 2024,
+        RunTimeTicks: 1000000000,
+      },
+      Session: {
+        PlayState: {
+          PositionTicks: 950000000,
+        },
+      },
+    });
+
+    expect(event).toMatchObject({
+      event: "scrobble",
+      media: {
+        type: "movie",
+        watchedDuration: 95000,
+      },
+    });
+  });
+
+  it("uses a valid payload Date and falls back for missing or invalid values", () => {
+    const withDate = EmbyWebhookParser.parse(playbackStopEpisodeFixture);
+    expect(withDate?.timestamp.toISOString()).toBe("2026-03-14T19:30:00.000Z");
+
+    const before = Date.now();
+    const withoutDate = EmbyWebhookParser.parse({
+      Event: "playback.stop",
+      User: { Id: "u1" },
+      Item: { Id: "1", Type: "Movie", Name: "X" },
+      PlaybackInfo: { PlayedToCompletion: true },
+    });
+    const after = Date.now();
+    expect(withoutDate?.timestamp.getTime()).toBeGreaterThanOrEqual(before);
+    expect(withoutDate?.timestamp.getTime()).toBeLessThanOrEqual(after);
+
+    const invalidDate = EmbyWebhookParser.parse({
+      Event: "playback.stop",
+      Date: "not-a-date",
+      User: { Id: "u1" },
+      Item: { Id: "1", Type: "Movie", Name: "X" },
+      PlaybackInfo: { PlayedToCompletion: true },
+    });
+    expect(Number.isNaN(invalidDate?.timestamp.getTime())).toBe(false);
+  });
+
+  it("omits blank provider ids and invalid movie numeric ids", () => {
+    const event = EmbyWebhookParser.parse({
+      Event: "playback.stop",
+      User: { Id: "u1" },
+      Item: {
+        Id: "1",
+        Type: "Movie",
+        Name: "X",
+        ProviderIds: {
+          Tvdb: "  ",
+          Imdb: "",
+          Tmdb: "not-a-number",
+        },
+      },
+      PlaybackInfo: { PlayedToCompletion: true },
+    });
+
+    expect(event?.media.tvdbMovieId).toBeUndefined();
+    expect(event?.media.imdbMovieId).toBeUndefined();
+    expect(event?.media.tmdbMovieId).toBeUndefined();
+  });
+
   it("ignores unsupported events, item types, and missing users", () => {
     expect(
       EmbyWebhookParser.parse({

@@ -402,6 +402,28 @@ describe("PosterService", () => {
     );
   });
 
+  it("does not use jellyfinApiKey for Emby posters on HTTP hosts", async () => {
+    const service = new PosterService();
+    const result = await service.fetchPoster(
+      createSyncHistory({
+        posterUrl: "http://emby.local/Items/1/Images/Primary",
+        source: "emby",
+      }),
+      createUser({ jellyfinAccessToken: undefined }),
+      {
+        jellyfinHost: "http://emby.local",
+        jellyfinApiKey: "server-api-key",
+        mediaBrowserType: "emby",
+      }
+    );
+
+    expect(result).toEqual({
+      status: 403,
+      message: "Media server authentication required",
+    });
+    expect(jellyfinClientMocks.fetchImage).not.toHaveBeenCalled();
+  });
+
   it("handles Jellyfin and generic fetch failures", async () => {
     jellyfinClientMocks.fetchImage.mockRejectedValue(new Error("network"));
     const service = new PosterService();

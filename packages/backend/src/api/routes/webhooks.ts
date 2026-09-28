@@ -287,7 +287,11 @@ router.post("/emby", upload.any(), async (req: Request, res: Response) => {
     const payload = extractEmbyPayload(req);
     if (!payload) {
       logger.webhook.error(
-        { body: req.body, contentType: req.headers["content-type"] },
+        {
+          contentType: req.headers["content-type"],
+          bodyLength:
+            typeof req.body === "string" ? req.body.length : undefined,
+        },
         "Emby webhook body is empty or invalid"
       );
       return res.status(400).json({ error: "Empty or invalid payload" });
@@ -344,7 +348,14 @@ router.post("/emby", upload.any(), async (req: Request, res: Response) => {
     await syncService.syncEvent(event);
     return res.status(200).json({ success: true });
   } catch (error) {
-    logger.webhook.error({ error, payload: req.body }, "Emby webhook error");
+    logger.webhook.error(
+      {
+        error,
+        contentType: req.headers["content-type"] || "",
+        bodyLength: typeof req.body === "string" ? req.body.length : undefined,
+      },
+      "Emby webhook error"
+    );
     return res.status(500).json({ error: "Internal server error" });
   }
 });

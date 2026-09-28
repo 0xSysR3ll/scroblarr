@@ -308,6 +308,46 @@ describe("webhook security", () => {
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ error: "Empty or invalid payload" });
+    expect(logger.webhook.error).toHaveBeenCalled();
+    const metadata = vi.mocked(logger.webhook.error).mock.calls[0][0] as Record<
+      string,
+      unknown
+    >;
+    expect(metadata).not.toHaveProperty("body");
+    expect(metadata).not.toHaveProperty("payload");
+    expect(metadata.contentType).toBeDefined();
+  });
+
+  it("does not log Emby request bodies when sync fails", async () => {
+    syncServiceMocks.syncEvent.mockRejectedValue(new Error("sync failed"));
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/emby?apiKey=expected-webhook-key")
+      .send({
+        Event: "playback.stop",
+        User: { Id: "emby-user-id", Name: "viewer" },
+        Item: {
+          Id: "1",
+          Type: "Movie",
+          Name: "Example",
+        },
+        PlaybackInfo: { PlayedToCompletion: true },
+        apiKey: "expected-webhook-key",
+      });
+
+    expect(response.status).toBe(500);
+    const metadata = vi.mocked(logger.webhook.error).mock.calls[0][0] as Record<
+      string,
+      unknown
+    >;
+    expect(metadata).not.toHaveProperty("body");
+    expect(metadata).not.toHaveProperty("payload");
+    expect(metadata.contentType).toBeDefined();
   });
 
   it("accepts Emby webhook when API key is in the JSON body", async () => {

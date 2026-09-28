@@ -14,6 +14,10 @@ import {
   ScrobbleResult,
   SyncOptions,
 } from "@integrations/common/ISyncClient";
+import {
+  MEDIA_SERVER_FETCH_TIMEOUT_MS,
+  resolveJellyfinAccessToken,
+} from "@integrations/jellyfin/jellyfinAccess";
 import { SimklClient } from "@integrations/simkl/SimklClient";
 import { SimklTokenManager } from "@integrations/simkl/SimklTokenManager";
 import { TmdbClient } from "@integrations/tmdb/TmdbClient";
@@ -531,15 +535,18 @@ export class SyncService {
                 : "jellyfin"
             );
             const user = await this.userRepository.findById(userId);
-            const accessToken =
-              user?.jellyfinAccessToken || settings.jellyfinApiKey || undefined;
+            const accessToken = resolveJellyfinAccessToken(
+              user?.jellyfinAccessToken,
+              settings
+            );
 
             if (accessToken && event.media.seasonNumber !== undefined) {
               const itemId = event.metadata.itemId as string;
               const seasonPosterUrl = await jellyfinClient.getSeasonPosterUrl(
                 accessToken,
                 itemId,
-                event.media.seasonNumber
+                event.media.seasonNumber,
+                AbortSignal.timeout(MEDIA_SERVER_FETCH_TIMEOUT_MS)
               );
               if (seasonPosterUrl) {
                 posterUrl = seasonPosterUrl;

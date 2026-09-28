@@ -91,11 +91,19 @@ export class EmbyWebhookParser {
       media,
       userId,
       source: "emby" as const,
-      timestamp: payload.Date ? new Date(payload.Date) : new Date(),
+      timestamp: this.parseEventTimestamp(payload.Date),
       metadata: {
         itemId: item.Id,
       },
     };
+  }
+
+  private static parseEventTimestamp(date: string | undefined): Date {
+    if (!date) {
+      return new Date();
+    }
+    const parsed = new Date(date);
+    return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
   }
 
   private static calculatePlayedToCompletion(

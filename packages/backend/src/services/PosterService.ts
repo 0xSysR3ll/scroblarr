@@ -1,5 +1,9 @@
 import type { SyncHistory } from "@entities/SyncHistory";
 import type { User } from "@entities/User";
+import {
+  MEDIA_SERVER_FETCH_TIMEOUT_MS,
+  resolveJellyfinAccessToken,
+} from "@integrations/jellyfin/jellyfinAccess";
 import { JellyfinClient } from "@integrations/jellyfin/JellyfinClient";
 import { TmdbRateLimitError } from "@integrations/tmdb/TmdbApiError";
 import { TmdbClient } from "@integrations/tmdb/TmdbClient";
@@ -11,7 +15,6 @@ import { logger } from "@utils/logger";
 
 import { MediaIdEnricher, needsMediaIdEnrichment } from "./MediaIdEnricher";
 
-const POSTER_FETCH_TIMEOUT_MS = 10_000;
 const TITLE_MISS_BACKOFF_MS = [
   5 * 60_000,
   15 * 60_000,
@@ -43,7 +46,7 @@ export function clearPosterEnrichmentCache(): void {
 }
 
 function posterFetchSignal(): AbortSignal {
-  return AbortSignal.timeout(POSTER_FETCH_TIMEOUT_MS);
+  return AbortSignal.timeout(MEDIA_SERVER_FETCH_TIMEOUT_MS);
 }
 
 export interface PosterFetchSuccess {
@@ -407,8 +410,10 @@ export class PosterService {
     settings: Record<string, string | undefined>,
     source: "jellyfin" | "emby" = "jellyfin"
   ): Promise<PosterFetchResult> {
-    const accessToken =
-      user.jellyfinAccessToken || settings.jellyfinApiKey || undefined;
+    const accessToken = resolveJellyfinAccessToken(
+      user.jellyfinAccessToken,
+      settings
+    );
     if (!accessToken) {
       return {
         status: 403,

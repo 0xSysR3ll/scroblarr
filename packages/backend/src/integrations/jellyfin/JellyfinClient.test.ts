@@ -135,9 +135,18 @@ describe("JellyfinClient", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const client = new JellyfinClient("https://jellyfin.local/jf");
+    const signal = AbortSignal.timeout(5_000);
     await expect(
-      client.getSeasonPosterUrl("access-token", "episode-1", 2)
+      client.getSeasonPosterUrl("access-token", "episode-1", 2, signal)
     ).resolves.toBe("https://jellyfin.local/jf/Items/season-9/Images/Primary");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://jellyfin.local/jf/Items/episode-1/Ancestors",
+      expect.objectContaining({ signal })
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://jellyfin.local/jf/Shows/series-1/Seasons",
+      expect.objectContaining({ signal })
+    );
   });
 
   it("returns null when season poster lookup throws", async () => {
