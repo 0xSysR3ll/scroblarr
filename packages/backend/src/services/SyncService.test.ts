@@ -959,6 +959,28 @@ describe("SyncService", () => {
     ).rejects.toThrow("User is missing the linked media server account");
   });
 
+  it("rejects retries for unsupported history sources", async () => {
+    const service = new SyncService();
+
+    await expect(
+      service.retryHistoryItem({
+        id: "history-id",
+        userId: "u1",
+        user: {
+          id: "u1",
+          enabled: true,
+          plexUsername: "plex-user",
+        },
+        mediaType: "movie",
+        mediaTitle: "Example",
+        source: "unknown",
+        originalMediaId: "media-id",
+        success: false,
+        syncedAt: new Date("2026-01-01T00:00:00.000Z"),
+      } as never)
+    ).rejects.toThrow("Sync history item source cannot be retried");
+  });
+
   it("does not create another history item when a retry fails completely", async () => {
     syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
     traktTokenManagerMocks.getValidAccessToken.mockResolvedValue(
@@ -1763,6 +1785,51 @@ describe("SyncService", () => {
           id: "episode-Show-unknown-2",
           type: "episode",
           title: "Show",
+          episodeNumber: 2,
+          posterUrl: "https://emby.local/Items/ep-1/Images/Primary",
+        },
+        metadata: { itemId: "ep-1" },
+      })
+    );
+
+    expect(jellyfinClientMocks.getSeasonPosterUrl).not.toHaveBeenCalled();
+    expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        posterUrl: "https://emby.local/Items/ep-1/Images/Primary",
+      })
+    );
+  });
+
+  it("skips season poster enrichment when the user lookup returns null", async () => {
+    userRepositoryMocks.findByJellyfinUserId.mockResolvedValue({
+      id: "u-emby",
+      enabled: true,
+      jellyfinUserId: "emby-user-guid",
+      jellyfinAccessToken: "emby-token",
+      traktClientId: "trakt-client",
+      traktClientSecret: "trakt-secret",
+      traktAccessToken: "trakt-token",
+    });
+    userRepositoryMocks.findById.mockResolvedValue(null);
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://emby.local",
+      jellyfinApiKey: undefined,
+      mediaBrowserType: "emby",
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    traktTokenManagerMocks.getValidAccessToken.mockResolvedValue("trakt-token");
+    traktClientMocks.scrobble.mockResolvedValue(undefined);
+
+    const service = new SyncService();
+    await service.syncEvent(
+      makeEvent({
+        source: "emby",
+        userId: "emby-user-guid",
+        media: {
+          id: "episode-Show-1-2",
+          type: "episode",
+          title: "Show",
+          seasonNumber: 1,
           episodeNumber: 2,
           posterUrl: "https://emby.local/Items/ep-1/Images/Primary",
         },
