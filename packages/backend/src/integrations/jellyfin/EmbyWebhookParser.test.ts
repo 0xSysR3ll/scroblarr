@@ -225,6 +225,25 @@ describe("EmbyWebhookParser", () => {
       PlaybackInfo: { PlayedToCompletion: true },
     });
     expect(Number.isNaN(invalidDate?.timestamp.getTime())).toBe(false);
+
+    const beforeImpossible = Date.now();
+    const impossibleDate = EmbyWebhookParser.parse({
+      Event: "playback.stop",
+      Date: "2026-02-30T19:30:00.0000000Z",
+      User: { Id: "u1" },
+      Item: { Id: "1", Type: "Movie", Name: "X" },
+      PlaybackInfo: { PlayedToCompletion: true },
+    });
+    const afterImpossible = Date.now();
+    expect(impossibleDate?.timestamp.getTime()).toBeGreaterThanOrEqual(
+      beforeImpossible
+    );
+    expect(impossibleDate?.timestamp.getTime()).toBeLessThanOrEqual(
+      afterImpossible
+    );
+    expect(impossibleDate?.timestamp.toISOString()).not.toBe(
+      "2026-03-02T19:30:00.000Z"
+    );
   });
 
   it("omits blank provider ids and invalid movie numeric ids", () => {

@@ -935,6 +935,37 @@ describe("webhook security", () => {
       })
     );
   });
+  it("logs an empty Emby contentType when the header is missing on sync failure", async () => {
+    syncServiceMocks.syncEvent.mockRejectedValue(new Error("sync failed"));
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+
+    const app = express();
+    app.use(express.json());
+    app.use((req, _res, next) => {
+      delete req.headers["content-type"];
+      next();
+    });
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/emby?apiKey=expected-webhook-key")
+      .send({
+        Event: "playback.stop",
+        User: { Id: "emby-user-id" },
+        Item: { Id: "1", Type: "Movie", Name: "Example" },
+        PlaybackInfo: { PlayedToCompletion: true },
+      });
+
+    expect(response.status).toBe(500);
+    const metadata = vi.mocked(logger.webhook.error).mock.calls[0][0] as Record<
+      string,
+      unknown
+    >;
+    expect(metadata.contentType).toBe("");
+    expect(metadata).not.toHaveProperty("body");
+    expect(metadata).not.toHaveProperty("payload");
+  });
+
   it("rejects Emby webhook when string body is invalid JSON", async () => {
     const app = express();
     app.use(express.text({ type: "*/*" }));

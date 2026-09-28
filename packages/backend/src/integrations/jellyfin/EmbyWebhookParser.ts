@@ -103,7 +103,25 @@ export class EmbyWebhookParser {
       return new Date();
     }
     const parsed = new Date(date);
-    return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+    if (Number.isNaN(parsed.getTime())) {
+      return new Date();
+    }
+
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(date);
+    if (match) {
+      const year = Number(match[1]);
+      const month = Number(match[2]);
+      const day = Number(match[3]);
+      if (
+        parsed.getUTCFullYear() !== year ||
+        parsed.getUTCMonth() + 1 !== month ||
+        parsed.getUTCDate() !== day
+      ) {
+        return new Date();
+      }
+    }
+
+    return parsed;
   }
 
   private static calculatePlayedToCompletion(

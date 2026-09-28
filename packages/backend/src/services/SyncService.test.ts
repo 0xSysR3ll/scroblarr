@@ -934,6 +934,31 @@ describe("SyncService", () => {
     );
   });
 
+  it("rejects Emby retries when the linked Jellyfin user id is missing", async () => {
+    const service = new SyncService();
+
+    await expect(
+      service.retryHistoryItem({
+        id: "emby-history-id",
+        userId: "u-emby",
+        user: {
+          id: "u-emby",
+          enabled: true,
+          jellyfinUserId: undefined,
+          traktClientId: "trakt-client-id",
+          traktClientSecret: "trakt-secret",
+          traktAccessToken: "trakt-token",
+        },
+        mediaType: "movie",
+        mediaTitle: "Emby Movie",
+        source: "emby",
+        originalMediaId: "emby-media-id",
+        success: false,
+        syncedAt: new Date("2026-01-01T00:00:00.000Z"),
+      } as never)
+    ).rejects.toThrow("User is missing the linked media server account");
+  });
+
   it("does not create another history item when a retry fails completely", async () => {
     syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
     traktTokenManagerMocks.getValidAccessToken.mockResolvedValue(
