@@ -1,5 +1,9 @@
 import type { SyncHistory } from "@entities/SyncHistory";
 import type { User } from "@entities/User";
+import {
+  MEDIA_SERVER_FETCH_TIMEOUT_MS,
+  resolveJellyfinAccessToken,
+} from "@integrations/jellyfin/jellyfinAccess";
 import { JellyfinClient } from "@integrations/jellyfin/JellyfinClient";
 import { TmdbRateLimitError } from "@integrations/tmdb/TmdbApiError";
 import { TmdbClient } from "@integrations/tmdb/TmdbClient";
@@ -11,7 +15,6 @@ import { logger } from "@utils/logger";
 
 import { MediaIdEnricher, needsMediaIdEnrichment } from "./MediaIdEnricher";
 
-const POSTER_FETCH_TIMEOUT_MS = 10_000;
 const TITLE_MISS_BACKOFF_MS = [
   5 * 60_000,
   15 * 60_000,
@@ -43,7 +46,7 @@ export function clearPosterEnrichmentCache(): void {
 }
 
 function posterFetchSignal(): AbortSignal {
-  return AbortSignal.timeout(POSTER_FETCH_TIMEOUT_MS);
+  return AbortSignal.timeout(MEDIA_SERVER_FETCH_TIMEOUT_MS);
 }
 
 export interface PosterFetchSuccess {
@@ -156,11 +159,15 @@ export class PosterService {
     if (posterUrl) {
       if (isPlexServerUrl(posterUrl)) {
         mediaServerResult = await this.fetchFromPlex(posterUrl, user, settings);
-      } else if (syncHistory.source === "jellyfin") {
+      } else if (
+        syncHistory.source === "jellyfin" ||
+        syncHistory.source === "emby"
+      ) {
         mediaServerResult = await this.fetchFromJellyfin(
           posterUrl,
           user,
-          settings
+          settings,
+          syncHistory.source
         );
       } else {
         mediaServerResult = await this.fetchFromUrl(posterUrl);
@@ -400,26 +407,39 @@ export class PosterService {
   private async fetchFromJellyfin(
     posterUrl: string,
     user: User,
-    settings: Record<string, string | undefined>
+    settings: Record<string, string | undefined>,
+    source: "jellyfin" | "emby" = "jellyfin"
   ): Promise<PosterFetchResult> {
-    if (!user.jellyfinAccessToken) {
+    const accessToken = resolveJellyfinAccessToken(
+      user.jellyfinAccessToken,
+      settings
+    );
+    if (!accessToken) {
       return {
         status: 403,
-        message: "Jellyfin authentication required",
+        message: "Media server authentication required",
       };
     }
 
     if (!settings.jellyfinHost) {
       return {
         status: 500,
-        message: "Jellyfin server not configured",
+        message: "Media server not configured",
       };
     }
 
     try {
-      const jellyfinClient = new JellyfinClient(settings.jellyfinHost);
+      const serverKind =
+        source === "emby" || settings.mediaBrowserType === "emby"
+          ? "emby"
+          : "jellyfin";
+      const jellyfinClient = new JellyfinClient(
+        settings.jellyfinHost,
+        undefined,
+        serverKind
+      );
       const { buffer, contentType } = await jellyfinClient.fetchImage(
-        user.jellyfinAccessToken,
+        accessToken,
         posterUrl,
         posterFetchSignal()
       );
@@ -429,7 +449,10 @@ export class PosterService {
         contentType,
       };
     } catch (error) {
-      logger.api.error({ error, posterUrl }, "Error proxying Jellyfin poster");
+      logger.api.error(
+        { error, posterUrl },
+        "Error proxying media server poster"
+      );
       return {
         status: 500,
         message: "Failed to fetch poster image",

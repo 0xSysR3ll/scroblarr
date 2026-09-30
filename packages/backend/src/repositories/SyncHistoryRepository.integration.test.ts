@@ -144,6 +144,37 @@ describe("SyncHistoryRepository integration", () => {
     expect(result.data[0]?.user.id).toBe(user.id);
   });
 
+  it("filters paginated history by Emby source", async () => {
+    await createHistory([
+      {
+        userId: user.id,
+        mediaType: "episode",
+        mediaTitle: "Emby Episode",
+        source: "emby",
+        success: true,
+        syncedAt: daysAgo(1),
+      },
+      {
+        userId: user.id,
+        mediaType: "episode",
+        mediaTitle: "Jellyfin Episode",
+        source: "jellyfin",
+        success: true,
+        syncedAt: daysAgo(0),
+      },
+    ]);
+
+    const result = await repository.findByUserPaginated(user.id, 1, 10, {
+      source: "emby",
+    });
+
+    expect(result.total).toBe(1);
+    expect(result.data.map((item) => item.mediaTitle)).toEqual([
+      "Emby Episode",
+    ]);
+    expect(result.data[0]?.source).toBe("emby");
+  });
+
   it("keeps the newest rows when clearing old history", async () => {
     await createHistory([
       {
@@ -223,7 +254,7 @@ describe("SyncHistoryRepository integration", () => {
     expect(stats.failed).toBe(1);
     expect(stats.successRate).toBe(66.67);
     expect(stats.byMediaType).toEqual({ episode: 2, movie: 1, series: 1 });
-    expect(stats.bySource).toEqual({ plex: 2, jellyfin: 1 });
+    expect(stats.bySource).toEqual({ plex: 2, jellyfin: 1, emby: 0 });
     expect(stats.byDestination).toEqual({
       trakt: 1,
       tvtime: 2,

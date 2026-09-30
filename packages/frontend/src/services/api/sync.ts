@@ -165,6 +165,7 @@ export interface SyncStatistics {
   bySource: {
     plex: number;
     jellyfin: number;
+    emby: number;
   };
   byDestination: {
     trakt: number;

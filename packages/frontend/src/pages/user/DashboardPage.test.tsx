@@ -36,7 +36,7 @@ function statisticsFixture() {
     failed: 2,
     successRate: 83,
     byMediaType: { episode: 8, movie: 4, series: 0 },
-    bySource: { plex: 10, jellyfin: 2 },
+    bySource: { plex: 7, jellyfin: 2, emby: 3 },
     byDestination: { trakt: 5, tvtime: 4, simkl: 3, bingers: 0 },
     byPeriod: { today: 1, thisWeek: 4, thisMonth: 12, lastMonth: 8 },
     topThisMonth: [],
@@ -56,7 +56,7 @@ function emptyStatisticsFixture(): SyncStatistics {
     failed: 0,
     successRate: 0,
     byMediaType: { episode: 0, movie: 0, series: 0 },
-    bySource: { plex: 0, jellyfin: 0 },
+    bySource: { plex: 0, jellyfin: 0, emby: 0 },
     byDestination: { trakt: 0, simkl: 0, tvtime: 0, bingers: 0 },
     byPeriod: { today: 0, thisWeek: 0, thisMonth: 0, lastMonth: 0 },
     topThisMonth: [],
@@ -211,6 +211,17 @@ describe("DashboardPage", () => {
     const totalLabel = await screen.findByText("total");
     expect(totalLabel.previousElementSibling).toHaveTextContent("12");
     expect(totalLabel.previousElementSibling).not.toHaveTextContent("99");
+  });
+
+  it("renders Emby in the source breakdown with Plex and Jellyfin", async () => {
+    renderWithProviders(<DashboardPage />, { route: "/" });
+
+    const card = (await screen.findByText("By Source")).closest("div");
+    expect(card).toBeTruthy();
+    expect(within(card!).getByText("Plex")).toBeInTheDocument();
+    expect(within(card!).getByText("Jellyfin")).toBeInTheDocument();
+    expect(within(card!).getByText("Emby")).toBeInTheDocument();
+    expect(within(card!).getByText(/3$/)).toBeInTheDocument();
   });
 
   it("retries loading after an initial failure", async () => {

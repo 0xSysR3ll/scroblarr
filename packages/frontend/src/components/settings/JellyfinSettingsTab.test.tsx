@@ -216,7 +216,7 @@ describe("JellyfinSettingsTab", () => {
     expect(await screen.findByText("Webhooks")).toBeInTheDocument();
   });
 
-  it("hides the webhook panel for saved Emby until the Emby handler ships", async () => {
+  it("shows the webhook panel when Emby host and API key are saved", async () => {
     const user = userEvent.setup();
     renderJellyfin({
       settings: {
@@ -232,7 +232,7 @@ describe("JellyfinSettingsTab", () => {
 
     await user.click(screen.getByRole("button", { name: /Emby Server/i }));
 
-    expect(screen.queryByText("Webhooks")).not.toBeInTheDocument();
+    expect(await screen.findByText("Webhooks")).toBeInTheDocument();
   });
 
   it("updates connection fields and notifies the parent", async () => {

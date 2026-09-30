@@ -336,7 +336,8 @@ export class JellyfinClient {
   async getSeasonPosterUrl(
     accessToken: string,
     episodeItemId: string,
-    seasonNumber: number
+    seasonNumber: number,
+    signal?: AbortSignal
   ): Promise<string | null> {
     try {
       const authHeaders = this.getAuthHeaders(accessToken);
@@ -345,6 +346,7 @@ export class JellyfinClient {
         `${this.baseUrl}/Items/${episodeItemId}/Ancestors`,
         {
           headers: authHeaders,
+          signal,
         }
       );
 
@@ -366,6 +368,7 @@ export class JellyfinClient {
         `${this.baseUrl}/Shows/${series.Id}/Seasons`,
         {
           headers: authHeaders,
+          signal,
         }
       );
 

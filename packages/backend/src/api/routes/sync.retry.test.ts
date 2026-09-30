@@ -225,4 +225,111 @@ describe("sync retry route", () => {
     });
     expect(syncServiceMocks.retryHistoryItem).toHaveBeenCalledTimes(2);
   });
+
+  it("retries a failed Emby sync history item for the authenticated user", async () => {
+    const historyItem = {
+      id: "sync-id",
+      userId: "user-id",
+      success: false,
+      source: "emby",
+      mediaType: "movie",
+      user: { id: "user-id", jellyfinUserId: "emby-user-guid" },
+    };
+    syncHistoryRepositoryMocks.findById.mockResolvedValue(historyItem);
+    syncServiceMocks.retryHistoryItem.mockResolvedValue({
+      success: true,
+      destinations: ["Trakt"],
+    });
+
+    const response = await request(makeApp())
+      .post("/api/v1/sync/history/sync-id/retry")
+      .set("authorization", "Bearer valid-user-token");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      id: "sync-id",
+      success: true,
+      destinations: ["Trakt"],
+    });
+    expect(syncServiceMocks.retryHistoryItem).toHaveBeenCalledWith(historyItem);
+  });
+
+  it("rejects Emby retry when jellyfinUserId is missing", async () => {
+    syncHistoryRepositoryMocks.findById.mockResolvedValue({
+      id: "sync-id",
+      userId: "user-id",
+      success: false,
+      source: "emby",
+      mediaType: "movie",
+      user: { id: "user-id", jellyfinUserId: null },
+    });
+
+    const response = await request(makeApp())
+      .post("/api/v1/sync/history/sync-id/retry")
+      .set("authorization", "Bearer valid-user-token");
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: "User is missing the linked media server account",
+    });
+    expect(syncServiceMocks.retryHistoryItem).not.toHaveBeenCalled();
+  });
+  it("rejects Emby retry when history user relation is missing", async () => {
+    syncHistoryRepositoryMocks.findById.mockResolvedValue({
+      id: "sync-id",
+      userId: "user-id",
+      success: false,
+      source: "emby",
+      mediaType: "movie",
+      user: undefined,
+    });
+
+    const response = await request(makeApp())
+      .post("/api/v1/sync/history/sync-id/retry")
+      .set("authorization", "Bearer valid-user-token");
+
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: "User not found" });
+    expect(syncServiceMocks.retryHistoryItem).not.toHaveBeenCalled();
+  });
+
+  it("rejects retry for unsupported sync history sources", async () => {
+    syncHistoryRepositoryMocks.findById.mockResolvedValue({
+      id: "sync-id",
+      userId: "user-id",
+      success: false,
+      source: "unknown",
+      mediaType: "movie",
+      user: { id: "user-id", plexUsername: "plex-user" },
+    });
+
+    const response = await request(makeApp())
+      .post("/api/v1/sync/history/sync-id/retry")
+      .set("authorization", "Bearer valid-user-token");
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: "Sync history item source cannot be retried",
+    });
+  });
+
+  it("rejects Emby retry for unsupported media types", async () => {
+    syncHistoryRepositoryMocks.findById.mockResolvedValue({
+      id: "sync-id",
+      userId: "user-id",
+      success: false,
+      source: "emby",
+      mediaType: "track",
+      user: { id: "user-id", jellyfinUserId: "emby-user-guid" },
+    });
+
+    const response = await request(makeApp())
+      .post("/api/v1/sync/history/sync-id/retry")
+      .set("authorization", "Bearer valid-user-token");
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: "Sync history item media type cannot be retried",
+    });
+  });
 });

@@ -154,6 +154,36 @@ describe("sync route protection", () => {
     );
   });
 
+  it("forwards Emby source filter to the history repository", async () => {
+    userRepositoryMocks.findBySessionToken.mockResolvedValue({
+      id: "user-id",
+      isAdmin: false,
+      displayName: "User",
+      plexUsername: "plex-user",
+    });
+    syncHistoryRepositoryMocks.findByUserPaginated.mockResolvedValue({
+      data: [],
+      total: 0,
+    });
+
+    const app = express();
+    app.use("/api/v1/sync", syncRoutes);
+
+    const response = await request(app)
+      .get("/api/v1/sync/history?source=emby&page=1&pageSize=20")
+      .set("authorization", "Bearer valid-user-token");
+
+    expect(response.status).toBe(200);
+    expect(syncHistoryRepositoryMocks.findByUserPaginated).toHaveBeenCalledWith(
+      "user-id",
+      1,
+      20,
+      { source: "emby" },
+      "syncedAt",
+      "DESC"
+    );
+  });
+
   it("includes parsed destination results in history responses", async () => {
     userRepositoryMocks.findBySessionToken.mockResolvedValue({
       id: "user-id",

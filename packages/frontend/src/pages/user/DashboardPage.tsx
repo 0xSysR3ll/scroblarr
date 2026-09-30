@@ -665,7 +665,9 @@ export function DashboardPage() {
       statistics.byMediaType.movie
     : 0;
   const sourceTotal = statistics
-    ? statistics.bySource.plex + statistics.bySource.jellyfin
+    ? statistics.bySource.plex +
+      statistics.bySource.jellyfin +
+      statistics.bySource.emby
     : 0;
   const destinationTotal = statistics
     ? statistics.byDestination.trakt +
@@ -1309,6 +1311,7 @@ export function DashboardPage() {
                         statistics.bySource.jellyfin,
                         "var(--chart-jellyfin)",
                       ],
+                      ["Emby", statistics.bySource.emby, "var(--chart-emby)"],
                     ] as const
                   ).map(([label, value, color]) => (
                     <div key={label} className="min-w-0">

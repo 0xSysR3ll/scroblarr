@@ -614,13 +614,9 @@ export function JellyfinSettingsTab({
                 </div>
               )}
 
-              {!!(
-                settings.jellyfinHost &&
-                settings.jellyfinApiKey &&
-                !isEmby
-              ) && (
+              {!!(settings.jellyfinHost && settings.jellyfinApiKey) && (
                 <WebhookSetupPanel
-                  source="jellyfin"
+                  source={isEmby ? "emby" : "jellyfin"}
                   webhookApiKey={webhookApiKey}
                 />
               )}
