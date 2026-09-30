@@ -302,4 +302,61 @@ describe("SettingsPage", () => {
       screen.getByText(/Access denied. Admin privileges required./i)
     ).toBeInTheDocument();
   });
+
+  it("preserves the Emby media browser type when saving media server settings", async () => {
+    vi.mocked(getSettings).mockResolvedValue({
+      syncHistoryLimit: "100",
+      jellyfinHost: "http://emby.local:8096",
+      jellyfinPort: "8096",
+      jellyfinUseSsl: "false",
+      jellyfinUrlBase: "/emby",
+      jellyfinApiKey: "emby-key",
+      mediaBrowserType: "emby",
+    });
+    vi.mocked(updateSettings).mockResolvedValue({
+      syncHistoryLimit: "100",
+      jellyfinHost: "http://emby.local:8096/emby",
+      jellyfinPort: "8096",
+      jellyfinUseSsl: "false",
+      jellyfinUrlBase: "/emby",
+      jellyfinApiKey: "emby-key",
+      mediaBrowserType: "emby",
+    });
+
+    const user = userEvent.setup();
+    renderWithProviders(<SettingsPage />, { route: "/settings/mediaServer" });
+
+    expect(
+      await screen.findByRole("button", { name: /Emby Server/i })
+    ).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(updateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mediaBrowserType: "emby",
+          jellyfinApiKey: "emby-key",
+          jellyfinUrlBase: "/emby",
+        })
+      );
+    });
+  });
+
+  it("defaults media browser type to jellyfin when loading Jellyfin settings", async () => {
+    vi.mocked(getSettings).mockResolvedValue({
+      syncHistoryLimit: "100",
+      jellyfinHost: "http://jellyfin.local:8096",
+      jellyfinPort: "8096",
+      jellyfinUseSsl: "false",
+      jellyfinUrlBase: "/jellyfin",
+      jellyfinApiKey: "jf-key",
+    });
+
+    renderWithProviders(<SettingsPage />, { route: "/settings/mediaServer" });
+
+    expect(
+      await screen.findByRole("button", { name: /Jellyfin Server/i })
+    ).toBeVisible();
+  });
 });

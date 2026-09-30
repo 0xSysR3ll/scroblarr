@@ -52,19 +52,40 @@ function buildJellyfinBaseUrl(
   return `${protocol}://${hostname}:${jellyfinPort}${basePath ? `/${basePath}` : ""}`;
 }
 
+function resolveMediaBrowserType(
+  bodyType: unknown,
+  settingsType?: string
+): "jellyfin" | "emby" {
+  if (bodyType === "emby" || bodyType === "jellyfin") {
+    return bodyType;
+  }
+  if (settingsType === "emby") {
+    return "emby";
+  }
+  return "jellyfin";
+}
+
+async function persistMediaBrowserType(
+  type: "jellyfin" | "emby"
+): Promise<void> {
+  await settingsRepository.set("mediaBrowserType", type);
+}
+
 router.get("/check-admin", async (_req: Request, res: Response) => {
   try {
     const admin = await userRepository.findAdmin();
     const settings = await settingsRepository.getAll();
     const configuredService = settings.jellyfinHost
-      ? "jellyfin"
+      ? settings.mediaBrowserType === "emby"
+        ? "emby"
+        : "jellyfin"
       : settings.plexServerUrl
         ? "plex"
         : null;
 
     const response: {
       hasAdmin: boolean;
-      configuredService: "plex" | "jellyfin" | null;
+      configuredService: "plex" | "jellyfin" | "emby" | null;
       jellyfinSettings?: {
         hostname: string;
         port: number;
@@ -76,7 +97,10 @@ router.get("/check-admin", async (_req: Request, res: Response) => {
       configuredService,
     };
 
-    if (configuredService === "jellyfin" && settings.jellyfinHost) {
+    if (
+      (configuredService === "jellyfin" || configuredService === "emby") &&
+      settings.jellyfinHost
+    ) {
       try {
         const url = new URL(settings.jellyfinHost);
         const hostname = url.hostname;
@@ -114,13 +138,22 @@ router.get(
       const admin = await userRepository.findAdmin();
       const settings = await settingsRepository.getAll();
 
-      const jellyfinConfigured = !!settings.jellyfinHost;
+      const hasMediaBrowser = !!settings.jellyfinHost;
+      const isEmby = settings.mediaBrowserType === "emby";
+      const jellyfinConfigured = hasMediaBrowser && !isEmby;
+      const embyConfigured = hasMediaBrowser && isEmby;
       const plexConfigured = !!settings.plexServerUrl;
 
       res.json({
         hasAdmin: !!admin,
         jellyfinConfigured,
+        embyConfigured,
         plexConfigured,
+        mediaBrowserType: hasMediaBrowser
+          ? isEmby
+            ? "emby"
+            : "jellyfin"
+          : undefined,
       });
     } catch (error) {
       logger.auth.error({ error }, "Error getting auth providers");
@@ -630,7 +663,13 @@ router.get("/me", auth, async (req: Request, res: Response): Promise<void> => {
         const allSettings = await settingsRepository.getAll();
         const jellyfinHost = allSettings.jellyfinHost;
         if (jellyfinHost) {
-          const jellyfinClient = new JellyfinClient(jellyfinHost);
+          const serverKind =
+            allSettings.mediaBrowserType === "emby" ? "emby" : "jellyfin";
+          const jellyfinClient = new JellyfinClient(
+            jellyfinHost,
+            undefined,
+            serverKind
+          );
           const userInfo = await jellyfinClient.getUserInfo(
             userWithToken.jellyfinAccessToken,
             userWithToken.jellyfinUserId
@@ -671,7 +710,11 @@ router.get("/me", auth, async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-router.post("/jellyfin", async (req: Request, res: Response) => {
+router.post("/jellyfin", (req, res) => {
+  void handleJellyfinLogin(req, res);
+});
+
+async function handleJellyfinLogin(req: Request, res: Response) {
   try {
     const env = getEnv();
     const { username, password, hostname, port, useSsl, urlBase } = req.body;
@@ -702,6 +745,7 @@ router.post("/jellyfin", async (req: Request, res: Response) => {
 
     let baseUrl: string;
     const settings = await settingsRepository.getAll();
+    let allowBodyMediaBrowserType = false;
 
     if (existingAdmin) {
       if (!settings.jellyfinHost) {
@@ -713,6 +757,7 @@ router.post("/jellyfin", async (req: Request, res: Response) => {
       baseUrl = settings.jellyfinHost;
     } else if (hostname) {
       baseUrl = buildJellyfinBaseUrl(hostname, port, useSsl, urlBase);
+      allowBodyMediaBrowserType = true;
     } else if (settings.jellyfinHost) {
       baseUrl = settings.jellyfinHost;
     } else {
@@ -721,7 +766,16 @@ router.post("/jellyfin", async (req: Request, res: Response) => {
       });
     }
 
-    const jellyfinClient = new JellyfinClient(baseUrl);
+    const mediaBrowserType = resolveMediaBrowserType(
+      allowBodyMediaBrowserType ? req.body.mediaBrowserType : undefined,
+      settings.mediaBrowserType
+    );
+
+    const jellyfinClient = new JellyfinClient(
+      baseUrl,
+      undefined,
+      mediaBrowserType
+    );
     const loginResponse = await jellyfinClient.login(username, password);
     const userInfo = await jellyfinClient.getUserInfo(
       loginResponse.AccessToken,
@@ -763,6 +817,7 @@ router.post("/jellyfin", async (req: Request, res: Response) => {
       );
 
       await settingsRepository.set("jellyfinHost", baseUrl);
+      await persistMediaBrowserType(mediaBrowserType);
       if (port) {
         await settingsRepository.set("jellyfinPort", port.toString());
       }
@@ -873,38 +928,180 @@ router.post("/jellyfin", async (req: Request, res: Response) => {
     );
     return res.status(500).json({ error: errorMessage });
   }
+}
+
+router.post("/jellyfin/setup-admin", (req, res) => {
+  void handleJellyfinSetupAdmin(req, res);
 });
 
-router.post(
-  "/jellyfin/setup-admin",
-  async (req: Request, res: Response): Promise<void> => {
+async function handleJellyfinSetupAdmin(
+  req: Request,
+  res: Response
+): Promise<void> {
+  try {
+    const existingAdmin = await userRepository.findAdmin();
+    if (existingAdmin) {
+      res.status(400).json({ error: "Admin already configured" });
+      return;
+    }
+
+    const { username, password, hostname, port, useSsl, urlBase } = req.body;
+    const mediaBrowserType = resolveMediaBrowserType(req.body.mediaBrowserType);
+
+    if (!username || !password) {
+      res.status(400).json({ error: "Username and password are required" });
+      return;
+    }
+
+    if (!hostname) {
+      res.status(400).json({ error: "Jellyfin hostname is required" });
+      return;
+    }
+
+    const baseUrl = buildJellyfinBaseUrl(hostname, port, useSsl, urlBase);
+    const jellyfinClient = new JellyfinClient(
+      baseUrl,
+      undefined,
+      mediaBrowserType
+    );
+    const loginResponse = await jellyfinClient.login(username, password);
+    const userInfo = await jellyfinClient.getUserInfo(
+      loginResponse.AccessToken,
+      loginResponse.User.Id
+    );
+
     try {
-      const existingAdmin = await userRepository.findAdmin();
-      if (existingAdmin) {
-        res.status(400).json({ error: "Admin already configured" });
-        return;
-      }
-
-      const { username, password, hostname, port, useSsl, urlBase } = req.body;
-
-      if (!username || !password) {
-        res.status(400).json({ error: "Username and password are required" });
-        return;
-      }
-
-      if (!hostname) {
-        res.status(400).json({ error: "Jellyfin hostname is required" });
-        return;
-      }
-
-      const baseUrl = buildJellyfinBaseUrl(hostname, port, useSsl, urlBase);
-      const jellyfinClient = new JellyfinClient(baseUrl);
-      const loginResponse = await jellyfinClient.login(username, password);
-      const userInfo = await jellyfinClient.getUserInfo(
+      const apiKey = await jellyfinClient.createApiKey(
         loginResponse.AccessToken,
-        loginResponse.User.Id
+        "Scroblarr"
       );
+      await settingsRepository.set("jellyfinApiKey", apiKey);
+    } catch (error) {
+      logger.auth.warn(
+        { error },
+        "Failed to create API key, server-side operations may fail after password changes"
+      );
+    }
 
+    const user = await userRepository.findByJellyfinUsernameOrCreate(
+      loginResponse.User.Name
+    );
+
+    logger.auth.info(
+      {
+        userId: user.id,
+        username: loginResponse.User.Name,
+        jellyfinUserId: userInfo.id,
+        isAdmin: true,
+        hadExistingToken: !!user.jellyfinAccessToken,
+        mediaBrowserType,
+      },
+      "Jellyfin admin setup successful"
+    );
+
+    const updatedUser = await userRepository.update(user.id, {
+      jellyfinUsername: loginResponse.User.Name,
+      jellyfinAccessToken: loginResponse.AccessToken,
+      jellyfinUserId: userInfo.id,
+      jellyfinThumb: userInfo.thumb,
+      displayName: userInfo.displayName || loginResponse.User.Name,
+      isAdmin: true,
+    });
+
+    await settingsRepository.set("jellyfinHost", baseUrl);
+    await persistMediaBrowserType(mediaBrowserType);
+    if (port) {
+      await settingsRepository.set("jellyfinPort", port.toString());
+    }
+    if (useSsl !== undefined) {
+      await settingsRepository.set("jellyfinUseSsl", useSsl.toString());
+    }
+    if (urlBase) {
+      await settingsRepository.set("jellyfinUrlBase", urlBase);
+    }
+
+    const primaryUsername = userRepository.getPrimaryUsername(updatedUser);
+
+    res.json({
+      user: {
+        id: updatedUser.id,
+        username: primaryUsername,
+        displayName: updatedUser.displayName,
+        email: updatedUser.email,
+        isAdmin: true,
+      },
+      accessToken: loginResponse.AccessToken,
+    });
+  } catch (error) {
+    logger.auth.error({ error }, "Error setting up Jellyfin admin");
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to setup admin";
+    if (errorMessage.includes("Invalid credentials")) {
+      res.status(401).json({ error: "Invalid credentials" });
+      return;
+    }
+    res.status(500).json({ error: errorMessage });
+  }
+}
+
+router.post("/jellyfin/link", auth, (req, res) => {
+  void handleJellyfinLink(req, res);
+});
+
+async function handleJellyfinLink(req: Request, res: Response): Promise<void> {
+  try {
+    const currentUser = req.user;
+    if (!currentUser) {
+      res.status(401).json({ error: "Invalid token" });
+      return;
+    }
+
+    const { username, password, hostname, port, useSsl, urlBase } = req.body;
+    const settings = await settingsRepository.getAll();
+    const mediaBrowserType = resolveMediaBrowserType(
+      currentUser.isAdmin && hostname ? req.body.mediaBrowserType : undefined,
+      settings.mediaBrowserType
+    );
+
+    if (!username || !password) {
+      res.status(400).json({ error: "Username and password are required" });
+      return;
+    }
+
+    const existingJellyfinUser =
+      await userRepository.findByJellyfinUsername(username);
+    if (existingJellyfinUser && existingJellyfinUser.id !== currentUser.id) {
+      res.status(400).json({
+        error: "This Jellyfin account is already linked to another user",
+      });
+      return;
+    }
+
+    let baseUrl: string;
+
+    if (currentUser.isAdmin && hostname) {
+      baseUrl = buildJellyfinBaseUrl(hostname, port, useSsl, urlBase);
+    } else if (settings.jellyfinHost) {
+      baseUrl = settings.jellyfinHost;
+    } else {
+      res.status(400).json({
+        error: "Jellyfin server not configured. Please provide server details.",
+      });
+      return;
+    }
+
+    const jellyfinClient = new JellyfinClient(
+      baseUrl,
+      undefined,
+      mediaBrowserType
+    );
+    const loginResponse = await jellyfinClient.login(username, password);
+    const userInfo = await jellyfinClient.getUserInfo(
+      loginResponse.AccessToken,
+      loginResponse.User.Id
+    );
+
+    if (currentUser.isAdmin) {
       try {
         const apiKey = await jellyfinClient.createApiKey(
           loginResponse.AccessToken,
@@ -917,32 +1114,20 @@ router.post(
           "Failed to create API key, server-side operations may fail after password changes"
         );
       }
+    }
 
-      const user = await userRepository.findByJellyfinUsernameOrCreate(
-        loginResponse.User.Name
-      );
+    const updatedUser = await userRepository.update(currentUser.id, {
+      jellyfinUsername: loginResponse.User.Name,
+      jellyfinAccessToken: loginResponse.AccessToken,
+      jellyfinUserId: userInfo.id,
+      jellyfinThumb: userInfo.thumb,
+      email: userInfo.email || currentUser.email,
+      displayName: currentUser.displayName || userInfo.displayName,
+    });
 
-      logger.auth.info(
-        {
-          userId: user.id,
-          username: loginResponse.User.Name,
-          jellyfinUserId: userInfo.id,
-          isAdmin: true,
-          hadExistingToken: !!user.jellyfinAccessToken,
-        },
-        "Jellyfin admin setup successful"
-      );
-
-      const updatedUser = await userRepository.update(user.id, {
-        jellyfinUsername: loginResponse.User.Name,
-        jellyfinAccessToken: loginResponse.AccessToken,
-        jellyfinUserId: userInfo.id,
-        jellyfinThumb: userInfo.thumb,
-        displayName: userInfo.displayName || loginResponse.User.Name,
-        isAdmin: true,
-      });
-
+    if (currentUser.isAdmin && hostname) {
       await settingsRepository.set("jellyfinHost", baseUrl);
+      await persistMediaBrowserType(mediaBrowserType);
       if (port) {
         await settingsRepository.set("jellyfinPort", port.toString());
       }
@@ -953,162 +1138,51 @@ router.post(
         await settingsRepository.set("jellyfinUrlBase", urlBase);
       }
 
-      const primaryUsername = userRepository.getPrimaryUsername(updatedUser);
-
-      res.json({
-        user: {
-          id: updatedUser.id,
-          username: primaryUsername,
-          displayName: updatedUser.displayName,
-          email: updatedUser.email,
-          isAdmin: true,
+      logger.auth.info(
+        {
+          userId: updatedUser.id,
+          username: loginResponse.User.Name,
+          hostname,
+          port,
+          useSsl,
+          mediaBrowserType,
+          wasAlreadyLinked: !!currentUser.jellyfinUsername,
         },
-        accessToken: loginResponse.AccessToken,
-      });
-    } catch (error) {
-      logger.auth.error({ error }, "Error setting up Jellyfin admin");
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to setup admin";
-      if (errorMessage.includes("Invalid credentials")) {
-        res.status(401).json({ error: "Invalid credentials" });
-        return;
-      }
-      res.status(500).json({ error: errorMessage });
-    }
-  }
-);
-
-router.post(
-  "/jellyfin/link",
-  auth,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const currentUser = req.user;
-      if (!currentUser) {
-        res.status(401).json({ error: "Invalid token" });
-        return;
-      }
-
-      const { username, password, hostname, port, useSsl, urlBase } = req.body;
-
-      if (!username || !password) {
-        res.status(400).json({ error: "Username and password are required" });
-        return;
-      }
-
-      const existingJellyfinUser =
-        await userRepository.findByJellyfinUsername(username);
-      if (existingJellyfinUser && existingJellyfinUser.id !== currentUser.id) {
-        res.status(400).json({
-          error: "This Jellyfin account is already linked to another user",
-        });
-        return;
-      }
-
-      const settings = await settingsRepository.getAll();
-
-      let baseUrl: string;
-
-      if (currentUser.isAdmin && hostname) {
-        baseUrl = buildJellyfinBaseUrl(hostname, port, useSsl, urlBase);
-      } else if (settings.jellyfinHost) {
-        baseUrl = settings.jellyfinHost;
-      } else {
-        res.status(400).json({
-          error:
-            "Jellyfin server not configured. Please provide server details.",
-        });
-        return;
-      }
-
-      const jellyfinClient = new JellyfinClient(baseUrl);
-      const loginResponse = await jellyfinClient.login(username, password);
-      const userInfo = await jellyfinClient.getUserInfo(
-        loginResponse.AccessToken,
-        loginResponse.User.Id
+        "Jellyfin account linked and server configured by admin"
       );
-
-      if (currentUser.isAdmin) {
-        try {
-          const apiKey = await jellyfinClient.createApiKey(
-            loginResponse.AccessToken,
-            "Scroblarr"
-          );
-          await settingsRepository.set("jellyfinApiKey", apiKey);
-        } catch (error) {
-          logger.auth.warn(
-            { error },
-            "Failed to create API key, server-side operations may fail after password changes"
-          );
-        }
-      }
-
-      const updatedUser = await userRepository.update(currentUser.id, {
-        jellyfinUsername: loginResponse.User.Name,
-        jellyfinAccessToken: loginResponse.AccessToken,
-        jellyfinUserId: userInfo.id,
-        jellyfinThumb: userInfo.thumb,
-        email: userInfo.email || currentUser.email,
-        displayName: currentUser.displayName || userInfo.displayName,
-      });
-
-      if (currentUser.isAdmin && hostname) {
-        await settingsRepository.set("jellyfinHost", baseUrl);
-        if (port) {
-          await settingsRepository.set("jellyfinPort", port.toString());
-        }
-        if (useSsl !== undefined) {
-          await settingsRepository.set("jellyfinUseSsl", useSsl.toString());
-        }
-        if (urlBase) {
-          await settingsRepository.set("jellyfinUrlBase", urlBase);
-        }
-
-        logger.auth.info(
-          {
-            userId: updatedUser.id,
-            username: loginResponse.User.Name,
-            hostname,
-            port,
-            useSsl,
-            wasAlreadyLinked: !!currentUser.jellyfinUsername,
-          },
-          "Jellyfin account linked and server configured by admin"
-        );
-      } else {
-        logger.auth.info(
-          {
-            userId: updatedUser.id,
-            username: loginResponse.User.Name,
-            wasAlreadyLinked: !!currentUser.jellyfinUsername,
-          },
-          "Jellyfin account linked"
-        );
-      }
-
-      const primaryUsername = userRepository.getPrimaryUsername(updatedUser);
-
-      res.json({
-        id: updatedUser.id,
-        username: primaryUsername,
-        displayName: updatedUser.displayName,
-        email: updatedUser.email,
-        isAdmin: updatedUser.isAdmin,
-      });
-    } catch (error) {
-      logger.auth.error({ error }, "Error linking Jellyfin account");
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Unable to link Jellyfin account";
-      if (errorMessage.includes("Invalid credentials")) {
-        res.status(401).json({ error: "Invalid credentials" });
-        return;
-      }
-      res.status(500).json({ error: errorMessage });
+    } else {
+      logger.auth.info(
+        {
+          userId: updatedUser.id,
+          username: loginResponse.User.Name,
+          wasAlreadyLinked: !!currentUser.jellyfinUsername,
+        },
+        "Jellyfin account linked"
+      );
     }
+
+    const primaryUsername = userRepository.getPrimaryUsername(updatedUser);
+
+    res.json({
+      id: updatedUser.id,
+      username: primaryUsername,
+      displayName: updatedUser.displayName,
+      email: updatedUser.email,
+      isAdmin: updatedUser.isAdmin,
+    });
+  } catch (error) {
+    logger.auth.error({ error }, "Error linking Jellyfin account");
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Unable to link Jellyfin account";
+    if (errorMessage.includes("Invalid credentials")) {
+      res.status(401).json({ error: "Invalid credentials" });
+      return;
+    }
+    res.status(500).json({ error: errorMessage });
   }
-);
+}
 
 router.post(
   "/plex/unlink",
@@ -1121,17 +1195,15 @@ router.post(
         return;
       }
 
-      if (user.isAdmin) {
-        const hasJellyfin = !!user.jellyfinUsername;
-        const hasPlex = !!user.plexUsername;
+      const hasJellyfin = !!user.jellyfinUsername;
+      const hasPlex = !!user.plexUsername;
 
-        if (hasPlex && !hasJellyfin) {
-          res.status(400).json({
-            error:
-              "Cannot unlink Plex account. As an admin, you must have at least one linked account. Please link a Jellyfin account first before unlinking Plex.",
-          });
-          return;
-        }
+      if (hasPlex && !hasJellyfin) {
+        res.status(400).json({
+          error:
+            "Cannot unlink Plex account. You must keep at least one media server account linked to sign in. Link Jellyfin or Emby first, or ask an admin to delete your Scroblarr user.",
+        });
+        return;
       }
 
       await sessionRepository.deleteAllForUser(user.id);
@@ -1162,57 +1234,84 @@ router.post(
   }
 );
 
-router.post(
-  "/jellyfin/unlink",
-  auth,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const user = req.user;
-      if (!user) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
-      }
+router.post("/jellyfin/unlink", auth, (req, res) => {
+  void handleJellyfinUnlink(req, res);
+});
 
-      if (user.isAdmin) {
-        const hasJellyfin = !!user.jellyfinUsername;
-        const hasPlex = !!user.plexUsername;
-
-        if (hasJellyfin && !hasPlex) {
-          res.status(400).json({
-            error:
-              "Cannot unlink Jellyfin account. As an admin, you must have at least one linked account. Please link a Plex account first before unlinking Jellyfin.",
-          });
-          return;
-        }
-      }
-
-      await sessionRepository.deleteAllForUser(user.id);
-      await userRepository.update(user.id, {
-        jellyfinUsername: null,
-        jellyfinAccessToken: null,
-        jellyfinUserId: null,
-        jellyfinThumb: null,
-      } as unknown as Partial<User>);
-
-      logger.auth.info(
-        {
-          userId: user.id,
-          username: user.plexUsername || user.jellyfinUsername,
-          isAdmin: user.isAdmin,
-        },
-        "Jellyfin account unlinked"
-      );
-
-      res.json({ success: true });
-    } catch (error) {
-      logger.auth.error({ error }, "Error unlinking Jellyfin account");
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Failed to unlink Jellyfin account";
-      res.status(500).json({ error: errorMessage });
+async function handleJellyfinUnlink(
+  req: Request,
+  res: Response
+): Promise<void> {
+  try {
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
     }
+
+    const hasJellyfin = !!user.jellyfinUsername;
+    const hasPlex = !!user.plexUsername;
+
+    if (hasJellyfin && !hasPlex) {
+      res.status(400).json({
+        error:
+          "Cannot unlink this account. You must keep at least one media server account linked to sign in. Link Plex first, or ask an admin to delete your Scroblarr user.",
+      });
+      return;
+    }
+
+    await sessionRepository.deleteAllForUser(user.id);
+    await userRepository.update(user.id, {
+      jellyfinUsername: null,
+      jellyfinAccessToken: null,
+      jellyfinUserId: null,
+      jellyfinThumb: null,
+    } as unknown as Partial<User>);
+
+    logger.auth.info(
+      {
+        userId: user.id,
+        username: user.plexUsername,
+        isAdmin: user.isAdmin,
+      },
+      "Jellyfin account unlinked"
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    logger.auth.error({ error }, "Error unlinking Jellyfin account");
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "Failed to unlink Jellyfin account";
+    res.status(500).json({ error: errorMessage });
   }
-);
+}
+
+function forceEmbyMediaBrowserType(req: Request): void {
+  req.body = {
+    ...(typeof req.body === "object" && req.body !== null ? req.body : {}),
+    mediaBrowserType: "emby",
+  };
+}
+
+router.post("/emby", (req, res) => {
+  forceEmbyMediaBrowserType(req);
+  void handleJellyfinLogin(req, res);
+});
+
+router.post("/emby/setup-admin", (req, res) => {
+  forceEmbyMediaBrowserType(req);
+  void handleJellyfinSetupAdmin(req, res);
+});
+
+router.post("/emby/link", auth, (req, res) => {
+  forceEmbyMediaBrowserType(req);
+  void handleJellyfinLink(req, res);
+});
+
+router.post("/emby/unlink", auth, (req, res) => {
+  void handleJellyfinUnlink(req, res);
+});
 
 export { router as authRoutes };

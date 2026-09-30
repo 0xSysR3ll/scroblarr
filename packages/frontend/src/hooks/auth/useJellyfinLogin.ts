@@ -25,7 +25,8 @@ export function useJellyfinLogin({
     hostname?: string,
     port?: number,
     useSsl?: boolean,
-    urlBase?: string
+    urlBase?: string,
+    mediaBrowserType: "jellyfin" | "emby" = "jellyfin"
   ) {
     try {
       setLoading(true);
@@ -35,7 +36,8 @@ export function useJellyfinLogin({
         hostname,
         port,
         useSsl,
-        urlBase
+        urlBase,
+        mediaBrowserType
       );
       if (onSuccess) {
         onSuccess(response);

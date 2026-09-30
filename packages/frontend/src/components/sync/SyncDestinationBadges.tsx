@@ -14,13 +14,6 @@ interface SyncDestinationBadgesProps {
   emptyFallback?: ReactNode;
 }
 
-const destinationLabels: Record<SyncDestinationName, string> = {
-  TVTime: "TVTime",
-  Trakt: "Trakt",
-  Simkl: "Simkl",
-  Bingers: "Bingers",
-};
-
 const destinationLogoPaths: Record<SyncDestinationName, string> = {
   TVTime: "/logos/tvtime.svg",
   Trakt: "/logos/trakt.svg",
@@ -28,12 +21,22 @@ const destinationLogoPaths: Record<SyncDestinationName, string> = {
   Bingers: "/logos/bingers.png",
 };
 
-const destinationTranslationKeys: Record<SyncDestinationName, string> = {
-  TVTime: "sync.destinations.tvtime",
-  Trakt: "sync.destinations.trakt",
-  Simkl: "sync.destinations.simkl",
-  Bingers: "sync.destinations.bingers",
-};
+function getDestinationLabel(
+  t: (key: string, options?: { defaultValue?: string }) => string,
+  name: SyncDestinationName
+): string {
+  // Literal keys so i18n:extract keeps sync.destinations.* entries.
+  switch (name) {
+    case "TVTime":
+      return t("sync.destinations.tvtime", { defaultValue: "TVTime" });
+    case "Trakt":
+      return t("sync.destinations.trakt", { defaultValue: "Trakt" });
+    case "Simkl":
+      return t("sync.destinations.simkl", { defaultValue: "Simkl" });
+    case "Bingers":
+      return t("sync.destinations.bingers", { defaultValue: "Bingers" });
+  }
+}
 
 function getBadgeClasses(destination: SyncDestinationResult): string {
   if (destination.status === "failed") {
@@ -74,9 +77,7 @@ export function SyncDestinationBadges({
   const badges = (
     <>
       {destinations.map((destination) => {
-        const label = t(destinationTranslationKeys[destination.name], {
-          defaultValue: destinationLabels[destination.name],
-        });
+        const label = getDestinationLabel(t, destination.name);
         const title =
           destination.status === "failed" && destination.errorMessage
             ? `${label}: ${destination.errorMessage}`

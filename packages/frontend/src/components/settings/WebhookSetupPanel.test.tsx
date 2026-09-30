@@ -3,6 +3,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { showError, showSuccess } from "@utils/toast";
 import {
+  buildEmbyWebhookUrl,
   buildJellyfinWebhookUrl,
   buildPlexWebhookUrl,
   buildTautulliWebhookHeaders,
@@ -215,5 +216,61 @@ describe("WebhookSetupPanel", () => {
     expect(
       screen.getByRole("button", { name: "Copy JSON headers" })
     ).toBeDisabled();
+  });
+
+  it("shows Emby webhook instructions and a placeholder API-key URL", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<WebhookSetupPanel source="emby" />);
+    await expandWebhooks(user);
+
+    expect(screen.getByRole("link", { name: "Setup docs" })).toHaveAttribute(
+      "href",
+      "https://0xsysr3ll.github.io/scroblarr/docs/configuration/emby"
+    );
+    expect(screen.getByLabelText("Webhook URL")).toHaveValue(
+      buildEmbyWebhookUrl("YOUR_WEBHOOK_API_KEY")
+    );
+    expect(
+      screen.getByText(
+        /Configure an Emby webhook under your Emby notification preferences/i
+      )
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        /Optional: Limit user events to the Emby accounts that should scrobble/i
+      )
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Copy webhook URL" })
+    ).toBeDisabled();
+  });
+
+  it("shows the Emby webhook URL when an API key is set", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+
+    renderWithProviders(
+      <WebhookSetupPanel source="emby" webhookApiKey="sk_emby" />
+    );
+    await expandWebhooks(user);
+
+    const expected = buildEmbyWebhookUrl("sk_emby");
+    expect(screen.getByLabelText("Webhook URL")).toHaveValue(expected);
+    expect(
+      screen.queryByText(
+        /Set and save an API key under Settings → General first/
+      )
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Copy webhook URL" }));
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith(expected);
+      expect(showSuccess).toHaveBeenCalledWith("Copied to clipboard");
+    });
   });
 });

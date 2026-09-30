@@ -50,12 +50,16 @@ router.get("/jellyfin/:userId", async (req: Request, res: Response) => {
       return res.status(503).json({ error: "Jellyfin not configured" });
     }
 
-    const jellyfinClient = new JellyfinClient(jellyfinHost);
+    const jellyfinClient = new JellyfinClient(
+      jellyfinHost,
+      undefined,
+      allSettings.mediaBrowserType === "emby" ? "emby" : "jellyfin"
+    );
     const avatarUrl = `${jellyfinHost}/Users/${user.jellyfinUserId}/Images/Primary`;
 
     const response = await fetch(avatarUrl, {
       headers: {
-        Authorization: jellyfinClient.getAuthHeader(jellyfinApiKey),
+        ...jellyfinClient.getAuthHeaders(jellyfinApiKey),
         Accept: "image/*",
       },
     });

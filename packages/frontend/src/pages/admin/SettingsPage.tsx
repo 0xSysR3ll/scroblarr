@@ -53,12 +53,14 @@ export function SettingsPage() {
     useSsl: boolean;
     urlBase: string;
     apiKey: string;
+    mediaBrowserType: "jellyfin" | "emby";
   }>({
     hostname: "",
     port: 8096,
     useSsl: false,
     urlBase: "",
     apiKey: "",
+    mediaBrowserType: "jellyfin",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -198,6 +200,8 @@ export function SettingsPage() {
             useSsl: settingsData.jellyfinUseSsl === "true",
             urlBase: settingsData.jellyfinUrlBase || "",
             apiKey: settingsData.jellyfinApiKey || "",
+            mediaBrowserType:
+              settingsData.mediaBrowserType === "emby" ? "emby" : "jellyfin",
           });
         }
 
@@ -285,6 +289,7 @@ export function SettingsPage() {
           updated.jellyfinUseSsl = jellyfinSettings.useSsl;
           updated.jellyfinUrlBase = jellyfinSettings.urlBase;
           updated.jellyfinApiKey = jellyfinSettings.apiKey;
+          updated.mediaBrowserType = jellyfinSettings.mediaBrowserType;
         }
       }
 

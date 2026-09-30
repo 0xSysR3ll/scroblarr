@@ -41,17 +41,19 @@ function mockAuth(overrides: Partial<ReturnType<typeof useAuth>> = {}) {
 
 describe("LoginPage", () => {
   const plexLogin = vi.fn();
+  const jellyfinLogin = vi.fn();
 
   beforeEach(() => {
     mockAuth();
     plexLogin.mockReset();
+    jellyfinLogin.mockReset();
     vi.mocked(usePlexLogin).mockReturnValue({
       loading: false,
       login: plexLogin,
     });
     vi.mocked(useJellyfinLogin).mockReturnValue({
       loading: false,
-      login: vi.fn(),
+      login: jellyfinLogin,
     });
     vi.mocked(getAuthProviders).mockResolvedValue({
       hasAdmin: true,
@@ -92,10 +94,92 @@ describe("LoginPage", () => {
     const user = userEvent.setup();
     renderWithProviders(<LoginPage />);
 
-    const password = await screen.findByLabelText("Jellyfin password");
+    const password = await screen.findByLabelText("Password");
     expect(password).toHaveAttribute("type", "password");
 
     await user.click(screen.getByRole("button", { name: /Show password/i }));
     expect(password).toHaveAttribute("type", "text");
+  });
+
+  it("renders Emby-specific login content and passes the Emby media browser type", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getAuthProviders).mockResolvedValue({
+      hasAdmin: false,
+      plexConfigured: false,
+      jellyfinConfigured: false,
+      embyConfigured: true,
+    });
+
+    renderWithProviders(<LoginPage />);
+
+    expect(await screen.findByLabelText("Username")).toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).toBeInTheDocument();
+    const embyLoginText = await screen.findByText("Emby Login");
+    const embyLoginButton = embyLoginText.closest("button");
+    expect(embyLoginButton).toBeTruthy();
+    expect(screen.getByAltText("Emby")).toHaveAttribute(
+      "src",
+      "/logos/emby.svg"
+    );
+
+    await user.type(screen.getByLabelText("Username"), "alice");
+    await user.type(screen.getByLabelText("Password"), "secret");
+    await user.click(embyLoginButton!);
+
+    await waitFor(() => {
+      expect(jellyfinLogin).toHaveBeenCalledWith(
+        "alice",
+        "secret",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        "emby"
+      );
+    });
+  });
+
+  it("shows the default Emby login error for non-Error rejections", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getAuthProviders).mockResolvedValue({
+      hasAdmin: false,
+      plexConfigured: false,
+      jellyfinConfigured: false,
+      embyConfigured: true,
+    });
+    jellyfinLogin.mockRejectedValueOnce("offline");
+
+    renderWithProviders(<LoginPage />);
+
+    await user.type(await screen.findByLabelText("Username"), "alice");
+    await user.type(screen.getByLabelText("Password"), "secret");
+    await user.click(
+      (await screen.findByText("Emby Login")).closest("button")!
+    );
+
+    expect(await screen.findByText("Failed to login with Emby")).toBeVisible();
+  });
+
+  it("shows the default Jellyfin login error for non-Error rejections", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getAuthProviders).mockResolvedValue({
+      hasAdmin: false,
+      plexConfigured: false,
+      jellyfinConfigured: true,
+      embyConfigured: false,
+    });
+    jellyfinLogin.mockRejectedValueOnce("offline");
+
+    renderWithProviders(<LoginPage />);
+
+    await user.type(await screen.findByLabelText("Username"), "alice");
+    await user.type(screen.getByLabelText("Password"), "secret");
+    await user.click(
+      (await screen.findByText("Jellyfin Login")).closest("button")!
+    );
+
+    expect(
+      await screen.findByText("Failed to login with Jellyfin")
+    ).toBeVisible();
   });
 });

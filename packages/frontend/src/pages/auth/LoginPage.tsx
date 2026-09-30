@@ -21,6 +21,7 @@ export function LoginPage() {
     hasAdmin: boolean;
     plexConfigured: boolean;
     jellyfinConfigured: boolean;
+    embyConfigured?: boolean;
   } | null>(null);
   const [jellyfinFormData, setJellyfinFormData] = useState({
     username: "",
@@ -76,6 +77,15 @@ export function LoginPage() {
     }
   }, [isAuthenticated, navigate]);
 
+  const mediaBrowserConfigured =
+    !!authProviders?.jellyfinConfigured || !!authProviders?.embyConfigured;
+  const mediaBrowserIsEmby = !!authProviders?.embyConfigured;
+  const isEmbyLogin = mediaBrowserIsEmby;
+  const mediaBrowserName = mediaBrowserIsEmby ? "Emby" : "Jellyfin";
+  const mediaBrowserLogo = mediaBrowserIsEmby
+    ? "/logos/emby.svg"
+    : "/logos/jellyfin.svg";
+
   async function handleJellyfinLogin() {
     try {
       setError(null);
@@ -87,14 +97,26 @@ export function LoginPage() {
         );
         return;
       }
-      await jellyfinLogin(jellyfinFormData.username, jellyfinFormData.password);
+      await jellyfinLogin(
+        jellyfinFormData.username,
+        jellyfinFormData.password,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        isEmbyLogin ? "emby" : "jellyfin"
+      );
     } catch (error) {
       setError(
         error instanceof Error
           ? error.message
-          : t("auth.loginWithJellyfinFailed", {
-              defaultValue: "Failed to login with Jellyfin",
-            })
+          : isEmbyLogin
+            ? t("auth.loginWithEmbyFailed", {
+                defaultValue: "Failed to login with Emby",
+              })
+            : t("auth.loginWithJellyfinFailed", {
+                defaultValue: "Failed to login with Jellyfin",
+              })
       );
     }
   }
@@ -161,7 +183,7 @@ export function LoginPage() {
             )}
 
             {(authProviders?.plexConfigured || authProviders?.hasAdmin) &&
-              authProviders?.jellyfinConfigured && (
+              mediaBrowserConfigured && (
                 <div className="flex items-center gap-3">
                   <div className="h-px flex-1 bg-border" />
                   <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -171,10 +193,16 @@ export function LoginPage() {
                 </div>
               )}
 
-            {authProviders?.jellyfinConfigured && (
+            {mediaBrowserConfigured && (
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="jellyfin-username">Jellyfin username</Label>
+                  <Label htmlFor="jellyfin-username">
+                    {mediaBrowserIsEmby
+                      ? t("auth.emby.username", { defaultValue: "Username" })
+                      : t("auth.jellyfin.username", {
+                          defaultValue: "Username",
+                        })}
+                  </Label>
                   <Input
                     id="jellyfin-username"
                     type="text"
@@ -190,7 +218,13 @@ export function LoginPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="jellyfin-password">Jellyfin password</Label>
+                  <Label htmlFor="jellyfin-password">
+                    {mediaBrowserIsEmby
+                      ? t("auth.emby.password", { defaultValue: "Password" })
+                      : t("auth.jellyfin.password", {
+                          defaultValue: "Password",
+                        })}
+                  </Label>
                   <div className="relative">
                     <Input
                       id="jellyfin-password"
@@ -251,11 +285,17 @@ export function LoginPage() {
                   ) : (
                     <>
                       <img
-                        src="/logos/jellyfin.svg"
-                        alt="Jellyfin"
+                        src={mediaBrowserLogo}
+                        alt={mediaBrowserName}
                         className="h-4 w-4"
                       />
-                      <span>Jellyfin Login</span>
+                      <span>
+                        {mediaBrowserIsEmby
+                          ? t("auth.embyLogin", { defaultValue: "Emby Login" })
+                          : t("auth.jellyfinLogin", {
+                              defaultValue: "Jellyfin Login",
+                            })}
+                      </span>
                     </>
                   )}
                 </Button>
@@ -264,7 +304,7 @@ export function LoginPage() {
 
             {!authProviders?.hasAdmin &&
               !authProviders?.plexConfigured &&
-              !authProviders?.jellyfinConfigured && (
+              !mediaBrowserConfigured && (
                 <p className="text-center text-sm text-muted-foreground">
                   {t("auth.noServiceConfigured", {
                     defaultValue:

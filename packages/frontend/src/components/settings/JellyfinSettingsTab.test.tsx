@@ -50,6 +50,9 @@ const configuredSettings: Settings = {
 function renderJellyfin(
   overrides: Partial<{
     settings: Settings;
+    mediaBrowserType: "jellyfin" | "emby";
+    formOpen?: boolean;
+    onFormOpenChange?: ReturnType<typeof vi.fn>;
     webhookApiKey?: string;
     onJellyfinSettingsChange?: ReturnType<typeof vi.fn>;
     onSettingsUpdated?: ReturnType<typeof vi.fn>;
@@ -58,6 +61,9 @@ function renderJellyfin(
   return renderWithProviders(
     <JellyfinSettingsTab
       settings={overrides.settings ?? {}}
+      mediaBrowserType={overrides.mediaBrowserType}
+      formOpen={overrides.formOpen}
+      onFormOpenChange={overrides.onFormOpenChange}
       onJellyfinSettingsChange={overrides.onJellyfinSettingsChange ?? vi.fn()}
       onSettingsUpdated={overrides.onSettingsUpdated}
       webhookApiKey={overrides.webhookApiKey ?? "sk_test"}
@@ -96,6 +102,96 @@ describe("JellyfinSettingsTab", () => {
     });
   });
 
+  it("collapses an unsaved draft when formOpen becomes false", async () => {
+    const user = userEvent.setup();
+    const onFormOpenChange = vi.fn();
+    const view = renderJellyfin({
+      settings: {},
+      formOpen: true,
+      onFormOpenChange,
+    });
+
+    await expandJellyfin(user);
+    await user.click(
+      screen.getByRole("button", { name: "Add Jellyfin Server" })
+    );
+    expect(
+      screen.getByPlaceholderText("jellyfin.example.com")
+    ).toBeInTheDocument();
+
+    view.rerender(
+      <JellyfinSettingsTab
+        settings={{}}
+        formOpen={false}
+        onFormOpenChange={onFormOpenChange}
+        onJellyfinSettingsChange={vi.fn()}
+        webhookApiKey="sk_test"
+      />
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Add Jellyfin Server" })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText("jellyfin.example.com")
+    ).not.toBeInTheDocument();
+  });
+
+  it("collapses a filled unsaved draft when formOpen becomes false", async () => {
+    const user = userEvent.setup();
+    const onFormOpenChange = vi.fn();
+    const view = renderJellyfin({
+      settings: {},
+      formOpen: true,
+      onFormOpenChange,
+    });
+
+    await expandJellyfin(user);
+    await user.click(
+      screen.getByRole("button", { name: "Add Jellyfin Server" })
+    );
+    await user.type(
+      screen.getByPlaceholderText("jellyfin.example.com"),
+      "draft.local"
+    );
+    await user.type(
+      screen.getByPlaceholderText("No API key configured"),
+      "draft-key"
+    );
+
+    view.rerender(
+      <JellyfinSettingsTab
+        settings={{}}
+        formOpen={false}
+        onFormOpenChange={onFormOpenChange}
+        onJellyfinSettingsChange={vi.fn()}
+        webhookApiKey="sk_test"
+      />
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Add Jellyfin Server" })
+    ).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("draft.local")).not.toBeInTheDocument();
+  });
+
+  it("keeps a configured server form open even when formOpen is false", async () => {
+    const user = userEvent.setup();
+    renderJellyfin({
+      settings: configuredSettings,
+      formOpen: false,
+    });
+
+    await expandJellyfin(user);
+
+    expect(
+      await screen.findByDisplayValue("jellyfin.local")
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Add Jellyfin Server" })
+    ).not.toBeInTheDocument();
+  });
+
   it("hides the webhook panel when Jellyfin is not saved", async () => {
     const user = userEvent.setup();
     renderJellyfin({ settings: {} });
@@ -118,6 +214,25 @@ describe("JellyfinSettingsTab", () => {
     await expandJellyfin(user);
 
     expect(await screen.findByText("Webhooks")).toBeInTheDocument();
+  });
+
+  it("hides the webhook panel for saved Emby until the Emby handler ships", async () => {
+    const user = userEvent.setup();
+    renderJellyfin({
+      settings: {
+        jellyfinHost: "http://emby.local:8096",
+        jellyfinPort: "8096",
+        jellyfinUseSsl: "false",
+        jellyfinUrlBase: "/emby",
+        jellyfinApiKey: "emby-key",
+        mediaBrowserType: "emby",
+      },
+      mediaBrowserType: "emby",
+    });
+
+    await user.click(screen.getByRole("button", { name: /Emby Server/i }));
+
+    expect(screen.queryByText("Webhooks")).not.toBeInTheDocument();
   });
 
   it("updates connection fields and notifies the parent", async () => {
@@ -265,7 +380,8 @@ describe("JellyfinSettingsTab", () => {
         "jf",
         8096,
         false,
-        ""
+        "",
+        "jellyfin"
       );
       expect(showSuccess).toHaveBeenCalled();
       expect(onSettingsUpdated).toHaveBeenCalled();
@@ -350,6 +466,101 @@ describe("JellyfinSettingsTab", () => {
 
     await waitFor(() => {
       expect(showError).toHaveBeenCalledWith("delete blocked");
+    });
+  });
+
+  it("renders Emby-specific form copy and generates an API key", async () => {
+    const user = userEvent.setup();
+    const onSettingsUpdated = vi.fn();
+
+    renderJellyfin({
+      settings: {},
+      mediaBrowserType: "emby",
+      onSettingsUpdated,
+    });
+
+    await user.click(screen.getByRole("button", { name: /Emby Server/i }));
+    await user.click(screen.getByRole("button", { name: "Add Emby Server" }));
+
+    expect(screen.getByPlaceholderText("emby.example.com")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("/emby")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Login with your Emby credentials to automatically generate an API key/i
+      )
+    ).toBeVisible();
+    expect(
+      screen.getAllByText(/Emby Dashboard → Advanced → Security/i).length
+    ).toBeGreaterThan(0);
+    expect(screen.getByText("API Key")).toBeVisible();
+
+    await user.type(
+      screen.getByPlaceholderText("emby.example.com"),
+      "emby.local"
+    );
+    await user.type(screen.getByPlaceholderText("Username"), "admin");
+    await user.type(screen.getByPlaceholderText("Password"), "secret");
+    await user.click(
+      screen.getByRole("button", { name: "Login & Generate API Key" })
+    );
+
+    await waitFor(() => {
+      expect(linkJellyfinAccount).toHaveBeenCalledWith(
+        "admin",
+        "secret",
+        "emby.local",
+        8096,
+        false,
+        "",
+        "emby"
+      );
+      expect(showSuccess).toHaveBeenCalledWith(
+        "API key generated successfully!"
+      );
+      expect(onSettingsUpdated).toHaveBeenCalled();
+    });
+  });
+
+  it("shows saved Emby API key guidance and removes the Emby server", async () => {
+    const user = userEvent.setup();
+    const onSettingsUpdated = vi.fn();
+
+    renderJellyfin({
+      settings: {
+        jellyfinHost: "http://emby.local:8096",
+        jellyfinPort: "8096",
+        jellyfinUseSsl: "false",
+        jellyfinUrlBase: "/emby",
+        jellyfinApiKey: "emby-key",
+        mediaBrowserType: "emby",
+      },
+      mediaBrowserType: "emby",
+      onSettingsUpdated,
+    });
+
+    await user.click(screen.getByRole("button", { name: /Emby Server/i }));
+
+    expect(
+      screen.getByText(
+        /API key is automatically generated during setup when possible/i
+      )
+    ).toBeVisible();
+    expect(
+      screen.getByText(/Emby Dashboard → Advanced → Security if needed/i)
+    ).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Remove Server" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Remove Server" })
+    );
+
+    await waitFor(() => {
+      expect(removeJellyfinServer).toHaveBeenCalled();
+      expect(showSuccess).toHaveBeenCalledWith(
+        "Emby server removed successfully"
+      );
+      expect(onSettingsUpdated).toHaveBeenCalled();
     });
   });
 });

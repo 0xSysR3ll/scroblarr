@@ -59,7 +59,8 @@ export async function loginWithJellyfin(
   hostname?: string,
   port?: number,
   useSsl?: boolean,
-  urlBase?: string
+  urlBase?: string,
+  mediaBrowserType: "jellyfin" | "emby" = "jellyfin"
 ): Promise<{
   id: string;
   username: string;
@@ -74,9 +75,11 @@ export async function loginWithJellyfin(
     port?: number;
     useSsl?: boolean;
     urlBase?: string;
+    mediaBrowserType?: "jellyfin" | "emby";
   } = {
     username,
     password,
+    mediaBrowserType,
   };
 
   if (hostname) {
@@ -86,7 +89,9 @@ export async function loginWithJellyfin(
     if (urlBase) body.urlBase = urlBase;
   }
 
-  const response = await fetch(`${API_BASE_URL}/auth/jellyfin`, {
+  const endpoint =
+    mediaBrowserType === "emby" ? "/auth/emby" : "/auth/jellyfin";
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -106,7 +111,8 @@ export async function linkJellyfinAccount(
   hostname?: string,
   port?: number,
   useSsl?: boolean,
-  urlBase?: string
+  urlBase?: string,
+  mediaBrowserType: "jellyfin" | "emby" = "jellyfin"
 ): Promise<{
   id: string;
   username: string;
@@ -121,9 +127,11 @@ export async function linkJellyfinAccount(
     port?: number;
     useSsl?: boolean;
     urlBase?: string;
+    mediaBrowserType?: "jellyfin" | "emby";
   } = {
     username,
     password,
+    mediaBrowserType,
   };
 
   if (hostname) {
@@ -133,7 +141,9 @@ export async function linkJellyfinAccount(
     if (urlBase) body.urlBase = urlBase;
   }
 
-  const response = await fetch(`${API_BASE_URL}/auth/jellyfin/link`, {
+  const endpoint =
+    mediaBrowserType === "emby" ? "/auth/emby/link" : "/auth/jellyfin/link";
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     method: "POST",
     headers: getAuthHeaders(),
     body: JSON.stringify(body),
@@ -182,7 +192,9 @@ export async function unlinkJellyfinAccount(): Promise<{
 export async function getAuthProviders(): Promise<{
   hasAdmin: boolean;
   jellyfinConfigured: boolean;
+  embyConfigured?: boolean;
   plexConfigured: boolean;
+  mediaBrowserType?: "jellyfin" | "emby";
 }> {
   const response = await fetch(`${API_BASE_URL}/auth/providers`, {
     method: "GET",
@@ -223,6 +235,116 @@ export async function setupJellyfinAdmin(
   hostname: string,
   port?: number,
   useSsl?: boolean,
+  urlBase?: string,
+  mediaBrowserType: "jellyfin" | "emby" = "jellyfin"
+): Promise<{
+  user: {
+    id: string;
+    username: string;
+    displayName?: string;
+    email?: string;
+    isAdmin: boolean;
+  };
+  accessToken: string;
+}> {
+  const endpoint =
+    mediaBrowserType === "emby"
+      ? "/auth/emby/setup-admin"
+      : "/auth/jellyfin/setup-admin";
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username,
+      password,
+      hostname,
+      port,
+      useSsl,
+      urlBase,
+      mediaBrowserType,
+    }),
+  });
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ error: "Failed to setup Jellyfin admin" }));
+    throw new Error(error.error || "Failed to setup Jellyfin admin");
+  }
+  return response.json();
+}
+
+export async function loginWithEmby(
+  username: string,
+  password: string,
+  hostname?: string,
+  port?: number,
+  useSsl?: boolean,
+  urlBase?: string
+): Promise<{
+  id: string;
+  username: string;
+  displayName?: string;
+  email?: string;
+  isAdmin: boolean;
+}> {
+  return loginWithJellyfin(
+    username,
+    password,
+    hostname,
+    port,
+    useSsl,
+    urlBase,
+    "emby"
+  );
+}
+
+export async function linkEmbyAccount(
+  username: string,
+  password: string,
+  hostname?: string,
+  port?: number,
+  useSsl?: boolean,
+  urlBase?: string
+): Promise<{
+  id: string;
+  username: string;
+  displayName?: string;
+  email?: string;
+  isAdmin: boolean;
+}> {
+  return linkJellyfinAccount(
+    username,
+    password,
+    hostname,
+    port,
+    useSsl,
+    urlBase,
+    "emby"
+  );
+}
+
+export async function unlinkEmbyAccount(): Promise<{
+  success: boolean;
+}> {
+  const response = await fetch(`${API_BASE_URL}/auth/emby/unlink`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ error: "Failed to unlink Emby account" }));
+    throw new Error(error.error || "Failed to unlink Emby account");
+  }
+  return response.json();
+}
+
+export async function setupEmbyAdmin(
+  username: string,
+  password: string,
+  hostname: string,
+  port?: number,
+  useSsl?: boolean,
   urlBase?: string
 ): Promise<{
   user: {
@@ -234,25 +356,15 @@ export async function setupJellyfinAdmin(
   };
   accessToken: string;
 }> {
-  const response = await fetch(`${API_BASE_URL}/auth/jellyfin/setup-admin`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      username,
-      password,
-      hostname,
-      port,
-      useSsl,
-      urlBase,
-    }),
-  });
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ error: "Failed to setup Jellyfin admin" }));
-    throw new Error(error.error || "Failed to setup Jellyfin admin");
-  }
-  return response.json();
+  return setupJellyfinAdmin(
+    username,
+    password,
+    hostname,
+    port,
+    useSsl,
+    urlBase,
+    "emby"
+  );
 }
 
 export async function getCurrentUser(): Promise<{

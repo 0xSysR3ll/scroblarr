@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const settingsRepositoryMocks = vi.hoisted(() => ({
   get: vi.fn(),
   getAll: vi.fn(),
+  deleteMany: vi.fn(),
 }));
 
 const userRepositoryMocks = vi.hoisted(() => ({
@@ -17,7 +18,7 @@ vi.mock("@repositories/SettingsRepository", () => ({
     getAll = settingsRepositoryMocks.getAll;
     set = vi.fn();
     delete = vi.fn();
-    deleteMany = vi.fn();
+    deleteMany = settingsRepositoryMocks.deleteMany;
   },
 }));
 
@@ -71,5 +72,31 @@ describe("settings route protection", () => {
     expect(response.body).toEqual({
       error: "Forbidden: Admin access required",
     });
+  });
+
+  it("removes Jellyfin settings including mediaBrowserType", async () => {
+    userRepositoryMocks.findBySessionToken.mockResolvedValue({
+      id: "admin-id",
+      isAdmin: true,
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/settings", settingsRoutes);
+
+    const response = await request(app)
+      .delete("/api/v1/settings/jellyfin")
+      .set("authorization", "Bearer admin-token");
+
+    expect(response.status).toBe(200);
+    expect(settingsRepositoryMocks.deleteMany).toHaveBeenCalledWith([
+      "jellyfinHost",
+      "jellyfinPort",
+      "jellyfinUseSsl",
+      "jellyfinUrlBase",
+      "jellyfinApiKey",
+      "mediaBrowserType",
+    ]);
   });
 });

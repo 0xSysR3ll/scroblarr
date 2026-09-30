@@ -51,7 +51,8 @@ describe("useJellyfinLogin", () => {
       "jellyfin.local",
       8096,
       false,
-      "/jf"
+      "/jf",
+      "jellyfin"
     );
 
     await act(async () => {
@@ -79,5 +80,31 @@ describe("useJellyfinLogin", () => {
 
     expect(onError).toHaveBeenCalledWith("Invalid Jellyfin credentials");
     expect(result.current.loading).toBe(false);
+  });
+  it("logs in with Emby mediaBrowserType", async () => {
+    vi.mocked(loginWithJellyfin).mockResolvedValue(user);
+    const { result } = renderHook(() => useJellyfinLogin({}));
+
+    await act(async () => {
+      await result.current.login(
+        "alice",
+        "secret",
+        "emby.local",
+        8096,
+        false,
+        undefined,
+        "emby"
+      );
+    });
+
+    expect(loginWithJellyfin).toHaveBeenCalledWith(
+      "alice",
+      "secret",
+      "emby.local",
+      8096,
+      false,
+      undefined,
+      "emby"
+    );
   });
 });

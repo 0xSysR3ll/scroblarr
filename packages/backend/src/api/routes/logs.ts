@@ -3,8 +3,8 @@ import { readFile, readdir, stat } from "fs/promises";
 import { join, resolve, sep } from "path";
 
 import { logger, formatDateUTC } from "@utils/logger";
-import { routeParam } from "@utils/routeParams";
 import { getDataDir } from "@utils/paths";
+import { routeParam } from "@utils/routeParams";
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 
@@ -34,6 +34,7 @@ const getLogsQuerySchema = z.object({
       "trakt",
       "plex",
       "jellyfin",
+      "emby",
       "system",
       "migration",
     ])

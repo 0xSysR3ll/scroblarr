@@ -161,4 +161,21 @@ describe("settings PATCH", () => {
     expect(response.body.error).toBe("Validation error");
     expect(settingsRepositoryMocks.set).not.toHaveBeenCalled();
   });
+
+  it("persists mediaBrowserType", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/settings", settingsRoutes);
+
+    const response = await request(app)
+      .patch("/api/v1/settings")
+      .set("authorization", "Bearer admin-token")
+      .send({ mediaBrowserType: "emby" });
+
+    expect(response.status).toBe(200);
+    expect(settingsRepositoryMocks.set).toHaveBeenCalledWith(
+      "mediaBrowserType",
+      "emby"
+    );
+  });
 });

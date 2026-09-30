@@ -22,12 +22,16 @@ import { WebhookSetupPanel } from "./WebhookSetupPanel";
 
 interface JellyfinSettingsTabProps {
   settings: Settings;
+  mediaBrowserType?: "jellyfin" | "emby";
+  formOpen?: boolean;
+  onFormOpenChange?: (open: boolean) => void;
   onJellyfinSettingsChange: (settings: {
     hostname: string;
     port: number;
     useSsl: boolean;
     urlBase: string;
     apiKey: string;
+    mediaBrowserType: "jellyfin" | "emby";
   }) => void;
   onSettingsUpdated?: () => void;
   webhookApiKey?: string;
@@ -35,12 +39,18 @@ interface JellyfinSettingsTabProps {
 
 export function JellyfinSettingsTab({
   settings,
+  mediaBrowserType = "jellyfin",
+  formOpen,
+  onFormOpenChange,
   onJellyfinSettingsChange,
   onSettingsUpdated,
   webhookApiKey,
 }: JellyfinSettingsTabProps) {
   const { t } = useTranslation();
   const { checkAuth, isAdmin } = useAuth();
+  const isEmby = mediaBrowserType === "emby";
+  const brandName = isEmby ? "Emby" : "Jellyfin";
+  const brandLogo = isEmby ? "/logos/emby.svg" : "/logos/jellyfin.svg";
   const [jellyfinUsername, setJellyfinUsername] = useState("");
   const [jellyfinPassword, setJellyfinPassword] = useState("");
   const [linkingJellyfin, setLinkingJellyfin] = useState(false);
@@ -49,6 +59,7 @@ export function JellyfinSettingsTab({
     hasAdmin: boolean;
     plexConfigured: boolean;
     jellyfinConfigured: boolean;
+    embyConfigured?: boolean;
   } | null>(null);
 
   const parseHostname = (host: string | undefined): string => {
@@ -103,6 +114,7 @@ export function JellyfinSettingsTab({
 
     if (parsedHostname && parsedApiKey) {
       setShowForm(true);
+      onFormOpenChange?.(true);
     }
   }, [
     settings.jellyfinHost,
@@ -113,11 +125,33 @@ export function JellyfinSettingsTab({
   ]);
 
   useEffect(() => {
+    if (formOpen !== false) {
+      return;
+    }
+    if (settings.jellyfinHost && settings.jellyfinApiKey) {
+      return;
+    }
+    setShowForm(false);
+    setHostname("");
+    setPort(8096);
+    setUseSsl(false);
+    setUrlBase("");
+    setApiKey("");
+  }, [formOpen, settings.jellyfinHost, settings.jellyfinApiKey]);
+
+  useEffect(() => {
     if (showForm) {
-      onJellyfinSettingsChange({ hostname, port, useSsl, urlBase, apiKey });
+      onJellyfinSettingsChange({
+        hostname,
+        port,
+        useSsl,
+        urlBase,
+        apiKey,
+        mediaBrowserType,
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hostname, port, useSsl, urlBase, apiKey, showForm]);
+  }, [hostname, port, useSsl, urlBase, apiKey, showForm, mediaBrowserType]);
 
   useEffect(() => {
     async function loadAuthProviders() {
@@ -167,9 +201,13 @@ export function JellyfinSettingsTab({
       setApiKey("");
       setShowRemoveModal(false);
       showSuccess(
-        t("settings.jellyfinServerRemoved", {
-          defaultValue: "Jellyfin server removed successfully",
-        })
+        isEmby
+          ? t("settings.embyServerRemoved", {
+              defaultValue: "Emby server removed successfully",
+            })
+          : t("settings.jellyfinServerRemoved", {
+              defaultValue: "Jellyfin server removed successfully",
+            })
       );
       if (onSettingsUpdated) {
         onSettingsUpdated();
@@ -187,13 +225,19 @@ export function JellyfinSettingsTab({
     }
   }
 
-  const title = t("settings.jellyfinServer", {
-    defaultValue: "Jellyfin Server",
-  });
-  const description = t("settings.jellyfinServerDescription", {
-    defaultValue: "Configure your Jellyfin server connection settings.",
-  });
-  const icon = <img src="/logos/jellyfin.svg" alt="" className="w-5 h-5" />;
+  const title = isEmby
+    ? t("settings.embyServer", { defaultValue: "Emby Server" })
+    : t("settings.jellyfinServer", { defaultValue: "Jellyfin Server" });
+  const description = isEmby
+    ? t("settings.embyServerDescription", {
+        defaultValue:
+          "Configure your Emby server connection for importing users and poster lookups.",
+      })
+    : t("settings.jellyfinServerDescription", {
+        defaultValue:
+          "Configure your Jellyfin server connection for importing users and poster lookups.",
+      });
+  const icon = <img src={brandLogo} alt="" className="w-5 h-5" />;
   const showEmptyState = !showForm && !isConfigured;
 
   return (
@@ -206,19 +250,30 @@ export function JellyfinSettingsTab({
         {showEmptyState ? (
           <div className="surface-tile p-6 text-center">
             <p className="mb-4 text-sm text-muted-foreground">
-              {t("settings.jellyfinNotConfigured", {
-                defaultValue: "No Jellyfin server has been configured yet.",
-              })}
+              {isEmby
+                ? t("settings.embyNotConfigured", {
+                    defaultValue: "Emby is not configured yet.",
+                  })
+                : t("settings.jellyfinNotConfigured", {
+                    defaultValue: "Jellyfin is not configured yet.",
+                  })}
             </p>
             <button
               type="button"
-              onClick={() => setShowForm(true)}
+              onClick={() => {
+                onFormOpenChange?.(true);
+                setShowForm(true);
+              }}
               className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
             >
               <FaPlus className="w-4 h-4" />
-              {t("settings.addJellyfinServer", {
-                defaultValue: "Add Jellyfin Server",
-              })}
+              {isEmby
+                ? t("settings.addEmbyServer", {
+                    defaultValue: "Add Emby Server",
+                  })
+                : t("settings.addJellyfinServer", {
+                    defaultValue: "Add Jellyfin Server",
+                  })}
             </button>
           </div>
         ) : (
@@ -251,25 +306,37 @@ export function JellyfinSettingsTab({
             <div className="space-y-4">
               <div>
                 <label
-                  htmlFor="jellyfin-hostname"
+                  htmlFor={`${isEmby ? "emby" : "jellyfin"}-hostname`}
                   className="mb-1 block text-sm font-medium text-foreground"
                 >
-                  {t("auth.jellyfin.serverHostname", {
-                    defaultValue: "Server Hostname",
-                  })}
+                  {t(
+                    isEmby
+                      ? "auth.emby.serverHostname"
+                      : "auth.jellyfin.serverHostname",
+                    {
+                      defaultValue: "Server Hostname",
+                    }
+                  )}
                 </label>
                 <div className="flex rounded-md shadow-sm">
                   <span className="inline-flex cursor-default items-center rounded-l-md border border-r-0 border-input bg-muted px-3 text-sm text-muted-foreground">
                     {useSsl ? "https://" : "http://"}
                   </span>
                   <input
-                    id="jellyfin-hostname"
+                    id={`${isEmby ? "emby" : "jellyfin"}-hostname`}
                     type="text"
                     value={hostname}
                     onChange={(e) => handleHostnameChange(e.target.value)}
-                    placeholder={t("auth.jellyfin.hostnamePlaceholder", {
-                      defaultValue: "jellyfin.example.com",
-                    })}
+                    placeholder={t(
+                      isEmby
+                        ? "auth.emby.hostnamePlaceholder"
+                        : "auth.jellyfin.hostnamePlaceholder",
+                      {
+                        defaultValue: isEmby
+                          ? "emby.example.com"
+                          : "jellyfin.example.com",
+                      }
+                    )}
                     className="flex-1 rounded-r-md border border-input bg-background px-3 py-2 text-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
                   />
                 </div>
@@ -278,13 +345,15 @@ export function JellyfinSettingsTab({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label
-                    htmlFor="jellyfin-port"
+                    htmlFor={`${isEmby ? "emby" : "jellyfin"}-port`}
                     className="mb-1 block text-sm font-medium text-foreground"
                   >
-                    {t("auth.jellyfin.port", { defaultValue: "Port" })}
+                    {isEmby
+                      ? t("auth.emby.port", { defaultValue: "Port" })
+                      : t("auth.jellyfin.port", { defaultValue: "Port" })}
                   </label>
                   <input
-                    id="jellyfin-port"
+                    id={`${isEmby ? "emby" : "jellyfin"}-port`}
                     type="number"
                     value={port}
                     onChange={(e) =>
@@ -298,12 +367,17 @@ export function JellyfinSettingsTab({
                     <CustomCheckbox
                       checked={useSsl}
                       onChange={() => handleSslChange(!useSsl)}
-                      ariaLabel={t("auth.jellyfin.useSsl", {
-                        defaultValue: "Use SSL",
-                      })}
+                      ariaLabel={t(
+                        isEmby ? "auth.emby.useSsl" : "auth.jellyfin.useSsl",
+                        {
+                          defaultValue: "Use SSL",
+                        }
+                      )}
                     />
                     <span className="ml-2">
-                      {t("auth.jellyfin.useSsl", { defaultValue: "Use SSL" })}
+                      {t(isEmby ? "auth.emby.useSsl" : "auth.jellyfin.useSsl", {
+                        defaultValue: "Use SSL",
+                      })}
                     </span>
                   </label>
                 </div>
@@ -311,21 +385,26 @@ export function JellyfinSettingsTab({
 
               <div>
                 <label
-                  htmlFor="jellyfin-url-base"
+                  htmlFor={`${isEmby ? "emby" : "jellyfin"}-url-base`}
                   className="mb-1 block text-sm font-medium text-foreground"
                 >
-                  {t("auth.jellyfin.urlBase", {
+                  {t(isEmby ? "auth.emby.urlBase" : "auth.jellyfin.urlBase", {
                     defaultValue: "URL Base (optional)",
                   })}
                 </label>
                 <input
-                  id="jellyfin-url-base"
+                  id={`${isEmby ? "emby" : "jellyfin"}-url-base`}
                   type="text"
                   value={urlBase}
                   onChange={(e) => handleUrlBaseChange(e.target.value)}
-                  placeholder={t("auth.jellyfin.urlBasePlaceholder", {
-                    defaultValue: "/jellyfin",
-                  })}
+                  placeholder={t(
+                    isEmby
+                      ? "auth.emby.urlBasePlaceholder"
+                      : "auth.jellyfin.urlBasePlaceholder",
+                    {
+                      defaultValue: isEmby ? "/emby" : "/jellyfin",
+                    }
+                  )}
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
                 />
               </div>
@@ -333,10 +412,15 @@ export function JellyfinSettingsTab({
               {!apiKey && isAdmin && (
                 <div className="rounded border-l-4 border-primary bg-primary/5 p-4">
                   <p className="mb-3 text-sm text-primary">
-                    {t("settings.jellyfinLoginRequired", {
-                      defaultValue:
-                        "Login with your Jellyfin credentials to automatically generate an API key.",
-                    })}
+                    {isEmby
+                      ? t("settings.embyLoginRequired", {
+                          defaultValue:
+                            "Login with your Emby credentials to automatically generate an API key. If key creation fails, paste one from Emby Dashboard → Advanced → Security.",
+                        })
+                      : t("settings.jellyfinLoginRequired", {
+                          defaultValue:
+                            "Login with your Jellyfin credentials to automatically generate an API key.",
+                        })}
                   </p>
                   <div className="space-y-3">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -344,9 +428,15 @@ export function JellyfinSettingsTab({
                         type="text"
                         value={jellyfinUsername}
                         onChange={(e) => setJellyfinUsername(e.target.value)}
-                        placeholder={t("auth.jellyfin.username", {
-                          defaultValue: "Username",
-                        })}
+                        placeholder={
+                          isEmby
+                            ? t("auth.emby.username", {
+                                defaultValue: "Username",
+                              })
+                            : t("auth.jellyfin.username", {
+                                defaultValue: "Username",
+                              })
+                        }
                         className="rounded-md border border-input bg-background px-3 py-2 text-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
                       />
                       <div className="relative">
@@ -392,14 +482,21 @@ export function JellyfinSettingsTab({
                             hostname,
                             port,
                             useSsl,
-                            urlBase
+                            urlBase,
+                            mediaBrowserType
                           );
                           setJellyfinPassword("");
                           setJellyfinUsername("");
                           showSuccess(
-                            t("settings.jellyfinApiKeyGenerated", {
-                              defaultValue: "API key generated successfully!",
-                            })
+                            isEmby
+                              ? t("settings.embyApiKeyGenerated", {
+                                  defaultValue:
+                                    "API key generated successfully!",
+                                })
+                              : t("settings.jellyfinApiKeyGenerated", {
+                                  defaultValue:
+                                    "API key generated successfully!",
+                                })
                           );
                           await checkAuth();
                           if (onSettingsUpdated) {
@@ -427,9 +524,13 @@ export function JellyfinSettingsTab({
                     >
                       {linkingJellyfin
                         ? t("common.loading", { defaultValue: "Loading..." })
-                        : t("settings.jellyfinLoginAndGenerateKey", {
-                            defaultValue: "Login & Generate API Key",
-                          })}
+                        : isEmby
+                          ? t("settings.embyLoginAndGenerateKey", {
+                              defaultValue: "Login & Generate API Key",
+                            })
+                          : t("settings.jellyfinLoginAndGenerateKey", {
+                              defaultValue: "Login & Generate API Key",
+                            })}
                     </button>
                   </div>
                 </div>
@@ -440,7 +541,9 @@ export function JellyfinSettingsTab({
                   htmlFor="jellyfin-api-key"
                   className="mb-1 block text-sm font-medium text-foreground"
                 >
-                  {t("settings.jellyfinApiKey", { defaultValue: "API Key" })}
+                  {isEmby
+                    ? t("settings.embyApiKey", { defaultValue: "API Key" })
+                    : t("settings.jellyfinApiKey", { defaultValue: "API Key" })}
                 </label>
                 <div className="relative">
                   <input
@@ -476,14 +579,24 @@ export function JellyfinSettingsTab({
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {apiKey
-                    ? t("settings.jellyfinApiKeyDescription", {
-                        defaultValue:
-                          "API key is automatically generated during setup. You can manually update it here if needed.",
-                      })
-                    : t("settings.jellyfinApiKeyDescriptionNoKey", {
-                        defaultValue:
-                          "Login with your Jellyfin credentials above to automatically generate an API key, or enter one manually.",
-                      })}
+                    ? isEmby
+                      ? t("settings.embyApiKeyDescription", {
+                          defaultValue:
+                            "API key is automatically generated during setup when possible. You can paste one from Emby Dashboard → Advanced → Security if needed.",
+                        })
+                      : t("settings.jellyfinApiKeyDescription", {
+                          defaultValue:
+                            "API key is automatically generated during setup. You can manually update it here if needed.",
+                        })
+                    : isEmby
+                      ? t("settings.embyApiKeyDescriptionNoKey", {
+                          defaultValue:
+                            "Login with your Emby credentials above to generate an API key, or paste one from Emby Dashboard → Advanced → Security.",
+                        })
+                      : t("settings.jellyfinApiKeyDescriptionNoKey", {
+                          defaultValue:
+                            "Login with your Jellyfin credentials above to automatically generate an API key, or enter one manually.",
+                        })}
                 </p>
               </div>
 
@@ -501,7 +614,11 @@ export function JellyfinSettingsTab({
                 </div>
               )}
 
-              {!!(settings.jellyfinHost && settings.jellyfinApiKey) && (
+              {!!(
+                settings.jellyfinHost &&
+                settings.jellyfinApiKey &&
+                !isEmby
+              ) && (
                 <WebhookSetupPanel
                   source="jellyfin"
                   webhookApiKey={webhookApiKey}
@@ -515,15 +632,24 @@ export function JellyfinSettingsTab({
       <Dialog open={showRemoveModal} onOpenChange={setShowRemoveModal}>
         <DialogContent className="max-w-md">
           <DialogTitle>
-            {t("settings.removeJellyfinServerTitle", {
-              defaultValue: "Remove Jellyfin Server",
-            })}
+            {t(
+              isEmby
+                ? "settings.removeEmbyServerTitle"
+                : "settings.removeJellyfinServerTitle",
+              {
+                defaultValue: `Remove ${brandName} Server`,
+              }
+            )}
           </DialogTitle>
           <DialogDescription className="whitespace-pre-line">
-            {t("settings.removeJellyfinServerMessage", {
-              defaultValue:
-                "Are you sure you want to remove the Jellyfin server configuration? This will:\n\n• Clear all Jellyfin server settings\n• Prevent importing new users from Jellyfin\n• Prevent syncing for existing Jellyfin users\n• Keep existing users and their sync history\n\nThis action cannot be undone.",
-            })}
+            {t(
+              isEmby
+                ? "settings.removeEmbyServerMessage"
+                : "settings.removeJellyfinServerMessage",
+              {
+                defaultValue: `Are you sure you want to remove the ${brandName} server configuration? This will:\n\n• Clear all ${brandName} server settings\n• Prevent importing new users from ${brandName}\n• Prevent syncing for existing ${brandName} users\n• Keep existing users and their sync history\n\nThis action cannot be undone.`,
+              }
+            )}
           </DialogDescription>
           {isAdmin && !authProviders?.plexConfigured && (
             <div className="mb-4 rounded border-l-4 border-warning-400 bg-warning-50 p-3 dark:border-warning-600 dark:bg-warning-950">

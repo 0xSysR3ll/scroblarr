@@ -855,7 +855,7 @@ export function DashboardPage() {
                 <p className="mb-6 text-muted-foreground">
                   {t("dashboard.empty.description", {
                     defaultValue:
-                      "Watch something on Plex or Jellyfin and it will appear here. Make sure webhooks are configured and your Trakt, Simkl, or Bingers account is linked in your profile.",
+                      "Watch something on Plex, Jellyfin, or Emby and it will appear here. Make sure webhooks are configured and your Trakt, Simkl, or Bingers account is linked in your profile.",
                   })}
                 </p>
                 <Button asChild>

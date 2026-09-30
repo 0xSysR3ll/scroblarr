@@ -67,6 +67,28 @@ describe("GET /api/v1/auth/check-admin", () => {
     });
   });
 
+  it("returns configured service emby when mediaBrowserType is emby", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue({ id: "admin-id" });
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "http://emby.local:8096",
+      mediaBrowserType: "emby",
+    });
+
+    const app = express();
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app).get("/api/v1/auth/check-admin");
+
+    expect(response.status).toBe(200);
+    expect(response.body.configuredService).toBe("emby");
+    expect(response.body.jellyfinSettings).toEqual({
+      hostname: "emby.local",
+      port: 8096,
+      useSsl: false,
+      urlBase: "",
+    });
+  });
+
   it("returns null configured service when no media server is configured", async () => {
     userRepositoryMocks.findAdmin.mockResolvedValue(null);
     settingsRepositoryMocks.getAll.mockResolvedValue({});

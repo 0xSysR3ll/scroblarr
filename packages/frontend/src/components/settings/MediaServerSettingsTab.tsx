@@ -1,4 +1,5 @@
 import type { PlexServer, Settings } from "@services/api";
+import { useState } from "react";
 
 import { JellyfinSettingsTab } from "./JellyfinSettingsTab";
 import { PlexSettingsTab } from "./PlexSettingsTab";
@@ -18,7 +19,6 @@ interface MediaServerSettingsTabProps {
   plexRefreshLoading: boolean;
   onRefreshPlexServers: () => void;
   plexLinkError: string | null;
-  // Jellyfin props
   settings: Settings;
   onJellyfinSettingsChange: (settings: {
     hostname: string;
@@ -26,6 +26,7 @@ interface MediaServerSettingsTabProps {
     useSsl: boolean;
     urlBase: string;
     apiKey: string;
+    mediaBrowserType: "jellyfin" | "emby";
   }) => void;
   onSettingsUpdated?: () => void;
   webhookApiKey?: string;
@@ -50,6 +51,17 @@ export function MediaServerSettingsTab({
   onSettingsUpdated,
   webhookApiKey,
 }: MediaServerSettingsTabProps) {
+  const configuredType = settings.jellyfinHost
+    ? settings.mediaBrowserType === "emby"
+      ? "emby"
+      : "jellyfin"
+    : null;
+  const showJellyfin = configuredType === null || configuredType === "jellyfin";
+  const showEmby = configuredType === null || configuredType === "emby";
+  const [draftProvider, setDraftProvider] = useState<
+    "jellyfin" | "emby" | null
+  >(null);
+
   return (
     <div className="space-y-4">
       <PlexSettingsTab
@@ -70,12 +82,39 @@ export function MediaServerSettingsTab({
         webhookApiKey={webhookApiKey}
       />
 
-      <JellyfinSettingsTab
-        settings={settings}
-        onJellyfinSettingsChange={onJellyfinSettingsChange}
-        onSettingsUpdated={onSettingsUpdated}
-        webhookApiKey={webhookApiKey}
-      />
+      {showJellyfin && (
+        <JellyfinSettingsTab
+          settings={settings}
+          mediaBrowserType="jellyfin"
+          formOpen={
+            configuredType !== null ? true : draftProvider === "jellyfin"
+          }
+          onFormOpenChange={() => {
+            if (configuredType === null) {
+              setDraftProvider("jellyfin");
+            }
+          }}
+          onJellyfinSettingsChange={onJellyfinSettingsChange}
+          onSettingsUpdated={onSettingsUpdated}
+          webhookApiKey={webhookApiKey}
+        />
+      )}
+
+      {showEmby && (
+        <JellyfinSettingsTab
+          settings={settings}
+          mediaBrowserType="emby"
+          formOpen={configuredType !== null ? true : draftProvider === "emby"}
+          onFormOpenChange={() => {
+            if (configuredType === null) {
+              setDraftProvider("emby");
+            }
+          }}
+          onJellyfinSettingsChange={onJellyfinSettingsChange}
+          onSettingsUpdated={onSettingsUpdated}
+          webhookApiKey={webhookApiKey}
+        />
+      )}
     </div>
   );
 }
