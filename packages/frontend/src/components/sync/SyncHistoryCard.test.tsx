@@ -106,4 +106,26 @@ describe("SyncHistoryCard", () => {
       screen.queryByRole("button", { name: "Retry this sync" })
     ).toBeNull();
   });
+
+  it("shows Emby source chip", () => {
+    renderCard({
+      ...baseItem,
+      success: true,
+      errorMessage: undefined,
+      source: "emby",
+    });
+
+    expect(screen.getByText("Emby")).toBeVisible();
+  });
+
+  it("falls back to plain text for unknown sources", () => {
+    renderCard({
+      ...baseItem,
+      success: true,
+      errorMessage: undefined,
+      source: "tautulli" as SyncHistoryItem["source"],
+    });
+
+    expect(screen.getByText("tautulli")).toBeVisible();
+  });
 });

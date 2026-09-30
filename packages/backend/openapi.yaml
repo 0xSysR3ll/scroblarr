@@ -184,6 +184,11 @@ components:
         jellyfinApiKey:
           type: string
           nullable: true
+        mediaBrowserType:
+          type: string
+          nullable: true
+          enum: [jellyfin, emby]
+          description: Which MediaBrowser server the jellyfin* settings refer to
         apiKey:
           type: string
           nullable: true
@@ -193,7 +198,7 @@ components:
           nullable: true
           minLength: 1
           pattern: '.*\S.*'
-          description: API key for Plex/Jellyfin webhook authentication
+          description: API key for Plex/Jellyfin/Emby webhook authentication
         tmdbAccessToken:
           type: string
           nullable: true
@@ -225,6 +230,10 @@ components:
           type: string
         jellyfinApiKey:
           type: string
+        mediaBrowserType:
+          type: string
+          enum: [jellyfin, emby]
+          description: Which MediaBrowser server the jellyfin* settings refer to
         apiKey:
           type: string
           minLength: 1
@@ -233,7 +242,7 @@ components:
           type: string
           minLength: 1
           pattern: '.*\S.*'
-          description: API key for Plex/Jellyfin webhook authentication
+          description: API key for Plex/Jellyfin/Emby webhook authentication
         tmdbAccessToken:
           type: string
           description: TMDB API Read Access Token for poster lookups; empty string clears it
@@ -254,7 +263,7 @@ components:
           type: string
         source:
           type: string
-          enum: [plex, jellyfin]
+          enum: [plex, jellyfin, emby]
         originalMediaId:
           type: string
           nullable: true
@@ -369,6 +378,8 @@ components:
             plex:
               type: integer
             jellyfin:
+              type: integer
+            emby:
               type: integer
 
     TraktStatus:
@@ -509,7 +520,7 @@ paths:
                     type: boolean
                   configuredService:
                     type: string
-                    enum: [plex, jellyfin, null]
+                    enum: [plex, jellyfin, emby, null]
                     nullable: true
                   jellyfinSettings:
                     type: object
@@ -542,8 +553,14 @@ paths:
                     type: boolean
                   jellyfinConfigured:
                     type: boolean
+                  embyConfigured:
+                    type: boolean
                   plexConfigured:
                     type: boolean
+                  mediaBrowserType:
+                    type: string
+                    enum: [jellyfin, emby]
+                    nullable: true
 
   /api/v1/auth/plex/pin:
     post:
@@ -850,6 +867,157 @@ paths:
   /api/v1/auth/jellyfin/unlink:
     post:
       summary: Unlink Jellyfin account
+      tags: [Auth]
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: Account unlinked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          description: Cannot unlink (admin must have at least one account)
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/auth/emby:
+    post:
+      summary: Authenticate with Emby
+      description: >
+        Same contract as Jellyfin login. Uses official Emby Authorization +
+        X-Emby-Token against the configured Emby host (mediaBrowserType=emby).
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                hostname:
+                  type: string
+                port:
+                  type: integer
+                useSsl:
+                  type: boolean
+                urlBase:
+                  type: string
+      responses:
+        '200':
+          description: Authentication successful (session cookie set)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Bad request
+        '401':
+          description: Invalid credentials
+        '403':
+          description: Access denied
+        '500':
+          description: Internal server error
+
+  /api/v1/auth/emby/setup-admin:
+    post:
+      summary: Setup admin with Emby (first time setup)
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+                - hostname
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                hostname:
+                  type: string
+                port:
+                  type: integer
+                useSsl:
+                  type: boolean
+                urlBase:
+                  type: string
+      responses:
+        '200':
+          description: Admin setup successful (session cookie set)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '400':
+          description: Bad request
+        '401':
+          description: Invalid credentials
+        '500':
+          description: Internal server error
+
+  /api/v1/auth/emby/link:
+    post:
+      summary: Link Emby account to current user
+      tags: [Auth]
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                hostname:
+                  type: string
+                port:
+                  type: integer
+                useSsl:
+                  type: boolean
+                urlBase:
+                  type: string
+      responses:
+        '200':
+          description: Account linked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized or invalid credentials
+        '500':
+          description: Internal server error
+
+  /api/v1/auth/emby/unlink:
+    post:
+      summary: Unlink Emby account
       tags: [Auth]
       security:
         - sessionAuth: []
@@ -2131,6 +2299,43 @@ paths:
         '500':
           description: Internal server error
 
+  /api/v1/webhooks/emby:
+    post:
+      summary: Emby webhook endpoint
+      description: |
+        Accepts Emby webhook payloads (`playback.start` / `playback.stop`).
+        Authenticate with the webhook API key via `?apiKey=`, the `X-API-Key` header, or an `apiKey` JSON field.
+      tags: [Webhooks]
+      security:
+        - webhookApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                Event:
+                  type: string
+                  example: playback.start
+                User:
+                  type: object
+                Item:
+                  type: object
+                PlaybackInfo:
+                  type: object
+      responses:
+        '200':
+          description: Webhook processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          description: Bad request
+        '500':
+          description: Internal server error
+
   /api/v1/webhooks/tautulli:
     post:
       summary: Tautulli webhook endpoint
@@ -2194,7 +2399,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [webhook, sync, auth, api, database, tvtime, plex, system, migration]
+            enum: [webhook, sync, auth, api, database, tvtime, trakt, plex, jellyfin, emby, system, migration]
         - name: search
           in: query
           schema:

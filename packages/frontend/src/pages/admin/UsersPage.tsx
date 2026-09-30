@@ -9,8 +9,9 @@ import { UserImport } from "@components/users/UserImport";
 import { UserList } from "@components/users/UserList";
 import { useAuth } from "@contexts/AuthContext";
 import { useUsers } from "@hooks/users/useUsers";
+import { getSettings } from "@services/api";
 import { showSuccess, showError } from "@utils/toast";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FaPlus, FaTrash } from "react-icons/fa";
 
@@ -20,6 +21,9 @@ export function UsersPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [mediaBrowserType, setMediaBrowserType] = useState<"jellyfin" | "emby">(
+    "jellyfin"
+  );
   const {
     users,
     loading,
@@ -30,6 +34,26 @@ export function UsersPage() {
     loadUsers,
   } = useUsers();
   const { isAdmin } = useAuth();
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadMediaBrowserType() {
+      try {
+        const settings = await getSettings();
+        if (!cancelled) {
+          setMediaBrowserType(
+            settings.mediaBrowserType === "emby" ? "emby" : "jellyfin"
+          );
+        }
+      } catch {
+        void 0;
+      }
+    }
+    void loadMediaBrowserType();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleBulkDelete() {
     if (!isAdmin || selectedIds.size === 0) return;
@@ -137,6 +161,7 @@ export function UsersPage() {
 
       <UserList
         users={users}
+        mediaBrowserType={mediaBrowserType}
         onDelete={isAdmin ? removeUser : undefined}
         onBulkDelete={isAdmin ? removeUsers : undefined}
         onToggleEnabled={

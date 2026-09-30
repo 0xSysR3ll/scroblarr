@@ -19,6 +19,7 @@ const sidebars: SidebarsConfig = {
             "configuration",
             "configuration/plex",
             "configuration/jellyfin",
+            "configuration/emby",
             "configuration/trakt",
             "configuration/simkl",
             "configuration/bingers",

@@ -191,4 +191,100 @@ describe("UserImport", () => {
       screen.getByRole("img", { name: "username-only" })
     ).toHaveTextContent("US");
   });
+
+  it("shows the Emby import title and empty-state message", async () => {
+    vi.mocked(getSettings).mockResolvedValue({
+      jellyfinHost: "emby.local",
+      mediaBrowserType: "emby",
+    });
+    vi.mocked(getJellyfinUsers).mockResolvedValue([]);
+
+    renderUserImport();
+
+    expect(
+      await screen.findByText("Import Users from Emby Server")
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText("No users found on this server.")
+    ).toBeInTheDocument();
+  });
+
+  it("shows the Jellyfin import title when only Jellyfin is configured", async () => {
+    vi.mocked(getSettings).mockResolvedValue({
+      jellyfinHost: "jellyfin.local",
+      mediaBrowserType: "jellyfin",
+    });
+    vi.mocked(getJellyfinUsers).mockResolvedValue([]);
+
+    renderUserImport();
+
+    expect(
+      await screen.findByText("Import Users from Jellyfin Server")
+    ).toBeInTheDocument();
+  });
+
+  it("shows an Emby tab and reports when all Emby users are already imported", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getSettings).mockResolvedValue({
+      plexServerUrl: "https://plex.example.test",
+      jellyfinHost: "emby.local",
+      mediaBrowserType: "emby",
+    });
+    vi.mocked(getServerUsers).mockResolvedValue([]);
+    vi.mocked(getJellyfinUsers).mockResolvedValue([
+      {
+        id: "emby-1",
+        username: "already-jellyfin",
+        displayName: "Already Imported",
+        isImported: false,
+      },
+    ]);
+
+    renderUserImport();
+
+    await user.click(await screen.findByRole("button", { name: "Emby" }));
+
+    expect(
+      await screen.findByText(
+        "All users from this server have already been imported."
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("imports selected Emby users from the Emby tab", async () => {
+    const user = userEvent.setup();
+    const onUsersImported = vi.fn();
+    vi.mocked(getSettings).mockResolvedValue({
+      plexServerUrl: "https://plex.example.test",
+      jellyfinHost: "emby.local",
+      mediaBrowserType: "emby",
+    });
+    vi.mocked(getServerUsers).mockResolvedValue([]);
+    vi.mocked(getJellyfinUsers).mockResolvedValue([
+      {
+        id: "emby-1",
+        username: "new-emby",
+        displayName: "New Emby User",
+        isImported: false,
+      },
+    ]);
+    vi.mocked(importJellyfinUsers).mockResolvedValue({
+      imported: 1,
+      users: [],
+    });
+
+    renderUserImport({ onUsersImported });
+
+    await user.click(await screen.findByRole("button", { name: "Emby" }));
+    expect(await screen.findByText("New Emby User")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Select All" }));
+    await user.click(screen.getByRole("button", { name: "Import 1 User" }));
+
+    await waitFor(() => {
+      expect(importJellyfinUsers).toHaveBeenCalledWith(["new-emby"]);
+    });
+    expect(showSuccess).toHaveBeenCalledWith("Users imported successfully");
+    expect(onUsersImported).toHaveBeenCalled();
+  });
 });

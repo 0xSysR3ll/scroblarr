@@ -106,4 +106,26 @@ describe("SyncHistoryTableRow", () => {
     expect(screen.getByText("Success")).toBeVisible();
     expect(screen.getByText("Jellyfin")).toBeVisible();
   });
+
+  it("shows Emby source chip", () => {
+    renderRow({
+      ...baseItem,
+      success: true,
+      errorMessage: undefined,
+      source: "emby",
+    });
+
+    expect(screen.getByText("Emby")).toBeVisible();
+  });
+
+  it("falls back to plain text for unknown sources", () => {
+    renderRow({
+      ...baseItem,
+      success: true,
+      errorMessage: undefined,
+      source: "tautulli" as SyncHistoryItem["source"],
+    });
+
+    expect(screen.getByText("tautulli")).toBeVisible();
+  });
 });

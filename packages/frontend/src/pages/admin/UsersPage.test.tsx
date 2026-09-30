@@ -1,6 +1,6 @@
 import { useAuth } from "@contexts/AuthContext";
 import { useUsers } from "@hooks/users/useUsers";
-import type { User } from "@services/api";
+import { getSettings, type User } from "@services/api";
 import { renderWithProviders } from "@test/render";
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -18,6 +18,10 @@ vi.mock("@hooks/users/useUsers", () => ({
 
 vi.mock("@components/users/UserImport", () => ({
   UserImport: () => null,
+}));
+
+vi.mock("@services/api", () => ({
+  getSettings: vi.fn(),
 }));
 
 vi.mock("@utils/toast", () => ({
@@ -73,6 +77,7 @@ describe("UsersPage", () => {
       isAuthenticated: true,
       isAdmin: true,
     });
+    vi.mocked(getSettings).mockResolvedValue({});
     mockUseUsers();
   });
 
@@ -114,5 +119,43 @@ describe("UsersPage", () => {
     expect(
       screen.getByRole("button", { name: /Delete Selected/i })
     ).toBeVisible();
+  });
+
+  it("uses the Emby label when settings prefer Emby", async () => {
+    vi.mocked(getSettings).mockResolvedValue({
+      mediaBrowserType: "emby",
+    });
+    mockUseUsers({
+      users: [
+        users[0],
+        {
+          ...users[1],
+          jellyfinUsername: "bob-emby",
+          plexUsername: "",
+        },
+      ],
+    });
+
+    renderWithProviders(<UsersPage />);
+
+    expect((await screen.findAllByText("Emby")).length).toBeGreaterThan(0);
+  });
+
+  it("keeps the default Jellyfin label when settings fail to load", async () => {
+    vi.mocked(getSettings).mockRejectedValue(new Error("offline"));
+    mockUseUsers({
+      users: [
+        users[0],
+        {
+          ...users[1],
+          jellyfinUsername: "bob-jf",
+          plexUsername: "",
+        },
+      ],
+    });
+
+    renderWithProviders(<UsersPage />);
+
+    expect((await screen.findAllByText("Jellyfin")).length).toBeGreaterThan(0);
   });
 });

@@ -16,6 +16,7 @@ interface UserListProps {
   onToggleEnabled?: (id: string, enabled: boolean) => Promise<void>;
   selectedIds?: Set<string>;
   onSelectedIdsChange?: (ids: Set<string>) => void;
+  mediaBrowserType?: "jellyfin" | "emby";
 }
 
 export function UserList({
@@ -25,9 +26,18 @@ export function UserList({
   onToggleEnabled,
   selectedIds: externalSelectedIds,
   onSelectedIdsChange,
+  mediaBrowserType = "jellyfin",
 }: UserListProps) {
   const { t } = useTranslation();
   const { user: currentUser } = useAuth();
+  const isEmby = mediaBrowserType === "emby";
+  const mediaBrowserLabel = isEmby
+    ? t("users.emby", { defaultValue: "Emby" })
+    : t("users.jellyfin", { defaultValue: "Jellyfin" });
+  const mediaBrowserLogo = isEmby ? "/logos/emby.svg" : "/logos/jellyfin.svg";
+  const mediaBrowserChipClass = isEmby
+    ? "chip bg-(--emby-chip-bg) text-(--emby-chip-fg)"
+    : "chip bg-(--jellyfin-chip-bg) text-(--jellyfin-chip-fg)";
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [internalSelectedIds, setInternalSelectedIds] = useState<Set<string>>(
@@ -271,14 +281,14 @@ export function UserList({
                     </div>
                   )}
                   {user.jellyfinUsername && (
-                    <div className="chip bg-indigo-100 dark:bg-indigo-900">
+                    <div className={mediaBrowserChipClass}>
                       <img
-                        src="/logos/jellyfin.svg"
-                        alt="Jellyfin"
+                        src={mediaBrowserLogo}
+                        alt={mediaBrowserLabel}
                         className="w-3 h-3"
                       />
-                      <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">
-                        {t("users.jellyfin", { defaultValue: "Jellyfin" })}
+                      <span className="text-xs font-medium">
+                        {mediaBrowserLabel}
                       </span>
                     </div>
                   )}
@@ -454,16 +464,14 @@ export function UserList({
                           </div>
                         )}
                         {user.jellyfinUsername && (
-                          <div className="chip bg-indigo-100 dark:bg-indigo-900">
+                          <div className={mediaBrowserChipClass}>
                             <img
-                              src="/logos/jellyfin.svg"
-                              alt="Jellyfin"
+                              src={mediaBrowserLogo}
+                              alt={mediaBrowserLabel}
                               className="w-3 h-3"
                             />
-                            <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">
-                              {t("users.jellyfin", {
-                                defaultValue: "Jellyfin",
-                              })}
+                            <span className="text-xs font-medium">
+                              {mediaBrowserLabel}
                             </span>
                           </div>
                         )}
