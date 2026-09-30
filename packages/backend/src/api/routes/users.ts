@@ -295,7 +295,7 @@ router.post("/import-jellyfin", async (req: Request, res: Response) => {
           enabled: true,
         });
         importedUsers.push(newUser);
-      } else if (!existingUser.jellyfinUsername) {
+      } else if (!existingUser.jellyfinUsername && !existingUser.isAdmin) {
         const userInfo = await jellyfinClient.getUserInfo(
           jellyfinApiKey,
           jellyfinUser.Id

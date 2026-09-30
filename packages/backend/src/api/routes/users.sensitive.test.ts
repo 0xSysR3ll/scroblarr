@@ -358,4 +358,38 @@ describe("sensitive user deletion routes", () => {
     });
     expect(response.body.imported).toBe(1);
   });
+
+  it("does not relink orphaned admin accounts by display name", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://emby.local",
+      jellyfinApiKey: "emby-api-key",
+      mediaBrowserType: "emby",
+    });
+    jellyfinClientMocks.getUsers.mockResolvedValue([
+      {
+        Id: "emby-user-id",
+        Name: "admin-orphan",
+      },
+    ]);
+    userRepositoryMocks.findByJellyfinUsername.mockResolvedValue(null);
+    userRepositoryMocks.findOrphanedMediaBrowserUser.mockResolvedValue({
+      id: "admin-orphan-id",
+      jellyfinUsername: null,
+      isAdmin: true,
+      email: "admin@example.com",
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/users", userRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/users/import-jellyfin")
+      .send({ usernames: ["admin-orphan"] });
+
+    expect(response.status).toBe(200);
+    expect(userRepositoryMocks.update).not.toHaveBeenCalled();
+    expect(userRepositoryMocks.create).not.toHaveBeenCalled();
+    expect(response.body.imported).toBe(0);
+  });
 });
