@@ -219,6 +219,12 @@
     --plex-chip-bg: #fff4d6;
     --plex-chip-fg: #915c00;
 
+    --jellyfin-chip-bg: #e0e7ff;
+    --jellyfin-chip-fg: #4338ca;
+
+    --emby-chip-bg: #e8f6e7;
+    --emby-chip-fg: #2f7a2c;
+
     --bingers-cta-bg: #f08a78;
     --bingers-cta-fg: #1a0f0c;
     --bingers-cta-hover: #e67a68;
@@ -233,6 +239,7 @@
 
     --chart-plex: oklch(0.72 0.14 82);
     --chart-jellyfin: oklch(0.52 0.16 285);
+    --chart-emby: oklch(0.55 0.14 145);
     --chart-trakt: oklch(0.48 0.2 305);
     --chart-simkl: oklch(0.52 0.14 160);
     --chart-bingers: #e89584;
@@ -275,6 +282,12 @@
     --plex-chip-bg: #231706;
     --plex-chip-fg: #ffdd8a;
 
+    --jellyfin-chip-bg: #1e1b4b;
+    --jellyfin-chip-fg: #a5b4fc;
+
+    --emby-chip-bg: #142816;
+    --emby-chip-fg: #86d982;
+
     --bingers-cta-bg: #e89584;
     --bingers-cta-fg: #1a0f0c;
     --bingers-cta-hover: #f0a898;
@@ -288,6 +301,7 @@
 
     --chart-plex: oklch(0.78 0.12 82);
     --chart-jellyfin: oklch(0.72 0.14 285);
+    --chart-emby: oklch(0.72 0.12 145);
     --chart-trakt: oklch(0.72 0.16 305);
     --chart-simkl: oklch(0.7 0.12 160);
     --chart-bingers: #f0a898;
