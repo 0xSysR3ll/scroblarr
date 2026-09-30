@@ -21,10 +21,6 @@ Configure Emby as a source for Scroblarr. This involves setting up the Emby serv
 
 After configuring the server, you need to set up webhooks so Emby sends watch events to Scroblarr.
 
-:::info Prerequisite
-Emby webhooks require an **Emby Premiere** subscription. Without Premiere, Emby cannot send watch events to Scroblarr.
-:::
-
 :::warning
 Emby webhooks are configured under **your user notification preferences** (Notifications), not a server-level Webhooks page like Plex.
 :::
