@@ -794,6 +794,9 @@ describe("DashboardPage", () => {
         /make sure webhooks are configured and your trakt, simkl, or bingers account is linked/i
       )
     ).toBeInTheDocument();
+    expect(
+      document.querySelector('img[src="/logos/emby.svg"]')
+    ).toBeInTheDocument();
     expect(screen.queryByText("By Destination")).not.toBeInTheDocument();
 
     await user.click(

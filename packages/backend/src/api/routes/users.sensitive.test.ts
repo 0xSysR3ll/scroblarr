@@ -170,6 +170,38 @@ describe("sensitive user deletion routes", () => {
     ]);
   });
 
+  it("defaults /jellyfin-users to the Jellyfin client kind", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://jellyfin.local",
+      jellyfinApiKey: "jellyfin-api-key",
+      mediaBrowserType: "jellyfin",
+    });
+    userRepositoryMocks.findAll.mockResolvedValue([]);
+    jellyfinClientMocks.getUsers.mockResolvedValue([
+      {
+        Id: "jf-user-id",
+        Name: "jf-user",
+      },
+    ]);
+    jellyfinClientMocks.getUserInfo.mockRejectedValue(
+      new Error("lookup failed")
+    );
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/users", userRoutes);
+
+    const response = await request(app).get("/api/v1/users/jellyfin-users");
+
+    expect(response.status).toBe(200);
+    expect(jellyfinClientMocks.constructedConfigs).toEqual([
+      {
+        baseUrl: "https://jellyfin.local",
+        serverKind: "jellyfin",
+      },
+    ]);
+  });
+
   it("creates new Jellyfin imports with the Emby client kind", async () => {
     settingsRepositoryMocks.getAll.mockResolvedValue({
       jellyfinHost: "https://emby.local",
@@ -269,6 +301,60 @@ describe("sensitive user deletion routes", () => {
       jellyfinUserId: "emby-user-id",
       displayName: "Relinked User",
       email: "old@example.com",
+    });
+    expect(response.body.imported).toBe(1);
+  });
+
+  it("relinks orphans with username and retained email fallbacks", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://jellyfin.local",
+      jellyfinApiKey: "jellyfin-api-key",
+      mediaBrowserType: "jellyfin",
+    });
+    jellyfinClientMocks.getUsers.mockResolvedValue([
+      {
+        Id: "jf-user-id",
+        Name: "orphan-user",
+      },
+    ]);
+    userRepositoryMocks.findByJellyfinUsername.mockResolvedValue(null);
+    userRepositoryMocks.findOrphanedMediaBrowserUser.mockResolvedValue({
+      id: "orphan-id",
+      jellyfinUsername: null,
+      email: "kept@example.com",
+    });
+    jellyfinClientMocks.getUserInfo.mockResolvedValue({
+      displayName: "",
+      email: undefined,
+    });
+    userRepositoryMocks.update.mockResolvedValue({
+      id: "orphan-id",
+      jellyfinUsername: "orphan-user",
+      jellyfinUserId: "jf-user-id",
+      displayName: "orphan-user",
+      email: "kept@example.com",
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/users", userRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/users/import-jellyfin")
+      .send({ usernames: ["orphan-user"] });
+
+    expect(response.status).toBe(200);
+    expect(jellyfinClientMocks.constructedConfigs).toEqual([
+      {
+        baseUrl: "https://jellyfin.local",
+        serverKind: "jellyfin",
+      },
+    ]);
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith("orphan-id", {
+      jellyfinUsername: "orphan-user",
+      jellyfinUserId: "jf-user-id",
+      displayName: "orphan-user",
+      email: "kept@example.com",
     });
     expect(response.body.imported).toBe(1);
   });

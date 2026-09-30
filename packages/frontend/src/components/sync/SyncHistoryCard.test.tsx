@@ -117,4 +117,15 @@ describe("SyncHistoryCard", () => {
 
     expect(screen.getByText("Emby")).toBeVisible();
   });
+
+  it("falls back to plain text for unknown sources", () => {
+    renderCard({
+      ...baseItem,
+      success: true,
+      errorMessage: undefined,
+      source: "tautulli" as SyncHistoryItem["source"],
+    });
+
+    expect(screen.getByText("tautulli")).toBeVisible();
+  });
 });
