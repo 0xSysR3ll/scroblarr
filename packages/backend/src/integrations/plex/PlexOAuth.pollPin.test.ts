@@ -1,7 +1,6 @@
 import { getAppVersionForClients } from "@utils/appVersion";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-
 import { PlexOAuth, PlexPinNotFoundError } from "./PlexOAuth";
 
 describe("PlexOAuth.createPin", () => {
