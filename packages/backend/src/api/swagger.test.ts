@@ -46,6 +46,16 @@ describe("buildSwaggerSpec", () => {
     expect(errorSpy).toHaveBeenCalled();
     errorSpy.mockRestore();
   });
+
+  it("still stamps a version when the loaded document has no info block", () => {
+    const spec = buildSwaggerSpec(() => "openapi: 3.0.0\npaths: {}\n") as {
+      info?: { version?: string };
+      paths?: object;
+    };
+
+    expect(spec.info?.version).toBe(getAppVersionForClients());
+    expect(spec.paths).toEqual({});
+  });
 });
 
 describe("setupSwagger", () => {
