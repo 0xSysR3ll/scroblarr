@@ -1,3 +1,4 @@
+import { getAppVersionForClients } from "@utils/appVersion";
 import { logger } from "@utils/logger";
 import { parseString } from "xml2js";
 
@@ -148,7 +149,7 @@ export class PlexOAuth {
       headers: {
         "X-Plex-Client-Identifier": this.clientIdentifier,
         "X-Plex-Product": "Scroblarr",
-        "X-Plex-Version": "1.0.0",
+        "X-Plex-Version": getAppVersionForClients(),
         Accept: "application/json",
       },
     });
@@ -720,7 +721,7 @@ export class PlexOAuth {
     const params = new URLSearchParams({
       clientID: clientIdentifier,
       "context[device][product]": "Scroblarr",
-      "context[device][version]": "1.0.0",
+      "context[device][version]": getAppVersionForClients(),
       "context[device][platform]": "Web",
       "context[device][platformVersion]": "1.0",
       "context[device][device]": "Browser",

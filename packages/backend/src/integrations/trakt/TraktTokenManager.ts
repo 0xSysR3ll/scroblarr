@@ -1,4 +1,5 @@
 import { UserRepository } from "@repositories/UserRepository";
+import { getUserAgent } from "@utils/appVersion";
 import { logger } from "@utils/logger";
 
 import { TraktApiError } from "./TraktApiError";
@@ -90,7 +91,7 @@ export class TraktTokenManager {
         Authorization: `Bearer ${accessToken}`,
         "trakt-api-version": "2",
         "trakt-api-key": clientId,
-        "User-Agent": "Scroblarr/1.0.0",
+        "User-Agent": getUserAgent(),
       },
     });
 

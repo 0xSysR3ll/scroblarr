@@ -58,7 +58,6 @@ normalize_version() {
   fi
 }
 
-# Return 0 if $1 is strictly greater than $2 (e.g. v0.4.0 > v0.3.1).
 version_greater() {
   local left="${1#v}"
   local right="${2#v}"
@@ -69,7 +68,40 @@ latest_tag() {
   git describe --tags --abbrev=0 2>/dev/null || true
 }
 
-# Suggest next version from commits in range: latest_tag..$1 (default: HEAD)
+PACKAGE_JSON_FILES=(
+  package.json
+  packages/backend/package.json
+  packages/frontend/package.json
+  packages/shared/package.json
+  website/package.json
+)
+
+set_package_versions() {
+  local ver="$1"
+  local f
+  for f in "${PACKAGE_JSON_FILES[@]}"; do
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+      echo "  [dry-run] set ${f} version=${ver}"
+    else
+      node -e "
+        const fs = require('fs');
+        const path = process.argv[1];
+        const version = process.argv[2];
+        const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
+        pkg.version = version;
+        fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
+      " "$f" "$ver"
+    fi
+  done
+
+  local openapi="packages/backend/openapi.yaml"
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    echo "  [dry-run] set ${openapi} info.version=${ver}"
+  else
+    sed -i -E "s/^(  version: ).*/\\1${ver}/" "$openapi"
+  fi
+}
+
 suggest_version() {
   local tip="${1:-HEAD}"
   local latest
@@ -106,14 +138,12 @@ suggest_version() {
   elif echo "$subjects" | grep -Eq '^(fix|perf)(\(.+\))?:'; then
     echo "v${major}.${minor}.$((patch + 1))"
   else
-    # deps/docs/chores only - still a patch release if you choose to cut one
     echo "v${major}.${minor}.$((patch + 1))"
   fi
 }
 
 restore_branch() {
   if [[ -n "$START_BRANCH" && "$DRY_RUN" -eq 0 ]]; then
-    # Abort a failed merge so checkout is not blocked by unmerged paths.
     if [[ -e "$(git rev-parse --git-path MERGE_HEAD)" ]]; then
       git merge --abort >/dev/null 2>&1 || true
     fi
@@ -273,14 +303,22 @@ fi
 
 info "Merging ${DEVELOP_REF} into main"
 if git merge-base --is-ancestor "$MAIN_REF" "$DEVELOP_REF"; then
-  # develop is strictly ahead - fast-forward
   run git merge --ff-only "$DEVELOP_REF"
 else
   run git merge --no-ff "$DEVELOP_REF" -m "chore: prepare release ${VERSION}"
 fi
 
 info "Creating release commit"
-run git commit --allow-empty -m "chore: release ${VERSION}"
+VERSION_NO_V="${VERSION#v}"
+info "Bumping package.json / OpenAPI versions to ${VERSION_NO_V}"
+set_package_versions "$VERSION_NO_V"
+if [[ "$DRY_RUN" -eq 1 ]]; then
+  echo "  [dry-run] git add ${PACKAGE_JSON_FILES[*]} packages/backend/openapi.yaml"
+  echo "  [dry-run] git commit -m \"chore: release ${VERSION}\""
+else
+  git add "${PACKAGE_JSON_FILES[@]}" packages/backend/openapi.yaml
+  git commit -m "chore: release ${VERSION}"
+fi
 
 info "Creating annotated tag ${VERSION}"
 run git tag -a "$VERSION" -m "$VERSION"
@@ -299,7 +337,6 @@ else
 fi
 run git push "$REMOTE" develop
 
-# Stay on develop after a successful release
 START_BRANCH="develop"
 trap - EXIT
 

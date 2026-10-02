@@ -1,3 +1,4 @@
+import { getUserAgent } from "@utils/appVersion";
 import { logger } from "@utils/logger";
 
 import { TraktApiError } from "./TraktApiError";
@@ -31,7 +32,6 @@ interface PendingTraktPin {
   expiresAt: number;
 }
 
-const TRAKT_USER_AGENT = "Scroblarr/1.0.0";
 const TRAKT_OAUTH_TIMEOUT_MS = 30_000;
 const TRAKT_API_BASE_URL = "https://api.trakt.tv";
 const pendingPinsByUserId = new Map<string, PendingTraktPin>();
@@ -129,7 +129,7 @@ export class TraktOAuth {
     return {
       Accept: "application/json",
       "Content-Type": "application/json",
-      "User-Agent": TRAKT_USER_AGENT,
+      "User-Agent": getUserAgent(),
       "trakt-api-version": "2",
       "trakt-api-key": this.clientId,
     };

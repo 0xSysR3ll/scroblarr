@@ -7,6 +7,7 @@ import {
 } from "@integrations/trakt/TraktOAuth";
 import { TraktTokenManager } from "@integrations/trakt/TraktTokenManager";
 import { UserRepository } from "@repositories/UserRepository";
+import { getUserAgent } from "@utils/appVersion";
 import { logger } from "@utils/logger";
 import { Router, Request, Response } from "express";
 import { z } from "zod";
@@ -136,7 +137,7 @@ router.post("/link", async (req: Request, res: Response) => {
             Authorization: `Bearer ${tokens.accessToken}`,
             "trakt-api-version": "2",
             "trakt-api-key": clientId,
-            "User-Agent": "Scroblarr/1.0.0",
+            "User-Agent": getUserAgent(),
           },
         }
       );

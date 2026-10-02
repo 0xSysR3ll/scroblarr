@@ -1,3 +1,4 @@
+import { getAppVersionForClients } from "@utils/appVersion";
 import { OAuthPopup } from "@utils/OAuthPopup";
 
 export interface PlexPin {
@@ -106,7 +107,7 @@ export class PlexOAuth {
     const params: Record<string, string> = {
       clientID: backendPin.clientIdentifier,
       "context[device][product]": "Scroblarr",
-      "context[device][version]": "1.0.0",
+      "context[device][version]": getAppVersionForClients(),
       "context[device][platform]": browserName,
       "context[device][platformVersion]": browserVersion,
       "context[device][device]": osName,

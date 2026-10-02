@@ -1,5 +1,6 @@
 import { ISyncClient, SyncOptions } from "@integrations/common/ISyncClient";
 import { MediaEvent } from "@scroblarr/shared";
+import { getUserAgent } from "@utils/appVersion";
 import { logger } from "@utils/logger";
 
 import { TraktApiError } from "./TraktApiError";
@@ -84,7 +85,7 @@ export class TraktClient implements ISyncClient {
         Authorization: `Bearer ${accessToken}`,
         "trakt-api-version": "2",
         "trakt-api-key": this.clientId,
-        "User-Agent": "Scroblarr/1.0.0",
+        "User-Agent": getUserAgent(),
       },
       body: JSON.stringify(payload),
     });
@@ -113,8 +114,6 @@ export class TraktClient implements ISyncClient {
       );
       throw apiError;
     }
-
-    // Response parsing is optional - scrobble succeeded if status is OK
   }
 
   private async scrobbleMovie(
@@ -152,7 +151,7 @@ export class TraktClient implements ISyncClient {
         Authorization: `Bearer ${accessToken}`,
         "trakt-api-version": "2",
         "trakt-api-key": this.clientId,
-        "User-Agent": "Scroblarr/1.0.0",
+        "User-Agent": getUserAgent(),
       },
       body: JSON.stringify(payload),
     });
@@ -180,7 +179,5 @@ export class TraktClient implements ISyncClient {
       );
       throw apiError;
     }
-
-    // Response parsing is optional - scrobble succeeded if status is OK
   }
 }
