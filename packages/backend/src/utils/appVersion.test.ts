@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { getAppVersion, getCommitTag, isDevelopVersion } from "./appVersion";
+import {
+  getAppVersion,
+  getAppVersionForClients,
+  getCommitTag,
+  getUserAgent,
+  isDevelopVersion,
+} from "./appVersion";
 
 describe("appVersion", () => {
   const originalGitTag = process.env.GIT_TAG;
@@ -26,6 +32,8 @@ describe("appVersion", () => {
     expect(getCommitTag()).toBe("local");
     expect(getAppVersion()).toBe("develop-local");
     expect(isDevelopVersion()).toBe(true);
+    expect(getAppVersionForClients()).toBe("develop-local");
+    expect(getUserAgent()).toBe("Scroblarr/develop-local");
   });
 
   it("uses develop-{commit} when only COMMIT_TAG is set", () => {
@@ -35,6 +43,7 @@ describe("appVersion", () => {
     expect(getCommitTag()).toBe("abc123def");
     expect(getAppVersion()).toBe("develop-abc123def");
     expect(isDevelopVersion()).toBe(true);
+    expect(getUserAgent()).toBe("Scroblarr/develop-abc123def");
   });
 
   it("uses GIT_TAG for stable releases and ignores ci placeholder", () => {
@@ -42,6 +51,8 @@ describe("appVersion", () => {
     process.env.COMMIT_TAG = "abc123def";
 
     expect(getAppVersion()).toBe("v0.8.0");
+    expect(getAppVersionForClients()).toBe("0.8.0");
+    expect(getUserAgent()).toBe("Scroblarr/0.8.0");
     expect(isDevelopVersion()).toBe(false);
 
     process.env.GIT_TAG = "ci";
@@ -53,6 +64,7 @@ describe("appVersion", () => {
     process.env.COMMIT_TAG = "abc";
 
     expect(getAppVersion()).toBe("v0.9.0");
+    expect(getUserAgent()).toBe("Scroblarr/0.9.0");
   });
 
   it("ignores non-semver GIT_TAG values", () => {

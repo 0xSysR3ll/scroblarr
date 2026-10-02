@@ -7,7 +7,23 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const RELEASE_TAG_RE = /^v?\d+\.\d+\.\d+/;
+
+function resolveBuildAppVersion(): string {
+  const gitTag = process.env.GIT_TAG?.trim();
+  const commitTag = process.env.COMMIT_TAG?.trim() || "local";
+  if (gitTag && gitTag !== "ci" && RELEASE_TAG_RE.test(gitTag)) {
+    return gitTag.startsWith("v") ? gitTag : `v${gitTag}`;
+  }
+  return `develop-${commitTag}`;
+}
+
 export default defineConfig({
+  define: {
+    "import.meta.env.VITE_APP_VERSION": JSON.stringify(
+      resolveBuildAppVersion()
+    ),
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -26,7 +42,6 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "icon-192.png", "icon-512.png"],
-      // Avoid SW/HMR races during local Vite; production still gets the SW.
       devOptions: {
         enabled: false,
       },

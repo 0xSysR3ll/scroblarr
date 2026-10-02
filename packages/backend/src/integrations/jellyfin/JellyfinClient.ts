@@ -1,3 +1,4 @@
+import { getAppVersionForClients } from "@utils/appVersion";
 import { logger } from "@utils/logger";
 
 export type MediaBrowserServerKind = "jellyfin" | "emby";
@@ -57,10 +58,8 @@ export class JellyfinClient {
   }
 
   getAuthHeader(token?: string, userId?: string): string {
-    const version = "1.0.0";
+    const version = getAppVersionForClients();
     if (this.serverKind === "emby") {
-      // https://dev.emby.media/doc/restapi/User-Authentication.html
-      // Scheme: Emby UserId="…", Client="…", Device="…", DeviceId="…", Version="…"
       const userPart = userId ? `UserId="${userId}", ` : "";
       return `Emby ${userPart}Client="${this.clientName}", Device="Scroblarr", DeviceId="${this.deviceId}", Version="${version}"`;
     }
@@ -70,11 +69,6 @@ export class JellyfinClient {
     return `MediaBrowser Client="${this.clientName}", Device="Scroblarr", DeviceId="${this.deviceId}", Version="${version}"`;
   }
 
-  /**
-   * Jellyfin: Authorization MediaBrowser + Token in header string.
-   * Emby: Authorization Emby … + X-Emby-Token for session/API key
-   * (https://dev.emby.media/doc/restapi/API-Key-Authentication.html).
-   */
   getAuthHeaders(token?: string, userId?: string): Record<string, string> {
     const authHeader = this.getAuthHeader(token, userId);
     const headers: Record<string, string> = {

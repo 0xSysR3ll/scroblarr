@@ -2,6 +2,7 @@ import { readFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
+import { getAppVersionForClients } from "@utils/appVersion";
 import { Express } from "express";
 import * as yaml from "js-yaml";
 import swaggerUi from "swagger-ui-express";
@@ -20,15 +21,13 @@ try {
     openapi: "3.0.0",
     info: {
       title: "Scroblarr API",
-      version: "1.0.0",
+      version: getAppVersionForClients(),
       description: "API documentation failed to load",
     },
   };
 }
 
 export function setupSwagger(app: Express): void {
-  // Relative asset URLs from /api-docs (no trailing slash) resolve to /swagger-ui.*;
-  // send those to the real files under /api-docs/ instead of the SPA fallback.
   app.get(/^\/swagger-ui[^/]*\.(css|js)$/, (req, res) => {
     res.redirect(301, `/api-docs${req.path}`);
   });

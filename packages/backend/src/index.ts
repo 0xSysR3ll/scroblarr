@@ -5,12 +5,15 @@ import { dataSource, ensureDatabase } from "@config/database";
 import { getEnv } from "@config/env";
 import { SettingsRepository } from "@repositories/SettingsRepository";
 import { ScheduledJobs } from "@services/ScheduledJobs";
+import { getAppVersion } from "@utils/appVersion";
 import { logger } from "@utils/logger";
 
 import { createApp } from "./api";
 
 async function bootstrap() {
   try {
+    logger.system.info(`Starting Scroblarr version ${getAppVersion()}`);
+
     await ensureDatabase();
     await dataSource.initialize();
     logger.system.debug("Database connected and migrations applied");

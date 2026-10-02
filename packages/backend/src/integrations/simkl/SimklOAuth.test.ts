@@ -1,3 +1,4 @@
+import { getAppVersionForClients, getUserAgent } from "@utils/appVersion";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@utils/logger", () => ({
@@ -57,11 +58,13 @@ describe("SimklOAuth", () => {
     expect(actualUrl.pathname).toBe("/oauth/token");
     expect(actualUrl.searchParams.get("client_id")).toBe("client-id");
     expect(actualUrl.searchParams.get("app-name")).toBe("scroblarr");
-    expect(actualUrl.searchParams.get("app-version")).toBe("1.0.0");
+    expect(actualUrl.searchParams.get("app-version")).toBe(
+      getAppVersionForClients()
+    );
     expect(request.headers).toEqual(
       expect.objectContaining({
         "simkl-api-key": "client-id",
-        "User-Agent": "Scroblarr/1.0.0",
+        "User-Agent": getUserAgent(),
       })
     );
     expect(JSON.parse(request.body)).toEqual({

@@ -28,6 +28,14 @@ export function getAppVersion(): string {
   return `develop-${getCommitTag()}`;
 }
 
+export function getAppVersionForClients(): string {
+  return getAppVersion().replace(/^v/, "");
+}
+
+export function getUserAgent(): string {
+  return `Scroblarr/${getAppVersionForClients()}`;
+}
+
 export function isDevelopVersion(version: string = getAppVersion()): boolean {
   return version.startsWith("develop-");
 }
