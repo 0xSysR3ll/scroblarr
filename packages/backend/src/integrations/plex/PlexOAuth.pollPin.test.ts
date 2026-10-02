@@ -1,4 +1,6 @@
+import { getAppVersionForClients } from "@utils/appVersion";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 
 import { PlexOAuth, PlexPinNotFoundError } from "./PlexOAuth";
 
@@ -30,8 +32,24 @@ describe("PlexOAuth.createPin", () => {
         signal: expect.any(AbortSignal),
         headers: expect.objectContaining({
           "X-Plex-Client-Identifier": "client-id",
+          "X-Plex-Version": getAppVersionForClients(),
         }),
       })
+    );
+  });
+});
+
+describe("PlexOAuth.getAuthUrl", () => {
+  it("includes the app version in the Plex auth context", () => {
+    const url = new PlexOAuth("client-id").getAuthUrl("PINCODE", "client-id");
+    expect(url.startsWith("https://app.plex.tv/auth/#!?")).toBe(true);
+
+    const params = new URLSearchParams(url.slice(url.indexOf("?") + 1));
+    expect(params.get("clientID")).toBe("client-id");
+    expect(params.get("code")).toBe("PINCODE");
+    expect(params.get("context[device][product]")).toBe("Scroblarr");
+    expect(params.get("context[device][version]")).toBe(
+      getAppVersionForClients()
     );
   });
 });
