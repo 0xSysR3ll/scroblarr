@@ -3,17 +3,19 @@ sidebar_position: 1
 slug: /
 ---
 
+import useBaseUrl from '@docusaurus/useBaseUrl';
+
 # Welcome to Scroblarr
 
 **Scroblarr** is a self-hosted service that syncs watch history from **Plex**, **Jellyfin**, and **Emby** to **Trakt**, **Simkl**, and **Bingers** using webhooks—no manual logging. For badges, releases, and repo-wide info, see the [README on GitHub](https://github.com/0xsysr3ll/scroblarr/blob/main/README.md).
 
 <div className="app-screenshots">
   <figure className="app-screenshot">
-    <img src="/img/dashboard.png" alt="Scroblarr dashboard with sync stats and activity charts" />
+    <img src={useBaseUrl('/img/dashboard.png')} alt="Scroblarr dashboard with sync stats and activity charts" />
     <figcaption>Dashboard — sync stats, activity, and trends</figcaption>
   </figure>
   <figure className="app-screenshot">
-    <img src="/img/sync.png" alt="Scroblarr sync history table" />
+    <img src={useBaseUrl('/img/sync.png')} alt="Scroblarr sync history table" />
     <figcaption>Sync history — every scrobble, source, and destination</figcaption>
   </figure>
 </div>
