@@ -452,6 +452,7 @@ function AveragePaceCard({
   average,
   actual,
   actualLabel,
+  baselineLabel,
   icon: Icon,
   color,
   locale,
@@ -460,22 +461,27 @@ function AveragePaceCard({
   average: number;
   actual: number;
   actualLabel: string;
+  baselineLabel: string;
   icon: ComponentType<{ className?: string }>;
   color: "blue" | "purple" | "green";
   locale: string;
 }) {
-  const { t } = useTranslation();
   const colorClasses = {
     blue: "bg-primary/15 text-primary",
     purple: "bg-primary/15 text-primary",
     green:
       "bg-success-500/15 text-success-700 dark:bg-success-400/15 dark:text-success-300",
   };
-  const ratio = average > 0 ? actual / average : actual > 0 ? 1 : 0;
-  const fillPct = Math.min(100, Math.max(0, ratio * 100));
+  const scaleMax = Math.max(actual, average, 0);
+  const actualPct = scaleMax > 0 ? Math.min(100, (actual / scaleMax) * 100) : 0;
+  const baselinePct =
+    scaleMax > 0 ? Math.min(100, (average / scaleMax) * 100) : 0;
   const deltaPct = average > 0 ? ((actual - average) / average) * 100 : 0;
   const showDelta = average > 0 && Math.abs(deltaPct) >= 5;
   const ahead = deltaPct > 0;
+  const actualBarClass = ahead
+    ? "bg-success-500 dark:bg-success-400"
+    : "bg-primary";
 
   return (
     <div className={tileClass("flex h-full flex-col p-3 sm:p-4")}>
@@ -489,37 +495,59 @@ function AveragePaceCard({
           <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
         </div>
       </div>
-      <p className="text-xl font-bold leading-tight tracking-tight text-foreground sm:text-2xl">
-        {formatAverage(average, locale)}
-      </p>
-      <p className="mt-1 text-xs text-muted-foreground">
-        {t("dashboard.stats.avgFromThisYear", {
-          defaultValue: "Yearly average",
-        })}
-      </p>
-      <div className="mt-auto pt-3">
-        <div className="mb-1.5 flex items-center justify-between gap-2 text-xs">
-          <span className="truncate text-muted-foreground">{actualLabel}</span>
-          {showDelta && (
-            <span
-              className={`shrink-0 tabular-nums ${
-                ahead
-                  ? "text-success-600 dark:text-success-400"
-                  : "text-muted-foreground"
-              }`}
-            >
-              {ahead ? "+" : "−"}
-              {formatTrendPercent(deltaPct, locale)}%
-            </span>
-          )}
-        </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-          <div
-            className={`h-full rounded-full ${
-              ahead ? "bg-success-500 dark:bg-success-400" : "bg-primary"
+
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="text-xl font-bold leading-tight tracking-tight text-foreground sm:text-2xl">
+          {formatCount(actual, locale)}
+        </p>
+        {showDelta && (
+          <span
+            className={`shrink-0 text-xs font-medium tabular-nums sm:text-sm ${
+              ahead
+                ? "text-success-600 dark:text-success-400"
+                : "text-muted-foreground"
             }`}
-            style={{ width: `${fillPct}%` }}
-          />
+          >
+            {ahead ? "+" : "−"}
+            {formatTrendPercent(deltaPct, locale)}%
+          </span>
+        )}
+      </div>
+
+      <div
+        className="mt-auto space-y-3 pt-4"
+        role="img"
+        aria-label={`${actualLabel}: ${formatCount(actual, locale)}. ${baselineLabel}: ${formatAverage(average, locale)}.`}
+      >
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-2 text-[11px] sm:text-xs">
+            <span className="truncate text-foreground/80">{actualLabel}</span>
+            <span className="shrink-0 tabular-nums text-foreground">
+              {formatCount(actual, locale)}
+            </span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-muted">
+            <div
+              className={`h-full rounded-full transition-[width] duration-500 ease-out ${actualBarClass}`}
+              style={{ width: `${actualPct}%` }}
+            />
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-2 text-[11px] sm:text-xs">
+            <span className="truncate text-muted-foreground">
+              {baselineLabel}
+            </span>
+            <span className="shrink-0 tabular-nums text-muted-foreground">
+              {formatAverage(average, locale)}
+            </span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-muted-foreground/35 transition-[width] duration-500 ease-out dark:bg-muted-foreground/45"
+              style={{ width: `${baselinePct}%` }}
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -642,15 +670,6 @@ export function DashboardPage() {
     : "";
   const formattedTopThisMonth = topThisMonth
     ? formatCount(topThisMonth.count, locale)
-    : "";
-  const formattedToday = statistics
-    ? formatCount(statistics.byPeriod.today, locale)
-    : "";
-  const formattedWeek = statistics
-    ? formatCount(statistics.byPeriod.thisWeek, locale)
-    : "";
-  const formattedMonth = statistics
-    ? formatCount(statistics.byPeriod.thisMonth, locale)
     : "";
   const trend = statistics
     ? monthTrend(
@@ -1499,54 +1518,38 @@ export function DashboardPage() {
 
             <div className="mb-6">
               <h3 className="mb-3 text-base font-semibold text-foreground sm:text-lg">
-                {t("dashboard.stats.averages", {
-                  defaultValue: "Averages",
+                {t("dashboard.stats.pace", {
+                  defaultValue: "Pace",
                 })}
               </h3>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <AveragePaceCard
-                  title={t("dashboard.stats.avgPerDay", {
-                    defaultValue: "Per Day",
-                  })}
-                  average={statistics.averages.perDay}
-                  actual={statistics.byPeriod.today}
-                  actualLabel={t("dashboard.stats.avgVsToday", {
-                    count: statistics.byPeriod.today,
-                    formattedCount: formattedToday,
-                    defaultValue_one: "{{formattedCount}} today",
-                    defaultValue_other: "{{formattedCount}} today",
-                  })}
-                  icon={FaCalendarDay}
-                  color="blue"
-                  locale={locale}
-                />
-                <AveragePaceCard
-                  title={t("dashboard.stats.avgPerWeek", {
+                  title={t("dashboard.stats.pacePerWeek", {
                     defaultValue: "Per Week",
                   })}
-                  average={statistics.averages.perWeek}
+                  average={statistics.pace.usualWeek}
                   actual={statistics.byPeriod.thisWeek}
-                  actualLabel={t("dashboard.stats.avgVsWeek", {
-                    count: statistics.byPeriod.thisWeek,
-                    formattedCount: formattedWeek,
-                    defaultValue_one: "{{formattedCount}} this week",
-                    defaultValue_other: "{{formattedCount}} this week",
+                  actualLabel={t("dashboard.stats.paceThisWeek", {
+                    defaultValue: "This week",
+                  })}
+                  baselineLabel={t("dashboard.stats.usualWeek", {
+                    defaultValue: "Usual week",
                   })}
                   icon={FaCalendarWeek}
                   color="purple"
                   locale={locale}
                 />
                 <AveragePaceCard
-                  title={t("dashboard.stats.avgPerMonth", {
+                  title={t("dashboard.stats.pacePerMonth", {
                     defaultValue: "Per Month",
                   })}
-                  average={statistics.averages.perMonth}
+                  average={statistics.pace.sameDaysLastMonth}
                   actual={statistics.byPeriod.thisMonth}
-                  actualLabel={t("dashboard.stats.avgVsMonth", {
-                    count: statistics.byPeriod.thisMonth,
-                    formattedCount: formattedMonth,
-                    defaultValue_one: "{{formattedCount}} this month",
-                    defaultValue_other: "{{formattedCount}} this month",
+                  actualLabel={t("dashboard.stats.paceThisMonth", {
+                    defaultValue: "This month",
+                  })}
+                  baselineLabel={t("dashboard.stats.sameDaysLastMonth", {
+                    defaultValue: "Same days last month",
                   })}
                   icon={FaCalendarAlt}
                   color="green"

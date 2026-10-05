@@ -110,11 +110,8 @@ export class SyncHistoryRepository {
       take: toDelete,
     });
 
-    if (oldest.length > 0) {
-      await this.repository.remove(oldest);
-      return oldest.length;
-    }
-    return 0;
+    await this.repository.remove(oldest);
+    return oldest.length;
   }
 
   async clearByUser(userId: string): Promise<void> {
@@ -404,10 +401,9 @@ export class SyncHistoryRepository {
       successful: number;
       failed: number;
     };
-    averages: {
-      perDay: number;
-      perWeek: number;
-      perMonth: number;
+    pace: {
+      usualWeek: number;
+      sameDaysLastMonth: number;
     };
     lastSyncedAt: string | null;
     last7Days: number[];
@@ -429,8 +425,20 @@ export class SyncHistoryRepository {
     const startOfLastMonth = new Date(
       Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)
     );
-    const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
     const startOf30DaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const startOf28DaysAgo = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
+    const lastMonthYear = startOfLastMonth.getUTCFullYear();
+    const lastMonthIndex = startOfLastMonth.getUTCMonth();
+    const daysInLastMonth = new Date(
+      Date.UTC(lastMonthYear, lastMonthIndex + 1, 0)
+    ).getUTCDate();
+    const sameDaysLastMonthEnd = new Date(
+      Date.UTC(
+        lastMonthYear,
+        lastMonthIndex,
+        Math.min(now.getUTCDate(), daysInLastMonth) + 1
+      )
+    );
 
     const last7DaysStarts: Date[] = [];
     for (let i = 0; i < 7; i++) {
@@ -461,7 +469,8 @@ export class SyncHistoryRepository {
       last30DaysTotal,
       last30DaysSuccessful,
       last30DaysFailed,
-      thisYear,
+      last28DaysTotal,
+      sameDaysLastMonth,
       latest,
       lastFailureRow,
       recentForPeakDay,
@@ -589,7 +598,19 @@ export class SyncHistoryRepository {
       this.repository
         .createQueryBuilder("sync_history")
         .where("sync_history.userId = :userId", { userId })
-        .andWhere("sync_history.syncedAt >= :startOfYear", { startOfYear })
+        .andWhere("sync_history.syncedAt >= :startOf28DaysAgo", {
+          startOf28DaysAgo,
+        })
+        .getCount(),
+      this.repository
+        .createQueryBuilder("sync_history")
+        .where("sync_history.userId = :userId", { userId })
+        .andWhere("sync_history.syncedAt >= :startOfLastMonth", {
+          startOfLastMonth,
+        })
+        .andWhere("sync_history.syncedAt < :sameDaysLastMonthEnd", {
+          sameDaysLastMonthEnd,
+        })
         .getCount(),
       this.repository.findOne({
         where: { userId },
@@ -619,18 +640,8 @@ export class SyncHistoryRepository {
 
     const successRate = total > 0 ? (successful / total) * 100 : 0;
 
-    const daysElapsedThisYear =
-      Math.floor(
-        (now.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24)
-      ) + 1;
-
-    let avgPerDay = 0;
-    if (daysElapsedThisYear > 0 && thisYear > 0) {
-      avgPerDay = thisYear / daysElapsedThisYear;
-    }
-
-    const avgPerWeek = avgPerDay * 7;
-    const avgPerMonth = avgPerDay * 30.44; // Average days per month
+    const usualWeek =
+      last28DaysTotal > 0 ? Math.round((last28DaysTotal / 4) * 10) / 10 : 0;
 
     const last7Days = (last7DaysCounts as number[]).slice(0, 7);
 
@@ -680,10 +691,9 @@ export class SyncHistoryRepository {
         successful: last30DaysSuccessful,
         failed: last30DaysFailed,
       },
-      averages: {
-        perDay: Math.round(avgPerDay * 100) / 100,
-        perWeek: Math.round(avgPerWeek * 100) / 100,
-        perMonth: Math.round(avgPerMonth * 100) / 100,
+      pace: {
+        usualWeek,
+        sameDaysLastMonth,
       },
       lastSyncedAt: latest?.syncedAt ? latest.syncedAt.toISOString() : null,
       last7Days,

@@ -365,6 +365,9 @@ components:
           type: integer
         failed:
           type: integer
+        successRate:
+          type: number
+          description: Percentage of successful syncs (0–100)
         byMediaType:
           type: object
           properties:
@@ -372,6 +375,9 @@ components:
               type: integer
             movie:
               type: integer
+            series:
+              type: integer
+              description: Distinct series count derived from episode syncs
         bySource:
           type: object
           properties:
@@ -381,6 +387,83 @@ components:
               type: integer
             emby:
               type: integer
+        byDestination:
+          type: object
+          properties:
+            trakt:
+              type: integer
+            tvtime:
+              type: integer
+            simkl:
+              type: integer
+            bingers:
+              type: integer
+        byPeriod:
+          type: object
+          properties:
+            today:
+              type: integer
+            thisWeek:
+              type: integer
+              description: Syncs since Monday 00:00 UTC
+            thisMonth:
+              type: integer
+            lastMonth:
+              type: integer
+        topThisMonth:
+          type: array
+          items:
+            type: object
+            properties:
+              mediaTitle:
+                type: string
+              mediaType:
+                type: string
+              count:
+                type: integer
+        last30Days:
+          type: object
+          properties:
+            total:
+              type: integer
+            successful:
+              type: integer
+            failed:
+              type: integer
+        pace:
+          type: object
+          description: Rolling baselines for dashboard pace cards
+          properties:
+            usualWeek:
+              type: number
+              description: Average syncs per week over the last 28 days (last28Days / 4)
+            sameDaysLastMonth:
+              type: integer
+              description: Syncs in the previous month from day 1 through today's day-of-month (clamped to last month length)
+        lastSyncedAt:
+          type: string
+          format: date-time
+          nullable: true
+        last7Days:
+          type: array
+          description: Sync counts for today and the previous 6 days (index 0 = today)
+          items:
+            type: integer
+          minItems: 7
+          maxItems: 7
+        peakDay:
+          type: integer
+          nullable: true
+          description: Most active weekday from recent syncs (0 = Sunday … 6 = Saturday), or null when empty
+        lastFailure:
+          type: object
+          nullable: true
+          properties:
+            mediaTitle:
+              type: string
+            syncedAt:
+              type: string
+              format: date-time
 
     TraktStatus:
       type: object
