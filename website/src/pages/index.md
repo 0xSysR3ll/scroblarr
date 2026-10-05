@@ -8,6 +8,17 @@ title: Scroblarr
 
 Scroblarr keeps your viewing data synchronized between your media servers (Plex, Jellyfin) and tracking services (Trakt, Simkl, Bingers). No manual logging required—just watch and sync.
 
+<div className="app-screenshots">
+  <figure className="app-screenshot">
+    <img src="img/dashboard.png" alt="Scroblarr dashboard with sync stats and activity charts" />
+    <figcaption>Dashboard — sync stats, activity, and trends</figcaption>
+  </figure>
+  <figure className="app-screenshot">
+    <img src="img/sync.png" alt="Scroblarr sync history table" />
+    <figcaption>Sync history — every scrobble, source, and destination</figcaption>
+  </figure>
+</div>
+
 ## How it works
 
 When you watch content on Plex or Jellyfin, Scroblarr receives webhook events and automatically syncs that watch data to Trakt, Simkl, and Bingers. This keeps your watch history synchronized across all platforms—no manual intervention needed.

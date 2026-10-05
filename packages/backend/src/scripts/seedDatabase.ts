@@ -23,84 +23,94 @@ interface TMDBTVShow {
   poster_path: string | null;
 }
 
-interface TMDBPerson {
-  id: number;
-  name: string;
-  known_for: Array<{
-    id: number;
-    media_type: "movie" | "tv";
-    title?: string;
-    name?: string;
-    release_date?: string;
-    first_air_date?: string;
-    poster_path: string | null;
-  }>;
-}
-
-async function fetchPopularMovies(): Promise<TMDBMovie[]> {
+async function fetchTmdbList<T>(path: string): Promise<T[]> {
   try {
     const response = await fetch(
-      `${TMDB_BASE_URL}/movie/popular?api_key=${TMDB_API_KEY}&language=en-US&page=1`
+      `${TMDB_BASE_URL}${path}${path.includes("?") ? "&" : "?"}api_key=${TMDB_API_KEY}&language=en-US`
     );
-    const data = (await response.json()) as { results?: TMDBMovie[] };
+    if (!response.ok) {
+      logger.system.warn(
+        { path, status: response.status },
+        "TMDB list request failed"
+      );
+      return [];
+    }
+    const data = (await response.json()) as { results?: T[] };
     return data.results || [];
   } catch (error) {
-    logger.system.warn({ error }, "Failed to fetch popular movies from TMDB");
+    logger.system.warn({ error, path }, "Failed to fetch TMDB list");
     return [];
   }
 }
 
-async function fetchPopularTVShows(): Promise<TMDBTVShow[]> {
-  try {
-    const response = await fetch(
-      `${TMDB_BASE_URL}/tv/popular?api_key=${TMDB_API_KEY}&language=en-US&page=1`
-    );
-    const data = (await response.json()) as { results?: TMDBTVShow[] };
-    return data.results || [];
-  } catch (error) {
-    logger.system.warn({ error }, "Failed to fetch popular TV shows from TMDB");
-    return [];
+async function fetchRecentPopularMovies(): Promise<TMDBMovie[]> {
+  const [
+    popular1,
+    popular2,
+    popular3,
+    popular4,
+    nowPlaying,
+    trending,
+    topRated,
+  ] = await Promise.all([
+    fetchTmdbList<TMDBMovie>("/movie/popular?page=1"),
+    fetchTmdbList<TMDBMovie>("/movie/popular?page=2"),
+    fetchTmdbList<TMDBMovie>("/movie/popular?page=3"),
+    fetchTmdbList<TMDBMovie>("/movie/popular?page=4"),
+    fetchTmdbList<TMDBMovie>("/movie/now_playing?page=1"),
+    fetchTmdbList<TMDBMovie>("/trending/movie/week"),
+    fetchTmdbList<TMDBMovie>("/movie/top_rated?page=1"),
+  ]);
+
+  const byId = new Map<number, TMDBMovie>();
+  for (const movie of [
+    ...trending,
+    ...nowPlaying,
+    ...popular1,
+    ...popular2,
+    ...popular3,
+    ...popular4,
+    ...topRated,
+  ]) {
+    if (movie?.id && movie.title) {
+      byId.set(movie.id, movie);
+    }
   }
+  return [...byId.values()];
 }
 
-async function fetchPopularPeople(): Promise<TMDBPerson[]> {
-  try {
-    const response = await fetch(
-      `${TMDB_BASE_URL}/person/popular?api_key=${TMDB_API_KEY}&language=en-US&page=1`
-    );
-    const data = (await response.json()) as { results?: TMDBPerson[] };
-    return data.results || [];
-  } catch (error) {
-    logger.system.warn({ error }, "Failed to fetch popular people from TMDB");
-    return [];
+async function fetchRecentPopularTVShows(): Promise<TMDBTVShow[]> {
+  const [popular1, popular2, onTheAir, trending] = await Promise.all([
+    fetchTmdbList<TMDBTVShow>("/tv/popular?page=1"),
+    fetchTmdbList<TMDBTVShow>("/tv/popular?page=2"),
+    fetchTmdbList<TMDBTVShow>("/tv/on_the_air?page=1"),
+    fetchTmdbList<TMDBTVShow>("/trending/tv/week"),
+  ]);
+
+  const byId = new Map<number, TMDBTVShow>();
+  for (const show of [...trending, ...onTheAir, ...popular1, ...popular2]) {
+    if (show?.id && show.name) {
+      byId.set(show.id, show);
+    }
   }
+  return [...byId.values()];
 }
 
-const sources = ["plex", "jellyfin"];
-const destinations = ["Trakt", "TVTime"];
-const partialSyncErrors: Record<string, string> = {
+const sources = ["plex", "jellyfin", "emby"] as const;
+type SeedDestination = "Trakt" | "Simkl" | "Bingers";
+const partialSyncErrors: Record<SeedDestination, string> = {
   Trakt:
     'Trakt API error: 409 - {"watched_at":"2026-05-11T19:40:00.000Z","expires_at":"2026-05-11T20:38:00.000Z"}',
-  TVTime:
-    "TVTime API error: Bad Gateway - TVTime service temporarily unavailable",
+  Simkl: "Simkl API error: 503 - Service temporarily unavailable",
+  Bingers: "Bingers API error: Network timeout",
 };
 
-function randomDate(start: Date, end: Date): Date {
-  return new Date(
-    start.getTime() + Math.random() * (end.getTime() - start.getTime())
-  );
-}
-
-function randomElement<T>(array: T[]): T {
+function randomElement<T>(array: readonly T[]): T {
   return array[Math.floor(Math.random() * array.length)];
 }
 
 function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-function randomBoolean(): boolean {
-  return Math.random() > 0.1;
 }
 
 function generateFakeTVDBId(): string {
@@ -110,9 +120,298 @@ function generateFakeTVDBId(): string {
 function generateFakeIMDBId(isMovie: boolean): string {
   if (isMovie) {
     return `tt${randomInt(1000000, 9999999)}`;
-  } else {
-    return `tt${randomInt(10000000, 99999999)}`;
   }
+  return `tt${randomInt(10000000, 99999999)}`;
+}
+
+interface OrderedEpisode {
+  show: TMDBTVShow;
+  seasonNumber: number;
+  episodeNumber: number;
+  source: (typeof sources)[number];
+}
+
+function buildOrderedEpisodes(
+  shows: TMDBTVShow[],
+  count: number
+): OrderedEpisode[] {
+  if (shows.length === 0 || count <= 0) {
+    return [];
+  }
+
+  const episodes: OrderedEpisode[] = [];
+  const usedKeys = new Set<string>();
+  const nextEpisode = new Map<number, { season: number; episode: number }>();
+  const shuffledShows = [...shows].sort(() => Math.random() - 0.5);
+  let showCursor = 0;
+  const EPISODES_PER_SEASON = 10;
+  const MAX_SEASON = 5;
+  let idlePasses = 0;
+
+  while (episodes.length < count && idlePasses < shuffledShows.length * 2) {
+    const show = shuffledShows[showCursor % shuffledShows.length];
+    showCursor++;
+
+    const progress = nextEpisode.get(show.id) ?? { season: 1, episode: 1 };
+    if (progress.season > MAX_SEASON) {
+      idlePasses++;
+      continue;
+    }
+
+    const source = randomElement(sources);
+    let seasonNumber = progress.season;
+    let episodeNumber = progress.episode;
+    const runLength = Math.min(randomInt(4, 8), count - episodes.length);
+    let added = 0;
+
+    for (let i = 0; i < runLength && episodes.length < count; i++) {
+      if (episodeNumber > EPISODES_PER_SEASON) {
+        seasonNumber += 1;
+        episodeNumber = 1;
+      }
+      if (seasonNumber > MAX_SEASON) {
+        break;
+      }
+
+      const key = `${show.id}:S${seasonNumber}E${episodeNumber}`;
+      if (usedKeys.has(key)) {
+        episodeNumber += 1;
+        continue;
+      }
+
+      usedKeys.add(key);
+      episodes.push({ show, seasonNumber, episodeNumber, source });
+      added++;
+      episodeNumber += 1;
+    }
+
+    nextEpisode.set(show.id, { season: seasonNumber, episode: episodeNumber });
+    if (added === 0) {
+      idlePasses++;
+    } else {
+      idlePasses = 0;
+    }
+  }
+
+  return episodes;
+}
+
+function eveningOnDay(day: Date, now: Date): Date {
+  const d = new Date(day);
+  d.setHours(randomInt(19, 22), randomInt(0, 59), randomInt(0, 59), 0);
+  if (d.getTime() > now.getTime()) {
+    return new Date(now.getTime() - randomInt(45, 180) * 60 * 1000);
+  }
+  return d;
+}
+
+function buildRealisticWatchTimes(count: number, now: Date): Date[] {
+  if (count <= 0) {
+    return [];
+  }
+
+  const dayStartsNewestFirst: Date[] = [];
+  const cursor = new Date(now);
+  cursor.setHours(0, 0, 0, 0);
+
+  dayStartsNewestFirst.push(new Date(cursor));
+  cursor.setDate(cursor.getDate() - 1);
+
+  while (dayStartsNewestFirst.length < count) {
+    const isWeekend = cursor.getDay() === 0 || cursor.getDay() === 6;
+    let watches: number;
+    if (isWeekend) {
+      watches = randomInt(1, 2);
+    } else {
+      watches = Math.random() > 0.2 ? 1 : 0;
+    }
+
+    for (let w = 0; w < watches && dayStartsNewestFirst.length < count; w++) {
+      dayStartsNewestFirst.push(new Date(cursor));
+    }
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  const dayStarts = dayStartsNewestFirst.reverse();
+  const times: Date[] = [];
+  let previousMs = 0;
+
+  for (let i = 0; i < dayStarts.length; i++) {
+    const sameDayAsPrev =
+      i > 0 && dayStarts[i].getTime() === dayStarts[i - 1].getTime();
+    const t = eveningOnDay(dayStarts[i], now);
+
+    if (sameDayAsPrev) {
+      t.setHours(
+        Math.min(Math.max(t.getHours(), 21), 23),
+        randomInt(0, 59),
+        0,
+        0
+      );
+    }
+
+    if (t.getTime() <= previousMs) {
+      t.setTime(previousMs + 60 * 60 * 1000);
+    }
+    if (t.getTime() > now.getTime()) {
+      t.setTime(Math.max(previousMs + 60 * 1000, now.getTime() - 60 * 1000));
+    }
+
+    times.push(t);
+    previousMs = t.getTime();
+  }
+
+  return times;
+}
+
+type SeedWatchItem =
+  | { kind: "episode"; episode: OrderedEpisode }
+  | { kind: "movie"; movie: TMDBMovie };
+
+function buildWatchPlan(
+  episodes: OrderedEpisode[],
+  movies: TMDBMovie[]
+): SeedWatchItem[] {
+  const plan: SeedWatchItem[] = [];
+  const movieQueue = [...movies];
+  const tonightMovie = movieQueue.length > 0 ? movieQueue.shift()! : undefined;
+
+  const runs: OrderedEpisode[][] = [];
+  let current: OrderedEpisode[] = [];
+  for (const ep of episodes) {
+    const prev = current[current.length - 1];
+    if (
+      prev &&
+      prev.show.id === ep.show.id &&
+      (prev.seasonNumber < ep.seasonNumber ||
+        (prev.seasonNumber === ep.seasonNumber &&
+          prev.episodeNumber + 1 === ep.episodeNumber))
+    ) {
+      current.push(ep);
+    } else {
+      if (current.length) {
+        runs.push(current);
+      }
+      current = [ep];
+    }
+  }
+  if (current.length) {
+    runs.push(current);
+  }
+
+  for (const run of runs) {
+    for (const episode of run) {
+      plan.push({ kind: "episode", episode });
+    }
+    if (movieQueue.length > 0 && Math.random() > 0.3) {
+      plan.push({ kind: "movie", movie: movieQueue.shift()! });
+    }
+  }
+
+  while (movieQueue.length > 0) {
+    plan.unshift({ kind: "movie", movie: movieQueue.shift()! });
+  }
+
+  if (tonightMovie) {
+    plan.push({ kind: "movie", movie: tonightMovie });
+  }
+
+  return plan;
+}
+
+function pickDestinations(
+  linkedDestinations: readonly SeedDestination[],
+  isPartialSync: boolean
+): {
+  successfulDestinations: string[];
+  failedDestination?: SeedDestination;
+} {
+  if (linkedDestinations.length === 0) {
+    return { successfulDestinations: [] };
+  }
+
+  if (!isPartialSync) {
+    return { successfulDestinations: [...linkedDestinations] };
+  }
+
+  const failedDestination = randomElement(linkedDestinations);
+  return {
+    successfulDestinations: linkedDestinations.filter(
+      (d) => d !== failedDestination
+    ),
+    failedDestination,
+  };
+}
+
+function toHistoryEntry(
+  userId: string,
+  item: SeedWatchItem,
+  syncedAt: Date,
+  index: number,
+  profile: {
+    source: (typeof sources)[number];
+    linkedDestinations: readonly SeedDestination[];
+  }
+): Partial<SyncHistory> {
+  const isPartialSync = index === 4 || index === 11;
+  const { successfulDestinations, failedDestination } = pickDestinations(
+    profile.linkedDestinations,
+    isPartialSync
+  );
+  const success = successfulDestinations.length > 0;
+
+  const base = {
+    userId,
+    success,
+    errorMessage: failedDestination
+      ? `${failedDestination}: ${partialSyncErrors[failedDestination]}`
+      : undefined,
+    wasRewatched: false,
+    destinations:
+      successfulDestinations.length > 0
+        ? JSON.stringify(successfulDestinations)
+        : undefined,
+    syncedAt,
+    source: profile.source,
+  };
+
+  if (item.kind === "movie") {
+    const movie = item.movie;
+    return {
+      ...base,
+      mediaType: "movie",
+      mediaTitle: movie.title,
+      year: movie.release_date
+        ? new Date(movie.release_date).getFullYear()
+        : undefined,
+      posterUrl: movie.poster_path
+        ? `${TMDB_IMAGE_BASE}${movie.poster_path}`
+        : undefined,
+      tmdbMovieId: movie.id.toString(),
+      tvdbMovieId: generateFakeTVDBId(),
+      imdbMovieId: generateFakeIMDBId(true),
+    };
+  }
+
+  const ep = item.episode;
+  const seasonLabel = ep.seasonNumber.toString().padStart(2, "0");
+  const episodeLabel = ep.episodeNumber.toString().padStart(2, "0");
+  return {
+    ...base,
+    mediaType: "episode",
+    mediaTitle: `${ep.show.name} - S${seasonLabel}E${episodeLabel}`,
+    year: ep.show.first_air_date
+      ? new Date(ep.show.first_air_date).getFullYear()
+      : undefined,
+    seasonNumber: ep.seasonNumber,
+    episodeNumber: ep.episodeNumber,
+    posterUrl: ep.show.poster_path
+      ? `${TMDB_IMAGE_BASE}${ep.show.poster_path}`
+      : undefined,
+    tmdbSeriesId: ep.show.id.toString(),
+    tvdbEpisodeId: generateFakeTVDBId(),
+    imdbEpisodeId: generateFakeIMDBId(false),
+  };
 }
 
 async function seedDatabase() {
@@ -146,43 +445,17 @@ async function seedDatabase() {
     }
 
     const existingHistory = await syncHistoryRepository.findByUser(user.id, 1);
-    const existingCount = existingHistory.length;
-
-    if (existingCount > 0) {
-      logger.system.info(`Found existing sync history entries. Clearing...`);
+    if (existingHistory.length > 0) {
+      logger.system.info("Found existing sync history entries. Clearing...");
       await dataSource.getRepository(SyncHistory).delete({ userId: user.id });
     }
 
-    logger.system.info("Fetching popular media from TMDB...");
+    logger.system.info("Fetching recent popular / trending media from TMDB...");
 
-    const [movies, tvShows, people] = await Promise.all([
-      fetchPopularMovies(),
-      fetchPopularTVShows(),
-      fetchPopularPeople(),
+    const [allMovies, allTVShows] = await Promise.all([
+      fetchRecentPopularMovies(),
+      fetchRecentPopularTVShows(),
     ]);
-
-    const allMovies: TMDBMovie[] = [...movies];
-    const allTVShows: TMDBTVShow[] = [...tvShows];
-
-    people.forEach((person) => {
-      person.known_for.forEach((item) => {
-        if (item.media_type === "movie" && item.title) {
-          allMovies.push({
-            id: item.id,
-            title: item.title,
-            release_date: item.release_date || "",
-            poster_path: item.poster_path,
-          });
-        } else if (item.media_type === "tv" && item.name) {
-          allTVShows.push({
-            id: item.id,
-            name: item.name,
-            first_air_date: item.first_air_date || "",
-            poster_path: item.poster_path,
-          });
-        }
-      });
-    });
 
     logger.system.info(
       { movies: allMovies.length, tvShows: allTVShows.length },
@@ -197,121 +470,64 @@ async function seedDatabase() {
     logger.system.info("Generating sync history data...");
 
     const now = new Date();
-    const oneYearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-    const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const targetMovieCount = 150;
+    const targetEpisodeCount = 100;
 
-    const historyEntries: Partial<SyncHistory>[] = [];
+    const profile = {
+      source: randomElement(sources),
+      linkedDestinations: ["Trakt", "Simkl", "Bingers"] as const,
+    };
+    logger.system.info(
+      {
+        source: profile.source,
+        destinations: profile.linkedDestinations,
+      },
+      "Seed user profile"
+    );
 
-    for (let i = 0; i < 250; i++) {
-      const isMovie = Math.random() > 0.4;
-      const mediaType = isMovie ? "movie" : "episode";
-      const isPartialSync = i < 12;
-      const success = isPartialSync || randomBoolean();
-      const source = randomElement(sources);
+    const orderedEpisodes = buildOrderedEpisodes(
+      allTVShows,
+      targetEpisodeCount
+    );
+    const uniqueMovies = [...allMovies]
+      .sort(() => Math.random() - 0.5)
+      .slice(0, Math.min(targetMovieCount, allMovies.length));
 
-      const successfulDestinations = success
-        ? [randomElement(destinations)]
-        : [];
-      const successfulDestination = successfulDestinations[0];
+    const plan = buildWatchPlan(orderedEpisodes, uniqueMovies);
+    const rewatchCount = 2;
+    const times = buildRealisticWatchTimes(plan.length + rewatchCount, now);
 
-      // For successful syncs, 40% chance of syncing to both destinations.
-      // Partial syncs keep only the successful destination here and store the
-      // failed destination in errorMessage, matching production history rows.
-      if (success && !isPartialSync && Math.random() > 0.6) {
-        const otherDest = destinations.find((d) => d !== successfulDestination);
-        if (otherDest) {
-          successfulDestinations.push(otherDest);
-        }
-      }
+    const historyEntries: Partial<SyncHistory>[] = plan.map((item, index) =>
+      toHistoryEntry(user.id, item, times[index], index, profile)
+    );
 
-      let mediaTitle: string;
-      let year: number | undefined;
-      let seasonNumber: number | undefined;
-      let episodeNumber: number | undefined;
-      let posterUrl: string | undefined;
-      let tmdbMovieId: string | undefined;
-      let tmdbSeriesId: string | undefined;
-      let tvdbMovieId: string | undefined;
-      let tvdbEpisodeId: string | undefined;
-      let imdbMovieId: string | undefined;
-      let imdbEpisodeId: string | undefined;
+    const rewatchSources = [
+      historyEntries.find((entry) => entry.mediaType === "movie"),
+      historyEntries.find((entry) => entry.mediaType === "episode"),
+    ].filter((entry): entry is Partial<SyncHistory> => Boolean(entry));
 
-      if (isMovie && allMovies.length > 0) {
-        const movie = randomElement(allMovies);
-        mediaTitle = movie.title;
-        if (movie.release_date) {
-          year = new Date(movie.release_date).getFullYear();
-        }
-        if (movie.poster_path) {
-          posterUrl = `${TMDB_IMAGE_BASE}${movie.poster_path}`;
-        }
-        tmdbMovieId = movie.id.toString();
-        tvdbMovieId = generateFakeTVDBId();
-        imdbMovieId = generateFakeIMDBId(true);
-      } else if (!isMovie && allTVShows.length > 0) {
-        const show = randomElement(allTVShows);
-        seasonNumber = randomInt(1, 5);
-        episodeNumber = randomInt(1, 12);
-        mediaTitle = `${show.name} - S${seasonNumber.toString().padStart(2, "0")}E${episodeNumber.toString().padStart(2, "0")}`;
-        if (show.poster_path) {
-          posterUrl = `${TMDB_IMAGE_BASE}${show.poster_path}`;
-        }
-        tmdbSeriesId = show.id.toString();
-        tvdbEpisodeId = generateFakeTVDBId();
-        imdbEpisodeId = generateFakeIMDBId(false);
-      } else {
-        continue;
-      }
-
-      let syncedAt: Date;
-      if (i < 10) {
-        syncedAt = randomDate(today, now);
-      } else if (i < 50) {
-        syncedAt = randomDate(oneWeekAgo, now);
-      } else if (i < 120) {
-        syncedAt = randomDate(oneMonthAgo, now);
-      } else {
-        syncedAt = randomDate(oneYearAgo, now);
-      }
-
-      const failedDestination = isPartialSync
-        ? destinations.find(
-            (destination) => destination !== successfulDestination
-          )
-        : success
-          ? undefined
-          : randomElement(destinations);
-      const errorMessage = failedDestination
-        ? `${failedDestination}: ${partialSyncErrors[failedDestination]}`
-        : undefined;
-      const wasRewatched =
-        successfulDestinations.includes("TVTime") && Math.random() > 0.85;
-
+    for (let i = 0; i < rewatchSources.length; i++) {
+      const original = rewatchSources[i];
       historyEntries.push({
         userId: user.id,
-        mediaType,
-        mediaTitle,
-        source,
-        year,
-        seasonNumber,
-        episodeNumber,
-        posterUrl,
-        tmdbMovieId,
-        tmdbSeriesId,
-        tvdbMovieId,
-        tvdbEpisodeId,
-        imdbMovieId,
-        imdbEpisodeId,
-        success,
-        errorMessage,
-        wasRewatched,
-        destinations:
-          successfulDestinations.length > 0
-            ? JSON.stringify(successfulDestinations)
-            : undefined,
-        syncedAt,
+        mediaType: original.mediaType,
+        mediaTitle: original.mediaTitle,
+        source: profile.source,
+        year: original.year,
+        seasonNumber: original.seasonNumber,
+        episodeNumber: original.episodeNumber,
+        posterUrl: original.posterUrl,
+        tmdbMovieId: original.tmdbMovieId,
+        tmdbSeriesId: original.tmdbSeriesId,
+        tvdbMovieId: original.tvdbMovieId,
+        tvdbEpisodeId: original.tvdbEpisodeId,
+        imdbMovieId: original.imdbMovieId,
+        imdbEpisodeId: original.imdbEpisodeId,
+        success: true,
+        errorMessage: undefined,
+        wasRewatched: true,
+        destinations: JSON.stringify([...profile.linkedDestinations]),
+        syncedAt: times[plan.length + i],
       });
     }
 
@@ -334,6 +550,16 @@ async function seedDatabase() {
 
     const stats = await syncHistoryRepository.getStatisticsByUser(user.id);
 
+    const byDay = new Map<string, number>();
+    for (const entry of historyEntries) {
+      if (!entry.syncedAt) {
+        continue;
+      }
+      const key = entry.syncedAt.toISOString().slice(0, 10);
+      byDay.set(key, (byDay.get(key) || 0) + 1);
+    }
+    const maxPerDay = Math.max(0, ...byDay.values());
+
     logger.system.info(
       {
         total: stats.total,
@@ -345,6 +571,7 @@ async function seedDatabase() {
         today: stats.byPeriod.today,
         thisWeek: stats.byPeriod.thisWeek,
         thisMonth: stats.byPeriod.thisMonth,
+        maxWatchesPerDay: maxPerDay,
       },
       `✅ Successfully seeded database with ${stats.total} sync history entries!`
     );

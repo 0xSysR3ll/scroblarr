@@ -14,6 +14,14 @@
 **Scroblarr** automatically syncs your watch history from [Plex](https://plex.tv), [Jellyfin](https://jellyfin.org), and [Emby](https://emby.media) to [Trakt](https://trakt.tv), [Simkl](https://simkl.com), and [Bingers](https://bingers.app). \
 No manual logging — just watch and sync.
 
+<p align="center">
+  <img src="website/static/img/dashboard.png" alt="Scroblarr dashboard" width="900" />
+</p>
+
+<p align="center">
+  <img src="website/static/img/sync.png" alt="Scroblarr sync history" width="900" />
+</p>
+
 ## Features
 
 - **Automatic syncing** — Real-time webhook-based sync; no manual steps
