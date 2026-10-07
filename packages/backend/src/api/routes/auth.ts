@@ -2,7 +2,10 @@ import { randomUUID } from "crypto";
 
 import { getEnv } from "@config/env";
 import { User } from "@entities/User";
-import { JellyfinClient } from "@integrations/jellyfin/JellyfinClient";
+import {
+  describeNetworkError,
+  JellyfinClient,
+} from "@integrations/jellyfin/JellyfinClient";
 import { PlexOAuth } from "@integrations/plex/PlexOAuth";
 import { SessionRepository } from "@repositories/SessionRepository";
 import { SettingsRepository } from "@repositories/SettingsRepository";
@@ -715,6 +718,9 @@ router.post("/jellyfin", (req, res) => {
 });
 
 async function handleJellyfinLogin(req: Request, res: Response) {
+  let baseUrl: string | undefined;
+  let mediaBrowserType: "jellyfin" | "emby" | undefined;
+
   try {
     const env = getEnv();
     const { username, password, hostname, port, useSsl, urlBase } = req.body;
@@ -743,7 +749,6 @@ async function handleJellyfinLogin(req: Request, res: Response) {
       }
     }
 
-    let baseUrl: string;
     const settings = await settingsRepository.getAll();
     let allowBodyMediaBrowserType = false;
 
@@ -766,7 +771,7 @@ async function handleJellyfinLogin(req: Request, res: Response) {
       });
     }
 
-    const mediaBrowserType = resolveMediaBrowserType(
+    mediaBrowserType = resolveMediaBrowserType(
       allowBodyMediaBrowserType ? req.body.mediaBrowserType : undefined,
       settings.mediaBrowserType
     );
@@ -905,6 +910,9 @@ async function handleJellyfinLogin(req: Request, res: Response) {
     const errorMessage =
       error instanceof Error ? error.message : "Unable to authenticate";
     const errorStack = error instanceof Error ? error.stack : undefined;
+    const errorCause =
+      error instanceof Error ? describeNetworkError(error) : undefined;
+    const serverLabel = mediaBrowserType === "emby" ? "Emby" : "Jellyfin";
 
     if (errorMessage.includes("Invalid credentials")) {
       logger.auth.warn(
@@ -912,7 +920,7 @@ async function handleJellyfinLogin(req: Request, res: Response) {
           username: req.body.username,
           error: errorMessage,
         },
-        "Jellyfin login failed: invalid credentials"
+        `${serverLabel} login failed: invalid credentials`
       );
       return res.status(401).json({ error: "Invalid credentials" });
     }
@@ -921,10 +929,13 @@ async function handleJellyfinLogin(req: Request, res: Response) {
       {
         username: req.body.username,
         error: errorMessage,
+        errorCause,
         errorStack,
+        baseUrl,
+        mediaBrowserType,
         hostname: req.body.hostname,
       },
-      "Jellyfin login error"
+      `${serverLabel} login error`
     );
     return res.status(500).json({ error: errorMessage });
   }

@@ -17,7 +17,39 @@ vi.mock("@utils/logger", () => ({
   logger: loggerMocks,
 }));
 
-import { JellyfinClient } from "./JellyfinClient";
+import { describeNetworkError, JellyfinClient } from "./JellyfinClient";
+
+describe("describeNetworkError", () => {
+  it("surfaces nested undici cause codes", () => {
+    const root = new Error("connect ECONNREFUSED 127.0.0.1:8096") as Error & {
+      code?: string;
+    };
+    root.code = "ECONNREFUSED";
+    const fetchError = new TypeError("fetch failed", { cause: root });
+
+    expect(describeNetworkError(fetchError)).toBe(
+      "connect ECONNREFUSED 127.0.0.1:8096"
+    );
+  });
+
+  it("prefixes a code when it is missing from the deepest message", () => {
+    const root = new Error("certificate has expired") as Error & {
+      code?: string;
+    };
+    root.code = "CERT_HAS_EXPIRED";
+    const fetchError = new TypeError("fetch failed", { cause: root });
+
+    expect(describeNetworkError(fetchError)).toBe(
+      "CERT_HAS_EXPIRED: certificate has expired"
+    );
+  });
+
+  it("returns the message when no errno code is present", () => {
+    expect(describeNetworkError(new Error("something went wrong"))).toBe(
+      "something went wrong"
+    );
+  });
+});
 
 describe("JellyfinClient", () => {
   afterEach(() => {
@@ -158,6 +190,70 @@ describe("JellyfinClient", () => {
     ).resolves.toBeNull();
   });
 
+  it("returns null when season poster ancestors request fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 500 })
+    );
+
+    const client = new JellyfinClient("https://jellyfin.local");
+    await expect(
+      client.getSeasonPosterUrl("access-token", "episode-1", 1)
+    ).resolves.toBeNull();
+  });
+
+  it("returns null when season poster ancestors lack a series", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => [{ Type: "Folder", Id: "folder-1" }],
+      })
+    );
+
+    const client = new JellyfinClient("https://jellyfin.local");
+    await expect(
+      client.getSeasonPosterUrl("access-token", "episode-1", 1)
+    ).resolves.toBeNull();
+  });
+
+  it("returns null when season poster seasons request fails", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ Type: "Series", Id: "series-1" }],
+      })
+      .mockResolvedValueOnce({ ok: false, status: 500 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new JellyfinClient("https://jellyfin.local");
+    await expect(
+      client.getSeasonPosterUrl("access-token", "episode-1", 1)
+    ).resolves.toBeNull();
+  });
+
+  it("returns null when season poster season index is missing", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ Type: "Series", Id: "series-1" }],
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          Items: [{ Id: "season-1", IndexNumber: 1 }],
+        }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new JellyfinClient("https://jellyfin.local");
+    await expect(
+      client.getSeasonPosterUrl("access-token", "episode-1", 9)
+    ).resolves.toBeNull();
+  });
+
   it("uses official Emby Authorization and X-Emby-Token headers", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -232,6 +328,7 @@ describe("JellyfinClient", () => {
         statusText: "Service Unavailable",
         errorText: "upstream down",
         username: "admin",
+        baseUrl: "https://jellyfin.local",
         serverKind: "jellyfin",
       }),
       "Jellyfin login failed"
@@ -244,6 +341,113 @@ describe("JellyfinClient", () => {
     const client = new JellyfinClient("https://jellyfin.local");
     await expect(client.login("admin", "secret")).rejects.toThrow(
       "Failed to authenticate with Jellyfin"
+    );
+  });
+
+  it("enriches fetch failures with target URL and cause", async () => {
+    const root = new Error("connect ECONNREFUSED 10.0.0.5:8096") as Error & {
+      code?: string;
+    };
+    root.code = "ECONNREFUSED";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new TypeError("fetch failed", { cause: root }))
+    );
+
+    const client = new JellyfinClient(
+      "http://emby.local:8096",
+      undefined,
+      "emby"
+    );
+    await expect(client.login("admin", "secret")).rejects.toThrow(
+      "Unable to reach Emby at http://emby.local:8096: connect ECONNREFUSED 10.0.0.5:8096"
+    );
+    expect(loggerMocks.emby.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: "admin",
+        baseUrl: "http://emby.local:8096",
+        serverKind: "emby",
+        error: "fetch failed",
+        cause: "connect ECONNREFUSED 10.0.0.5:8096",
+      }),
+      "Emby login network error"
+    );
+  });
+
+  it("enriches Jellyfin fetch failures with the Jellyfin label", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new TypeError("fetch failed"))
+    );
+
+    const client = new JellyfinClient("https://jellyfin.local");
+    await expect(client.login("admin", "secret")).rejects.toThrow(
+      "Unable to reach Jellyfin at https://jellyfin.local: fetch failed"
+    );
+    expect(loggerMocks.jellyfin.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        serverKind: "jellyfin",
+        error: "fetch failed",
+      }),
+      "Jellyfin login network error"
+    );
+  });
+
+  it("treats errno-style causes as network failures even without fetch failed", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("getaddrinfo ENOTFOUND emby.invalid"))
+    );
+
+    const client = new JellyfinClient(
+      "http://emby.invalid:8096",
+      undefined,
+      "emby"
+    );
+    await expect(client.login("admin", "secret")).rejects.toThrow(
+      "Unable to reach Emby at http://emby.invalid:8096: getaddrinfo ENOTFOUND emby.invalid"
+    );
+  });
+
+  it("rethrows unexpected Errors that are not network failures", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new SyntaxError("Unexpected token < in JSON"))
+    );
+
+    const client = new JellyfinClient("https://jellyfin.local");
+    await expect(client.login("admin", "secret")).rejects.toThrow(
+      "Unexpected token < in JSON"
+    );
+    expect(loggerMocks.jellyfin.error).not.toHaveBeenCalledWith(
+      expect.anything(),
+      "Jellyfin login network error"
+    );
+  });
+
+  it("labels Emby HTTP auth failures with Emby", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        statusText: "Service Unavailable",
+        text: async () => "upstream down",
+      })
+    );
+
+    const client = new JellyfinClient("https://emby.local", undefined, "emby");
+    await expect(client.login("admin", "secret")).rejects.toThrow(
+      "Emby authentication failed: 503 Service Unavailable"
+    );
+  });
+
+  it("wraps non-Error Emby login failures", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue("network down"));
+
+    const client = new JellyfinClient("https://emby.local", undefined, "emby");
+    await expect(client.login("admin", "secret")).rejects.toThrow(
+      "Failed to authenticate with Emby"
     );
   });
 
@@ -330,6 +534,29 @@ describe("JellyfinClient", () => {
       }),
       "Fetched Jellyfin user info"
     );
+  });
+
+  it("omits thumb when Jellyfin user has no primary image tag", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          Id: "u2",
+          Name: "Bob",
+        }),
+      })
+    );
+
+    const client = new JellyfinClient("https://jellyfin.local");
+    await expect(client.getUserInfo("api-key", "u2")).resolves.toEqual({
+      id: "u2",
+      username: "Bob",
+      displayName: "Bob",
+      email: undefined,
+      thumb: undefined,
+      isAdmin: false,
+    });
   });
 
   it("logs getUserInfo failures before throwing", async () => {

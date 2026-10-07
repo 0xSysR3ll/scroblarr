@@ -3,6 +3,33 @@ import { logger } from "@utils/logger";
 
 export type MediaBrowserServerKind = "jellyfin" | "emby";
 
+export function describeNetworkError(error: Error): string {
+  let current: unknown = error;
+  let deepestMessage = error.message;
+  let code: string | undefined;
+  const seen = new Set<unknown>();
+
+  while (current instanceof Error && !seen.has(current)) {
+    seen.add(current);
+    deepestMessage = current.message;
+    if (
+      "code" in current &&
+      typeof (current as NodeJS.ErrnoException).code === "string"
+    ) {
+      code = (current as NodeJS.ErrnoException).code;
+    }
+    current = current.cause;
+  }
+
+  if (code && deepestMessage.includes(code)) {
+    return deepestMessage;
+  }
+  if (code) {
+    return `${code}: ${deepestMessage}`;
+  }
+  return deepestMessage;
+}
+
 export interface JellyfinUser {
   Id: string;
   Name: string;
@@ -117,28 +144,65 @@ export class JellyfinClient {
           throw new Error("Invalid credentials");
         }
 
+        const serverLabel = this.serverKind === "emby" ? "Emby" : "Jellyfin";
         this.log.error(
           {
             status: statusCode,
             statusText: response.statusText,
             errorText: errorText.substring(0, 500),
             username,
+            baseUrl: this.baseUrl,
             serverKind: this.serverKind,
           },
-          "Jellyfin login failed"
+          `${serverLabel} login failed`
         );
         throw new Error(
-          `Jellyfin authentication failed: ${statusCode} ${response.statusText}`
+          `${serverLabel} authentication failed: ${statusCode} ${response.statusText}`
         );
       }
 
       const data = (await response.json()) as JellyfinLoginResponse;
       return data;
     } catch (error) {
-      if (error instanceof Error) {
+      if (!(error instanceof Error)) {
+        const serverLabel = this.serverKind === "emby" ? "Emby" : "Jellyfin";
+        throw new Error(`Failed to authenticate with ${serverLabel}`);
+      }
+
+      if (
+        error.message === "Invalid credentials" ||
+        error.message.startsWith("Jellyfin authentication failed") ||
+        error.message.startsWith("Emby authentication failed")
+      ) {
         throw error;
       }
-      throw new Error("Failed to authenticate with Jellyfin");
+
+      const cause = describeNetworkError(error);
+      const looksLikeNetworkFailure =
+        error.message === "fetch failed" ||
+        /ECONNREFUSED|ENOTFOUND|ECONNRESET|ETIMEDOUT|CERT_|UNABLE_TO_VERIFY/i.test(
+          cause
+        );
+
+      if (!looksLikeNetworkFailure) {
+        throw error;
+      }
+
+      const serverLabel = this.serverKind === "emby" ? "Emby" : "Jellyfin";
+      const message = `Unable to reach ${serverLabel} at ${this.baseUrl}: ${cause}`;
+
+      this.log.error(
+        {
+          username,
+          baseUrl: this.baseUrl,
+          serverKind: this.serverKind,
+          error: error.message,
+          cause,
+        },
+        `${serverLabel} login network error`
+      );
+
+      throw new Error(message, { cause: error });
     }
   }
 
