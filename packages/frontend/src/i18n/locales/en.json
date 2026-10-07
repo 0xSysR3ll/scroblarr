@@ -586,6 +586,7 @@
       "bingers": "Bingers",
       "tvtime": "TVTime"
     },
+    "source": "Source",
     "source": "Source"
   },
   "errors": {
@@ -623,7 +624,9 @@
     "importUsers_other": "Import {{count}} User{{plural}}",
     "importUsersButton": "Import Users",
     "usersSelected": "{{count}} user{{plural}} selected",
-    "importUsers": "Import {{count}} User{{plural}}"
+    "importUsers": "Import {{count}} User{{plural}}",
+    "importFromEmby": "Import Users from Emby Server",
+    "importFromJellyfin": "Import Users from Jellyfin Server"
   },
   "simkl": {
     "getAuthUrlFailed": "Failed to get Simkl PIN code",

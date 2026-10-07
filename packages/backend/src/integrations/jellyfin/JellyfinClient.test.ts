@@ -66,6 +66,18 @@ describe("describeNetworkError", () => {
     );
   });
 
+  it("prefixes AggregateError entry codes missing from their messages", () => {
+    const socketError = new Error("other side closed") as Error & {
+      code?: string;
+    };
+    socketError.code = "UND_ERR_SOCKET";
+    const aggregate = new AggregateError([socketError], "");
+
+    expect(describeNetworkError(aggregate)).toBe(
+      "UND_ERR_SOCKET: other side closed"
+    );
+  });
+
   it("skips non-Error AggregateError entries and cyclic causes", () => {
     const cyclic = new Error("connect ECONNREFUSED 10.0.0.1:8096") as Error & {
       cause?: Error;

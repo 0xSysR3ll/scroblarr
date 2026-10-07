@@ -6,6 +6,23 @@ export type MediaBrowserServerKind = "jellyfin" | "emby";
 const NETWORK_ERROR_PATTERN =
   /ECONNREFUSED|ENOTFOUND|ECONNRESET|ETIMEDOUT|CERT_|UNABLE_TO_VERIFY|UND_ERR_/i;
 
+function getErrnoCode(error: Error): string | undefined {
+  if (
+    "code" in error &&
+    typeof (error as NodeJS.ErrnoException).code === "string"
+  ) {
+    return (error as NodeJS.ErrnoException).code;
+  }
+  return undefined;
+}
+
+function formatMessageWithCode(message: string, code?: string): string {
+  if (code && !message.includes(code)) {
+    return `${code}: ${message}`;
+  }
+  return message;
+}
+
 export function describeNetworkError(error: Error): string {
   let deepestMessage = error.message;
   let code: string | undefined;
@@ -24,11 +41,9 @@ export function describeNetworkError(error: Error): string {
     if (trimmed) {
       deepestMessage = trimmed;
     }
-    if (
-      "code" in current &&
-      typeof (current as NodeJS.ErrnoException).code === "string"
-    ) {
-      code = (current as NodeJS.ErrnoException).code;
+    const currentCode = getErrnoCode(current);
+    if (currentCode) {
+      code = currentCode;
     }
 
     if (current instanceof AggregateError) {
@@ -37,7 +52,9 @@ export function describeNetworkError(error: Error): string {
         if (nested instanceof Error) {
           const nestedMessage = nested.message.trim();
           if (nestedMessage) {
-            aggregateMessages.push(nestedMessage);
+            aggregateMessages.push(
+              formatMessageWithCode(nestedMessage, getErrnoCode(nested))
+            );
           }
         }
       }
@@ -52,13 +69,7 @@ export function describeNetworkError(error: Error): string {
     return [...new Set(aggregateMessages)].join("; ");
   }
 
-  if (code && deepestMessage.includes(code)) {
-    return deepestMessage;
-  }
-  if (code) {
-    return `${code}: ${deepestMessage}`;
-  }
-  return deepestMessage;
+  return formatMessageWithCode(deepestMessage, code);
 }
 
 function looksLikeNetworkFailure(error: Error, described: string): boolean {
@@ -114,6 +125,10 @@ export class JellyfinClient {
     this.deviceId = deviceId || this.generateDeviceId();
     this.clientName = "Scroblarr";
     this.serverKind = serverKind;
+  }
+
+  private get serverLabel(): "Emby" | "Jellyfin" {
+    return this.serverKind === "emby" ? "Emby" : "Jellyfin";
   }
 
   private get log() {
@@ -179,12 +194,11 @@ export class JellyfinClient {
               errorText: errorText.substring(0, 500),
               serverKind: this.serverKind,
             },
-            "Jellyfin login failed: invalid credentials (401)"
+            `${this.serverLabel} login failed: invalid credentials (401)`
           );
           throw new Error("Invalid credentials");
         }
 
-        const serverLabel = this.serverKind === "emby" ? "Emby" : "Jellyfin";
         this.log.error(
           {
             status: statusCode,
@@ -194,10 +208,10 @@ export class JellyfinClient {
             baseUrl: this.baseUrl,
             serverKind: this.serverKind,
           },
-          `${serverLabel} login failed`
+          `${this.serverLabel} login failed`
         );
         throw new Error(
-          `${serverLabel} authentication failed: ${statusCode} ${response.statusText}`
+          `${this.serverLabel} authentication failed: ${statusCode} ${response.statusText}`
         );
       }
 
@@ -205,8 +219,7 @@ export class JellyfinClient {
       return data;
     } catch (error) {
       if (!(error instanceof Error)) {
-        const serverLabel = this.serverKind === "emby" ? "Emby" : "Jellyfin";
-        throw new Error(`Failed to authenticate with ${serverLabel}`);
+        throw new Error(`Failed to authenticate with ${this.serverLabel}`);
       }
 
       if (
@@ -223,8 +236,7 @@ export class JellyfinClient {
         throw error;
       }
 
-      const serverLabel = this.serverKind === "emby" ? "Emby" : "Jellyfin";
-      const message = `Unable to reach ${serverLabel} at ${this.baseUrl}: ${cause}`;
+      const message = `Unable to reach ${this.serverLabel} at ${this.baseUrl}: ${cause}`;
 
       this.log.error(
         {
@@ -234,7 +246,7 @@ export class JellyfinClient {
           error: error.message,
           cause,
         },
-        `${serverLabel} login network error`
+        `${this.serverLabel} login network error`
       );
 
       throw new Error(message, { cause: error });
