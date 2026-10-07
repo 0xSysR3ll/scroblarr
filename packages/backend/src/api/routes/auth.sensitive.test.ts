@@ -1401,6 +1401,46 @@ describe("auth route sensitive guards", () => {
     );
   });
 
+  it("handles non-Error Jellyfin login rejections without a cause", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue({
+      id: "admin-id",
+      isAdmin: true,
+    });
+    userRepositoryMocks.findByJellyfinUsername.mockResolvedValue({
+      id: "imported-id",
+      jellyfinUsername: "sysr3ll",
+      enabled: true,
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://jellyfin.local",
+      mediaBrowserType: "jellyfin",
+    });
+    jellyfinClientMocks.login.mockRejectedValue("boom");
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app).post("/api/v1/auth/jellyfin").send({
+      username: "sysr3ll",
+      password: "secret",
+    });
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: "Unable to authenticate" });
+    expect(logger.auth.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: "sysr3ll",
+        error: "Unable to authenticate",
+        errorCause: undefined,
+        errorStack: undefined,
+        baseUrl: "https://jellyfin.local",
+        mediaBrowserType: "jellyfin",
+      }),
+      "Jellyfin login error"
+    );
+  });
+
   it("rejects Jellyfin setup-admin when an admin already exists", async () => {
     userRepositoryMocks.findAdmin.mockResolvedValue({
       id: "admin-id",

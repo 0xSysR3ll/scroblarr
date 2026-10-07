@@ -49,6 +49,37 @@ describe("describeNetworkError", () => {
       "something went wrong"
     );
   });
+
+  it("joins useful messages from AggregateError.errors", () => {
+    const first = new Error("connect ETIMEDOUT 192.168.1.87:8096") as Error & {
+      code?: string;
+    };
+    first.code = "ETIMEDOUT";
+    const second = new Error("connect ECONNREFUSED 127.0.0.1:8096") as Error & {
+      code?: string;
+    };
+    second.code = "ECONNREFUSED";
+    const aggregate = new AggregateError([first, second], "");
+
+    expect(describeNetworkError(aggregate)).toBe(
+      "connect ETIMEDOUT 192.168.1.87:8096; connect ECONNREFUSED 127.0.0.1:8096"
+    );
+  });
+
+  it("skips non-Error AggregateError entries and cyclic causes", () => {
+    const cyclic = new Error("connect ECONNREFUSED 10.0.0.1:8096") as Error & {
+      cause?: Error;
+    };
+    cyclic.cause = cyclic;
+    const aggregate = new AggregateError(
+      ["not-an-error", cyclic, new Error("   ")],
+      ""
+    );
+
+    expect(describeNetworkError(aggregate)).toBe(
+      "connect ECONNREFUSED 10.0.0.1:8096"
+    );
+  });
 });
 
 describe("JellyfinClient", () => {
@@ -390,6 +421,24 @@ describe("JellyfinClient", () => {
         error: "fetch failed",
       }),
       "Jellyfin login network error"
+    );
+  });
+
+  it("treats terminated socket reads as network failures", async () => {
+    const socketError = new Error("other side closed") as Error & {
+      code?: string;
+    };
+    socketError.code = "UND_ERR_SOCKET";
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockRejectedValue(new TypeError("terminated", { cause: socketError }))
+    );
+
+    const client = new JellyfinClient("https://jellyfin.local");
+    await expect(client.login("admin", "secret")).rejects.toThrow(
+      "Unable to reach Jellyfin at https://jellyfin.local: UND_ERR_SOCKET: other side closed"
     );
   });
 

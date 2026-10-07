@@ -3,22 +3,53 @@ import { logger } from "@utils/logger";
 
 export type MediaBrowserServerKind = "jellyfin" | "emby";
 
+const NETWORK_ERROR_PATTERN =
+  /ECONNREFUSED|ENOTFOUND|ECONNRESET|ETIMEDOUT|CERT_|UNABLE_TO_VERIFY|UND_ERR_/i;
+
 export function describeNetworkError(error: Error): string {
-  let current: unknown = error;
   let deepestMessage = error.message;
   let code: string | undefined;
+  const aggregateMessages: string[] = [];
   const seen = new Set<unknown>();
+  const queue: unknown[] = [error];
 
-  while (current instanceof Error && !seen.has(current)) {
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!(current instanceof Error) || seen.has(current)) {
+      continue;
+    }
     seen.add(current);
-    deepestMessage = current.message;
+
+    const trimmed = current.message.trim();
+    if (trimmed) {
+      deepestMessage = trimmed;
+    }
     if (
       "code" in current &&
       typeof (current as NodeJS.ErrnoException).code === "string"
     ) {
       code = (current as NodeJS.ErrnoException).code;
     }
-    current = current.cause;
+
+    if (current instanceof AggregateError) {
+      for (const nested of current.errors) {
+        queue.push(nested);
+        if (nested instanceof Error) {
+          const nestedMessage = nested.message.trim();
+          if (nestedMessage) {
+            aggregateMessages.push(nestedMessage);
+          }
+        }
+      }
+    }
+
+    if (current.cause !== undefined) {
+      queue.push(current.cause);
+    }
+  }
+
+  if (aggregateMessages.length > 0) {
+    return [...new Set(aggregateMessages)].join("; ");
   }
 
   if (code && deepestMessage.includes(code)) {
@@ -28,6 +59,15 @@ export function describeNetworkError(error: Error): string {
     return `${code}: ${deepestMessage}`;
   }
   return deepestMessage;
+}
+
+function looksLikeNetworkFailure(error: Error, described: string): boolean {
+  return (
+    error.message === "fetch failed" ||
+    error.message === "terminated" ||
+    NETWORK_ERROR_PATTERN.test(error.message) ||
+    NETWORK_ERROR_PATTERN.test(described)
+  );
 }
 
 export interface JellyfinUser {
@@ -178,13 +218,8 @@ export class JellyfinClient {
       }
 
       const cause = describeNetworkError(error);
-      const looksLikeNetworkFailure =
-        error.message === "fetch failed" ||
-        /ECONNREFUSED|ENOTFOUND|ECONNRESET|ETIMEDOUT|CERT_|UNABLE_TO_VERIFY/i.test(
-          cause
-        );
 
-      if (!looksLikeNetworkFailure) {
+      if (!looksLikeNetworkFailure(error, cause)) {
         throw error;
       }
 
