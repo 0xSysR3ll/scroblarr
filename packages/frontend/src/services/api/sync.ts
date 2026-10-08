@@ -189,10 +189,9 @@ export interface SyncStatistics {
     successful: number;
     failed: number;
   };
-  averages: {
-    perDay: number;
-    perWeek: number;
-    perMonth: number;
+  pace: {
+    usualWeek: number;
+    sameDaysLastMonth: number;
   };
   lastSyncedAt: string | null;
   last7Days: number[];
