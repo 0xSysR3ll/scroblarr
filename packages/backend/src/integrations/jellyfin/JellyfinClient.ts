@@ -3,6 +3,84 @@ import { logger } from "@utils/logger";
 
 export type MediaBrowserServerKind = "jellyfin" | "emby";
 
+const NETWORK_ERROR_PATTERN =
+  /ECONNREFUSED|ENOTFOUND|ECONNRESET|ETIMEDOUT|CERT_|UNABLE_TO_VERIFY|UND_ERR_/i;
+
+function getErrnoCode(error: Error): string | undefined {
+  if (
+    "code" in error &&
+    typeof (error as NodeJS.ErrnoException).code === "string"
+  ) {
+    return (error as NodeJS.ErrnoException).code;
+  }
+  return undefined;
+}
+
+function formatMessageWithCode(message: string, code?: string): string {
+  if (code && !message.includes(code)) {
+    return `${code}: ${message}`;
+  }
+  return message;
+}
+
+export function describeNetworkError(error: Error): string {
+  let deepestMessage = error.message;
+  let code: string | undefined;
+  const aggregateMessages: string[] = [];
+  const seen = new Set<unknown>();
+  const queue: unknown[] = [error];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!(current instanceof Error) || seen.has(current)) {
+      continue;
+    }
+    seen.add(current);
+
+    const trimmed = current.message.trim();
+    if (trimmed) {
+      deepestMessage = trimmed;
+    }
+    const currentCode = getErrnoCode(current);
+    if (currentCode) {
+      code = currentCode;
+    }
+
+    if (current instanceof AggregateError) {
+      for (const nested of current.errors) {
+        queue.push(nested);
+        if (nested instanceof Error) {
+          const nestedMessage = nested.message.trim();
+          if (nestedMessage) {
+            aggregateMessages.push(
+              formatMessageWithCode(nestedMessage, getErrnoCode(nested))
+            );
+          }
+        }
+      }
+    }
+
+    if (current.cause !== undefined) {
+      queue.push(current.cause);
+    }
+  }
+
+  if (aggregateMessages.length > 0) {
+    return [...new Set(aggregateMessages)].join("; ");
+  }
+
+  return formatMessageWithCode(deepestMessage, code);
+}
+
+function looksLikeNetworkFailure(error: Error, described: string): boolean {
+  return (
+    error.message === "fetch failed" ||
+    error.message === "terminated" ||
+    NETWORK_ERROR_PATTERN.test(error.message) ||
+    NETWORK_ERROR_PATTERN.test(described)
+  );
+}
+
 export interface JellyfinUser {
   Id: string;
   Name: string;
@@ -47,6 +125,10 @@ export class JellyfinClient {
     this.deviceId = deviceId || this.generateDeviceId();
     this.clientName = "Scroblarr";
     this.serverKind = serverKind;
+  }
+
+  private get serverLabel(): "Emby" | "Jellyfin" {
+    return this.serverKind === "emby" ? "Emby" : "Jellyfin";
   }
 
   private get log() {
@@ -112,7 +194,7 @@ export class JellyfinClient {
               errorText: errorText.substring(0, 500),
               serverKind: this.serverKind,
             },
-            "Jellyfin login failed: invalid credentials (401)"
+            `${this.serverLabel} login failed: invalid credentials (401)`
           );
           throw new Error("Invalid credentials");
         }
@@ -123,22 +205,51 @@ export class JellyfinClient {
             statusText: response.statusText,
             errorText: errorText.substring(0, 500),
             username,
+            baseUrl: this.baseUrl,
             serverKind: this.serverKind,
           },
-          "Jellyfin login failed"
+          `${this.serverLabel} login failed`
         );
         throw new Error(
-          `Jellyfin authentication failed: ${statusCode} ${response.statusText}`
+          `${this.serverLabel} authentication failed: ${statusCode} ${response.statusText}`
         );
       }
 
       const data = (await response.json()) as JellyfinLoginResponse;
       return data;
     } catch (error) {
-      if (error instanceof Error) {
+      if (!(error instanceof Error)) {
+        throw new Error(`Failed to authenticate with ${this.serverLabel}`);
+      }
+
+      if (
+        error.message === "Invalid credentials" ||
+        error.message.startsWith("Jellyfin authentication failed") ||
+        error.message.startsWith("Emby authentication failed")
+      ) {
         throw error;
       }
-      throw new Error("Failed to authenticate with Jellyfin");
+
+      const cause = describeNetworkError(error);
+
+      if (!looksLikeNetworkFailure(error, cause)) {
+        throw error;
+      }
+
+      const message = `Unable to reach ${this.serverLabel} at ${this.baseUrl}: ${cause}`;
+
+      this.log.error(
+        {
+          username,
+          baseUrl: this.baseUrl,
+          serverKind: this.serverKind,
+          error: error.message,
+          cause,
+        },
+        `${this.serverLabel} login network error`
+      );
+
+      throw new Error(message, { cause: error });
     }
   }
 

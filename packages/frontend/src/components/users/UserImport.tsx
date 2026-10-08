@@ -364,22 +364,18 @@ export function UserImport({
                   defaultValue: "Import Users from Plex Server",
                 })
               : configuredServices.length === 1 &&
-                  (configuredServices[0].type === "jellyfin" ||
-                    configuredServices[0].type === "emby")
-                ? t(
-                    configuredServices[0].type === "emby"
-                      ? "userImport.importFromEmby"
-                      : "userImport.importFromJellyfin",
-                    {
-                      defaultValue:
-                        configuredServices[0].type === "emby"
-                          ? "Import Users from Emby Server"
-                          : "Import Users from Jellyfin Server",
-                    }
-                  )
-                : t("userImport.importUsersTitle", {
-                    defaultValue: "Import Users",
-                  })}
+                  configuredServices[0].type === "emby"
+                ? t("userImport.importFromEmby", {
+                    defaultValue: "Import Users from Emby Server",
+                  })
+                : configuredServices.length === 1 &&
+                    configuredServices[0].type === "jellyfin"
+                  ? t("userImport.importFromJellyfin", {
+                      defaultValue: "Import Users from Jellyfin Server",
+                    })
+                  : t("userImport.importUsersTitle", {
+                      defaultValue: "Import Users",
+                    })}
           </DialogTitle>
           <button
             type="button"
