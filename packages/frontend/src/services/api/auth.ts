@@ -53,6 +53,41 @@ export async function linkPlexAccount(
   return response.json();
 }
 
+type MediaBrowserAuthBody = {
+  username: string;
+  password: string;
+  hostname?: string;
+  port?: number;
+  useSsl?: boolean;
+  urlBase?: string;
+  mediaBrowserType?: "jellyfin" | "emby";
+};
+
+function buildMediaBrowserAuthBody(
+  username: string,
+  password: string,
+  hostname: string | undefined,
+  port: number | undefined,
+  useSsl: boolean | undefined,
+  urlBase: string | undefined,
+  mediaBrowserType: "jellyfin" | "emby"
+): MediaBrowserAuthBody {
+  const body: MediaBrowserAuthBody = {
+    username,
+    password,
+    mediaBrowserType,
+  };
+
+  if (hostname) {
+    body.hostname = hostname;
+    if (port) body.port = port;
+    if (useSsl !== undefined) body.useSsl = useSsl;
+    if (urlBase) body.urlBase = urlBase;
+  }
+
+  return body;
+}
+
 export async function loginWithJellyfin(
   username: string,
   password: string,
@@ -68,26 +103,15 @@ export async function loginWithJellyfin(
   email?: string;
   isAdmin: boolean;
 }> {
-  const body: {
-    username: string;
-    password: string;
-    hostname?: string;
-    port?: number;
-    useSsl?: boolean;
-    urlBase?: string;
-    mediaBrowserType?: "jellyfin" | "emby";
-  } = {
+  const body = buildMediaBrowserAuthBody(
     username,
     password,
-    mediaBrowserType,
-  };
-
-  if (hostname) {
-    body.hostname = hostname;
-    if (port) body.port = port;
-    if (useSsl !== undefined) body.useSsl = useSsl;
-    if (urlBase) body.urlBase = urlBase;
-  }
+    hostname,
+    port,
+    useSsl,
+    urlBase,
+    mediaBrowserType
+  );
 
   const endpoint =
     mediaBrowserType === "emby" ? "/auth/emby" : "/auth/jellyfin";
@@ -120,26 +144,15 @@ export async function linkJellyfinAccount(
   email?: string;
   isAdmin: boolean;
 }> {
-  const body: {
-    username: string;
-    password: string;
-    hostname?: string;
-    port?: number;
-    useSsl?: boolean;
-    urlBase?: string;
-    mediaBrowserType?: "jellyfin" | "emby";
-  } = {
+  const body = buildMediaBrowserAuthBody(
     username,
     password,
-    mediaBrowserType,
-  };
-
-  if (hostname) {
-    body.hostname = hostname;
-    if (port) body.port = port;
-    if (useSsl !== undefined) body.useSsl = useSsl;
-    if (urlBase) body.urlBase = urlBase;
-  }
+    hostname,
+    port,
+    useSsl,
+    urlBase,
+    mediaBrowserType
+  );
 
   const endpoint =
     mediaBrowserType === "emby" ? "/auth/emby/link" : "/auth/jellyfin/link";

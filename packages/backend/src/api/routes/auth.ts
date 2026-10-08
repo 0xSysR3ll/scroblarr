@@ -2,7 +2,10 @@ import { randomUUID } from "crypto";
 
 import { getEnv } from "@config/env";
 import { User } from "@entities/User";
-import { JellyfinClient } from "@integrations/jellyfin/JellyfinClient";
+import {
+  describeNetworkError,
+  JellyfinClient,
+} from "@integrations/jellyfin/JellyfinClient";
 import { PlexOAuth } from "@integrations/plex/PlexOAuth";
 import { SessionRepository } from "@repositories/SessionRepository";
 import { SettingsRepository } from "@repositories/SettingsRepository";
@@ -69,6 +72,39 @@ async function persistMediaBrowserType(
   type: "jellyfin" | "emby"
 ): Promise<void> {
   await settingsRepository.set("mediaBrowserType", type);
+}
+
+async function persistJellyfinConnectionSettings(
+  baseUrl: string,
+  mediaBrowserType: "jellyfin" | "emby",
+  options: { port?: number; useSsl?: boolean; urlBase?: string }
+): Promise<void> {
+  await settingsRepository.set("jellyfinHost", baseUrl);
+  await persistMediaBrowserType(mediaBrowserType);
+  if (options.port) {
+    await settingsRepository.set("jellyfinPort", options.port.toString());
+  }
+  if (options.useSsl !== undefined) {
+    await settingsRepository.set("jellyfinUseSsl", options.useSsl.toString());
+  }
+  if (options.urlBase) {
+    await settingsRepository.set("jellyfinUrlBase", options.urlBase);
+  }
+}
+
+async function ensureJellyfinApiKey(
+  jellyfinClient: JellyfinClient,
+  accessToken: string
+): Promise<void> {
+  try {
+    const apiKey = await jellyfinClient.createApiKey(accessToken, "Scroblarr");
+    await settingsRepository.set("jellyfinApiKey", apiKey);
+  } catch (error) {
+    logger.auth.warn(
+      { error },
+      "Failed to create API key, server-side operations may fail after password changes"
+    );
+  }
 }
 
 router.get("/check-admin", async (_req: Request, res: Response) => {
@@ -715,6 +751,9 @@ router.post("/jellyfin", (req, res) => {
 });
 
 async function handleJellyfinLogin(req: Request, res: Response) {
+  let baseUrl: string | undefined;
+  let mediaBrowserType: "jellyfin" | "emby" | undefined;
+
   try {
     const env = getEnv();
     const { username, password, hostname, port, useSsl, urlBase } = req.body;
@@ -743,7 +782,6 @@ async function handleJellyfinLogin(req: Request, res: Response) {
       }
     }
 
-    let baseUrl: string;
     const settings = await settingsRepository.getAll();
     let allowBodyMediaBrowserType = false;
 
@@ -766,7 +804,7 @@ async function handleJellyfinLogin(req: Request, res: Response) {
       });
     }
 
-    const mediaBrowserType = resolveMediaBrowserType(
+    mediaBrowserType = resolveMediaBrowserType(
       allowBodyMediaBrowserType ? req.body.mediaBrowserType : undefined,
       settings.mediaBrowserType
     );
@@ -783,19 +821,7 @@ async function handleJellyfinLogin(req: Request, res: Response) {
     );
 
     if (!existingAdmin) {
-      let apiKey: string;
-      try {
-        apiKey = await jellyfinClient.createApiKey(
-          loginResponse.AccessToken,
-          "Scroblarr"
-        );
-        await settingsRepository.set("jellyfinApiKey", apiKey);
-      } catch (error) {
-        logger.auth.warn(
-          { error },
-          "Failed to create API key, server-side operations may fail after password changes"
-        );
-      }
+      await ensureJellyfinApiKey(jellyfinClient, loginResponse.AccessToken);
 
       const user = await userRepository.findByJellyfinUsernameOrCreate(
         loginResponse.User.Name
@@ -816,17 +842,11 @@ async function handleJellyfinLogin(req: Request, res: Response) {
         ttlMs
       );
 
-      await settingsRepository.set("jellyfinHost", baseUrl);
-      await persistMediaBrowserType(mediaBrowserType);
-      if (port) {
-        await settingsRepository.set("jellyfinPort", port.toString());
-      }
-      if (useSsl !== undefined) {
-        await settingsRepository.set("jellyfinUseSsl", useSsl.toString());
-      }
-      if (urlBase) {
-        await settingsRepository.set("jellyfinUrlBase", urlBase);
-      }
+      await persistJellyfinConnectionSettings(baseUrl, mediaBrowserType, {
+        port,
+        useSsl,
+        urlBase,
+      });
 
       const primaryUsername = userRepository.getPrimaryUsername(updatedUser);
 
@@ -905,6 +925,9 @@ async function handleJellyfinLogin(req: Request, res: Response) {
     const errorMessage =
       error instanceof Error ? error.message : "Unable to authenticate";
     const errorStack = error instanceof Error ? error.stack : undefined;
+    const errorCause =
+      error instanceof Error ? describeNetworkError(error) : undefined;
+    const serverLabel = mediaBrowserType === "emby" ? "Emby" : "Jellyfin";
 
     if (errorMessage.includes("Invalid credentials")) {
       logger.auth.warn(
@@ -912,7 +935,7 @@ async function handleJellyfinLogin(req: Request, res: Response) {
           username: req.body.username,
           error: errorMessage,
         },
-        "Jellyfin login failed: invalid credentials"
+        `${serverLabel} login failed: invalid credentials`
       );
       return res.status(401).json({ error: "Invalid credentials" });
     }
@@ -921,10 +944,13 @@ async function handleJellyfinLogin(req: Request, res: Response) {
       {
         username: req.body.username,
         error: errorMessage,
+        errorCause,
         errorStack,
+        baseUrl,
+        mediaBrowserType,
         hostname: req.body.hostname,
       },
-      "Jellyfin login error"
+      `${serverLabel} login error`
     );
     return res.status(500).json({ error: errorMessage });
   }
@@ -970,18 +996,7 @@ async function handleJellyfinSetupAdmin(
       loginResponse.User.Id
     );
 
-    try {
-      const apiKey = await jellyfinClient.createApiKey(
-        loginResponse.AccessToken,
-        "Scroblarr"
-      );
-      await settingsRepository.set("jellyfinApiKey", apiKey);
-    } catch (error) {
-      logger.auth.warn(
-        { error },
-        "Failed to create API key, server-side operations may fail after password changes"
-      );
-    }
+    await ensureJellyfinApiKey(jellyfinClient, loginResponse.AccessToken);
 
     const user = await userRepository.findByJellyfinUsernameOrCreate(
       loginResponse.User.Name
@@ -1008,17 +1023,11 @@ async function handleJellyfinSetupAdmin(
       isAdmin: true,
     });
 
-    await settingsRepository.set("jellyfinHost", baseUrl);
-    await persistMediaBrowserType(mediaBrowserType);
-    if (port) {
-      await settingsRepository.set("jellyfinPort", port.toString());
-    }
-    if (useSsl !== undefined) {
-      await settingsRepository.set("jellyfinUseSsl", useSsl.toString());
-    }
-    if (urlBase) {
-      await settingsRepository.set("jellyfinUrlBase", urlBase);
-    }
+    await persistJellyfinConnectionSettings(baseUrl, mediaBrowserType, {
+      port,
+      useSsl,
+      urlBase,
+    });
 
     const primaryUsername = userRepository.getPrimaryUsername(updatedUser);
 
@@ -1102,18 +1111,7 @@ async function handleJellyfinLink(req: Request, res: Response): Promise<void> {
     );
 
     if (currentUser.isAdmin) {
-      try {
-        const apiKey = await jellyfinClient.createApiKey(
-          loginResponse.AccessToken,
-          "Scroblarr"
-        );
-        await settingsRepository.set("jellyfinApiKey", apiKey);
-      } catch (error) {
-        logger.auth.warn(
-          { error },
-          "Failed to create API key, server-side operations may fail after password changes"
-        );
-      }
+      await ensureJellyfinApiKey(jellyfinClient, loginResponse.AccessToken);
     }
 
     const updatedUser = await userRepository.update(currentUser.id, {
@@ -1126,17 +1124,11 @@ async function handleJellyfinLink(req: Request, res: Response): Promise<void> {
     });
 
     if (currentUser.isAdmin && hostname) {
-      await settingsRepository.set("jellyfinHost", baseUrl);
-      await persistMediaBrowserType(mediaBrowserType);
-      if (port) {
-        await settingsRepository.set("jellyfinPort", port.toString());
-      }
-      if (useSsl !== undefined) {
-        await settingsRepository.set("jellyfinUseSsl", useSsl.toString());
-      }
-      if (urlBase) {
-        await settingsRepository.set("jellyfinUrlBase", urlBase);
-      }
+      await persistJellyfinConnectionSettings(baseUrl, mediaBrowserType, {
+        port,
+        useSsl,
+        urlBase,
+      });
 
       logger.auth.info(
         {

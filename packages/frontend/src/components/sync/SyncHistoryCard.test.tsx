@@ -22,6 +22,7 @@ function renderCard(
   item: SyncHistoryItem,
   options: {
     retrying?: string | null;
+    deleting?: string | null;
     isSelected?: boolean;
     confirmDeleteId?: string | null;
   } = {}
@@ -35,7 +36,7 @@ function renderCard(
       item={item}
       isSelected={options.isSelected ?? false}
       confirmDeleteId={options.confirmDeleteId ?? null}
-      deleting={null}
+      deleting={options.deleting ?? null}
       retrying={options.retrying ?? null}
       onSelect={vi.fn()}
       onDelete={onDelete}
@@ -127,5 +128,34 @@ describe("SyncHistoryCard", () => {
     });
 
     expect(screen.getByText("tautulli")).toBeVisible();
+  });
+
+  it("shows a rewatched badge and media links when available", () => {
+    renderCard({
+      ...baseItem,
+      success: true,
+      errorMessage: undefined,
+      wasRewatched: true,
+      destinations: ["TVTime"],
+      tmdbMovieId: "42",
+      imdbMovieId: "tt42",
+    });
+
+    expect(screen.getByText("Rewatched")).toBeVisible();
+    expect(screen.getByTitle(/TMDB:/i)).toBeVisible();
+    expect(screen.getByTitle(/IMDB:/i)).toBeVisible();
+  });
+
+  it("shows spinners while deleting or retrying the current item", () => {
+    const { container: deleting } = renderCard(baseItem, {
+      confirmDeleteId: baseItem.id,
+      deleting: baseItem.id,
+    });
+    expect(deleting.querySelector(".animate-spin")).not.toBeNull();
+
+    const { container: retrying } = renderCard(baseItem, {
+      retrying: baseItem.id,
+    });
+    expect(retrying.querySelector(".animate-spin")).not.toBeNull();
   });
 });

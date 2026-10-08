@@ -41,7 +41,7 @@ function statisticsFixture() {
     byPeriod: { today: 1, thisWeek: 4, thisMonth: 12, lastMonth: 8 },
     topThisMonth: [],
     last30Days: { total: 12, successful: 10, failed: 2 },
-    averages: { perDay: 0.4, perWeek: 3, perMonth: 12 },
+    pace: { usualWeek: 3, sameDaysLastMonth: 10 },
     lastSyncedAt: "2026-06-01T12:00:00.000Z",
     last7Days: [1, 2, 0, 1, 3, 2, 3],
     peakDay: 3,
@@ -61,7 +61,7 @@ function emptyStatisticsFixture(): SyncStatistics {
     byPeriod: { today: 0, thisWeek: 0, thisMonth: 0, lastMonth: 0 },
     topThisMonth: [],
     last30Days: { total: 0, successful: 0, failed: 0 },
-    averages: { perDay: 0, perWeek: 0, perMonth: 0 },
+    pace: { usualWeek: 0, sameDaysLastMonth: 0 },
     lastSyncedAt: null,
     last7Days: [0, 0, 0, 0, 0, 0, 0],
     peakDay: null,
@@ -163,15 +163,24 @@ describe("DashboardPage", () => {
     expect(
       screen.getByRole("img", { name: "Today: 1 sync" })
     ).toBeInTheDocument();
-    expect(screen.getByText("Per Day")).toBeInTheDocument();
-    expect(screen.getByText("1 today")).toBeInTheDocument();
+    expect(screen.getByText("Per Week")).toBeInTheDocument();
+    expect(screen.getAllByText("This week").length).toBeGreaterThan(0);
+    expect(screen.getByText("Usual week")).toBeInTheDocument();
+    expect(screen.getByText("Per Month")).toBeInTheDocument();
+    expect(screen.getAllByText("This month").length).toBeGreaterThan(0);
+    expect(screen.getByText("Same days last month")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", {
+        name: /This week: 4\. Usual week: 3\./i,
+      })
+    ).toBeInTheDocument();
   });
 
   it("localizes decimal trend and pace deltas", async () => {
     vi.mocked(getSyncStatistics).mockResolvedValue({
       ...statisticsFixture(),
       byPeriod: { today: 1, thisWeek: 4, thisMonth: 13, lastMonth: 8 },
-      averages: { perDay: 0.3, perWeek: 3, perMonth: 12 },
+      pace: { usualWeek: 1.2, sameDaysLastMonth: 10 },
     });
     await i18n.changeLanguage("de");
 
@@ -675,8 +684,8 @@ describe("DashboardPage", () => {
   it("shows a negative pace delta when behind the average", async () => {
     vi.mocked(getSyncStatistics).mockResolvedValue({
       ...statisticsFixture(),
-      byPeriod: { today: 1, thisWeek: 4, thisMonth: 12, lastMonth: 8 },
-      averages: { perDay: 10, perWeek: 3, perMonth: 12 },
+      byPeriod: { today: 1, thisWeek: 1, thisMonth: 12, lastMonth: 8 },
+      pace: { usualWeek: 10, sameDaysLastMonth: 12 },
     });
 
     renderWithProviders(<DashboardPage />, { route: "/" });
@@ -726,17 +735,21 @@ describe("DashboardPage", () => {
     expect(totalLabel.previousElementSibling).toHaveTextContent("0");
   });
 
-  it("fills pace bars when the yearly average is zero", async () => {
+  it("fills pace bars when the usual pace is zero", async () => {
     vi.mocked(getSyncStatistics).mockResolvedValue({
       ...statisticsFixture(),
       byPeriod: { today: 1, thisWeek: 0, thisMonth: 0, lastMonth: 0 },
-      averages: { perDay: 0, perWeek: 0, perMonth: 0 },
+      pace: { usualWeek: 0, sameDaysLastMonth: 0 },
     });
 
     renderWithProviders(<DashboardPage />, { route: "/" });
 
-    expect(await screen.findByText("1 today")).toBeInTheDocument();
-    expect(screen.getByText("0 this week")).toBeInTheDocument();
+    expect(await screen.findByText("Usual week")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", {
+        name: /This week: 0\. Usual week: 0\./i,
+      })
+    ).toBeInTheDocument();
   });
 
   it("renders the page chrome when statistics are missing", async () => {

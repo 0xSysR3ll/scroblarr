@@ -116,11 +116,13 @@
       "movies": "Movies",
       "bySource": "By Source",
       "byDestination": "By Destination",
-      "averages": "Averages",
-      "avgPerDay": "Per Day",
-      "avgPerWeek": "Per Week",
-      "avgPerMonth": "Per Month",
-      "avgFromThisYear": "Yearly average",
+      "pace": "Pace",
+      "pacePerWeek": "Per Week",
+      "pacePerMonth": "Per Month",
+      "paceThisWeek": "This week",
+      "paceThisMonth": "This month",
+      "usualWeek": "Usual week",
+      "sameDaysLastMonth": "Same days last month",
       "mostActiveDay": "Most Active Day",
       "activityTrend": "Activity Trend",
       "trendUpShort": "Up {{percent}}%",
@@ -128,13 +130,7 @@
       "trendNew": "New this month",
       "trendFlat": "No change",
       "periodSummary": "{{today}} today · {{thisWeek}} this week · {{thisMonth}} this month",
-      "mediaMixTotal": "total",
-      "avgVsToday_one": "{{formattedCount}} today",
-      "avgVsToday_other": "{{formattedCount}} today",
-      "avgVsWeek_one": "{{formattedCount}} this week",
-      "avgVsWeek_other": "{{formattedCount}} this week",
-      "avgVsMonth_one": "{{formattedCount}} this month",
-      "avgVsMonth_other": "{{formattedCount}} this month"
+      "mediaMixTotal": "total"
     },
     "viewFailedSyncs": "View failed syncs",
     "lastFailure": "Last failure",
@@ -589,7 +585,9 @@
       "simkl": "Simkl",
       "bingers": "Bingers",
       "tvtime": "TVTime"
-    }
+    },
+    "source": "Source",
+    "source": "Source"
   },
   "errors": {
     "routeLoadTitle": "Could not load this screen",
@@ -627,6 +625,7 @@
     "importUsersButton": "Import Users",
     "usersSelected": "{{count}} user{{plural}} selected",
     "importUsers": "Import {{count}} User{{plural}}",
+    "importFromEmby": "Import Users from Emby Server",
     "importFromJellyfin": "Import Users from Jellyfin Server"
   },
   "simkl": {

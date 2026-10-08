@@ -262,6 +262,122 @@ describe("SyncHistoryRepository integration", () => {
       bingers: 0,
     });
     expect(stats.lastFailure?.mediaTitle).toBe("Example Show");
+    const utcDay = new Date().getUTCDay();
+    const elapsedWeekDays = (utcDay === 0 ? 6 : utcDay - 1) + 1;
+    expect(stats.pace.usualWeek).toBe(
+      Math.round((3 / 4) * (elapsedWeekDays / 7) * 10) / 10
+    );
+  });
+
+  it("computes pace from last 28 days and same days last month", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-15T12:00:00.000Z"));
+
+    try {
+      const now = new Date();
+      const dayOfMonth = now.getUTCDate();
+      const lastMonthYear =
+        now.getUTCMonth() === 0
+          ? now.getUTCFullYear() - 1
+          : now.getUTCFullYear();
+      const lastMonthIndex =
+        now.getUTCMonth() === 0 ? 11 : now.getUTCMonth() - 1;
+      const daysInLastMonth = new Date(
+        Date.UTC(lastMonthYear, lastMonthIndex + 1, 0)
+      ).getUTCDate();
+      const includedDay = Math.min(dayOfMonth, daysInLastMonth);
+      const sameDayLastMonth = new Date(
+        Date.UTC(lastMonthYear, lastMonthIndex, includedDay, 12)
+      );
+      const dayAfterIncluded =
+        includedDay < daysInLastMonth
+          ? new Date(
+              Date.UTC(lastMonthYear, lastMonthIndex, includedDay + 1, 12)
+            )
+          : null;
+      const inLast28Days =
+        sameDayLastMonth.getTime() >= now.getTime() - 28 * 24 * 60 * 60 * 1000;
+      const dayAfterInLast28 =
+        dayAfterIncluded != null &&
+        dayAfterIncluded.getTime() >= now.getTime() - 28 * 24 * 60 * 60 * 1000;
+
+      await createHistory([
+        {
+          userId: user.id,
+          mediaType: "movie",
+          mediaTitle: "Recent A",
+          source: "plex",
+          success: true,
+          syncedAt: daysAgo(1),
+        },
+        {
+          userId: user.id,
+          mediaType: "movie",
+          mediaTitle: "Recent B",
+          source: "plex",
+          success: true,
+          syncedAt: daysAgo(2),
+        },
+        {
+          userId: user.id,
+          mediaType: "movie",
+          mediaTitle: "Recent C",
+          source: "plex",
+          success: true,
+          syncedAt: daysAgo(3),
+        },
+        {
+          userId: user.id,
+          mediaType: "movie",
+          mediaTitle: "Recent D",
+          source: "plex",
+          success: true,
+          syncedAt: daysAgo(4),
+        },
+        {
+          userId: user.id,
+          mediaType: "movie",
+          mediaTitle: "Same Day Last Month",
+          source: "plex",
+          success: true,
+          syncedAt: sameDayLastMonth,
+        },
+        ...(dayAfterIncluded
+          ? [
+              {
+                userId: user.id,
+                mediaType: "movie" as const,
+                mediaTitle: "Day After Same Days Window",
+                source: "plex",
+                success: true,
+                syncedAt: dayAfterIncluded,
+              },
+            ]
+          : []),
+        {
+          userId: user.id,
+          mediaType: "movie",
+          mediaTitle: "Older Than 28 Days",
+          source: "plex",
+          success: true,
+          syncedAt: new Date(
+            Date.UTC(lastMonthYear, lastMonthIndex - 1, 1, 12)
+          ),
+        },
+      ]);
+
+      const stats = await repository.getStatisticsByUser(user.id);
+
+      const last28Count =
+        4 + (inLast28Days ? 1 : 0) + (dayAfterInLast28 ? 1 : 0);
+      const elapsedWeekDays = 4;
+      expect(stats.pace.usualWeek).toBe(
+        Math.round((last28Count / 4) * (elapsedWeekDays / 7) * 10) / 10
+      );
+      expect(stats.pace.sameDaysLastMonth).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("matches existing syncs by TVDB, IMDb, and TMDB identifiers", async () => {
@@ -623,6 +739,184 @@ describe("SyncHistoryRepository integration", () => {
 
     const stats = await repository.getStatisticsByUser(user.id);
     expect(stats.byDestination.bingers).toBe(1);
+  });
+
+  it("returns empty pace and null peak when the user has no history", async () => {
+    const stats = await repository.getStatisticsByUser(user.id);
+
+    expect(stats.total).toBe(0);
+    expect(stats.successRate).toBe(0);
+    expect(stats.pace).toEqual({ usualWeek: 0, sameDaysLastMonth: 0 });
+    expect(stats.peakDay).toBeNull();
+    expect(stats.lastSyncedAt).toBeNull();
+    expect(stats.lastFailure).toBeNull();
+    expect(stats.byMediaType.series).toBe(0);
+    expect(stats.topThisMonth).toEqual([]);
+  });
+
+  it("treats usualWeek as zero when all syncs are older than 28 days", async () => {
+    await createHistory([
+      {
+        userId: user.id,
+        mediaType: "movie",
+        mediaTitle: "Ancient",
+        success: true,
+        syncedAt: daysAgo(40),
+      },
+    ]);
+
+    const stats = await repository.getStatisticsByUser(user.id);
+    expect(stats.total).toBe(1);
+    expect(stats.pace.usualWeek).toBe(0);
+  });
+
+  it("computes week start from Sunday with UTC fake timers", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-04T15:00:00.000Z")); // Sunday
+
+    try {
+      await createHistory([
+        {
+          userId: user.id,
+          mediaType: "movie",
+          mediaTitle: "Sunday Watch",
+          success: true,
+          syncedAt: new Date("2026-10-04T12:00:00.000Z"),
+        },
+        {
+          userId: user.id,
+          mediaType: "movie",
+          mediaTitle: "Prior Saturday",
+          success: true,
+          syncedAt: new Date("2026-10-03T12:00:00.000Z"),
+        },
+      ]);
+
+      const stats = await repository.getStatisticsByUser(user.id);
+      expect(stats.byPeriod.thisWeek).toBe(2);
+      expect(stats.byPeriod.today).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("falls back to syncedAt sort for invalid sort fields", async () => {
+    await createHistory([
+      {
+        userId: user.id,
+        mediaType: "movie",
+        mediaTitle: "Older",
+        success: true,
+        syncedAt: daysAgo(2),
+      },
+      {
+        userId: user.id,
+        mediaType: "movie",
+        mediaTitle: "Newer",
+        success: true,
+        syncedAt: daysAgo(0),
+      },
+    ]);
+
+    const result = await repository.findByUserPaginated(
+      user.id,
+      1,
+      10,
+      undefined,
+      "notAField",
+      "DESC"
+    );
+
+    expect(result.data.map((item) => item.mediaTitle)).toEqual([
+      "Newer",
+      "Older",
+    ]);
+  });
+
+  it("returns zero when clearOldByUser has nothing to remove", async () => {
+    await createHistory([
+      {
+        userId: user.id,
+        mediaType: "movie",
+        mediaTitle: "Only",
+        success: true,
+      },
+    ]);
+
+    await expect(repository.clearOldByUser(user.id, 5)).resolves.toBe(0);
+    await expect(repository.countByUser(user.id)).resolves.toBe(1);
+  });
+
+  it("covers create, save, find, count, and delete helpers", async () => {
+    const created = await repository.create({
+      userId: user.id,
+      mediaType: "movie",
+      mediaTitle: "Created Movie",
+      source: "plex",
+      success: true,
+      wasRewatched: false,
+      syncedAt: daysAgo(0),
+    });
+    expect(created.mediaTitle).toBe("Created Movie");
+
+    created.mediaTitle = "Saved Movie";
+    const saved = await repository.save(created);
+    expect(saved.mediaTitle).toBe("Saved Movie");
+
+    await expect(repository.count()).resolves.toBe(1);
+    await expect(repository.countByUser(user.id)).resolves.toBe(1);
+
+    const recent = await repository.findRecent(10);
+    expect(recent.map((item) => item.mediaTitle)).toEqual(["Saved Movie"]);
+
+    const byId = await repository.findById(saved.id);
+    expect(byId?.mediaTitle).toBe("Saved Movie");
+
+    const byIdForUser = await repository.findById(saved.id, user.id);
+    expect(byIdForUser?.id).toBe(saved.id);
+
+    await expect(
+      repository.findById(saved.id, "missing-user")
+    ).resolves.toBeNull();
+
+    const second = await repository.create({
+      userId: user.id,
+      mediaType: "episode",
+      mediaTitle: "Second",
+      source: "plex",
+      success: true,
+      wasRewatched: false,
+      syncedAt: daysAgo(1),
+    });
+
+    await expect(repository.deleteByIds([second.id], user.id)).resolves.toBe(1);
+    await expect(repository.deleteByIds(["missing-id"], user.id)).resolves.toBe(
+      0
+    );
+    await expect(repository.deleteById(saved.id, user.id)).resolves.toBe(true);
+    await expect(repository.deleteById(saved.id, user.id)).resolves.toBe(false);
+
+    await repository.create({
+      userId: user.id,
+      mediaType: "movie",
+      mediaTitle: "Clear Me",
+      source: "plex",
+      success: true,
+      wasRewatched: false,
+    });
+    await repository.clearByUser(user.id);
+    await expect(repository.countByUser(user.id)).resolves.toBe(0);
+
+    await repository.create({
+      userId: user.id,
+      mediaType: "movie",
+      mediaTitle: "Clear All",
+      source: "plex",
+      success: true,
+      wasRewatched: false,
+    });
+    await repository.clearAll();
+    await expect(repository.count()).resolves.toBe(0);
   });
 
   async function createHistory(items: Array<Partial<SyncHistory>>) {

@@ -139,6 +139,13 @@ vi.mock("@integrations/plex/PlexOAuth", () => ({
 }));
 
 vi.mock("@integrations/jellyfin/JellyfinClient", () => ({
+  describeNetworkError: (error: Error) => {
+    const cause = error.cause;
+    if (cause instanceof Error) {
+      return cause.message;
+    }
+    return error.message;
+  },
   JellyfinClient: class {
     constructor(
       baseUrl: string,
@@ -178,6 +185,8 @@ const getEnvMock = vi.hoisted(() =>
 vi.mock("@config/env", () => ({
   getEnv: getEnvMock,
 }));
+
+import { logger } from "@utils/logger";
 
 import { authRoutes } from "./auth";
 
@@ -1311,6 +1320,125 @@ describe("auth route sensitive guards", () => {
       error: "Jellyfin server not configured. Please provide server details.",
     });
     expect(jellyfinClientMocks.login).not.toHaveBeenCalled();
+  });
+
+  it("logs Emby login network failures with baseUrl and cause", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue({
+      id: "admin-id",
+      isAdmin: true,
+    });
+    userRepositoryMocks.findByJellyfinUsername.mockResolvedValue({
+      id: "imported-id",
+      jellyfinUsername: "sysr3ll",
+      enabled: true,
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "http://192.168.1.87:8096",
+      mediaBrowserType: "emby",
+    });
+    const networkError = new TypeError("fetch failed", {
+      cause: new Error("connect ECONNREFUSED 192.168.1.87:8096"),
+    });
+    jellyfinClientMocks.login.mockRejectedValue(networkError);
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app).post("/api/v1/auth/jellyfin").send({
+      username: "sysr3ll",
+      password: "secret",
+    });
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: "fetch failed" });
+    expect(logger.auth.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: "sysr3ll",
+        error: "fetch failed",
+        errorCause: "connect ECONNREFUSED 192.168.1.87:8096",
+        baseUrl: "http://192.168.1.87:8096",
+        mediaBrowserType: "emby",
+      }),
+      "Emby login error"
+    );
+  });
+
+  it("logs Jellyfin invalid credentials with the Jellyfin label", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue({
+      id: "admin-id",
+      isAdmin: true,
+    });
+    userRepositoryMocks.findByJellyfinUsername.mockResolvedValue({
+      id: "imported-id",
+      jellyfinUsername: "sysr3ll",
+      enabled: true,
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://jellyfin.local",
+      mediaBrowserType: "jellyfin",
+    });
+    jellyfinClientMocks.login.mockRejectedValue(
+      new Error("Invalid credentials")
+    );
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app).post("/api/v1/auth/jellyfin").send({
+      username: "sysr3ll",
+      password: "bad",
+    });
+
+    expect(response.status).toBe(401);
+    expect(logger.auth.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: "sysr3ll",
+        error: "Invalid credentials",
+      }),
+      "Jellyfin login failed: invalid credentials"
+    );
+  });
+
+  it("handles non-Error Jellyfin login rejections without a cause", async () => {
+    userRepositoryMocks.findAdmin.mockResolvedValue({
+      id: "admin-id",
+      isAdmin: true,
+    });
+    userRepositoryMocks.findByJellyfinUsername.mockResolvedValue({
+      id: "imported-id",
+      jellyfinUsername: "sysr3ll",
+      enabled: true,
+    });
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      jellyfinHost: "https://jellyfin.local",
+      mediaBrowserType: "jellyfin",
+    });
+    jellyfinClientMocks.login.mockRejectedValue("boom");
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/auth", authRoutes);
+
+    const response = await request(app).post("/api/v1/auth/jellyfin").send({
+      username: "sysr3ll",
+      password: "secret",
+    });
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: "Unable to authenticate" });
+    expect(logger.auth.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: "sysr3ll",
+        error: "Unable to authenticate",
+        errorCause: undefined,
+        errorStack: undefined,
+        baseUrl: "https://jellyfin.local",
+        mediaBrowserType: "jellyfin",
+      }),
+      "Jellyfin login error"
+    );
   });
 
   it("rejects Jellyfin setup-admin when an admin already exists", async () => {
