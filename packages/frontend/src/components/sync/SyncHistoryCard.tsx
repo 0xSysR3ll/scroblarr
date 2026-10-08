@@ -1,4 +1,5 @@
 import { SyncDestinationBadges } from "@components/sync/SyncDestinationBadges";
+import { SyncHistoryMediaLinks } from "@components/sync/SyncHistoryMediaLinks";
 import { SyncHistoryPoster } from "@components/sync/SyncHistoryPoster";
 import { CustomCheckbox } from "@components/ui/CustomCheckbox";
 import { Spinner } from "@components/ui/spinner";
@@ -18,7 +19,6 @@ import {
   FaTimes,
   FaCheckCircle,
   FaExclamationCircle,
-  FaExternalLinkAlt,
   FaRedo,
 } from "react-icons/fa";
 
@@ -243,27 +243,7 @@ export function SyncHistoryCard({
           {/* External Links */}
           {getMediaLinks(item).length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
-              {getMediaLinks(item).map((link) => (
-                <a
-                  key={link.id}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors ${
-                    link.needsDarkBg
-                      ? "bg-foreground text-background hover:bg-foreground/90"
-                      : "bg-primary/10 text-primary hover:bg-primary/20"
-                  }`}
-                  title={`${link.label}: ${link.url}`}
-                >
-                  <img
-                    src={link.logoPath}
-                    alt={link.label}
-                    className="h-3 w-auto"
-                  />
-                  <FaExternalLinkAlt className="h-2.5 w-2.5" />
-                </a>
-              ))}
+              <SyncHistoryMediaLinks item={item} />
             </div>
           )}
 

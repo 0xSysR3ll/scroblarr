@@ -22,6 +22,7 @@ function renderRow(
   item: SyncHistoryItem,
   options: {
     retrying?: string | null;
+    deleting?: string | null;
     isSelected?: boolean;
     confirmDeleteId?: string | null;
   } = {}
@@ -35,7 +36,7 @@ function renderRow(
           item={item}
           isSelected={options.isSelected ?? false}
           confirmDeleteId={options.confirmDeleteId ?? null}
-          deleting={null}
+          deleting={options.deleting ?? null}
           retrying={options.retrying ?? null}
           onSelect={vi.fn()}
           onDelete={vi.fn()}
@@ -127,5 +128,45 @@ describe("SyncHistoryTableRow", () => {
     });
 
     expect(screen.getByText("tautulli")).toBeVisible();
+  });
+
+  it("shows a placeholder when source is missing", () => {
+    const { container } = renderRow({
+      ...baseItem,
+      success: true,
+      errorMessage: undefined,
+      source: undefined,
+      destinations: ["Trakt"],
+    });
+
+    const sourceCell = container.querySelectorAll("td")[4];
+    expect(sourceCell?.textContent).toBe("-");
+  });
+
+  it("shows a rewatched badge and media links when available", () => {
+    renderRow({
+      ...baseItem,
+      success: true,
+      errorMessage: undefined,
+      wasRewatched: true,
+      destinations: ["Bingers"],
+      tmdbMovieId: "42",
+    });
+
+    expect(screen.getByText("Rewatched")).toBeVisible();
+    expect(screen.getByTitle(/TMDB:/i)).toBeVisible();
+  });
+
+  it("shows spinners while deleting or retrying the current item", () => {
+    const { container: deleting } = renderRow(baseItem, {
+      confirmDeleteId: baseItem.id,
+      deleting: baseItem.id,
+    });
+    expect(deleting.querySelector(".animate-spin")).not.toBeNull();
+
+    const { container: retrying } = renderRow(baseItem, {
+      retrying: baseItem.id,
+    });
+    expect(retrying.querySelector(".animate-spin")).not.toBeNull();
   });
 });

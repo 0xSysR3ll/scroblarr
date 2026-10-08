@@ -6,12 +6,17 @@ import {
   getAuthProviders,
   linkEmbyAccount,
   linkJellyfinAccount,
+  linkPlexAccount,
   loginWithEmby,
   loginWithJellyfin,
   loginWithPlex,
+  setupAdmin,
   setupEmbyAdmin,
   setupJellyfinAdmin,
   unlinkEmbyAccount,
+  unlinkJellyfinAccount,
+  unlinkPlexAccount,
+  updateProfile,
 } from "./auth";
 
 describe("auth api", () => {
@@ -252,5 +257,217 @@ describe("auth api", () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ success: true }));
 
     await expect(unlinkEmbyAccount()).resolves.toEqual({ success: true });
+  });
+
+  it("falls back when Plex login error payload omits a message", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, false));
+
+    await expect(loginWithPlex("bad-token")).rejects.toThrow(
+      "Failed to login with Plex"
+    );
+  });
+
+  it("links Plex accounts and surfaces server errors", async () => {
+    const user = { id: "1", username: "plex-user", isAdmin: false };
+    fetchMock.mockResolvedValueOnce(jsonResponse(user));
+
+    await expect(linkPlexAccount("token", "client-id")).resolves.toEqual(user);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/auth/plex/link",
+      expect.objectContaining({ method: "POST" })
+    );
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "Already linked" }, false)
+    );
+    await expect(linkPlexAccount("token")).rejects.toThrow("Already linked");
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, false));
+    await expect(linkPlexAccount("token")).rejects.toThrow(
+      "Failed to link Plex account"
+    );
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: vi.fn().mockRejectedValue(new Error("bad json")),
+    });
+    await expect(linkPlexAccount("token")).rejects.toThrow(
+      "Failed to link Plex account"
+    );
+  });
+
+  it("covers Jellyfin login and link error fallbacks", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "Bad credentials" }, false)
+    );
+    await expect(loginWithJellyfin("alice", "secret")).rejects.toThrow(
+      "Bad credentials"
+    );
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, false));
+    await expect(loginWithJellyfin("alice", "secret")).rejects.toThrow(
+      "Failed to login with Jellyfin"
+    );
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: vi.fn().mockRejectedValue(new Error("bad json")),
+    });
+    await expect(loginWithJellyfin("alice", "secret")).rejects.toThrow(
+      "Failed to login with Jellyfin"
+    );
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "Link failed" }, false)
+    );
+    await expect(linkJellyfinAccount("alice", "secret")).rejects.toThrow(
+      "Link failed"
+    );
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, false));
+    await expect(linkJellyfinAccount("alice", "secret")).rejects.toThrow(
+      "Failed to link Jellyfin account"
+    );
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: vi.fn().mockRejectedValue(new Error("bad json")),
+    });
+    await expect(linkJellyfinAccount("alice", "secret")).rejects.toThrow(
+      "Failed to link Jellyfin account"
+    );
+  });
+
+  it("builds media-browser bodies with hostname only", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ id: "1", isAdmin: false }));
+
+    await loginWithJellyfin("alice", "secret", "jellyfin.local");
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      username: "alice",
+      password: "secret",
+      hostname: "jellyfin.local",
+      mediaBrowserType: "jellyfin",
+    });
+  });
+
+  it("unlinks Plex and Jellyfin accounts with error fallbacks", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ success: true }));
+    await expect(unlinkPlexAccount()).resolves.toEqual({ success: true });
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "Plex unlink denied" }, false)
+    );
+    await expect(unlinkPlexAccount()).rejects.toThrow("Plex unlink denied");
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, false));
+    await expect(unlinkPlexAccount()).rejects.toThrow(
+      "Failed to unlink Plex account"
+    );
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: vi.fn().mockRejectedValue(new Error("bad json")),
+    });
+    await expect(unlinkPlexAccount()).rejects.toThrow(
+      "Failed to unlink Plex account"
+    );
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({ success: true }));
+    await expect(unlinkJellyfinAccount()).resolves.toEqual({ success: true });
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "Jellyfin unlink denied" }, false)
+    );
+    await expect(unlinkJellyfinAccount()).rejects.toThrow(
+      "Jellyfin unlink denied"
+    );
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, false));
+    await expect(unlinkJellyfinAccount()).rejects.toThrow(
+      "Failed to unlink Jellyfin account"
+    );
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: vi.fn().mockRejectedValue(new Error("bad json")),
+    });
+    await expect(unlinkJellyfinAccount()).rejects.toThrow(
+      "Failed to unlink Jellyfin account"
+    );
+  });
+
+  it("fails loudly when auth providers cannot be loaded", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, false));
+
+    await expect(getAuthProviders()).rejects.toThrow(
+      "Failed to get auth providers"
+    );
+  });
+
+  it("sets up a Plex admin and surfaces setup failures", async () => {
+    const user = { id: "1", username: "admin", isAdmin: true };
+    fetchMock.mockResolvedValueOnce(jsonResponse(user));
+
+    await expect(setupAdmin("token", "client-id")).resolves.toEqual(user);
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, false));
+    await expect(setupAdmin("token")).rejects.toThrow("Failed to setup admin");
+  });
+
+  it("covers Jellyfin admin setup error fallbacks", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "Setup denied" }, false)
+    );
+    await expect(
+      setupJellyfinAdmin("admin", "secret", "jellyfin.local")
+    ).rejects.toThrow("Setup denied");
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, false));
+    await expect(
+      setupJellyfinAdmin("admin", "secret", "jellyfin.local")
+    ).rejects.toThrow("Failed to setup Jellyfin admin");
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: vi.fn().mockRejectedValue(new Error("bad json")),
+    });
+    await expect(
+      setupJellyfinAdmin("admin", "secret", "jellyfin.local")
+    ).rejects.toThrow("Failed to setup Jellyfin admin");
+  });
+
+  it("loads the current user and updates the profile", async () => {
+    const user = { id: "1", username: "alice", isAdmin: false };
+    fetchMock.mockResolvedValueOnce(jsonResponse(user));
+    await expect(getCurrentUser()).resolves.toEqual(user);
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ ...user, displayName: "Alice" })
+    );
+    await expect(updateProfile({ displayName: "Alice" })).resolves.toEqual({
+      ...user,
+      displayName: "Alice",
+    });
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "Profile update denied" }, false)
+    );
+    await expect(updateProfile({ email: "a@b.c" })).rejects.toThrow(
+      "Profile update denied"
+    );
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, false));
+    await expect(updateProfile({ email: "a@b.c" })).rejects.toThrow(
+      "Failed to update profile"
+    );
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: vi.fn().mockRejectedValue(new Error("bad json")),
+    });
+    await expect(updateProfile({ email: "a@b.c" })).rejects.toThrow(
+      "Failed to update profile"
+    );
   });
 });

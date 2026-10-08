@@ -436,7 +436,9 @@ components:
           properties:
             usualWeek:
               type: number
-              description: Average syncs per week over the last 28 days (last28Days / 4)
+              description: >
+                Expected syncs for the elapsed portion of the current week
+                (Mon-today UTC): (last28Days / 4) x (elapsedWeekDays / 7)
             sameDaysLastMonth:
               type: integer
               description: Syncs in the previous month from day 1 through today's day-of-month (clamped to last month length)

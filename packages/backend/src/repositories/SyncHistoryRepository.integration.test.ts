@@ -262,100 +262,122 @@ describe("SyncHistoryRepository integration", () => {
       bingers: 0,
     });
     expect(stats.lastFailure?.mediaTitle).toBe("Example Show");
-    expect(stats.pace.usualWeek).toBe(0.8);
+    const utcDay = new Date().getUTCDay();
+    const elapsedWeekDays = (utcDay === 0 ? 6 : utcDay - 1) + 1;
+    expect(stats.pace.usualWeek).toBe(
+      Math.round((3 / 4) * (elapsedWeekDays / 7) * 10) / 10
+    );
   });
 
   it("computes pace from last 28 days and same days last month", async () => {
-    const now = new Date();
-    const dayOfMonth = now.getUTCDate();
-    const lastMonthYear =
-      now.getUTCMonth() === 0 ? now.getUTCFullYear() - 1 : now.getUTCFullYear();
-    const lastMonthIndex = now.getUTCMonth() === 0 ? 11 : now.getUTCMonth() - 1;
-    const daysInLastMonth = new Date(
-      Date.UTC(lastMonthYear, lastMonthIndex + 1, 0)
-    ).getUTCDate();
-    const includedDay = Math.min(dayOfMonth, daysInLastMonth);
-    const sameDayLastMonth = new Date(
-      Date.UTC(lastMonthYear, lastMonthIndex, includedDay, 12)
-    );
-    const dayAfterIncluded =
-      includedDay < daysInLastMonth
-        ? new Date(Date.UTC(lastMonthYear, lastMonthIndex, includedDay + 1, 12))
-        : null;
-    const inLast28Days =
-      sameDayLastMonth.getTime() >= now.getTime() - 28 * 24 * 60 * 60 * 1000;
-    const dayAfterInLast28 =
-      dayAfterIncluded != null &&
-      dayAfterIncluded.getTime() >= now.getTime() - 28 * 24 * 60 * 60 * 1000;
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-15T12:00:00.000Z"));
 
-    await createHistory([
-      {
-        userId: user.id,
-        mediaType: "movie",
-        mediaTitle: "Recent A",
-        source: "plex",
-        success: true,
-        syncedAt: daysAgo(1),
-      },
-      {
-        userId: user.id,
-        mediaType: "movie",
-        mediaTitle: "Recent B",
-        source: "plex",
-        success: true,
-        syncedAt: daysAgo(2),
-      },
-      {
-        userId: user.id,
-        mediaType: "movie",
-        mediaTitle: "Recent C",
-        source: "plex",
-        success: true,
-        syncedAt: daysAgo(3),
-      },
-      {
-        userId: user.id,
-        mediaType: "movie",
-        mediaTitle: "Recent D",
-        source: "plex",
-        success: true,
-        syncedAt: daysAgo(4),
-      },
-      {
-        userId: user.id,
-        mediaType: "movie",
-        mediaTitle: "Same Day Last Month",
-        source: "plex",
-        success: true,
-        syncedAt: sameDayLastMonth,
-      },
-      ...(dayAfterIncluded
-        ? [
-            {
-              userId: user.id,
-              mediaType: "movie" as const,
-              mediaTitle: "Day After Same Days Window",
-              source: "plex",
-              success: true,
-              syncedAt: dayAfterIncluded,
-            },
-          ]
-        : []),
-      {
-        userId: user.id,
-        mediaType: "movie",
-        mediaTitle: "Older Than 28 Days",
-        source: "plex",
-        success: true,
-        syncedAt: daysAgo(40),
-      },
-    ]);
+    try {
+      const now = new Date();
+      const dayOfMonth = now.getUTCDate();
+      const lastMonthYear =
+        now.getUTCMonth() === 0
+          ? now.getUTCFullYear() - 1
+          : now.getUTCFullYear();
+      const lastMonthIndex =
+        now.getUTCMonth() === 0 ? 11 : now.getUTCMonth() - 1;
+      const daysInLastMonth = new Date(
+        Date.UTC(lastMonthYear, lastMonthIndex + 1, 0)
+      ).getUTCDate();
+      const includedDay = Math.min(dayOfMonth, daysInLastMonth);
+      const sameDayLastMonth = new Date(
+        Date.UTC(lastMonthYear, lastMonthIndex, includedDay, 12)
+      );
+      const dayAfterIncluded =
+        includedDay < daysInLastMonth
+          ? new Date(
+              Date.UTC(lastMonthYear, lastMonthIndex, includedDay + 1, 12)
+            )
+          : null;
+      const inLast28Days =
+        sameDayLastMonth.getTime() >= now.getTime() - 28 * 24 * 60 * 60 * 1000;
+      const dayAfterInLast28 =
+        dayAfterIncluded != null &&
+        dayAfterIncluded.getTime() >= now.getTime() - 28 * 24 * 60 * 60 * 1000;
 
-    const stats = await repository.getStatisticsByUser(user.id);
+      await createHistory([
+        {
+          userId: user.id,
+          mediaType: "movie",
+          mediaTitle: "Recent A",
+          source: "plex",
+          success: true,
+          syncedAt: daysAgo(1),
+        },
+        {
+          userId: user.id,
+          mediaType: "movie",
+          mediaTitle: "Recent B",
+          source: "plex",
+          success: true,
+          syncedAt: daysAgo(2),
+        },
+        {
+          userId: user.id,
+          mediaType: "movie",
+          mediaTitle: "Recent C",
+          source: "plex",
+          success: true,
+          syncedAt: daysAgo(3),
+        },
+        {
+          userId: user.id,
+          mediaType: "movie",
+          mediaTitle: "Recent D",
+          source: "plex",
+          success: true,
+          syncedAt: daysAgo(4),
+        },
+        {
+          userId: user.id,
+          mediaType: "movie",
+          mediaTitle: "Same Day Last Month",
+          source: "plex",
+          success: true,
+          syncedAt: sameDayLastMonth,
+        },
+        ...(dayAfterIncluded
+          ? [
+              {
+                userId: user.id,
+                mediaType: "movie" as const,
+                mediaTitle: "Day After Same Days Window",
+                source: "plex",
+                success: true,
+                syncedAt: dayAfterIncluded,
+              },
+            ]
+          : []),
+        {
+          userId: user.id,
+          mediaType: "movie",
+          mediaTitle: "Older Than 28 Days",
+          source: "plex",
+          success: true,
+          syncedAt: new Date(
+            Date.UTC(lastMonthYear, lastMonthIndex - 1, 1, 12)
+          ),
+        },
+      ]);
 
-    const last28Count = 4 + (inLast28Days ? 1 : 0) + (dayAfterInLast28 ? 1 : 0);
-    expect(stats.pace.usualWeek).toBe(Math.round((last28Count / 4) * 10) / 10);
-    expect(stats.pace.sameDaysLastMonth).toBe(1);
+      const stats = await repository.getStatisticsByUser(user.id);
+
+      const last28Count =
+        4 + (inLast28Days ? 1 : 0) + (dayAfterInLast28 ? 1 : 0);
+      const elapsedWeekDays = 4;
+      expect(stats.pace.usualWeek).toBe(
+        Math.round((last28Count / 4) * (elapsedWeekDays / 7) * 10) / 10
+      );
+      expect(stats.pace.sameDaysLastMonth).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("matches existing syncs by TVDB, IMDb, and TMDB identifiers", async () => {

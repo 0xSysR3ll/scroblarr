@@ -175,6 +175,42 @@ const dashboardAlignGrid =
   "grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5";
 const dashboardHeroSpan = "sm:col-span-2 md:col-span-3 xl:col-span-2";
 
+const statIconColorClasses = {
+  blue: "bg-primary/15 text-primary",
+  green:
+    "bg-success-500/15 text-success-700 dark:bg-success-400/15 dark:text-success-300",
+  red: "bg-destructive/15 text-destructive dark:bg-destructive/20",
+  purple: "bg-primary/15 text-primary",
+  yellow:
+    "bg-warning-500/15 text-warning-800 dark:bg-warning-400/15 dark:text-warning-200",
+  muted: "bg-muted text-muted-foreground",
+} as const;
+
+type StatIconColor = keyof typeof statIconColorClasses;
+
+function StatCardHeader({
+  title,
+  icon: Icon,
+  color,
+}: {
+  title: string;
+  icon: ComponentType<{ className?: string }>;
+  color: StatIconColor;
+}) {
+  return (
+    <div className="mb-2 flex items-start justify-between gap-2">
+      <h3 className="min-w-0 text-xs font-medium leading-tight text-muted-foreground sm:text-sm">
+        {title}
+      </h3>
+      <div
+        className={`shrink-0 rounded-lg p-1.5 sm:p-2 ${statIconColorClasses[color]}`}
+      >
+        <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden />
+      </div>
+    </div>
+  );
+}
+
 function StatCard({
   title,
   value,
@@ -186,33 +222,13 @@ function StatCard({
   title: string;
   value: string | number;
   icon: ComponentType<{ className?: string }>;
-  color?: "blue" | "green" | "red" | "purple" | "yellow" | "muted";
+  color?: StatIconColor;
   subtitle?: string;
   footer?: ReactNode;
 }) {
-  const colorClasses = {
-    blue: "bg-primary/15 text-primary",
-    green:
-      "bg-success-500/15 text-success-700 dark:bg-success-400/15 dark:text-success-300",
-    red: "bg-destructive/15 text-destructive dark:bg-destructive/20",
-    purple: "bg-primary/15 text-primary",
-    yellow:
-      "bg-warning-500/15 text-warning-800 dark:bg-warning-400/15 dark:text-warning-200",
-    muted: "bg-muted text-muted-foreground",
-  };
-
   return (
     <div className={tileClass("flex h-full flex-col p-3 sm:p-4")}>
-      <div className="mb-2 flex items-start justify-between gap-2">
-        <h3 className="min-w-0 text-xs font-medium leading-tight text-muted-foreground sm:text-sm">
-          {title}
-        </h3>
-        <div
-          className={`shrink-0 rounded-lg p-1.5 sm:p-2 ${colorClasses[color]}`}
-        >
-          <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-        </div>
-      </div>
+      <StatCardHeader title={title} icon={Icon} color={color} />
       <p className="text-xl font-bold leading-tight tracking-tight break-words text-foreground sm:text-2xl">
         {value}
       </p>
@@ -463,15 +479,9 @@ function AveragePaceCard({
   actualLabel: string;
   baselineLabel: string;
   icon: ComponentType<{ className?: string }>;
-  color: "blue" | "purple" | "green";
+  color: Extract<StatIconColor, "blue" | "purple" | "green">;
   locale: string;
 }) {
-  const colorClasses = {
-    blue: "bg-primary/15 text-primary",
-    purple: "bg-primary/15 text-primary",
-    green:
-      "bg-success-500/15 text-success-700 dark:bg-success-400/15 dark:text-success-300",
-  };
   const scaleMax = Math.max(actual, average, 0);
   const actualPct = scaleMax > 0 ? Math.min(100, (actual / scaleMax) * 100) : 0;
   const baselinePct =
@@ -485,16 +495,7 @@ function AveragePaceCard({
 
   return (
     <div className={tileClass("flex h-full flex-col p-3 sm:p-4")}>
-      <div className="mb-2 flex items-start justify-between gap-2">
-        <h3 className="min-w-0 text-xs font-medium leading-tight text-muted-foreground sm:text-sm">
-          {title}
-        </h3>
-        <div
-          className={`shrink-0 rounded-lg p-1.5 sm:p-2 ${colorClasses[color]}`}
-        >
-          <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-        </div>
-      </div>
+      <StatCardHeader title={title} icon={Icon} color={color} />
 
       <div className="flex items-baseline justify-between gap-2">
         <p className="text-xl font-bold leading-tight tracking-tight text-foreground sm:text-2xl">

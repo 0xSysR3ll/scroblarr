@@ -640,8 +640,11 @@ export class SyncHistoryRepository {
 
     const successRate = total > 0 ? (successful / total) * 100 : 0;
 
+    const elapsedWeekDays = daysToMonday + 1;
     const usualWeek =
-      last28DaysTotal > 0 ? Math.round((last28DaysTotal / 4) * 10) / 10 : 0;
+      last28DaysTotal > 0
+        ? Math.round((last28DaysTotal / 4) * (elapsedWeekDays / 7) * 10) / 10
+        : 0;
 
     const last7Days = (last7DaysCounts as number[]).slice(0, 7);
 
