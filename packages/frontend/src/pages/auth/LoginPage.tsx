@@ -162,7 +162,7 @@ export function LoginPage() {
               </div>
             )}
 
-            {(authProviders?.plexConfigured || authProviders?.hasAdmin) && (
+            {authProviders?.plexConfigured && (
               <button
                 type="button"
                 onClick={plexLogin}
@@ -182,16 +182,15 @@ export function LoginPage() {
               </button>
             )}
 
-            {(authProviders?.plexConfigured || authProviders?.hasAdmin) &&
-              mediaBrowserConfigured && (
-                <div className="flex items-center gap-3">
-                  <div className="h-px flex-1 bg-border" />
-                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {t("auth.or", { defaultValue: "Or" })}
-                  </span>
-                  <div className="h-px flex-1 bg-border" />
-                </div>
-              )}
+            {authProviders?.plexConfigured && mediaBrowserConfigured && (
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {t("auth.or", { defaultValue: "Or" })}
+                </span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+            )}
 
             {mediaBrowserConfigured && (
               <div className="space-y-4">
