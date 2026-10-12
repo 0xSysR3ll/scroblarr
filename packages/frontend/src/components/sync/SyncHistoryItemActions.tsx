@@ -43,10 +43,14 @@ export function SyncHistoryItemActions({
     return (
       <div className={containerClass}>
         <button
+          type="button"
           onClick={onDelete}
           disabled={isDeleting}
           className={confirmClass}
           title={t("sync.confirmDelete", {
+            defaultValue: "Confirm delete",
+          })}
+          aria-label={t("sync.confirmDelete", {
             defaultValue: "Confirm delete",
           })}
         >
@@ -57,10 +61,14 @@ export function SyncHistoryItemActions({
           )}
         </button>
         <button
+          type="button"
           onClick={onCancelDelete}
           disabled={isDeleting}
           className="inline-flex size-8 cursor-pointer items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-50"
           title={t("sync.cancel", {
+            defaultValue: "Cancel",
+          })}
+          aria-label={t("sync.cancel", {
             defaultValue: "Cancel",
           })}
         >
@@ -97,6 +105,9 @@ export function SyncHistoryItemActions({
         onClick={onDelete}
         className="inline-flex size-8 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:text-destructive"
         title={t("sync.deleteItemTitle", {
+          defaultValue: "Delete this item",
+        })}
+        aria-label={t("sync.deleteItemTitle", {
           defaultValue: "Delete this item",
         })}
       >

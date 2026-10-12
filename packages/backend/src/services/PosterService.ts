@@ -382,7 +382,7 @@ export class PosterService {
         signal: posterFetchSignal(),
       });
 
-      return this.readFetchImage(response);
+      return await this.readFetchImage(response);
     } catch (error) {
       logger.api.error({ error, posterUrl }, "Error proxying Plex poster");
       return {
@@ -455,7 +455,7 @@ export class PosterService {
         signal: posterFetchSignal(),
       });
 
-      return this.readFetchImage(response);
+      return await this.readFetchImage(response);
     } catch (error) {
       logger.api.error({ error, posterUrl }, "Error proxying generic poster");
       return {
