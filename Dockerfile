@@ -15,6 +15,13 @@ ARG COMMIT_TAG=local
 ENV GIT_TAG=${GIT_TAG}
 ENV COMMIT_TAG=${COMMIT_TAG}
 
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+  && rm -rf /var/lib/apt/lists/*
+
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY packages/backend/package.json packages/backend/
 COPY packages/frontend/package.json packages/frontend/
