@@ -1,8 +1,8 @@
 import { getAppVersionForClients, getUserAgent } from "@utils/appVersion";
 
 export const SIMKL_API_BASE_URL = "https://api.simkl.com";
-export const SIMKL_AUTH_URL = "https://simkl.com/oauth/authorize";
 export const SIMKL_APP_NAME = "scroblarr";
+export const SIMKL_OAUTH_SCOPES = "media:read media:write";
 
 export function getSimklAppVersion(): string {
   return getAppVersionForClients();
@@ -22,11 +22,14 @@ export function withSimklQueryParams(url: string, clientId: string): string {
 
 export function getSimklHeaders(
   clientId: string,
-  accessToken?: string
+  accessToken?: string,
+  contentType:
+    | "application/json"
+    | "application/x-www-form-urlencoded" = "application/json"
 ): Record<string, string> {
   const headers: Record<string, string> = {
     Accept: "application/json",
-    "Content-Type": "application/json",
+    "Content-Type": contentType,
     "User-Agent": getSimklUserAgent(),
     "simkl-api-key": clientId,
   };
@@ -36,4 +39,8 @@ export function getSimklHeaders(
   }
 
   return headers;
+}
+
+export function isSimklV2AccessToken(accessToken: string): boolean {
+  return accessToken.startsWith("simkl_at_");
 }

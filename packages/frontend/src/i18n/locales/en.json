@@ -586,7 +586,6 @@
       "bingers": "Bingers",
       "tvtime": "TVTime"
     },
-    "source": "Source",
     "source": "Source"
   },
   "errors": {
@@ -639,7 +638,7 @@
     "profile": {
       "username": "Username"
     },
-    "docsHint": "Create a Simkl app and enter its Client ID below. Simkl PIN authorization does not require a client secret.",
+    "docsHint": "Create a Simkl app and enter its Client ID below. PIN authorization does not require a client secret.",
     "clientId": "Client ID",
     "clientIdPlaceholder": "Enter your Simkl Client ID",
     "oauthInstructions": "Click 'Authorize' to get a Simkl PIN code, then enter that code on Simkl's PIN page.",

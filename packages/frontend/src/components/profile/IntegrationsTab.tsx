@@ -1172,7 +1172,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
             <p className="text-sm text-muted-foreground">
               {t("simkl.docsHint", {
                 defaultValue:
-                  "Create a Simkl app and enter its Client ID below. Simkl PIN authorization does not require a client secret.",
+                  "Create a Simkl app and enter its Client ID below. PIN authorization does not require a client secret.",
               })}
             </p>
             {simklError && (

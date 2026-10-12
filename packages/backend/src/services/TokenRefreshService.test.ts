@@ -18,6 +18,7 @@ const loggerMocks = vi.hoisted(() => ({
   traktDebug: vi.fn(),
   traktWarn: vi.fn(),
   simklDebug: vi.fn(),
+  simklWarn: vi.fn(),
   bingersDebug: vi.fn(),
   bingersWarn: vi.fn(),
 }));
@@ -31,6 +32,16 @@ vi.mock("@repositories/UserRepository", () => ({
 vi.mock("@integrations/trakt/TraktTokenManager", () => ({
   TraktTokenManager: class {
     getValidAccessToken = traktTokenManagerMocks.getValidAccessToken;
+  },
+}));
+
+const simklTokenManagerMocks = vi.hoisted(() => ({
+  getValidAccessToken: vi.fn(),
+}));
+
+vi.mock("@integrations/simkl/SimklTokenManager", () => ({
+  SimklTokenManager: class {
+    getValidAccessToken = simklTokenManagerMocks.getValidAccessToken;
   },
 }));
 
@@ -52,6 +63,7 @@ vi.mock("@utils/logger", () => ({
     },
     simkl: {
       debug: loggerMocks.simklDebug,
+      warn: loggerMocks.simklWarn,
     },
     bingers: {
       debug: loggerMocks.bingersDebug,
@@ -67,11 +79,11 @@ describe("TokenRefreshService", () => {
     vi.clearAllMocks();
   });
 
-  it("counts linked Simkl accounts without refreshing them", async () => {
+  it("skips refresh for AUTH V1 Simkl tokens", async () => {
     userRepositoryMocks.findAll.mockResolvedValue([
       {
         id: "simkl-user",
-        simklAccessToken: "simkl-token",
+        simklAccessToken: "simkl-v1-token",
       },
     ]);
 
@@ -79,17 +91,117 @@ describe("TokenRefreshService", () => {
     await service.refreshAllTokens();
 
     expect(traktTokenManagerMocks.getValidAccessToken).not.toHaveBeenCalled();
+    expect(simklTokenManagerMocks.getValidAccessToken).not.toHaveBeenCalled();
     expect(bingersSessionManagerMocks.getValidCookieJar).not.toHaveBeenCalled();
     expect(loggerMocks.simklDebug).toHaveBeenCalledWith(
       { userId: "simkl-user" },
-      "Simkl token does not expire; skipping refresh"
+      "Simkl legacy token does not expire; skipping refresh"
     );
     expect(loggerMocks.systemInfo).toHaveBeenLastCalledWith(
       expect.objectContaining({
         totalUsers: 1,
-        simklLinked: 1,
+        simklLegacy: 1,
+        simklSuccess: 0,
+        simklFailed: 0,
       }),
       "Completed scheduled token refresh"
+    );
+  });
+
+  it("refreshes AUTH V2 Simkl tokens", async () => {
+    userRepositoryMocks.findAll.mockResolvedValue([
+      {
+        id: "simkl-v2-user",
+        simklAccessToken: "simkl_at_token",
+        simklRefreshToken: "simkl_rt_token",
+      },
+    ]);
+    simklTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "simkl_at_token"
+    );
+
+    const service = new TokenRefreshService();
+    await service.refreshAllTokens();
+
+    expect(simklTokenManagerMocks.getValidAccessToken).toHaveBeenCalledWith(
+      "simkl-v2-user"
+    );
+    expect(loggerMocks.systemInfo).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        simklSuccess: 1,
+        simklFailed: 0,
+        simklLegacy: 0,
+      }),
+      "Completed scheduled token refresh"
+    );
+  });
+
+  it("counts failed Simkl refreshes", async () => {
+    userRepositoryMocks.findAll.mockResolvedValue([
+      {
+        id: "simkl-v2-user",
+        simklAccessToken: "simkl_at_token",
+        simklRefreshToken: "simkl_rt_token",
+      },
+    ]);
+    simklTokenManagerMocks.getValidAccessToken.mockRejectedValue(
+      new Error("refresh failed")
+    );
+
+    const service = new TokenRefreshService();
+    await service.refreshAllTokens();
+
+    expect(loggerMocks.simklWarn).toHaveBeenCalledWith(
+      { userId: "simkl-v2-user", error: expect.any(Error) },
+      "Failed to refresh Simkl token during scheduled refresh"
+    );
+    expect(loggerMocks.systemInfo).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        simklSuccess: 0,
+        simklFailed: 1,
+      }),
+      "Completed scheduled token refresh"
+    );
+  });
+
+  it("refreshes Trakt tokens and counts failures", async () => {
+    userRepositoryMocks.findAll.mockResolvedValue([
+      {
+        id: "trakt-ok",
+        traktAccessToken: "trakt-access",
+        traktRefreshToken: "trakt-refresh",
+      },
+      {
+        id: "trakt-fail",
+        traktAccessToken: "trakt-access",
+        traktRefreshToken: "trakt-refresh",
+      },
+    ]);
+    traktTokenManagerMocks.getValidAccessToken
+      .mockResolvedValueOnce("trakt-access")
+      .mockRejectedValueOnce(new Error("trakt down"));
+
+    const service = new TokenRefreshService();
+    await service.refreshAllTokens();
+
+    expect(loggerMocks.systemInfo).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        traktSuccess: 1,
+        traktFailed: 1,
+      }),
+      "Completed scheduled token refresh"
+    );
+  });
+
+  it("logs top-level refresh failures", async () => {
+    userRepositoryMocks.findAll.mockRejectedValue(new Error("db down"));
+
+    const service = new TokenRefreshService();
+    await service.refreshAllTokens();
+
+    expect(loggerMocks.systemError).toHaveBeenCalledWith(
+      { error: expect.any(Error) },
+      "Error during scheduled token refresh"
     );
   });
 

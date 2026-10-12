@@ -10,6 +10,13 @@ const userRepositoryMocks = vi.hoisted(() => ({
 const simklOAuthMocks = vi.hoisted(() => ({
   requestPinCode: vi.fn(),
   exchangePinForToken: vi.fn(),
+  revokeToken: vi.fn(),
+}));
+
+const simklDeviceStoreMocks = vi.hoisted(() => ({
+  rememberSimklDevice: vi.fn(),
+  resolveSimklDeviceCode: vi.fn(),
+  clearSimklDevice: vi.fn(),
 }));
 
 const simklClientMocks = vi.hoisted(() => ({
@@ -51,7 +58,11 @@ vi.mock("@integrations/simkl/SimklOAuth", () => ({
   SimklOAuth: class {
     requestPinCode = simklOAuthMocks.requestPinCode;
     exchangePinForToken = simklOAuthMocks.exchangePinForToken;
+    revokeToken = simklOAuthMocks.revokeToken;
   },
+  rememberSimklDevice: simklDeviceStoreMocks.rememberSimklDevice,
+  resolveSimklDeviceCode: simklDeviceStoreMocks.resolveSimklDeviceCode,
+  clearSimklDevice: simklDeviceStoreMocks.clearSimklDevice,
 }));
 
 vi.mock("@integrations/simkl/SimklClient", () => ({
@@ -104,8 +115,10 @@ describe("simkl routes", () => {
 
   it("returns a PIN authorization payload", async () => {
     simklOAuthMocks.requestPinCode.mockResolvedValue({
-      user_code: "ABCDE",
-      verification_url: "https://simkl.com/pin/",
+      device_code: "device-code",
+      user_code: "BDWP-HQPK",
+      verification_uri: "https://simkl.com/pin",
+      verification_uri_complete: "https://simkl.com/pin?user_code=BDWP-HQPK",
       expires_in: 900,
       interval: 5,
     });
@@ -113,12 +126,33 @@ describe("simkl routes", () => {
     const response = await request(app).get("/simkl/authorize").expect(200);
 
     expect(response.body).toEqual({
-      userCode: "ABCDE",
-      verificationUrl: "https://simkl.com/pin/",
+      userCode: "BDWP-HQPK",
+      verificationUrl: "https://simkl.com/pin?user_code=BDWP-HQPK",
       expiresIn: 900,
       interval: 5,
     });
     expect(simklOAuthMocks.requestPinCode).toHaveBeenCalledOnce();
+    expect(simklDeviceStoreMocks.rememberSimklDevice).toHaveBeenCalledWith(
+      "user-id",
+      expect.objectContaining({
+        device_code: "device-code",
+        user_code: "BDWP-HQPK",
+      })
+    );
+  });
+
+  it("falls back to verification_uri when the complete URI is absent", async () => {
+    simklOAuthMocks.requestPinCode.mockResolvedValue({
+      device_code: "device-code",
+      user_code: "BDWP-HQPK",
+      verification_uri: "https://simkl.com/pin",
+      expires_in: 900,
+      interval: 5,
+    });
+
+    const response = await request(app).get("/simkl/authorize").expect(200);
+
+    expect(response.body.verificationUrl).toBe("https://simkl.com/pin");
   });
 
   it("requires a client ID when requesting authorization", async () => {
@@ -135,8 +169,11 @@ describe("simkl routes", () => {
   });
 
   it("links a Simkl account", async () => {
+    simklDeviceStoreMocks.resolveSimklDeviceCode.mockReturnValue("device-code");
     simklOAuthMocks.exchangePinForToken.mockResolvedValue({
-      accessToken: "new-access-token",
+      accessToken: "simkl_at_new",
+      refreshToken: "simkl_rt_new",
+      expiresAt: 1_700_000_000_000,
     });
     simklClientMocks.getUserProfile.mockResolvedValue({
       id: 51,
@@ -146,14 +183,26 @@ describe("simkl routes", () => {
 
     const response = await request(app)
       .post("/simkl/link")
-      .send({ userCode: "ABCDE" })
+      .send({ userCode: "BDWP-HQPK" })
       .expect(200);
 
     expect(response.body).toEqual({ success: true });
+    expect(simklDeviceStoreMocks.resolveSimklDeviceCode).toHaveBeenCalledWith(
+      "user-id",
+      "BDWP-HQPK"
+    );
+    expect(simklOAuthMocks.exchangePinForToken).toHaveBeenCalledWith(
+      "device-code"
+    );
+    expect(simklDeviceStoreMocks.clearSimklDevice).toHaveBeenCalledWith(
+      "user-id"
+    );
     expect(userRepositoryMocks.update).toHaveBeenCalledWith(
       "user-id",
       expect.objectContaining({
-        simklAccessToken: "new-access-token",
+        simklAccessToken: "simkl_at_new",
+        simklRefreshToken: "simkl_rt_new",
+        simklTokenExpiresAt: 1_700_000_000_000,
         simklUsername: "alice",
         simklThumb: "https://img.example/alice.png",
       })
@@ -161,8 +210,11 @@ describe("simkl routes", () => {
   });
 
   it("stores a provided client ID when linking", async () => {
+    simklDeviceStoreMocks.resolveSimklDeviceCode.mockReturnValue("device-code");
     simklOAuthMocks.exchangePinForToken.mockResolvedValue({
-      accessToken: "new-access-token",
+      accessToken: "simkl_at_new",
+      refreshToken: "simkl_rt_new",
+      expiresAt: 1_700_000_000_000,
     });
     simklClientMocks.getUserProfile.mockRejectedValue(
       new Error("profile down")
@@ -170,13 +222,13 @@ describe("simkl routes", () => {
 
     await request(app)
       .post("/simkl/link")
-      .send({ userCode: "ABCDE", clientId: "provided-client-id" })
+      .send({ userCode: "BDWP-HQPK", clientId: "provided-client-id" })
       .expect(200);
 
     expect(userRepositoryMocks.update).toHaveBeenCalledWith(
       "user-id",
       expect.objectContaining({
-        simklAccessToken: "new-access-token",
+        simklAccessToken: "simkl_at_new",
         simklClientId: "provided-client-id",
       })
     );
@@ -193,19 +245,86 @@ describe("simkl routes", () => {
   });
 
   it("returns pending PIN errors as bad requests", async () => {
+    simklDeviceStoreMocks.resolveSimklDeviceCode.mockReturnValue("device-code");
     simklOAuthMocks.exchangePinForToken.mockRejectedValue(
-      new Error("Authorization pending")
+      new Error("authorization pending")
     );
 
     const response = await request(app)
       .post("/simkl/link")
-      .send({ userCode: "ABCDE" })
+      .send({ userCode: "BDWP-HQPK" })
       .expect(400);
 
-    expect(response.body).toEqual({ error: "Authorization pending" });
+    expect(response.body).toEqual({ error: "authorization pending" });
+  });
+
+  it("returns expired device code errors as bad requests", async () => {
+    simklDeviceStoreMocks.resolveSimklDeviceCode.mockImplementation(() => {
+      throw new Error(
+        "Simkl device code expired. Generate a new one to try again."
+      );
+    });
+
+    const response = await request(app)
+      .post("/simkl/link")
+      .send({ userCode: "BDWP-HQPK" })
+      .expect(400);
+
+    expect(response.body).toEqual({
+      error: "Simkl device code expired. Generate a new one to try again.",
+    });
+  });
+
+  it("returns mismatched PIN errors as bad requests", async () => {
+    simklDeviceStoreMocks.resolveSimklDeviceCode.mockImplementation(() => {
+      throw new Error("Simkl PIN code does not match the active authorization");
+    });
+
+    const response = await request(app)
+      .post("/simkl/link")
+      .send({ userCode: "WRONG-CODE" })
+      .expect(400);
+
+    expect(response.body).toEqual({
+      error: "Simkl PIN code does not match the active authorization",
+    });
   });
 
   it("unlinks a Simkl account", async () => {
+    userRepositoryMocks.findById.mockResolvedValueOnce({
+      id: "user-id",
+      plexUsername: "plex-user",
+      simklClientId: "stored-client-id",
+      simklAccessToken: "simkl_at_token",
+      simklRefreshToken: "simkl_rt_token",
+    });
+    simklOAuthMocks.revokeToken.mockResolvedValue(undefined);
+
+    const response = await request(app).post("/simkl/unlink").expect(200);
+
+    expect(response.body).toEqual({ success: true });
+    expect(simklOAuthMocks.revokeToken).toHaveBeenCalledWith("simkl_rt_token");
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith(
+      "user-id",
+      expect.objectContaining({
+        simklAccessToken: null,
+        simklRefreshToken: null,
+        simklTokenExpiresAt: null,
+        simklClientId: null,
+      })
+    );
+  });
+
+  it("still unlinks when token revoke fails", async () => {
+    userRepositoryMocks.findById.mockResolvedValueOnce({
+      id: "user-id",
+      plexUsername: "plex-user",
+      simklClientId: "stored-client-id",
+      simklAccessToken: "simkl_at_token",
+      simklRefreshToken: "simkl_rt_token",
+    });
+    simklOAuthMocks.revokeToken.mockRejectedValue(new Error("revoke down"));
+
     const response = await request(app).post("/simkl/unlink").expect(200);
 
     expect(response.body).toEqual({ success: true });
@@ -291,13 +410,14 @@ describe("simkl routes", () => {
   });
 
   it("returns 500 for unexpected link failures", async () => {
+    simklDeviceStoreMocks.resolveSimklDeviceCode.mockReturnValue("device-code");
     simklOAuthMocks.exchangePinForToken.mockRejectedValue(
       new Error("Server error")
     );
 
     const response = await request(app)
       .post("/simkl/link")
-      .send({ userCode: "ABCDE" })
+      .send({ userCode: "BDWP-HQPK" })
       .expect(500);
 
     expect(response.body).toEqual({ error: "Server error" });
@@ -443,8 +563,11 @@ describe("simkl routes", () => {
   });
 
   it("links when profile fields are empty strings", async () => {
+    simklDeviceStoreMocks.resolveSimklDeviceCode.mockReturnValue("device-code");
     simklOAuthMocks.exchangePinForToken.mockResolvedValue({
-      accessToken: "new-access-token",
+      accessToken: "simkl_at_new",
+      refreshToken: "simkl_rt_new",
+      expiresAt: 1_700_000_000_000,
     });
     simklClientMocks.getUserProfile.mockResolvedValue({
       id: 51,
@@ -460,14 +583,14 @@ describe("simkl routes", () => {
 
     const response = await request(app)
       .post("/simkl/link")
-      .send({ userCode: "ABCDE" })
+      .send({ userCode: "BDWP-HQPK" })
       .expect(200);
 
     expect(response.body).toEqual({ success: true });
     expect(userRepositoryMocks.update).toHaveBeenCalledWith(
       "user-id",
       expect.objectContaining({
-        simklAccessToken: "new-access-token",
+        simklAccessToken: "simkl_at_new",
         simklUsername: undefined,
         simklThumb: undefined,
       })
@@ -475,11 +598,12 @@ describe("simkl routes", () => {
   });
 
   it("returns a generic link error for non-Error failures", async () => {
+    simklDeviceStoreMocks.resolveSimklDeviceCode.mockReturnValue("device-code");
     simklOAuthMocks.exchangePinForToken.mockRejectedValue("boom");
 
     const response = await request(app)
       .post("/simkl/link")
-      .send({ userCode: "ABCDE" })
+      .send({ userCode: "BDWP-HQPK" })
       .expect(500);
 
     expect(response.body).toEqual({ error: "Failed to link Simkl account" });

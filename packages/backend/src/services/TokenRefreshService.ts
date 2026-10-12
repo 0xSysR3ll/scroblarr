@@ -1,5 +1,6 @@
 import { isBingersAuthError } from "@integrations/bingers/BingersApiError";
 import { BingersSessionManager } from "@integrations/bingers/BingersSessionManager";
+import { SimklTokenManager } from "@integrations/simkl/SimklTokenManager";
 import { TraktTokenManager } from "@integrations/trakt/TraktTokenManager";
 import { UserRepository } from "@repositories/UserRepository";
 import { logger } from "@utils/logger";
@@ -7,11 +8,13 @@ import { logger } from "@utils/logger";
 export class TokenRefreshService {
   private userRepository: UserRepository;
   private traktTokenManager: TraktTokenManager;
+  private simklTokenManager: SimklTokenManager;
   private bingersSessionManager: BingersSessionManager;
 
   constructor() {
     this.userRepository = new UserRepository();
     this.traktTokenManager = new TraktTokenManager();
+    this.simklTokenManager = new SimklTokenManager();
     this.bingersSessionManager = new BingersSessionManager(this.userRepository);
   }
 
@@ -23,7 +26,9 @@ export class TokenRefreshService {
 
       let traktSuccess = 0;
       let traktFailed = 0;
-      let simklLinked = 0;
+      let simklSuccess = 0;
+      let simklFailed = 0;
+      let simklLegacy = 0;
       let bingersSuccess = 0;
       let bingersFailed = 0;
       let bingersExpired = 0;
@@ -47,11 +52,28 @@ export class TokenRefreshService {
         }
 
         if (user.simklAccessToken) {
-          simklLinked++;
-          logger.simkl.debug(
-            { userId: user.id },
-            "Simkl token does not expire; skipping refresh"
-          );
+          if (user.simklRefreshToken) {
+            try {
+              await this.simklTokenManager.getValidAccessToken(user.id);
+              simklSuccess++;
+              logger.simkl.debug(
+                { userId: user.id },
+                "Successfully refreshed Simkl token"
+              );
+            } catch (error) {
+              simklFailed++;
+              logger.simkl.warn(
+                { userId: user.id, error },
+                "Failed to refresh Simkl token during scheduled refresh"
+              );
+            }
+          } else {
+            simklLegacy++;
+            logger.simkl.debug(
+              { userId: user.id },
+              "Simkl legacy token does not expire; skipping refresh"
+            );
+          }
         }
 
         if (user.bingersCookieJar) {
@@ -85,7 +107,9 @@ export class TokenRefreshService {
           totalUsers: users.length,
           traktSuccess,
           traktFailed,
-          simklLinked,
+          simklSuccess,
+          simklFailed,
+          simklLegacy,
           bingersSuccess,
           bingersFailed,
           bingersExpired,
