@@ -382,19 +382,7 @@ export class PosterService {
         signal: posterFetchSignal(),
       });
 
-      if (!response.ok) {
-        return {
-          status: response.status,
-          message: "Failed to fetch poster image",
-        };
-      }
-
-      const contentType = response.headers.get("content-type") || "image/jpeg";
-      const imageBuffer = await response.arrayBuffer();
-      return {
-        buffer: Buffer.from(imageBuffer),
-        contentType,
-      };
+      return await this.readFetchImage(response);
     } catch (error) {
       logger.api.error({ error, posterUrl }, "Error proxying Plex poster");
       return {
@@ -467,19 +455,7 @@ export class PosterService {
         signal: posterFetchSignal(),
       });
 
-      if (!response.ok) {
-        return {
-          status: response.status,
-          message: "Failed to fetch poster image",
-        };
-      }
-
-      const contentType = response.headers.get("content-type") || "image/jpeg";
-      const imageBuffer = await response.arrayBuffer();
-      return {
-        buffer: Buffer.from(imageBuffer),
-        contentType,
-      };
+      return await this.readFetchImage(response);
     } catch (error) {
       logger.api.error({ error, posterUrl }, "Error proxying generic poster");
       return {
@@ -487,5 +463,23 @@ export class PosterService {
         message: "Failed to fetch poster image",
       };
     }
+  }
+
+  private async readFetchImage(
+    response: globalThis.Response
+  ): Promise<PosterFetchResult> {
+    if (!response.ok) {
+      return {
+        status: response.status,
+        message: "Failed to fetch poster image",
+      };
+    }
+
+    const contentType = response.headers.get("content-type") || "image/jpeg";
+    const imageBuffer = await response.arrayBuffer();
+    return {
+      buffer: Buffer.from(imageBuffer),
+      contentType,
+    };
   }
 }

@@ -170,6 +170,178 @@ describe("TraktClient", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("reports its integration name", () => {
+    expect(new TraktClient("client-id").getName()).toBe("Trakt");
+  });
+
+  it("rejects unsupported media types", async () => {
+    const client = new TraktClient("client-id");
+
+    await expect(
+      client.scrobble(
+        {
+          event: "scrobble",
+          source: "plex",
+          userId: "plex-user",
+          timestamp: new Date("2026-06-04T17:00:00.000Z"),
+          media: {
+            id: "track-1",
+            type: "track" as "movie",
+            title: "Song",
+          },
+        },
+        "access-token"
+      )
+    ).rejects.toThrow("Unsupported media type: track");
+  });
+
+  it("uses TVDB episode IDs when present", async () => {
+    fetchMock.mockResolvedValue({ ok: true });
+    const client = new TraktClient("client-id");
+    const event = makeEpisodeEvent();
+    event.media.tvdbEpisodeId = 12345;
+    event.media.tmdbSeriesId = 99;
+
+    await client.scrobble(event, "access-token");
+
+    const [, request] = fetchMock.mock.calls[0] as [string, { body: string }];
+    expect(JSON.parse(request.body)).toEqual({
+      episode: {
+        ids: { tvdb: 12345 },
+        season: 2,
+        number: 3,
+      },
+      show: {
+        ids: { tmdb: 99 },
+        title: "Example Show",
+        year: 2024,
+      },
+      progress: 100,
+    });
+  });
+
+  it("falls back to IMDB episode IDs", async () => {
+    fetchMock.mockResolvedValue({ ok: true });
+    const client = new TraktClient("client-id");
+    const event = makeEpisodeEvent();
+    event.media.imdbEpisodeId = "tt999";
+
+    await client.scrobble(event, "access-token");
+
+    const [, request] = fetchMock.mock.calls[0] as [string, { body: string }];
+    expect(JSON.parse(request.body).episode.ids).toEqual({ imdb: "tt999" });
+  });
+
+  it("rejects episode scrobbles without a show title", async () => {
+    const client = new TraktClient("client-id");
+    const event = makeEpisodeEvent();
+    event.media.title = undefined as unknown as string;
+
+    await expect(client.scrobble(event, "access-token")).rejects.toThrow(
+      "Show title is required for episode scrobble"
+    );
+  });
+
+  it("uses TMDB movie IDs when IMDB is absent", async () => {
+    fetchMock.mockResolvedValue({ ok: true });
+    const client = new TraktClient("client-id");
+
+    await client.scrobble(
+      {
+        event: "scrobble",
+        source: "plex",
+        userId: "plex-user",
+        timestamp: new Date("2026-06-04T17:00:00.000Z"),
+        media: {
+          id: "movie-1",
+          type: "movie",
+          title: "Example Movie",
+          tmdbMovieId: 42,
+          year: 2024,
+        },
+      },
+      "access-token"
+    );
+
+    const [, request] = fetchMock.mock.calls[0] as [string, { body: string }];
+    expect(JSON.parse(request.body).movie.ids).toEqual({ tmdb: 42 });
+  });
+
+  it("uses TVDB movie IDs when IMDB and TMDB are absent", async () => {
+    fetchMock.mockResolvedValue({ ok: true });
+    const client = new TraktClient("client-id");
+
+    await client.scrobble(
+      {
+        event: "scrobble",
+        source: "plex",
+        userId: "plex-user",
+        timestamp: new Date("2026-06-04T17:00:00.000Z"),
+        media: {
+          id: "movie-1",
+          type: "movie",
+          title: "Example Movie",
+          tvdbMovieId: 77,
+          year: 2024,
+        },
+      },
+      "access-token"
+    );
+
+    const [, request] = fetchMock.mock.calls[0] as [string, { body: string }];
+    expect(JSON.parse(request.body).movie.ids).toEqual({ tvdb: 77 });
+  });
+
+  it("falls back to title and year for movies without IDs", async () => {
+    fetchMock.mockResolvedValue({ ok: true });
+    const client = new TraktClient("client-id");
+
+    await client.scrobble(
+      {
+        event: "scrobble",
+        source: "plex",
+        userId: "plex-user",
+        timestamp: new Date("2026-06-04T17:00:00.000Z"),
+        media: {
+          id: "movie-1",
+          type: "movie",
+          title: "Example Movie",
+          year: 2024,
+        },
+      },
+      "access-token"
+    );
+
+    const [, request] = fetchMock.mock.calls[0] as [string, { body: string }];
+    expect(JSON.parse(request.body).movie).toEqual({
+      title: "Example Movie",
+      year: 2024,
+    });
+  });
+
+  it("rejects movies without IDs or a title", async () => {
+    const client = new TraktClient("client-id");
+
+    await expect(
+      client.scrobble(
+        {
+          event: "scrobble",
+          source: "plex",
+          userId: "plex-user",
+          timestamp: new Date("2026-06-04T17:00:00.000Z"),
+          media: {
+            id: "movie-1",
+            type: "movie",
+            title: undefined as unknown as string,
+          },
+        },
+        "access-token"
+      )
+    ).rejects.toThrow(
+      "Movie requires at least IMDB ID, TMDB ID, TVDB ID, or title"
+    );
+  });
+
   function makeEpisodeEvent(): MediaEvent {
     return {
       event: "scrobble",

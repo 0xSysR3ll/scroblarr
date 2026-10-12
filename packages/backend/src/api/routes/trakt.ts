@@ -9,6 +9,7 @@ import { TraktTokenManager } from "@integrations/trakt/TraktTokenManager";
 import { UserRepository } from "@repositories/UserRepository";
 import { getUserAgent } from "@utils/appVersion";
 import { logger } from "@utils/logger";
+import { requireFreshUser, requireRequestUser } from "@utils/requireFreshUser";
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 
@@ -49,14 +50,9 @@ function getTraktCredentials(
 
 router.post("/authorize", async (req: Request, res: Response) => {
   try {
-    const user = req.user;
-    if (!user) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const freshUser = await userRepository.findById(user.id);
+    const freshUser = await requireFreshUser(req, res, userRepository);
     if (!freshUser) {
-      return res.status(401).json({ error: "User not found" });
+      return;
     }
 
     const validated = authorizeTraktSchema.parse(req.body ?? {});
@@ -74,7 +70,7 @@ router.post("/authorize", async (req: Request, res: Response) => {
 
     const traktOAuth = new TraktOAuth(clientId, clientSecret);
     const pin = await traktOAuth.requestPinCode();
-    rememberTraktPin(user.id, pin);
+    rememberTraktPin(freshUser.id, pin);
 
     return res.json({
       userCode: pin.user_code,
@@ -100,15 +96,11 @@ router.post("/authorize", async (req: Request, res: Response) => {
 
 router.post("/link", async (req: Request, res: Response) => {
   try {
-    const user = req.user;
-    if (!user) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const freshUser = await userRepository.findById(user.id);
+    const freshUser = await requireFreshUser(req, res, userRepository);
     if (!freshUser) {
-      return res.status(401).json({ error: "User not found" });
+      return;
     }
+    const user = freshUser;
 
     const validated = linkTraktSchema.parse(req.body);
     const { clientId, clientSecret } = getTraktCredentials(
@@ -215,9 +207,9 @@ router.post("/link", async (req: Request, res: Response) => {
 
 router.post("/unlink", async (req: Request, res: Response) => {
   try {
-    const user = req.user;
+    const user = requireRequestUser(req, res);
     if (!user) {
-      return res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     await userRepository.update(user.id, {
@@ -255,14 +247,9 @@ router.post("/unlink", async (req: Request, res: Response) => {
 
 router.get("/status", async (req: Request, res: Response) => {
   try {
-    const user = req.user;
-    if (!user) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const freshUser = await userRepository.findById(user.id);
+    const freshUser = await requireFreshUser(req, res, userRepository);
     if (!freshUser) {
-      return res.status(401).json({ error: "User not found" });
+      return;
     }
 
     const linked = !!freshUser.traktAccessToken;

@@ -23,16 +23,64 @@ function canAccessUserAvatar(req: Request, targetUserId: string): boolean {
   return viewer.isAdmin || viewer.id === targetUserId;
 }
 
+function parseAccessibleUserId(req: Request, res: Response): string | null {
+  const userId = routeParam(req.params.userId);
+  if (!userId) {
+    res.status(400).json({ error: "Missing user id" });
+    return null;
+  }
+  if (!canAccessUserAvatar(req, userId)) {
+    res.status(403).json({ error: "Forbidden" });
+    return null;
+  }
+  return userId;
+}
+
+async function sendImageResponse(
+  res: Response,
+  response: globalThis.Response
+): Promise<Response> {
+  const contentType = response.headers.get("content-type") || "image/jpeg";
+  const imageBuffer = await response.arrayBuffer();
+  res.setHeader("Content-Type", contentType);
+  res.setHeader("Cache-Control", "public, max-age=86400");
+  return res.send(Buffer.from(imageBuffer));
+}
+
+async function proxyRemoteThumb(
+  res: Response,
+  thumbUrl: string,
+  provider: string
+): Promise<Response> {
+  try {
+    const response = await fetch(thumbUrl, {
+      headers: {
+        Accept: "image/*",
+      },
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).json({
+        error: `Failed to fetch ${provider} avatar`,
+      });
+    }
+
+    return await sendImageResponse(res, response);
+  } catch (error) {
+    logger.api.error({ error, thumbUrl }, `Error proxying ${provider} avatar`);
+    return res
+      .status(500)
+      .json({ error: `Failed to fetch ${provider} avatar` });
+  }
+}
+
 router.use(auth);
 
 router.get("/jellyfin/:userId", async (req: Request, res: Response) => {
   try {
-    const userId = routeParam(req.params.userId);
+    const userId = parseAccessibleUserId(req, res);
     if (!userId) {
-      return res.status(400).json({ error: "Missing user id" });
-    }
-    if (!canAccessUserAvatar(req, userId)) {
-      return res.status(403).json({ error: "Forbidden" });
+      return;
     }
     const user = await userRepository.findById(userId);
 
@@ -70,12 +118,7 @@ router.get("/jellyfin/:userId", async (req: Request, res: Response) => {
         .json({ error: "Failed to fetch avatar" });
     }
 
-    const imageBuffer = await response.arrayBuffer();
-    const contentType = response.headers.get("content-type") || "image/jpeg";
-
-    res.setHeader("Content-Type", contentType);
-    res.setHeader("Cache-Control", "public, max-age=86400");
-    return res.send(Buffer.from(imageBuffer));
+    return await sendImageResponse(res, response);
   } catch (error) {
     logger.api.error(
       { error, userId: req.params.userId },
@@ -87,12 +130,9 @@ router.get("/jellyfin/:userId", async (req: Request, res: Response) => {
 
 router.get("/plex/:userId", async (req: Request, res: Response) => {
   try {
-    const userId = routeParam(req.params.userId);
+    const userId = parseAccessibleUserId(req, res);
     if (!userId) {
-      return res.status(400).json({ error: "Missing user id" });
-    }
-    if (!canAccessUserAvatar(req, userId)) {
-      return res.status(403).json({ error: "Forbidden" });
+      return;
     }
     const user = await userRepository.findById(userId);
 
@@ -144,13 +184,7 @@ router.get("/plex/:userId", async (req: Request, res: Response) => {
         });
       }
 
-      const contentType =
-        fetchResponse.headers.get("content-type") || "image/jpeg";
-      const imageBuffer = await fetchResponse.arrayBuffer();
-
-      res.setHeader("Content-Type", contentType);
-      res.setHeader("Cache-Control", "public, max-age=86400");
-      return res.send(Buffer.from(imageBuffer));
+      return await sendImageResponse(res, fetchResponse);
     } catch (error) {
       logger.api.error({ error, thumbUrl }, "Error proxying Plex avatar");
       return res.status(500).json({ error: "Failed to fetch Plex avatar" });
@@ -163,12 +197,9 @@ router.get("/plex/:userId", async (req: Request, res: Response) => {
 
 router.get("/trakt/:userId", async (req: Request, res: Response) => {
   try {
-    const userId = routeParam(req.params.userId);
+    const userId = parseAccessibleUserId(req, res);
     if (!userId) {
-      return res.status(400).json({ error: "Missing user id" });
-    }
-    if (!canAccessUserAvatar(req, userId)) {
-      return res.status(403).json({ error: "Forbidden" });
+      return;
     }
     const user = await userRepository.findById(userId);
 
@@ -176,32 +207,7 @@ router.get("/trakt/:userId", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "User or Trakt avatar not found" });
     }
 
-    try {
-      const response = await fetch(user.traktThumb, {
-        headers: {
-          Accept: "image/*",
-        },
-      });
-
-      if (!response.ok) {
-        return res.status(response.status).json({
-          error: "Failed to fetch Trakt avatar",
-        });
-      }
-
-      const contentType = response.headers.get("content-type") || "image/jpeg";
-      const imageBuffer = await response.arrayBuffer();
-
-      res.setHeader("Content-Type", contentType);
-      res.setHeader("Cache-Control", "public, max-age=86400");
-      return res.send(Buffer.from(imageBuffer));
-    } catch (error) {
-      logger.api.error(
-        { error, thumbUrl: user.traktThumb },
-        "Error proxying Trakt avatar"
-      );
-      return res.status(500).json({ error: "Failed to fetch Trakt avatar" });
-    }
+    return await proxyRemoteThumb(res, user.traktThumb, "Trakt");
   } catch (error) {
     logger.api.error({ error }, "Error fetching Trakt avatar");
     return res.status(500).json({ error: "Internal server error" });
@@ -210,12 +216,9 @@ router.get("/trakt/:userId", async (req: Request, res: Response) => {
 
 router.get("/simkl/:userId", async (req: Request, res: Response) => {
   try {
-    const userId = routeParam(req.params.userId);
+    const userId = parseAccessibleUserId(req, res);
     if (!userId) {
-      return res.status(400).json({ error: "Missing user id" });
-    }
-    if (!canAccessUserAvatar(req, userId)) {
-      return res.status(403).json({ error: "Forbidden" });
+      return;
     }
     const user = await userRepository.findById(userId);
 
@@ -223,32 +226,7 @@ router.get("/simkl/:userId", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "User or Simkl avatar not found" });
     }
 
-    try {
-      const response = await fetch(user.simklThumb, {
-        headers: {
-          Accept: "image/*",
-        },
-      });
-
-      if (!response.ok) {
-        return res.status(response.status).json({
-          error: "Failed to fetch Simkl avatar",
-        });
-      }
-
-      const contentType = response.headers.get("content-type") || "image/jpeg";
-      const imageBuffer = await response.arrayBuffer();
-
-      res.setHeader("Content-Type", contentType);
-      res.setHeader("Cache-Control", "public, max-age=86400");
-      return res.send(Buffer.from(imageBuffer));
-    } catch (error) {
-      logger.api.error(
-        { error, thumbUrl: user.simklThumb },
-        "Error proxying Simkl avatar"
-      );
-      return res.status(500).json({ error: "Failed to fetch Simkl avatar" });
-    }
+    return await proxyRemoteThumb(res, user.simklThumb, "Simkl");
   } catch (error) {
     logger.api.error({ error }, "Error fetching Simkl avatar");
     return res.status(500).json({ error: "Internal server error" });

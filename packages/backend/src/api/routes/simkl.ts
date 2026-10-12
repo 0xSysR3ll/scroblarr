@@ -4,6 +4,7 @@ import { SimklOAuth } from "@integrations/simkl/SimklOAuth";
 import { SimklTokenManager } from "@integrations/simkl/SimklTokenManager";
 import { UserRepository } from "@repositories/UserRepository";
 import { logger } from "@utils/logger";
+import { requireFreshUser, requireRequestUser } from "@utils/requireFreshUser";
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 
@@ -38,14 +39,9 @@ function getSimklCredentials(
 
 router.get("/authorize", async (req: Request, res: Response) => {
   try {
-    const user = req.user;
-    if (!user) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const freshUser = await userRepository.findById(user.id);
+    const freshUser = await requireFreshUser(req, res, userRepository);
     if (!freshUser) {
-      return res.status(401).json({ error: "User not found" });
+      return;
     }
 
     const validated = authorizeSimklSchema.parse({
@@ -86,15 +82,11 @@ router.get("/authorize", async (req: Request, res: Response) => {
 
 router.post("/link", async (req: Request, res: Response) => {
   try {
-    const user = req.user;
-    if (!user) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const freshUser = await userRepository.findById(user.id);
+    const freshUser = await requireFreshUser(req, res, userRepository);
     if (!freshUser) {
-      return res.status(401).json({ error: "User not found" });
+      return;
     }
+    const user = freshUser;
 
     const validated = linkSimklSchema.parse(req.body);
     const { clientId } = getSimklCredentials(validated, freshUser);
@@ -165,9 +157,9 @@ router.post("/link", async (req: Request, res: Response) => {
 
 router.post("/unlink", async (req: Request, res: Response) => {
   try {
-    const user = req.user;
+    const user = requireRequestUser(req, res);
     if (!user) {
-      return res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     await userRepository.update(user.id, {
@@ -200,14 +192,9 @@ router.post("/unlink", async (req: Request, res: Response) => {
 
 router.get("/status", async (req: Request, res: Response) => {
   try {
-    const user = req.user;
-    if (!user) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const freshUser = await userRepository.findById(user.id);
+    const freshUser = await requireFreshUser(req, res, userRepository);
     if (!freshUser) {
-      return res.status(401).json({ error: "User not found" });
+      return;
     }
 
     return res.json({
@@ -230,15 +217,11 @@ router.get("/status", async (req: Request, res: Response) => {
 
 router.get("/profile", async (req: Request, res: Response) => {
   try {
-    const user = req.user;
-    if (!user) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const freshUser = await userRepository.findById(user.id);
+    const freshUser = await requireFreshUser(req, res, userRepository);
     if (!freshUser) {
-      return res.status(401).json({ error: "User not found" });
+      return;
     }
+    const user = freshUser;
 
     if (!freshUser.simklAccessToken || !freshUser.simklClientId) {
       return res.status(400).json({ error: "Simkl account not linked" });

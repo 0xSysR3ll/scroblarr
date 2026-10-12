@@ -6,6 +6,7 @@ import {
 import { BingersSessionManager } from "@integrations/bingers/BingersSessionManager";
 import { UserRepository } from "@repositories/UserRepository";
 import { logger } from "@utils/logger";
+import { requireFreshUser, requireRequestUser } from "@utils/requireFreshUser";
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 
@@ -29,15 +30,11 @@ router.use(auth);
 
 router.post("/link", async (req: Request, res: Response) => {
   try {
-    const user = req.user;
-    if (!user) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const freshUser = await userRepository.findById(user.id);
+    const freshUser = await requireFreshUser(req, res, userRepository);
     if (!freshUser) {
-      return res.status(401).json({ error: "User not found" });
+      return;
     }
+    const user = freshUser;
 
     const validated = linkSchema.parse(req.body);
     const token = extractMagicLinkToken(validated.token);
@@ -86,9 +83,9 @@ router.post("/link", async (req: Request, res: Response) => {
 
 router.post("/unlink", async (req: Request, res: Response) => {
   try {
-    const user = req.user;
+    const user = requireRequestUser(req, res);
     if (!user) {
-      return res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     await sessionManager.clearAll(user.id);
@@ -114,9 +111,9 @@ router.post("/unlink", async (req: Request, res: Response) => {
 
 router.get("/status", async (req: Request, res: Response) => {
   try {
-    const user = req.user;
+    const user = requireRequestUser(req, res);
     if (!user) {
-      return res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const status = await sessionManager.validateAndRefresh(user.id);
@@ -142,9 +139,9 @@ router.get("/status", async (req: Request, res: Response) => {
 
 router.patch("/settings", async (req: Request, res: Response) => {
   try {
-    const user = req.user;
+    const user = requireRequestUser(req, res);
     if (!user) {
-      return res.status(401).json({ error: "Unauthorized" });
+      return;
     }
 
     const freshUser = await userRepository.findById(user.id);
