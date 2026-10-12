@@ -23,13 +23,22 @@ const traktPinStoreMocks = vi.hoisted(() => ({
   clearTraktPin: vi.fn(),
 }));
 
+const authState = vi.hoisted(() => ({
+  user: {
+    id: "user-id",
+    plexUsername: "plex-user",
+  } as Record<string, unknown> | null,
+}));
+
 vi.mock("../middleware/auth", () => ({
   auth: (
     req: express.Request,
     _res: express.Response,
     next: express.NextFunction
   ) => {
-    req.user = { id: "user-id", plexUsername: "plex-user" } as never;
+    if (authState.user) {
+      req.user = authState.user as never;
+    }
     next();
   },
 }));
@@ -88,6 +97,10 @@ describe("trakt routes", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    authState.user = {
+      id: "user-id",
+      plexUsername: "plex-user",
+    };
     userRepositoryMocks.findById.mockResolvedValue(linkedUser);
     traktTokenManagerMocks.validateAccessToken.mockResolvedValue(true);
     traktTokenManagerMocks.refreshAccessToken.mockResolvedValue(
@@ -441,5 +454,136 @@ describe("trakt routes", () => {
     const response = await request(app).get("/trakt/status").expect(500);
 
     expect(response.body).toEqual({ error: "db down" });
+  });
+
+  it("returns 401 when the authenticated user is missing", async () => {
+    authState.user = null;
+
+    const response = await request(app).post("/trakt/authorize").expect(401);
+
+    expect(response.body).toEqual({ error: "Unauthorized" });
+  });
+
+  it("returns 401 when status user no longer exists", async () => {
+    userRepositoryMocks.findById.mockResolvedValueOnce(null);
+
+    const response = await request(app).get("/trakt/status").expect(401);
+
+    expect(response.body).toEqual({ error: "User not found" });
+  });
+
+  it("returns validation errors for invalid authorize payloads", async () => {
+    const response = await request(app)
+      .post("/trakt/authorize")
+      .send({ clientId: 123 })
+      .expect(400);
+
+    expect(response.body.error).toBe("Validation error");
+  });
+
+  it("returns validation errors for invalid link payloads", async () => {
+    const response = await request(app)
+      .post("/trakt/link")
+      .send({})
+      .expect(400);
+
+    expect(response.body.error).toBe("Validation error");
+  });
+
+  it("unlinks a Trakt account", async () => {
+    const response = await request(app).post("/trakt/unlink").expect(200);
+
+    expect(response.body).toEqual({ success: true });
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith(
+      "user-id",
+      expect.objectContaining({
+        traktAccessToken: null,
+        traktClientId: null,
+        traktClientSecret: null,
+      })
+    );
+  });
+
+  it("returns 401 when unlinking without an authenticated user", async () => {
+    authState.user = null;
+
+    const response = await request(app).post("/trakt/unlink").expect(401);
+
+    expect(response.body).toEqual({ error: "Unauthorized" });
+  });
+
+  it("returns 500 when unlink fails", async () => {
+    userRepositoryMocks.update.mockRejectedValueOnce(new Error("db down"));
+
+    const response = await request(app).post("/trakt/unlink").expect(500);
+
+    expect(response.body).toEqual({ error: "db down" });
+  });
+
+  it("returns a generic unlink error for non-Error failures", async () => {
+    userRepositoryMocks.update.mockRejectedValueOnce("boom");
+
+    const response = await request(app).post("/trakt/unlink").expect(500);
+
+    expect(response.body).toEqual({ error: "Failed to unlink Trakt account" });
+  });
+
+  it("unlinks using jellyfin username when plex username is absent", async () => {
+    authState.user = {
+      id: "user-id",
+      jellyfinUsername: "jf-user",
+    };
+
+    const response = await request(app).post("/trakt/unlink").expect(200);
+
+    expect(response.body).toEqual({ success: true });
+  });
+
+  it("links using jellyfin username when plex username is absent", async () => {
+    userRepositoryMocks.findById.mockResolvedValueOnce({
+      ...linkedUser,
+      plexUsername: null,
+      jellyfinUsername: "jf-user",
+    });
+    traktPinStoreMocks.resolveTraktDeviceCode.mockReturnValue("device-code");
+    traktOAuthMocks.exchangePinForToken.mockResolvedValue({
+      accessToken: "access",
+      refreshToken: "refresh",
+      expiresAt: new Date("2026-01-01T00:00:00.000Z"),
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+      })
+    );
+
+    const response = await request(app)
+      .post("/trakt/link")
+      .send({ userCode: "ABCD1234" })
+      .expect(200);
+
+    expect(response.body).toEqual({ success: true });
+    vi.unstubAllGlobals();
+  });
+
+  it("returns a generic link error for non-Error failures", async () => {
+    traktPinStoreMocks.resolveTraktDeviceCode.mockReturnValue("device-code");
+    traktOAuthMocks.exchangePinForToken.mockRejectedValue("boom");
+
+    const response = await request(app)
+      .post("/trakt/link")
+      .send({ userCode: "ABCD1234" })
+      .expect(500);
+
+    expect(response.body).toEqual({ error: "Failed to link Trakt account" });
+  });
+
+  it("returns a generic status error for non-Error failures", async () => {
+    userRepositoryMocks.findById.mockRejectedValueOnce("boom");
+
+    const response = await request(app).get("/trakt/status").expect(500);
+
+    expect(response.body).toEqual({ error: "Failed to get Trakt status" });
   });
 });

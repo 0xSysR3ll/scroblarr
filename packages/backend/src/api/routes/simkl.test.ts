@@ -20,13 +20,22 @@ const simklTokenManagerMocks = vi.hoisted(() => ({
   getValidAccessToken: vi.fn(),
 }));
 
+const authState = vi.hoisted(() => ({
+  user: {
+    id: "user-id",
+    plexUsername: "plex-user",
+  } as Record<string, unknown> | null,
+}));
+
 vi.mock("../middleware/auth", () => ({
   auth: (
     req: express.Request,
     _res: express.Response,
     next: express.NextFunction
   ) => {
-    req.user = { id: "user-id", plexUsername: "plex-user" } as never;
+    if (authState.user) {
+      req.user = authState.user as never;
+    }
     next();
   },
 }));
@@ -76,6 +85,10 @@ describe("simkl routes", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    authState.user = {
+      id: "user-id",
+      plexUsername: "plex-user",
+    };
     simklTokenManagerMocks.getValidAccessToken.mockResolvedValue(
       "access-token"
     );
@@ -331,5 +344,212 @@ describe("simkl routes", () => {
     const response = await request(app).get("/simkl/profile").expect(500);
 
     expect(response.body).toEqual({ error: "profile down" });
+  });
+
+  it("returns 401 when the authenticated user is missing", async () => {
+    authState.user = null;
+
+    const response = await request(app).get("/simkl/authorize").expect(401);
+
+    expect(response.body).toEqual({ error: "Unauthorized" });
+  });
+
+  it("returns 401 when the authorize user no longer exists", async () => {
+    userRepositoryMocks.findById.mockResolvedValueOnce(null);
+
+    const response = await request(app).get("/simkl/authorize").expect(401);
+
+    expect(response.body).toEqual({ error: "User not found" });
+  });
+
+  it("returns 401 when the link user no longer exists", async () => {
+    userRepositoryMocks.findById.mockResolvedValueOnce(null);
+
+    const response = await request(app)
+      .post("/simkl/link")
+      .send({ userCode: "ABCDE" })
+      .expect(401);
+
+    expect(response.body).toEqual({ error: "User not found" });
+  });
+
+  it("returns 401 when unlinking without an authenticated user", async () => {
+    authState.user = null;
+
+    const response = await request(app).post("/simkl/unlink").expect(401);
+
+    expect(response.body).toEqual({ error: "Unauthorized" });
+  });
+
+  it("returns 401 when status user no longer exists", async () => {
+    userRepositoryMocks.findById.mockResolvedValueOnce(null);
+
+    const response = await request(app).get("/simkl/status").expect(401);
+
+    expect(response.body).toEqual({ error: "User not found" });
+  });
+
+  it("returns 401 when profile user no longer exists", async () => {
+    userRepositoryMocks.findById.mockResolvedValueOnce(null);
+
+    const response = await request(app).get("/simkl/profile").expect(401);
+
+    expect(response.body).toEqual({ error: "User not found" });
+  });
+
+  it("returns validation errors for invalid authorize query values", async () => {
+    const response = await request(app)
+      .get("/simkl/authorize?clientId=a&clientId=b")
+      .expect(400);
+
+    expect(response.body.error).toBe("Validation error");
+  });
+
+  it("returns a generic authorize error for non-Error failures", async () => {
+    simklOAuthMocks.requestPinCode.mockRejectedValue("boom");
+
+    const response = await request(app).get("/simkl/authorize").expect(500);
+
+    expect(response.body).toEqual({
+      error: "Failed to get Simkl authorization URL",
+    });
+  });
+
+  it("returns a generic unlink error for non-Error failures", async () => {
+    userRepositoryMocks.update.mockRejectedValueOnce("boom");
+
+    const response = await request(app).post("/simkl/unlink").expect(500);
+
+    expect(response.body).toEqual({ error: "Failed to unlink Simkl account" });
+  });
+
+  it("returns a generic status error for non-Error failures", async () => {
+    userRepositoryMocks.findById.mockRejectedValueOnce("boom");
+
+    const response = await request(app).get("/simkl/status").expect(500);
+
+    expect(response.body).toEqual({ error: "Failed to get Simkl status" });
+  });
+
+  it("unlinks using jellyfin username when plex username is absent", async () => {
+    authState.user = {
+      id: "user-id",
+      jellyfinUsername: "jf-user",
+    };
+
+    const response = await request(app).post("/simkl/unlink").expect(200);
+
+    expect(response.body).toEqual({ success: true });
+  });
+
+  it("links when profile fields are empty strings", async () => {
+    simklOAuthMocks.exchangePinForToken.mockResolvedValue({
+      accessToken: "new-access-token",
+    });
+    simklClientMocks.getUserProfile.mockResolvedValue({
+      id: 51,
+      username: "",
+      image: "",
+    });
+    userRepositoryMocks.findById.mockResolvedValueOnce({
+      id: "user-id",
+      plexUsername: null,
+      jellyfinUsername: "jf-user",
+      simklClientId: "stored-client-id",
+    });
+
+    const response = await request(app)
+      .post("/simkl/link")
+      .send({ userCode: "ABCDE" })
+      .expect(200);
+
+    expect(response.body).toEqual({ success: true });
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith(
+      "user-id",
+      expect.objectContaining({
+        simklAccessToken: "new-access-token",
+        simklUsername: undefined,
+        simklThumb: undefined,
+      })
+    );
+  });
+
+  it("returns a generic link error for non-Error failures", async () => {
+    simklOAuthMocks.exchangePinForToken.mockRejectedValue("boom");
+
+    const response = await request(app)
+      .post("/simkl/link")
+      .send({ userCode: "ABCDE" })
+      .expect(500);
+
+    expect(response.body).toEqual({ error: "Failed to link Simkl account" });
+  });
+
+  it("returns null status fields when unset", async () => {
+    userRepositoryMocks.findById.mockResolvedValueOnce({
+      id: "user-id",
+      plexUsername: "plex-user",
+      simklAccessToken: null,
+      simklUsername: null,
+      simklThumb: null,
+      simklClientId: null,
+    });
+
+    const response = await request(app).get("/simkl/status").expect(200);
+
+    expect(response.body).toEqual({
+      linked: false,
+      username: null,
+      image: null,
+      hasCredentials: false,
+    });
+  });
+
+  it("returns stored profile fields when refresh omits them", async () => {
+    simklClientMocks.getUserProfile.mockResolvedValue({
+      id: 51,
+      username: "",
+      image: "",
+    });
+
+    const response = await request(app).get("/simkl/profile").expect(200);
+
+    expect(response.body).toEqual({
+      id: 51,
+      username: "stored-user",
+      image: "https://img.example/stored.png",
+    });
+  });
+
+  it("returns null profile fields when refresh and storage both omit them", async () => {
+    userRepositoryMocks.findById.mockResolvedValueOnce({
+      id: "user-id",
+      plexUsername: "plex-user",
+      simklAccessToken: "stored-access-token",
+      simklClientId: "stored-client-id",
+      simklUsername: null,
+      simklThumb: null,
+    });
+    simklClientMocks.getUserProfile.mockResolvedValue({
+      id: 51,
+      username: "",
+      image: "",
+    });
+
+    const response = await request(app).get("/simkl/profile").expect(200);
+
+    expect(response.body).toEqual({
+      id: 51,
+      username: null,
+      image: null,
+    });
+  });
+
+  it("returns a generic profile error for non-Error failures", async () => {
+    simklClientMocks.getUserProfile.mockRejectedValue("boom");
+
+    const response = await request(app).get("/simkl/profile").expect(500);
+
+    expect(response.body).toEqual({ error: "Failed to get Simkl profile" });
   });
 });

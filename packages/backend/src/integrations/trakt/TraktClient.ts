@@ -72,48 +72,23 @@ export class TraktClient implements ISyncClient {
       throw new Error("Show title is required for episode scrobble");
     }
 
-    const payload = {
-      episode,
-      show,
-      progress: 100,
-    };
-
-    const response = await fetch(`${TraktClient.BASE_URL}/scrobble/stop`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-        "trakt-api-version": "2",
-        "trakt-api-key": this.clientId,
-        "User-Agent": getUserAgent(),
+    await this.postScrobbleStop(
+      accessToken,
+      {
+        episode,
+        show,
+        progress: 100,
       },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      const apiError = TraktApiError.fromResponse(
-        response.status,
-        errorText,
-        response.headers.get("www-authenticate")
-      );
-      logger.trakt.error(
-        {
-          status: response.status,
-          errorText,
-          wwwAuthenticate: response.headers.get("www-authenticate"),
-          payload,
-          episodeId: event.media.tvdbEpisodeId,
-          episodeSeason: event.media.seasonNumber,
-          episodeNumber: event.media.episodeNumber,
-          showTitle: event.media.title,
-          showYear: event.media.year,
-          tmdbSeriesId: event.media.tmdbSeriesId,
-        },
-        "Trakt episode scrobble API error"
-      );
-      throw apiError;
-    }
+      {
+        episodeId: event.media.tvdbEpisodeId,
+        episodeSeason: event.media.seasonNumber,
+        episodeNumber: event.media.episodeNumber,
+        showTitle: event.media.title,
+        showYear: event.media.year,
+        tmdbSeriesId: event.media.tmdbSeriesId,
+      },
+      "Trakt episode scrobble API error"
+    );
   }
 
   private async scrobbleMovie(
@@ -139,11 +114,29 @@ export class TraktClient implements ISyncClient {
       );
     }
 
-    const payload = {
-      movie,
-      progress: 100,
-    };
+    await this.postScrobbleStop(
+      accessToken,
+      {
+        movie,
+        progress: 100,
+      },
+      {
+        movieTitle: event.media.title,
+        movieYear: event.media.year,
+        imdbId: event.media.imdbMovieId,
+        tmdbId: event.media.tmdbMovieId,
+        tvdbId: event.media.tvdbMovieId,
+      },
+      "Trakt movie scrobble API error"
+    );
+  }
 
+  private async postScrobbleStop(
+    accessToken: string,
+    payload: Record<string, unknown>,
+    errorContext: Record<string, unknown>,
+    errorMessage: string
+  ): Promise<void> {
     const response = await fetch(`${TraktClient.BASE_URL}/scrobble/stop`, {
       method: "POST",
       headers: {
@@ -169,13 +162,9 @@ export class TraktClient implements ISyncClient {
           errorText,
           wwwAuthenticate: response.headers.get("www-authenticate"),
           payload,
-          movieTitle: event.media.title,
-          movieYear: event.media.year,
-          imdbId: event.media.imdbMovieId,
-          tmdbId: event.media.tmdbMovieId,
-          tvdbId: event.media.tvdbMovieId,
+          ...errorContext,
         },
-        "Trakt movie scrobble API error"
+        errorMessage
       );
       throw apiError;
     }

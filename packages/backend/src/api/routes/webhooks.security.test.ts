@@ -169,6 +169,247 @@ describe("webhook security", () => {
     });
   });
 
+  it("parses Plex multipart-style string payload fields", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/plex?apiKey=expected-webhook-key")
+      .send({
+        payload: JSON.stringify({
+          event: "media.scrobble",
+          Metadata: { type: "movie" },
+          Account: { id: "1" },
+        }),
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      message: "Event not supported",
+    });
+  });
+
+  it("parses Plex object payload fields", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({});
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/plex?apiKey=expected-webhook-key")
+      .send({
+        payload: {
+          event: "media.scrobble",
+          Metadata: { type: "movie" },
+          Account: { id: "1" },
+        },
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      message: "Event not supported",
+    });
+  });
+
+  it("rejects Plex webhooks when the server UUID does not match", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      plexServerMachineIdentifier: "expected-machine",
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/plex?apiKey=expected-webhook-key")
+      .send({
+        event: "media.scrobble",
+        Metadata: { type: "movie" },
+        Account: { id: "1" },
+        Server: { uuid: "other-machine" },
+      });
+
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({ error: "Invalid server identity" });
+  });
+
+  it("rejects Plex webhooks when the server UUID is missing", async () => {
+    settingsRepositoryMocks.getAll.mockResolvedValue({
+      plexServerMachineIdentifier: "expected-machine",
+    });
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/plex?apiKey=expected-webhook-key")
+      .send({
+        event: "media.scrobble",
+        Metadata: { type: "movie" },
+        Account: { id: "1" },
+      });
+
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({ error: "Invalid server identity" });
+  });
+
+  it("returns 500 when Plex webhook processing throws", async () => {
+    settingsRepositoryMocks.getAll.mockRejectedValueOnce(new Error("db down"));
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/plex?apiKey=expected-webhook-key")
+      .send({
+        event: "media.scrobble",
+        Metadata: { type: "movie" },
+        Account: { id: "1" },
+      });
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: "Internal server error" });
+  });
+
+  it("parses empty Jellyfin bodies via rawBody", async () => {
+    const app = express();
+    app.use((req, _res, next) => {
+      req.body = {};
+      (req as express.Request & { rawBody?: string }).rawBody = JSON.stringify({
+        notificationType: "PlaybackStop",
+        apiKey: "expected-webhook-key",
+      });
+      next();
+    });
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/jellyfin")
+      .expect(200);
+
+    expect(response.body.success).toBe(true);
+  });
+
+  it("returns 400 for invalid Jellyfin rawBody JSON", async () => {
+    const app = express();
+    app.use((req, _res, next) => {
+      req.body = {};
+      (req as express.Request & { rawBody?: string }).rawBody = "{not-json";
+      next();
+    });
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/jellyfin")
+      .expect(400);
+
+    expect(response.body).toEqual({ error: "Invalid JSON payload" });
+  });
+
+  it("returns 400 for empty Jellyfin payloads without rawBody", async () => {
+    const app = express();
+    app.use((req, _res, next) => {
+      req.body = {};
+      next();
+    });
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/jellyfin")
+      .expect(400);
+
+    expect(response.body).toEqual({ error: "Empty or invalid payload" });
+  });
+
+  it("parses Jellyfin string bodies when json middleware leaves a string", async () => {
+    const app = express();
+    app.use((req, _res, next) => {
+      req.body = JSON.stringify({
+        notificationType: "PlaybackStop",
+        apiKey: "expected-webhook-key",
+      });
+      next();
+    });
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/jellyfin")
+      .expect(200);
+
+    expect(response.body.success).toBe(true);
+  });
+
+  it("returns 400 for invalid Jellyfin string bodies", async () => {
+    const app = express();
+    app.use((req, _res, next) => {
+      req.body = "{not-json";
+      next();
+    });
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/jellyfin")
+      .expect(400);
+
+    expect(response.body).toEqual({ error: "Invalid JSON payload" });
+  });
+
+  it("returns 500 when Jellyfin webhook processing throws", async () => {
+    settingsRepositoryMocks.getAll.mockRejectedValueOnce(new Error("db down"));
+
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/jellyfin")
+      .set("x-api-key", "expected-webhook-key")
+      .send({ notificationType: "PlaybackStop" })
+      .expect(500);
+
+    expect(response.body).toEqual({ error: "Internal server error" });
+  });
+
+  it("returns 400 for blank Jellyfin string bodies", async () => {
+    const app = express();
+    app.use((req, _res, next) => {
+      req.body = "   ";
+      next();
+    });
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/jellyfin")
+      .expect(400);
+
+    expect(response.body).toEqual({ error: "Empty or invalid payload" });
+  });
+
+  it("rejects Plex webhooks when apiKey query is not a string", async () => {
+    const app = express();
+    app.use(express.json());
+    app.use("/api/v1/webhooks", webhookRoutes);
+
+    const response = await request(app)
+      .post("/api/v1/webhooks/plex?apiKey=a&apiKey=b")
+      .send({
+        event: "media.scrobble",
+        Metadata: { type: "movie" },
+        Account: { id: "1" },
+      });
+
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({ error: "Invalid API key" });
+  });
+
   it("accepts Jellyfin webhook when webhook API key matches header", async () => {
     const app = express();
     app.use(express.json());

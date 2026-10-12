@@ -231,15 +231,11 @@ export async function setupAdmin(
   email?: string;
   isAdmin: boolean;
 }> {
-  const response = await fetch(`${API_BASE_URL}/auth/plex`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ authToken, clientIdentifier }),
-  });
-  if (!response.ok) {
+  try {
+    return await loginWithPlex(authToken, clientIdentifier);
+  } catch {
     throw new Error("Failed to setup admin");
   }
-  return response.json();
 }
 
 export async function setupJellyfinAdmin(

@@ -1,8 +1,9 @@
 import { SyncDestinationBadges } from "@components/sync/SyncDestinationBadges";
+import { SyncHistoryItemActions } from "@components/sync/SyncHistoryItemActions";
 import { SyncHistoryMediaLinks } from "@components/sync/SyncHistoryMediaLinks";
 import { SyncHistoryPoster } from "@components/sync/SyncHistoryPoster";
+import { SyncHistorySourceBadge } from "@components/sync/SyncHistorySourceBadge";
 import { CustomCheckbox } from "@components/ui/CustomCheckbox";
-import { Spinner } from "@components/ui/spinner";
 import type { SyncHistoryItem } from "@services/api";
 import {
   formatDate,
@@ -13,14 +14,7 @@ import {
   shouldShowRewatchedBadge,
 } from "@utils/syncHistory";
 import { useTranslation } from "react-i18next";
-import {
-  FaTrash,
-  FaCheck,
-  FaTimes,
-  FaCheckCircle,
-  FaExclamationCircle,
-  FaRedo,
-} from "react-icons/fa";
+import { FaCheckCircle, FaExclamationCircle } from "react-icons/fa";
 
 interface SyncHistoryCardProps {
   item: SyncHistoryItem;
@@ -93,67 +87,17 @@ export function SyncHistoryCard({
               ) : (
                 <FaExclamationCircle className="h-4 w-4 shrink-0 text-destructive" />
               )}
-              {isConfirming ? (
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={onDelete}
-                    disabled={isDeleting}
-                    className="inline-flex size-8 cursor-pointer items-center justify-center text-destructive hover:text-destructive/80 disabled:opacity-50"
-                    title={t("sync.confirmDelete", {
-                      defaultValue: "Confirm delete",
-                    })}
-                  >
-                    {isDeleting ? (
-                      <Spinner size="sm" />
-                    ) : (
-                      <FaCheck className="h-3.5 w-3.5" />
-                    )}
-                  </button>
-                  <button
-                    onClick={onCancelDelete}
-                    disabled={isDeleting}
-                    className="inline-flex size-8 cursor-pointer items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-50"
-                    title={t("sync.cancel", {
-                      defaultValue: "Cancel",
-                    })}
-                  >
-                    <FaTimes className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1">
-                  {(syncStatus === "failed" || syncStatus === "partial") && (
-                    <button
-                      type="button"
-                      onClick={onRetry}
-                      disabled={isAnyRetrying}
-                      className="inline-flex size-8 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
-                      title={t("sync.retryItemTitle", {
-                        defaultValue: "Retry this sync",
-                      })}
-                      aria-label={t("sync.retryItemTitle", {
-                        defaultValue: "Retry this sync",
-                      })}
-                    >
-                      {isRetrying ? (
-                        <Spinner size="sm" />
-                      ) : (
-                        <FaRedo className="h-3.5 w-3.5" />
-                      )}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={onDelete}
-                    className="inline-flex size-8 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:text-destructive"
-                    title={t("sync.deleteItemTitle", {
-                      defaultValue: "Delete this item",
-                    })}
-                  >
-                    <FaTrash className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
+              <SyncHistoryItemActions
+                syncStatus={syncStatus}
+                isConfirming={isConfirming}
+                isDeleting={isDeleting}
+                isRetrying={isRetrying}
+                isAnyRetrying={isAnyRetrying}
+                size="compact"
+                onDelete={onDelete}
+                onCancelDelete={onCancelDelete}
+                onRetry={onRetry}
+              />
             </div>
           </div>
 
@@ -187,50 +131,10 @@ export function SyncHistoryCard({
           {/* Source */}
           {item.source && (
             <div className="mb-2">
-              {item.source === "plex" ? (
-                <div className="chip-dense bg-(--plex-chip-bg) text-(--plex-chip-fg)">
-                  <img
-                    src="/logos/plex.svg"
-                    alt="Plex"
-                    className="w-2.5 h-2.5"
-                  />
-                  <span className="text-xs font-medium">
-                    {t("sync.sources.plex", {
-                      defaultValue: "Plex",
-                    })}
-                  </span>
-                </div>
-              ) : item.source === "jellyfin" ? (
-                <div className="chip-dense bg-(--jellyfin-chip-bg) text-(--jellyfin-chip-fg)">
-                  <img
-                    src="/logos/jellyfin.svg"
-                    alt="Jellyfin"
-                    className="w-2.5 h-2.5"
-                  />
-                  <span className="text-xs font-medium">
-                    {t("sync.sources.jellyfin", {
-                      defaultValue: "Jellyfin",
-                    })}
-                  </span>
-                </div>
-              ) : item.source === "emby" ? (
-                <div className="chip-dense bg-(--emby-chip-bg) text-(--emby-chip-fg)">
-                  <img
-                    src="/logos/emby.svg"
-                    alt="Emby"
-                    className="w-2.5 h-2.5"
-                  />
-                  <span className="text-xs font-medium">
-                    {t("sync.sources.emby", {
-                      defaultValue: "Emby",
-                    })}
-                  </span>
-                </div>
-              ) : (
-                <span className="text-xs capitalize text-muted-foreground">
-                  {item.source}
-                </span>
-              )}
+              <SyncHistorySourceBadge
+                source={item.source}
+                iconClassName="w-2.5 h-2.5"
+              />
             </div>
           )}
 

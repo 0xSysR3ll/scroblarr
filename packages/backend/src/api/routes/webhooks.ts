@@ -15,6 +15,7 @@ import {
   TautulliWebhookPayload,
 } from "@integrations/tautulli/TautulliWebhookParser";
 import { SettingsRepository } from "@repositories/SettingsRepository";
+import type { MediaEvent } from "@scroblarr/shared";
 import { SyncService } from "@services/SyncService";
 import { logger } from "@utils/logger";
 import { timingSafeStringEqual } from "@utils/timingSafeEqual";
@@ -61,18 +62,63 @@ function rejectInvalidWebhookKey(
   return res.status(401).json({ error: "Invalid API key" });
 }
 
+async function requireValidWebhookApiKey(
+  apiKey: string | undefined,
+  res: Response
+): Promise<boolean> {
+  const storedWebhookApiKey = await getStoredWebhookApiKey();
+  if (!storedWebhookApiKey) {
+    rejectMissingWebhookKey(res);
+    return false;
+  }
+  if (!apiKey || !timingSafeStringEqual(apiKey, storedWebhookApiKey)) {
+    rejectInvalidWebhookKey(res, !!apiKey, !!storedWebhookApiKey);
+    return false;
+  }
+  return true;
+}
+
+function stripPayloadApiKey(payload: Record<string, unknown>): void {
+  if (payload.apiKey) {
+    delete payload.apiKey;
+  }
+}
+
+async function respondWithWebhookEvent(
+  res: Response,
+  event: MediaEvent | null,
+  source: string,
+  logLabel: string
+): Promise<Response> {
+  if (!event) {
+    return res
+      .status(200)
+      .json({ success: true, message: "Event not supported" });
+  }
+
+  if (event.event === "scrobble") {
+    logger.webhook.info(
+      {
+        eventType: event.event,
+        mediaType: event.media.type,
+        mediaTitle: event.media.title,
+        userId: event.userId,
+        source,
+      },
+      `Received ${logLabel} webhook`
+    );
+  }
+
+  await syncService.syncEvent(event);
+  return res.status(200).json({ success: true });
+}
+
 router.post("/plex", upload.any(), async (req: Request, res: Response) => {
   try {
     const apiKey =
       typeof req.query.apiKey === "string" ? req.query.apiKey : undefined;
-    const storedWebhookApiKey = await getStoredWebhookApiKey();
-
-    if (!storedWebhookApiKey) {
-      return rejectMissingWebhookKey(res);
-    }
-
-    if (!apiKey || !timingSafeStringEqual(apiKey, storedWebhookApiKey)) {
-      return rejectInvalidWebhookKey(res, !!apiKey, !!storedWebhookApiKey);
+    if (!(await requireValidWebhookApiKey(apiKey, res))) {
+      return;
     }
 
     let payload: PlexWebhookPayload;
@@ -107,28 +153,7 @@ router.post("/plex", upload.any(), async (req: Request, res: Response) => {
 
     const plexServerUrl = settings.plexServerUrl;
     const event = PlexWebhookParser.parse(payload, plexServerUrl);
-
-    if (!event) {
-      return res
-        .status(200)
-        .json({ success: true, message: "Event not supported" });
-    }
-
-    if (event.event === "scrobble") {
-      logger.webhook.info(
-        {
-          eventType: event.event,
-          mediaType: event.media.type,
-          mediaTitle: event.media.title,
-          userId: event.userId,
-          source: "plex",
-        },
-        "Received Plex webhook"
-      );
-    }
-
-    await syncService.syncEvent(event);
-    return res.status(200).json({ success: true });
+    return await respondWithWebhookEvent(res, event, "plex", "Plex");
   } catch (error) {
     logger.webhook.error({ error, payload: req.body }, "Plex webhook error");
     return res.status(500).json({ error: "Internal server error" });
@@ -139,40 +164,44 @@ router.post("/jellyfin", async (req: Request, res: Response) => {
   try {
     let payload: JellyfinWebhookPayload | Partial<JellyfinWebhookPayload> =
       req.body as JellyfinWebhookPayload;
+    const contentType = req.headers["content-type"] || "";
 
-    if (!payload || Object.keys(payload).length === 0) {
-      const contentType = req.headers["content-type"] || "";
-
-      if (typeof req.body === "string" && req.body.trim()) {
+    if (typeof req.body === "string") {
+      if (!req.body.trim()) {
+        logger.webhook.error(
+          { body: req.body, contentType, headers: req.headers },
+          "Jellyfin webhook body is empty or invalid"
+        );
+        return res.status(400).json({ error: "Empty or invalid payload" });
+      }
+      try {
+        payload = JSON.parse(req.body) as JellyfinWebhookPayload;
+      } catch (parseError) {
+        logger.webhook.error(
+          { error: parseError, body: req.body, contentType },
+          "Failed to parse Jellyfin webhook body as JSON"
+        );
+        return res.status(400).json({ error: "Invalid JSON payload" });
+      }
+    } else if (!payload || Object.keys(payload).length === 0) {
+      const rawBody =
+        (req as Request & { rawBody?: string }).rawBody || req.body;
+      if (rawBody && typeof rawBody === "string") {
         try {
-          payload = JSON.parse(req.body) as JellyfinWebhookPayload;
+          payload = JSON.parse(rawBody) as JellyfinWebhookPayload;
         } catch (parseError) {
           logger.webhook.error(
-            { error: parseError, body: req.body, contentType },
-            "Failed to parse Jellyfin webhook body as JSON"
+            { error: parseError, rawBody, contentType },
+            "Failed to parse Jellyfin webhook raw body"
           );
           return res.status(400).json({ error: "Invalid JSON payload" });
         }
       } else {
-        const rawBody =
-          (req as Request & { rawBody?: string }).rawBody || req.body;
-        if (rawBody && typeof rawBody === "string") {
-          try {
-            payload = JSON.parse(rawBody) as JellyfinWebhookPayload;
-          } catch (parseError) {
-            logger.webhook.error(
-              { error: parseError, rawBody, contentType },
-              "Failed to parse Jellyfin webhook raw body"
-            );
-            return res.status(400).json({ error: "Invalid JSON payload" });
-          }
-        } else {
-          logger.webhook.error(
-            { body: req.body, contentType, headers: req.headers },
-            "Jellyfin webhook body is empty or invalid"
-          );
-          return res.status(400).json({ error: "Empty or invalid payload" });
-        }
+        logger.webhook.error(
+          { body: req.body, contentType, headers: req.headers },
+          "Jellyfin webhook body is empty or invalid"
+        );
+        return res.status(400).json({ error: "Empty or invalid payload" });
       }
     }
 
@@ -185,47 +214,18 @@ router.post("/jellyfin", async (req: Request, res: Response) => {
       apiKey = typeof k === "string" ? k : undefined;
     }
 
-    const storedWebhookApiKey = await getStoredWebhookApiKey();
-    if (!storedWebhookApiKey) {
-      return rejectMissingWebhookKey(res);
+    if (!(await requireValidWebhookApiKey(apiKey, res))) {
+      return;
     }
 
-    if (!apiKey || !timingSafeStringEqual(apiKey, storedWebhookApiKey)) {
-      return rejectInvalidWebhookKey(res, !!apiKey, !!storedWebhookApiKey);
-    }
-
-    const payloadWithApiKey = payload as Record<string, unknown>;
-    if (payloadWithApiKey.apiKey) {
-      delete payloadWithApiKey.apiKey;
-    }
+    stripPayloadApiKey(payload as Record<string, unknown>);
 
     const settings = await settingsRepository.getAll();
     const event = JellyfinWebhookParser.parse(
       payload as JellyfinWebhookPayload,
       settings.jellyfinHost
     );
-
-    if (!event) {
-      return res
-        .status(200)
-        .json({ success: true, message: "Event not supported" });
-    }
-
-    if (event.event === "scrobble") {
-      logger.webhook.info(
-        {
-          eventType: event.event,
-          mediaType: event.media.type,
-          mediaTitle: event.media.title,
-          userId: event.userId,
-          source: "jellyfin",
-        },
-        "Received Jellyfin webhook"
-      );
-    }
-
-    await syncService.syncEvent(event);
-    return res.status(200).json({ success: true });
+    return await respondWithWebhookEvent(res, event, "jellyfin", "Jellyfin");
   } catch (error) {
     logger.webhook.error(
       { error, payload: req.body },
@@ -309,44 +309,15 @@ router.post("/emby", upload.any(), async (req: Request, res: Response) => {
       apiKey = typeof k === "string" ? k : undefined;
     }
 
-    const storedWebhookApiKey = await getStoredWebhookApiKey();
-    if (!storedWebhookApiKey) {
-      return rejectMissingWebhookKey(res);
+    if (!(await requireValidWebhookApiKey(apiKey, res))) {
+      return;
     }
 
-    if (!apiKey || !timingSafeStringEqual(apiKey, storedWebhookApiKey)) {
-      return rejectInvalidWebhookKey(res, !!apiKey, !!storedWebhookApiKey);
-    }
-
-    const payloadWithApiKey = payload as Record<string, unknown>;
-    if (payloadWithApiKey.apiKey) {
-      delete payloadWithApiKey.apiKey;
-    }
+    stripPayloadApiKey(payload as Record<string, unknown>);
 
     const settings = await settingsRepository.getAll();
     const event = EmbyWebhookParser.parse(payload, settings.jellyfinHost);
-
-    if (!event) {
-      return res
-        .status(200)
-        .json({ success: true, message: "Event not supported" });
-    }
-
-    if (event.event === "scrobble") {
-      logger.webhook.info(
-        {
-          eventType: event.event,
-          mediaType: event.media.type,
-          mediaTitle: event.media.title,
-          userId: event.userId,
-          source: "emby",
-        },
-        "Received Emby webhook"
-      );
-    }
-
-    await syncService.syncEvent(event);
-    return res.status(200).json({ success: true });
+    return await respondWithWebhookEvent(res, event, "emby", "Emby");
   } catch (error) {
     logger.webhook.error(
       {
@@ -435,19 +406,11 @@ router.post("/tautulli", async (req: Request, res: Response) => {
       apiKey = typeof k === "string" ? k : undefined;
     }
 
-    const storedWebhookApiKey = await getStoredWebhookApiKey();
-    if (!storedWebhookApiKey) {
-      return rejectMissingWebhookKey(res);
+    if (!(await requireValidWebhookApiKey(apiKey, res))) {
+      return;
     }
 
-    if (!apiKey || !timingSafeStringEqual(apiKey, storedWebhookApiKey)) {
-      return rejectInvalidWebhookKey(res, !!apiKey, !!storedWebhookApiKey);
-    }
-
-    const payloadWithApiKey = payload as Record<string, unknown>;
-    if (payloadWithApiKey.apiKey) {
-      delete payloadWithApiKey.apiKey;
-    }
+    stripPayloadApiKey(payload as Record<string, unknown>);
 
     const settings = await settingsRepository.getAll();
     const expectedMachineId = settings.plexServerMachineIdentifier?.trim();
@@ -471,28 +434,7 @@ router.post("/tautulli", async (req: Request, res: Response) => {
       payload as TautulliWebhookPayload,
       settings.plexServerUrl
     );
-
-    if (!event) {
-      return res
-        .status(200)
-        .json({ success: true, message: "Event not supported" });
-    }
-
-    if (event.event === "scrobble") {
-      logger.webhook.info(
-        {
-          eventType: event.event,
-          mediaType: event.media.type,
-          mediaTitle: event.media.title,
-          userId: event.userId,
-          source: "plex",
-        },
-        "Received Tautulli webhook"
-      );
-    }
-
-    await syncService.syncEvent(event);
-    return res.status(200).json({ success: true });
+    return await respondWithWebhookEvent(res, event, "plex", "Tautulli");
   } catch (error) {
     logger.webhook.error(
       {
