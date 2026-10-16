@@ -1,206 +1,255 @@
+import { fetchWithTimeout } from "@utils/fetchWithTimeout";
 import { logger } from "@utils/logger";
+import { parseOAuthErrorBody } from "@utils/parseOAuthErrorBody";
+import { createPendingDeviceCodeStore } from "@utils/pendingDeviceCodeStore";
 
 import {
   getSimklHeaders,
   SIMKL_API_BASE_URL,
-  SIMKL_AUTH_URL,
+  SIMKL_OAUTH_SCOPES,
   withSimklQueryParams,
 } from "./SimklApi";
 
 export interface SimklTokenResponse {
   access_token: string;
   token_type?: string;
+  expires_in?: number;
+  refresh_token?: string;
   scope?: string;
 }
 
 export interface SimklTokens {
   accessToken: string;
+  refreshToken?: string;
+  expiresAt?: number;
+  scope?: string;
 }
 
-export interface SimklPinCodeResponse {
-  result: "OK" | "KO";
-  device_code?: string;
-  user_code?: string;
-  verification_url?: string;
-  expires_in?: number;
-  interval?: number;
-  message?: string;
+export interface SimklDeviceCodeResponse {
+  device_code: string;
+  user_code: string;
+  verification_uri: string;
+  verification_uri_complete?: string;
+  expires_in: number;
+  interval: number;
 }
 
-export interface SimklPinStatusResponse {
-  result: "OK" | "KO";
-  access_token?: string;
-  message?: string;
-}
+const simklDeviceStore = createPendingDeviceCodeStore("Simkl");
+export const rememberSimklDevice = simklDeviceStore.remember;
+export const resolveSimklDeviceCode = simklDeviceStore.resolve;
+export const clearSimklDevice = simklDeviceStore.clear;
 
-const SIMKL_OAUTH_TIMEOUT_MS = 30_000;
-
-async function fetchWithTimeout(
-  url: Parameters<typeof fetch>[0],
-  init: Parameters<typeof fetch>[1],
-  errorContext: string
-): Promise<Response> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), SIMKL_OAUTH_TIMEOUT_MS);
-
-  try {
-    return await fetch(url, {
-      ...init,
-      signal: controller.signal,
-    });
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error(`${errorContext} timed out`);
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeout);
+function toTokens(tokenData: SimklTokenResponse): SimklTokens {
+  if (!tokenData.access_token) {
+    throw new Error("Simkl token response did not include an access token");
   }
+
+  const tokens: SimklTokens = {
+    accessToken: tokenData.access_token,
+    scope: tokenData.scope,
+  };
+
+  if (tokenData.refresh_token) {
+    tokens.refreshToken = tokenData.refresh_token;
+  }
+  if (typeof tokenData.expires_in === "number") {
+    tokens.expiresAt = Date.now() + tokenData.expires_in * 1000;
+  }
+
+  return tokens;
 }
 
 export class SimklOAuth {
-  constructor(
-    private readonly clientId: string,
-    private readonly clientSecret?: string
-  ) {}
+  constructor(private readonly clientId: string) {}
 
-  getAuthUrl(redirectUri: string, state?: string): string {
-    const params = new URLSearchParams({
-      response_type: "code",
-      client_id: this.clientId,
-      redirect_uri: redirectUri,
-    });
-
-    if (state) {
-      params.append("state", state);
-    }
-
-    return `${SIMKL_AUTH_URL}?${params.toString()}`;
+  private getFormHeaders(): Record<string, string> {
+    return getSimklHeaders(
+      this.clientId,
+      undefined,
+      "application/x-www-form-urlencoded"
+    );
   }
 
-  async exchangeCodeForToken(
-    code: string,
-    redirectUri: string
-  ): Promise<SimklTokens> {
-    if (!this.clientSecret) {
+  async requestPinCode(): Promise<SimklDeviceCodeResponse> {
+    const body = new URLSearchParams({
+      client_id: this.clientId,
+      scope: SIMKL_OAUTH_SCOPES,
+    });
+
+    const response = await fetchWithTimeout(
+      withSimklQueryParams(
+        `${SIMKL_API_BASE_URL}/oauth2/device`,
+        this.clientId
+      ),
+      {
+        method: "POST",
+        headers: this.getFormHeaders(),
+        body,
+      },
+      "Simkl device code request"
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      const { error, errorDescription } = parseOAuthErrorBody(errorText);
+      logger.simkl.error(
+        { status: response.status, errorText, error },
+        "Failed to request Simkl device code"
+      );
+
+      if (error === "invalid_client" || response.status === 401) {
+        throw new Error(
+          "This Client ID is not supported for Simkl linking. Create a new app at https://simkl.com/settings/developer/ and use that Client ID."
+        );
+      }
+
       throw new Error(
-        "Simkl client secret is required for OAuth code exchange"
+        errorDescription ||
+          error ||
+          `Failed to request Simkl device code: ${response.status} - ${errorText}`
       );
     }
 
+    const pinData = (await response.json()) as Partial<SimklDeviceCodeResponse>;
+    if (
+      !pinData.device_code ||
+      !pinData.user_code ||
+      !pinData.verification_uri ||
+      !pinData.expires_in ||
+      !pinData.interval
+    ) {
+      throw new Error("Simkl device response did not include a user code");
+    }
+
+    return {
+      device_code: pinData.device_code,
+      user_code: pinData.user_code,
+      verification_uri: pinData.verification_uri,
+      verification_uri_complete: pinData.verification_uri_complete,
+      expires_in: pinData.expires_in,
+      interval: pinData.interval,
+    };
+  }
+
+  async exchangePinForToken(deviceCode: string): Promise<SimklTokens> {
+    const body = new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+      client_id: this.clientId,
+      device_code: deviceCode,
+    });
+
     const response = await fetchWithTimeout(
-      withSimklQueryParams(`${SIMKL_API_BASE_URL}/oauth/token`, this.clientId),
+      withSimklQueryParams(`${SIMKL_API_BASE_URL}/oauth2/token`, this.clientId),
       {
         method: "POST",
-        headers: getSimklHeaders(this.clientId),
-        body: JSON.stringify({
-          code,
-          client_id: this.clientId,
-          client_secret: this.clientSecret,
-          redirect_uri: redirectUri,
-          grant_type: "authorization_code",
-        }),
+        headers: this.getFormHeaders(),
+        body,
       },
-      "Simkl authorization code exchange"
+      "Simkl device token poll"
+    );
+
+    if (response.ok) {
+      const tokenData = (await response.json()) as SimklTokenResponse;
+      const tokens = toTokens(tokenData);
+
+      if (tokenData.scope && !/\bmedia:write\b/.test(tokenData.scope)) {
+        logger.simkl.warn(
+          { scope: tokenData.scope },
+          "Simkl token is missing media:write; scrobbling may fail"
+        );
+      }
+
+      return tokens;
+    }
+
+    const errorText = await response.text();
+    const { error, errorDescription } = parseOAuthErrorBody(errorText);
+
+    if (error === "authorization_pending") {
+      throw new Error("authorization pending");
+    }
+    if (error === "slow_down") {
+      throw new Error("slow down");
+    }
+    if (error === "expired_token") {
+      throw new Error(
+        "Simkl device code expired. Generate a new one to try again."
+      );
+    }
+    if (error === "invalid_client" || response.status === 401) {
+      throw new Error(
+        "This Client ID is not supported for Simkl linking. Create a new app at https://simkl.com/settings/developer/ and use that Client ID."
+      );
+    }
+
+    logger.simkl.error(
+      { status: response.status, errorText, error },
+      "Failed to poll Simkl device token"
+    );
+    throw new Error(
+      errorDescription ||
+        error ||
+        `Failed to poll Simkl device token: ${response.status} - ${errorText}`
+    );
+  }
+
+  async refreshToken(refreshToken: string): Promise<SimklTokens> {
+    const body = new URLSearchParams({
+      grant_type: "refresh_token",
+      client_id: this.clientId,
+      refresh_token: refreshToken,
+    });
+
+    const response = await fetchWithTimeout(
+      withSimklQueryParams(`${SIMKL_API_BASE_URL}/oauth2/token`, this.clientId),
+      {
+        method: "POST",
+        headers: this.getFormHeaders(),
+        body,
+      },
+      "Simkl token refresh"
     );
 
     if (!response.ok) {
       const errorText = await response.text();
       logger.simkl.error(
         { status: response.status, errorText },
-        "Failed to exchange Simkl authorization code"
+        "Failed to refresh Simkl token"
       );
       throw new Error(
-        `Failed to exchange Simkl authorization code: ${response.status} - ${errorText}`
+        `Failed to refresh Simkl token: ${response.status} - ${errorText}`
       );
     }
 
     const tokenData = (await response.json()) as SimklTokenResponse;
-    if (!tokenData.access_token) {
-      throw new Error("Simkl token response did not include an access token");
-    }
-
-    return {
-      accessToken: tokenData.access_token,
-    };
+    return toTokens(tokenData);
   }
 
-  async requestPinCode(): Promise<Required<SimklPinCodeResponse>> {
-    const response = await fetchWithTimeout(
-      withSimklQueryParams(`${SIMKL_API_BASE_URL}/oauth/pin`, this.clientId),
-      {
-        method: "GET",
-        headers: getSimklHeaders(this.clientId),
-      },
-      "Simkl PIN code request"
-    );
+  async revokeToken(token: string): Promise<void> {
+    const body = new URLSearchParams({
+      client_id: this.clientId,
+      token,
+    });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      logger.simkl.error(
-        { status: response.status, errorText },
-        "Failed to request Simkl PIN code"
-      );
-      throw new Error(
-        `Failed to request Simkl PIN code: ${response.status} - ${errorText}`
-      );
-    }
-
-    const pinData = (await response.json()) as SimklPinCodeResponse;
-    if (
-      pinData.result !== "OK" ||
-      !pinData.user_code ||
-      !pinData.verification_url ||
-      !pinData.expires_in ||
-      !pinData.interval
-    ) {
-      throw new Error(
-        pinData.message || "Simkl PIN response did not include a user code"
-      );
-    }
-
-    return {
-      result: pinData.result,
-      device_code: pinData.device_code || "",
-      user_code: pinData.user_code,
-      verification_url: pinData.verification_url,
-      expires_in: pinData.expires_in,
-      interval: pinData.interval,
-      message: pinData.message || "",
-    };
-  }
-
-  async exchangePinForToken(userCode: string): Promise<SimklTokens> {
     const response = await fetchWithTimeout(
       withSimklQueryParams(
-        `${SIMKL_API_BASE_URL}/oauth/pin/${encodeURIComponent(userCode)}`,
+        `${SIMKL_API_BASE_URL}/oauth2/revoke`,
         this.clientId
       ),
       {
-        method: "GET",
-        headers: getSimklHeaders(this.clientId),
+        method: "POST",
+        headers: this.getFormHeaders(),
+        body,
       },
-      "Simkl PIN status check"
+      "Simkl token revoke"
     );
 
     if (!response.ok) {
       const errorText = await response.text();
-      logger.simkl.error(
+      logger.simkl.warn(
         { status: response.status, errorText },
-        "Failed to check Simkl PIN status"
-      );
-      throw new Error(
-        `Failed to check Simkl PIN status: ${response.status} - ${errorText}`
+        "Simkl token revoke returned a non-OK status"
       );
     }
-
-    const pinStatus = (await response.json()) as SimklPinStatusResponse;
-    if (pinStatus.result !== "OK" || !pinStatus.access_token) {
-      throw new Error(pinStatus.message || "Simkl authorization is pending");
-    }
-
-    return {
-      accessToken: pinStatus.access_token,
-    };
   }
 }

@@ -1,6 +1,11 @@
 import { User } from "@entities/User";
 import { SimklClient } from "@integrations/simkl/SimklClient";
-import { SimklOAuth } from "@integrations/simkl/SimklOAuth";
+import {
+  clearSimklDevice,
+  rememberSimklDevice,
+  resolveSimklDeviceCode,
+  SimklOAuth,
+} from "@integrations/simkl/SimklOAuth";
 import { SimklTokenManager } from "@integrations/simkl/SimklTokenManager";
 import { UserRepository } from "@repositories/UserRepository";
 import { logger } from "@utils/logger";
@@ -58,9 +63,11 @@ router.get("/authorize", async (req: Request, res: Response) => {
 
     const simklOAuth = new SimklOAuth(clientId);
     const pin = await simklOAuth.requestPinCode();
+    rememberSimklDevice(freshUser.id, pin);
+
     return res.json({
       userCode: pin.user_code,
-      verificationUrl: pin.verification_url,
+      verificationUrl: pin.verification_uri_complete || pin.verification_uri,
       expiresIn: pin.expires_in,
       interval: pin.interval,
     });
@@ -98,8 +105,10 @@ router.post("/link", async (req: Request, res: Response) => {
       });
     }
 
+    const deviceCode = resolveSimklDeviceCode(user.id, validated.userCode);
     const simklOAuth = new SimklOAuth(clientId);
-    const tokens = await simklOAuth.exchangePinForToken(validated.userCode);
+    const tokens = await simklOAuth.exchangePinForToken(deviceCode);
+    clearSimklDevice(user.id);
 
     let username: string | undefined;
     let avatar: string | undefined;
@@ -114,6 +123,8 @@ router.post("/link", async (req: Request, res: Response) => {
 
     const updateData: Partial<User> = {
       simklAccessToken: tokens.accessToken,
+      simklRefreshToken: tokens.refreshToken,
+      simklTokenExpiresAt: tokens.expiresAt,
       simklUsername: username,
       simklThumb: avatar,
     };
@@ -136,10 +147,6 @@ router.post("/link", async (req: Request, res: Response) => {
     return res.json({ success: true });
   } catch (error) {
     const user = req.user;
-    logger.simkl.error(
-      { error, userId: user?.id },
-      "Error linking Simkl account"
-    );
     if (error instanceof z.ZodError) {
       return res.status(400).json({
         error: "Validation error",
@@ -149,6 +156,13 @@ router.post("/link", async (req: Request, res: Response) => {
     const errorMessage =
       error instanceof Error ? error.message : "Failed to link Simkl account";
     if (/authorization pending|slow down/i.test(errorMessage)) {
+      return res.status(400).json({ error: errorMessage });
+    }
+    logger.simkl.error(
+      { error, userId: user?.id },
+      "Error linking Simkl account"
+    );
+    if (/device code expired|PIN code does not match/i.test(errorMessage)) {
       return res.status(400).json({ error: errorMessage });
     }
     return res.status(500).json({ error: errorMessage });
@@ -162,8 +176,23 @@ router.post("/unlink", async (req: Request, res: Response) => {
       return;
     }
 
+    const freshUser = await userRepository.findById(user.id);
+    if (freshUser?.simklClientId && freshUser.simklRefreshToken) {
+      try {
+        const simklOAuth = new SimklOAuth(freshUser.simklClientId);
+        await simklOAuth.revokeToken(freshUser.simklRefreshToken);
+      } catch (error) {
+        logger.simkl.warn(
+          { error, userId: user.id },
+          "Failed to revoke Simkl token during unlink"
+        );
+      }
+    }
+
     await userRepository.update(user.id, {
       simklAccessToken: null,
+      simklRefreshToken: null,
+      simklTokenExpiresAt: null,
       simklUsername: null,
       simklThumb: null,
       simklClientId: null,
