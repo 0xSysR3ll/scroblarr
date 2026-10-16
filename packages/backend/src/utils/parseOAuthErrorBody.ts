@@ -3,14 +3,19 @@ export function parseOAuthErrorBody(errorText: string): {
   errorDescription?: string;
 } {
   try {
-    const body = JSON.parse(errorText) as {
-      error?: string;
-      error_description?: string;
-      message?: string;
-    };
+    const parsed: unknown = JSON.parse(errorText);
+    const body =
+      typeof parsed === "object" && parsed !== null
+        ? (parsed as Record<string, unknown>)
+        : {};
     return {
-      error: body.error,
-      errorDescription: body.error_description || body.message,
+      error: typeof body.error === "string" ? body.error : undefined,
+      errorDescription:
+        typeof body.error_description === "string" && body.error_description
+          ? body.error_description
+          : typeof body.message === "string"
+            ? body.message
+            : undefined,
     };
   } catch {
     return {};

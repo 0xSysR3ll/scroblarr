@@ -4,21 +4,42 @@ export async function fetchWithTimeout(
   errorContext: string,
   timeoutMs = 30_000
 ): Promise<Response> {
+  const callerSignal = init?.signal;
   const controller = new AbortController();
+  const onCallerAbort = () => controller.abort(callerSignal?.reason);
+
+  if (callerSignal?.aborted) {
+    controller.abort(callerSignal.reason);
+  } else {
+    callerSignal?.addEventListener("abort", onCallerAbort, { once: true });
+  }
+
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
+  let response: Response | undefined;
+  let failure: unknown;
   try {
-    const response = await fetch(url, {
+    response = await fetch(url, {
       ...init,
       signal: controller.signal,
     });
-    clearTimeout(timeout);
-    return response;
   } catch (error) {
+    failure = error;
+  } finally {
     clearTimeout(timeout);
-    if (error instanceof Error && error.name === "AbortError") {
+    callerSignal?.removeEventListener("abort", onCallerAbort);
+  }
+
+  if (failure !== undefined) {
+    if (
+      failure instanceof Error &&
+      failure.name === "AbortError" &&
+      !callerSignal?.aborted
+    ) {
       throw new Error(`${errorContext} timed out`);
     }
-    throw error;
+    throw failure;
   }
+
+  return response as Response;
 }

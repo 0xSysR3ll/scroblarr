@@ -53,4 +53,40 @@ describe("fetchWithTimeout", () => {
       )
     ).rejects.toBe("network down");
   });
+
+  it("preserves caller abort errors instead of timeout messages", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    fetchMock.mockRejectedValue(
+      Object.assign(new Error("aborted"), { name: "AbortError" })
+    );
+
+    await expect(
+      fetchWithTimeout(
+        "https://example.com",
+        { signal: controller.signal },
+        "example call"
+      )
+    ).rejects.toThrow("aborted");
+  });
+
+  it("forwards a caller abort signal to fetch", async () => {
+    const controller = new AbortController();
+    fetchMock.mockImplementation((_url, init) => {
+      expect(init?.signal?.aborted).toBe(false);
+      controller.abort();
+      expect(init?.signal?.aborted).toBe(true);
+      return Promise.reject(
+        Object.assign(new Error("aborted"), { name: "AbortError" })
+      );
+    });
+
+    await expect(
+      fetchWithTimeout(
+        "https://example.com",
+        { signal: controller.signal },
+        "example call"
+      )
+    ).rejects.toThrow("aborted");
+  });
 });
