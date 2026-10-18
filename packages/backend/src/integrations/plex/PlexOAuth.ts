@@ -101,6 +101,22 @@ export class PlexPinNotFoundError extends Error {
   }
 }
 
+/** Redact userinfo from a URL for logs without ReDoS-prone regex. */
+export function redactUrlUserinfo(url: string): string {
+  const schemeIdx = url.indexOf("://");
+  if (schemeIdx === -1) {
+    return url;
+  }
+  const authorityStart = schemeIdx + 3;
+  const slashIdx = url.indexOf("/", authorityStart);
+  const authorityEnd = slashIdx === -1 ? url.length : slashIdx;
+  const atIdx = url.indexOf("@", authorityStart);
+  if (atIdx === -1 || atIdx >= authorityEnd) {
+    return url;
+  }
+  return `${url.slice(0, authorityStart)}***${url.slice(atIdx)}`;
+}
+
 export class PlexOAuth {
   private clientIdentifier: string;
   private baseUrl = "https://plex.tv";
@@ -596,7 +612,7 @@ export class PlexOAuth {
         response,
         "Failed to get Plex server users",
         "Failed to get server users",
-        { serverUrl: serverUrl.replace(/\/\/.*@/, "//***@") }
+        { serverUrl: redactUrlUserinfo(serverUrl) }
       );
     }
 
