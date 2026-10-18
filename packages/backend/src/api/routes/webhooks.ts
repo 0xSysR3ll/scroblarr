@@ -84,6 +84,21 @@ function stripPayloadApiKey(payload: Record<string, unknown>): void {
   }
 }
 
+function resolveWebhookApiKey(options: {
+  header?: string | string[];
+  query?: unknown;
+  payload?: Record<string, unknown>;
+}): string | undefined {
+  if (typeof options.header === "string") {
+    return options.header;
+  }
+  if (typeof options.query === "string") {
+    return options.query;
+  }
+  const fromPayload = options.payload?.apiKey;
+  return typeof fromPayload === "string" ? fromPayload : undefined;
+}
+
 async function respondWithWebhookEvent(
   res: Response,
   event: MediaEvent | null,
@@ -115,8 +130,7 @@ async function respondWithWebhookEvent(
 
 router.post("/plex", upload.any(), async (req: Request, res: Response) => {
   try {
-    const apiKey =
-      typeof req.query.apiKey === "string" ? req.query.apiKey : undefined;
+    const apiKey = resolveWebhookApiKey({ query: req.query.apiKey });
     if (!(await requireValidWebhookApiKey(apiKey, res))) {
       return;
     }
@@ -205,14 +219,10 @@ router.post("/jellyfin", async (req: Request, res: Response) => {
       }
     }
 
-    let apiKey =
-      typeof req.headers["x-api-key"] === "string"
-        ? req.headers["x-api-key"]
-        : undefined;
-    if (!apiKey) {
-      const k = (payload as Record<string, unknown>).apiKey;
-      apiKey = typeof k === "string" ? k : undefined;
-    }
+    const apiKey = resolveWebhookApiKey({
+      header: req.headers["x-api-key"],
+      payload: payload as Record<string, unknown>,
+    });
 
     if (!(await requireValidWebhookApiKey(apiKey, res))) {
       return;
@@ -297,17 +307,11 @@ router.post("/emby", upload.any(), async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Empty or invalid payload" });
     }
 
-    let apiKey =
-      typeof req.headers["x-api-key"] === "string"
-        ? req.headers["x-api-key"]
-        : undefined;
-    if (!apiKey && typeof req.query.apiKey === "string") {
-      apiKey = req.query.apiKey;
-    }
-    if (!apiKey) {
-      const k = (payload as Record<string, unknown>).apiKey;
-      apiKey = typeof k === "string" ? k : undefined;
-    }
+    const apiKey = resolveWebhookApiKey({
+      header: req.headers["x-api-key"],
+      query: req.query.apiKey,
+      payload: payload as Record<string, unknown>,
+    });
 
     if (!(await requireValidWebhookApiKey(apiKey, res))) {
       return;
@@ -394,17 +398,11 @@ router.post("/tautulli", async (req: Request, res: Response) => {
       }
     }
 
-    let apiKey =
-      typeof req.headers["x-api-key"] === "string"
-        ? req.headers["x-api-key"]
-        : undefined;
-    if (!apiKey && typeof req.query.apiKey === "string") {
-      apiKey = req.query.apiKey;
-    }
-    if (!apiKey) {
-      const k = (payload as Record<string, unknown>).apiKey;
-      apiKey = typeof k === "string" ? k : undefined;
-    }
+    const apiKey = resolveWebhookApiKey({
+      header: req.headers["x-api-key"],
+      query: req.query.apiKey,
+      payload: payload as Record<string, unknown>,
+    });
 
     if (!(await requireValidWebhookApiKey(apiKey, res))) {
       return;
