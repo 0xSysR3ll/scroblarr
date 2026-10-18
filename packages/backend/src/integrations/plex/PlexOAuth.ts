@@ -101,6 +101,22 @@ export class PlexPinNotFoundError extends Error {
   }
 }
 
+/** Redact userinfo from a URL for logs without ReDoS-prone regex. */
+export function redactUrlUserinfo(url: string): string {
+  const schemeIdx = url.indexOf("://");
+  if (schemeIdx === -1) {
+    return url;
+  }
+  const authorityStart = schemeIdx + 3;
+  const slashIdx = url.indexOf("/", authorityStart);
+  const authorityEnd = slashIdx === -1 ? url.length : slashIdx;
+  const atIdx = url.indexOf("@", authorityStart);
+  if (atIdx === -1 || atIdx >= authorityEnd) {
+    return url;
+  }
+  return `${url.slice(0, authorityStart)}***${url.slice(atIdx)}`;
+}
+
 export class PlexOAuth {
   private clientIdentifier: string;
   private baseUrl = "https://plex.tv";
@@ -113,6 +129,43 @@ export class PlexOAuth {
 
   getClientIdentifier(): string {
     return this.clientIdentifier;
+  }
+
+  private async parseJsonBody<T>(response: Response): Promise<T> {
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      const text = await response.text();
+      throw new Error(
+        `Expected JSON but got ${contentType}. Response: ${text.substring(
+          0,
+          200
+        )}`
+      );
+    }
+    return (await response.json()) as T;
+  }
+
+  private async rejectFailedResponse(
+    response: Response,
+    logMessage: string,
+    errorPrefix: string,
+    logContext: Record<string, unknown> = {}
+  ): Promise<never> {
+    const text = await response.text();
+    logger.plex.error(
+      {
+        status: response.status,
+        statusText: response.statusText,
+        errorText: text.substring(0, 500),
+        ...logContext,
+      },
+      logMessage
+    );
+    throw new Error(
+      `${errorPrefix}: ${response.status} ${
+        response.statusText
+      } - ${text.substring(0, 200)}`
+    );
   }
 
   private generateClientIdentifier(): string {
@@ -163,18 +216,9 @@ export class PlexOAuth {
       );
     }
 
-    const contentType = response.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-      const text = await response.text();
-      throw new Error(
-        `Expected JSON but got ${contentType}. Response: ${text.substring(
-          0,
-          200
-        )}`
-      );
-    }
-
-    const data = (await response.json()) as { id: number; code: string };
+    const data = await this.parseJsonBody<{ id: number; code: string }>(
+      response
+    );
     return {
       id: data.id,
       code: data.code,
@@ -262,22 +306,11 @@ export class PlexOAuth {
       );
     }
 
-    const contentType = response.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-      const text = await response.text();
-      throw new Error(
-        `Expected JSON but got ${contentType}. Response: ${text.substring(
-          0,
-          200
-        )}`
-      );
-    }
-
-    const data = (await response.json()) as {
+    const data = await this.parseJsonBody<{
       username: string;
       email?: string;
       thumb?: string;
-    };
+    }>(response);
     return {
       username: data.username,
       email: data.email,
@@ -484,20 +517,11 @@ export class PlexOAuth {
     });
 
     if (!response.ok) {
-      const text = await response.text();
-      logger.plex.error(
-        {
-          status: response.status,
-          statusText: response.statusText,
-          errorText: text.substring(0, 500),
-          includeHttps,
-        },
-        "Failed to get Plex servers"
-      );
-      throw new Error(
-        `Failed to get servers: ${response.status} ${
-          response.statusText
-        } - ${text.substring(0, 200)}`
+      await this.rejectFailedResponse(
+        response,
+        "Failed to get Plex servers",
+        "Failed to get servers",
+        { includeHttps }
       );
     }
 
@@ -584,17 +608,12 @@ export class PlexOAuth {
     });
 
     if (!response.ok) {
-      const text = await response.text();
-      logger.plex.error(
-        {
-          status: response.status,
-          statusText: response.statusText,
-          errorText: text.substring(0, 500),
-          serverUrl: serverUrl.replace(/\/\/.*@/, "//***@"),
-        },
-        "Failed to get Plex server users"
+      await this.rejectFailedResponse(
+        response,
+        "Failed to get Plex server users",
+        "Failed to get server users",
+        { serverUrl: redactUrlUserinfo(serverUrl) }
       );
-      throw new Error(`Failed to get server users: ${response.statusText}`);
     }
 
     const xmlText = await response.text();

@@ -1,3 +1,4 @@
+import { User } from "@entities/User";
 import { UserRepository } from "@repositories/UserRepository";
 import { getUserAgent } from "@utils/appVersion";
 import { logger } from "@utils/logger";
@@ -5,11 +6,29 @@ import { logger } from "@utils/logger";
 import { TraktApiError } from "./TraktApiError";
 import { TraktOAuth, TraktTokens } from "./TraktOAuth";
 
+type LinkedTraktUser = User & {
+  traktAccessToken: string;
+  traktRefreshToken: string;
+};
+
 export class TraktTokenManager {
   private userRepository: UserRepository;
 
   constructor() {
     this.userRepository = new UserRepository();
+  }
+
+  private async requireLinkedUser(userId: string): Promise<LinkedTraktUser> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      throw new Error(`User ${userId} not found`);
+    }
+
+    if (!user.traktAccessToken || !user.traktRefreshToken) {
+      throw new Error("Trakt not linked for this user");
+    }
+
+    return user as LinkedTraktUser;
   }
 
   private async getTraktOAuth(userId: string): Promise<TraktOAuth> {
@@ -31,14 +50,7 @@ export class TraktTokenManager {
   }
 
   async getValidAccessToken(userId: string): Promise<string> {
-    const user = await this.userRepository.findById(userId);
-    if (!user) {
-      throw new Error(`User ${userId} not found`);
-    }
-
-    if (!user.traktAccessToken || !user.traktRefreshToken) {
-      throw new Error("Trakt not linked for this user");
-    }
+    const user = await this.requireLinkedUser(userId);
 
     const bufferTime = 5 * 60 * 1000;
     if (
@@ -52,14 +64,7 @@ export class TraktTokenManager {
   }
 
   async refreshAccessToken(userId: string): Promise<string> {
-    const user = await this.userRepository.findById(userId);
-    if (!user) {
-      throw new Error(`User ${userId} not found`);
-    }
-
-    if (!user.traktAccessToken || !user.traktRefreshToken) {
-      throw new Error("Trakt not linked for this user");
-    }
+    const user = await this.requireLinkedUser(userId);
 
     try {
       const traktOAuth = await this.getTraktOAuth(user.id);

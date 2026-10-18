@@ -77,6 +77,18 @@ export interface TmdbMovieSearchHit {
   popularity?: number;
 }
 
+function mapTvSearchHits(
+  results: TmdbSearchTvResult["results"]
+): TmdbTvSearchHit[] {
+  return (results ?? []).map((item) => ({
+    id: item.id,
+    name: item.name,
+    originalName: item.original_name,
+    firstAirDate: item.first_air_date,
+    popularity: item.popularity,
+  }));
+}
+
 export class TmdbClient {
   constructor(private readonly accessToken: string) {}
 
@@ -137,13 +149,7 @@ export class TmdbClient {
       `/search/tv?${params.toString()}`
     );
 
-    return (result?.results ?? []).map((item) => ({
-      id: item.id,
-      name: item.name,
-      originalName: item.original_name,
-      firstAirDate: item.first_air_date,
-      popularity: item.popularity,
-    }));
+    return mapTvSearchHits(result?.results);
   }
 
   async searchMovie(
@@ -217,13 +223,7 @@ export class TmdbClient {
       `/tv/${seriesId}/recommendations`
     );
 
-    return (result?.results ?? []).map((item) => ({
-      id: item.id,
-      name: item.name,
-      originalName: item.original_name,
-      firstAirDate: item.first_air_date,
-      popularity: item.popularity,
-    }));
+    return mapTvSearchHits(result?.results);
   }
 
   async getTvExternalIds(seriesId: string | number): Promise<{
