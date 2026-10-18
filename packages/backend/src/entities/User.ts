@@ -94,6 +94,12 @@ export class User {
   simklAccessToken?: string;
 
   @Column({ type: "varchar", length: 500, nullable: true })
+  simklRefreshToken?: string;
+
+  @Column({ type: "bigint", nullable: true })
+  simklTokenExpiresAt?: number;
+
+  @Column({ type: "varchar", length: 500, nullable: true })
   simklClientId?: string;
 
   @Column({ type: "varchar", length: 500, nullable: true })

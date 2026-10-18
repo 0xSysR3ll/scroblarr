@@ -12,18 +12,20 @@ Before linking your account, create a Simkl application to get a Client ID:
 
 1. Go to https://simkl.com/settings/developer/new/
 2. Create a new application for Scroblarr
-3. If Simkl asks for a **Redirect URI** or **Redirect URL**, enter `urn:ietf:wg:oauth:2.0:oob`
+3. If Simkl asks for an app type, choose **TV, devices & command line** (PIN flow; Client ID only, no secret or redirect URL)
 4. Copy the **Client ID** from the application settings
 
 Scroblarr uses Simkl PIN authorization, so it does not receive an OAuth callback and does not require a client secret.
+
+If you previously linked Simkl with an older Client ID and linking fails after an update, create a new application and use that Client ID — older app registrations may no longer work for new authorizations. Already-linked accounts keep syncing until you reconnect.
 
 ## Link your account
 
 1. Go to **Profile > Integrations** in Scroblarr
 2. In the Simkl section, enter your Simkl Client ID
 3. Click **Authorize**
-4. A popup will open the Simkl PIN page, and Scroblarr will display a PIN code
-5. Enter the PIN code on Simkl and approve access
+4. A popup will open the Simkl PIN page (with the code pre-filled when possible), and Scroblarr will display a PIN code
+5. Approve access on Simkl
 6. Scroblarr will detect the approval automatically, or you can click **Check approval now**
 
 Your Simkl account is now linked!
@@ -67,6 +69,7 @@ Your watch history will stop syncing to Simkl, but existing synced data remains 
 If you're having trouble linking or syncing:
 
 - Confirm the Client ID matches your Simkl developer application
+- If linking fails after an update, create a new Simkl application and try again with the new Client ID
 - Generate a fresh PIN if the previous PIN expired
 - Refresh metadata in Plex or Jellyfin if items fail to match
 - Check the sync history and Settings → Logs for Simkl-specific errors
