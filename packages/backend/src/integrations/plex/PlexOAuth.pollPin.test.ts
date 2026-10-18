@@ -36,6 +36,55 @@ describe("PlexOAuth.createPin", () => {
       })
     );
   });
+
+  it("generates a stable client identifier when none is provided", () => {
+    const oauth = new PlexOAuth();
+    expect(oauth.getClientIdentifier()).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    );
+  });
+
+  it("falls back to a fixed client identifier when crypto.randomUUID is unavailable", () => {
+    const originalCrypto = globalThis.crypto;
+    Object.defineProperty(globalThis, "crypto", {
+      configurable: true,
+      value: {},
+    });
+    try {
+      expect(new PlexOAuth().getClientIdentifier()).toBe("scroblarr-client");
+    } finally {
+      Object.defineProperty(globalThis, "crypto", {
+        configurable: true,
+        value: originalCrypto,
+      });
+    }
+  });
+
+  it("rejects non-OK pin creation responses", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 502,
+      statusText: "Bad Gateway",
+      text: async () => "upstream failed",
+    } as unknown as Response);
+
+    await expect(new PlexOAuth("client-id").createPin()).rejects.toThrow(
+      "Failed to create Plex OAuth pin: 502 Bad Gateway - upstream failed"
+    );
+  });
+
+  it("rejects pin creation responses that are not JSON", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: { get: () => "text/html" },
+      text: async () => "<html>oops</html>",
+    } as unknown as Response);
+
+    await expect(new PlexOAuth("client-id").createPin()).rejects.toThrow(
+      "Expected JSON but got text/html"
+    );
+  });
 });
 
 describe("PlexOAuth.getAuthUrl", () => {

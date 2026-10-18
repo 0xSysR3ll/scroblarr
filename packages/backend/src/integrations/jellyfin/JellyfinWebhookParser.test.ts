@@ -201,4 +201,155 @@ describe("JellyfinWebhookParser", () => {
       })
     ).toBeNull();
   });
+
+  it("maps PlaybackStart to playing", () => {
+    const event = JellyfinWebhookParser.parse({
+      notificationType: "PlaybackStart",
+      username: "jellyfin-user",
+      userId: "jellyfin-user-id",
+      itemType: "Movie",
+      itemId: "movie-id",
+      name: "Example Movie",
+      timestamp: "2026-06-04T17:00:00.000Z",
+    });
+
+    expect(event?.event).toBe("playing");
+  });
+
+  it("ignores unsupported notification types", () => {
+    expect(
+      JellyfinWebhookParser.parse({
+        notificationType: "UserDataSaved",
+        username: "jellyfin-user",
+        userId: "jellyfin-user-id",
+        itemType: "Movie",
+        itemId: "movie-id",
+        name: "Example Movie",
+        timestamp: "2026-06-04T17:00:00.000Z",
+      })
+    ).toBeNull();
+  });
+
+  it("treats completion under 90% as stopped when playedToCompletion is omitted", () => {
+    const event = JellyfinWebhookParser.parse({
+      notificationType: "PlaybackStop",
+      username: "jellyfin-user",
+      userId: "jellyfin-user-id",
+      itemType: "Movie",
+      itemId: "movie-id",
+      name: "Example Movie",
+      runtimeTicks: "1000000000",
+      playbackPositionTicks: "500000000",
+      timestamp: "2026-06-04T17:00:00.000Z",
+    });
+
+    expect(event?.event).toBe("stopped");
+  });
+
+  it("falls back when tick values are missing or non-numeric", () => {
+    expect(
+      JellyfinWebhookParser.parse({
+        notificationType: "PlaybackStop",
+        username: "jellyfin-user",
+        userId: "jellyfin-user-id",
+        itemType: "Movie",
+        itemId: "movie-id",
+        name: "Example Movie",
+        runtimeTicks: "not-a-number",
+        playbackPositionTicks: "100",
+        timestamp: "2026-06-04T17:00:00.000Z",
+      })?.event
+    ).toBe("stopped");
+
+    expect(
+      JellyfinWebhookParser.parse({
+        notificationType: "PlaybackStop",
+        username: "jellyfin-user",
+        userId: "jellyfin-user-id",
+        itemType: "Movie",
+        itemId: "movie-id",
+        name: "Example Movie",
+        runtimeTicks: "0",
+        playbackPositionTicks: "0",
+        timestamp: "2026-06-04T17:00:00.000Z",
+      })?.event
+    ).toBe("stopped");
+  });
+
+  it("normalizes sparse movie identifiers and empty titles", () => {
+    const event = JellyfinWebhookParser.parse({
+      notificationType: "PlaybackStop",
+      username: "jellyfin-user",
+      userId: "jellyfin-user-id",
+      itemType: "Movie",
+      itemId: "movie-id",
+      name: "",
+      year: "not-a-year",
+      provider_tvdb: "  ",
+      provider_imdb: "",
+      provider_tmdb: "not-numeric",
+      runtimeTicks: "bad",
+      playbackPositionTicks: "also-bad",
+      playedToCompletion: "true",
+      timestamp: "2026-06-04T17:00:00.000Z",
+    });
+
+    expect(event?.media).toMatchObject({
+      id: "movie--unknown",
+      type: "movie",
+      title: "Unknown",
+      year: undefined,
+      tvdbMovieId: undefined,
+      imdbMovieId: undefined,
+      tmdbMovieId: undefined,
+      duration: undefined,
+      watchedDuration: undefined,
+    });
+  });
+
+  it("keeps a movie IMDb id when provided", () => {
+    const event = JellyfinWebhookParser.parse({
+      notificationType: "PlaybackStop",
+      username: "jellyfin-user",
+      userId: "jellyfin-user-id",
+      itemType: "Movie",
+      itemId: "movie-id",
+      name: "Example Movie",
+      provider_imdb: "tt1234567",
+      playedToCompletion: "true",
+      timestamp: "2026-06-04T17:00:00.000Z",
+    });
+
+    expect(event?.media).toMatchObject({
+      type: "movie",
+      imdbMovieId: "tt1234567",
+    });
+  });
+
+  it("normalizes sparse episode identifiers and missing season data", () => {
+    const event = JellyfinWebhookParser.parse({
+      notificationType: "PlaybackStop",
+      username: "jellyfin-user",
+      userId: "jellyfin-user-id",
+      itemType: "Episode",
+      itemId: "episode-id",
+      name: "Pilot",
+      year: "bad",
+      provider_tvdb: "not-numeric",
+      provider_imdb: "   ",
+      playedToCompletion: "true",
+      timestamp: "2026-06-04T17:00:00.000Z",
+    });
+
+    expect(event?.media).toMatchObject({
+      id: "episode-Unknown-unknown-unknown",
+      type: "episode",
+      title: "Unknown",
+      year: undefined,
+      seasonNumber: undefined,
+      episodeNumber: undefined,
+      tvdbEpisodeId: undefined,
+      imdbEpisodeId: undefined,
+    });
+  });
 });
