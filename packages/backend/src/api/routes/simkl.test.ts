@@ -209,6 +209,32 @@ describe("simkl routes", () => {
     );
   });
 
+  it("clears refresh token and expiry when the link response omits them", async () => {
+    simklDeviceStoreMocks.resolveSimklDeviceCode.mockReturnValue("device-code");
+    simklOAuthMocks.exchangePinForToken.mockResolvedValue({
+      accessToken: "simkl_at_new",
+    });
+    simklClientMocks.getUserProfile.mockResolvedValue({
+      id: 51,
+      username: "alice",
+      image: "https://img.example/alice.png",
+    });
+
+    const response = await request(app)
+      .post("/simkl/link")
+      .send({ userCode: "BDWP-HQPK" })
+      .expect(200);
+
+    expect(response.body).toEqual({ success: true });
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith("user-id", {
+      simklAccessToken: "simkl_at_new",
+      simklRefreshToken: null,
+      simklTokenExpiresAt: null,
+      simklUsername: "alice",
+      simklThumb: "https://img.example/alice.png",
+    });
+  });
+
   it("stores a provided client ID when linking", async () => {
     simklDeviceStoreMocks.resolveSimklDeviceCode.mockReturnValue("device-code");
     simklOAuthMocks.exchangePinForToken.mockResolvedValue({

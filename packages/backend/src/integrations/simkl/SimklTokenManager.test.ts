@@ -30,11 +30,15 @@ vi.mock("@utils/logger", () => ({
   },
 }));
 
-import { SimklTokenManager } from "./SimklTokenManager";
+import {
+  clearInFlightSimklRefreshesForTests,
+  SimklTokenManager,
+} from "./SimklTokenManager";
 
 describe("SimklTokenManager", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    clearInFlightSimklRefreshesForTests();
   });
 
   it("returns stored AUTH V1 tokens without refreshing", async () => {
@@ -133,6 +137,51 @@ describe("SimklTokenManager", () => {
     await expect(manager.getValidAccessToken("user-id")).rejects.toThrow(
       "Failed to refresh Simkl token: refresh failed"
     );
+  });
+
+  it("shares one in-flight refresh across concurrent callers", async () => {
+    userRepositoryMocks.findById.mockResolvedValue({
+      id: "user-id",
+      simklAccessToken: "simkl_at_access_token_value_here_xx",
+      simklRefreshToken: "simkl_rt_refresh_token_value_here",
+      simklTokenExpiresAt: Date.now() + 60 * 60 * 1000,
+      simklClientId: "client-id",
+    });
+
+    let resolveRefresh:
+      | ((tokens: {
+          accessToken: string;
+          refreshToken: string;
+          expiresAt: number;
+        }) => void)
+      | undefined;
+    simklOAuthMocks.refreshToken.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRefresh = resolve;
+        })
+    );
+
+    const managerA = new SimklTokenManager();
+    const managerB = new SimklTokenManager();
+    const refreshA = managerA.refreshAccessToken("user-id");
+    const refreshB = managerB.refreshAccessToken("user-id");
+
+    await vi.waitFor(() => {
+      expect(simklOAuthMocks.refreshToken).toHaveBeenCalledTimes(1);
+    });
+    resolveRefresh?.({
+      accessToken: "simkl_at_new_access_token_value_xx",
+      refreshToken: "simkl_rt_refresh_token_value_here",
+      expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+    });
+
+    await expect(Promise.all([refreshA, refreshB])).resolves.toEqual([
+      "simkl_at_new_access_token_value_xx",
+      "simkl_at_new_access_token_value_xx",
+    ]);
+    expect(simklOAuthMocks.refreshToken).toHaveBeenCalledTimes(1);
+    expect(userRepositoryMocks.update).toHaveBeenCalledTimes(1);
   });
 
   it("rejects refresh when the user disappears mid-flight", async () => {

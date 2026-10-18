@@ -121,13 +121,13 @@ router.post("/link", async (req: Request, res: Response) => {
       logger.simkl.warn({ error }, "Failed to fetch Simkl profile");
     }
 
-    const updateData: Partial<User> = {
+    const updateData = {
       simklAccessToken: tokens.accessToken,
-      simklRefreshToken: tokens.refreshToken,
-      simklTokenExpiresAt: tokens.expiresAt,
+      simklRefreshToken: tokens.refreshToken ?? null,
+      simklTokenExpiresAt: tokens.expiresAt ?? null,
       simklUsername: username,
       simklThumb: avatar,
-    };
+    } as unknown as Partial<User>;
 
     if (validated.clientId) {
       updateData.simklClientId = validated.clientId;

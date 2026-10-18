@@ -4,6 +4,12 @@ import { logger } from "@utils/logger";
 import { isSimklV2AccessToken } from "./SimklApi";
 import { SimklOAuth, SimklTokens } from "./SimklOAuth";
 
+const inFlightRefreshes = new Map<string, Promise<string>>();
+
+export function clearInFlightSimklRefreshesForTests(): void {
+  inFlightRefreshes.clear();
+}
+
 export class SimklTokenManager {
   private userRepository: UserRepository;
 
@@ -55,6 +61,23 @@ export class SimklTokenManager {
   }
 
   async refreshAccessToken(userId: string): Promise<string> {
+    const pending = inFlightRefreshes.get(userId);
+    if (pending) {
+      return pending;
+    }
+
+    const refreshPromise = this.performRefreshAccessToken(userId);
+    inFlightRefreshes.set(userId, refreshPromise);
+    const clearPending = () => {
+      if (inFlightRefreshes.get(userId) === refreshPromise) {
+        inFlightRefreshes.delete(userId);
+      }
+    };
+    void refreshPromise.then(clearPending, clearPending);
+    return refreshPromise;
+  }
+
+  private async performRefreshAccessToken(userId: string): Promise<string> {
     const user = await this.userRepository.findById(userId);
     if (!user) {
       throw new Error(`User ${userId} not found`);
