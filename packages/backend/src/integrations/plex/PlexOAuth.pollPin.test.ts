@@ -17,6 +17,21 @@ describe("redactUrlUserinfo", () => {
     ).toBe("https://***@plex.local:32400/library");
   });
 
+  it("redacts credentials that contain embedded @ characters", () => {
+    expect(redactUrlUserinfo("https://user:p@ss@word@plex.local:32400")).toBe(
+      "https://***@plex.local:32400"
+    );
+    expect(
+      redactUrlUserinfo("https://user:p@ss@word@plex.local:32400/library")
+    ).toBe("https://***@plex.local:32400/library");
+    expect(
+      redactUrlUserinfo("https://user:p@ss@plex.local:32400?token=1")
+    ).toBe("https://***@plex.local:32400?token=1");
+    expect(redactUrlUserinfo("https://user:p@ss@plex.local:32400#frag")).toBe(
+      "https://***@plex.local:32400#frag"
+    );
+  });
+
   it("leaves URLs without userinfo unchanged", () => {
     expect(redactUrlUserinfo("https://plex.local:32400")).toBe(
       "https://plex.local:32400"
@@ -24,6 +39,9 @@ describe("redactUrlUserinfo", () => {
     expect(redactUrlUserinfo("not-a-url")).toBe("not-a-url");
     expect(redactUrlUserinfo("https://plex.local/path@file")).toBe(
       "https://plex.local/path@file"
+    );
+    expect(redactUrlUserinfo("https://plex.local?q=a@b")).toBe(
+      "https://plex.local?q=a@b"
     );
   });
 });

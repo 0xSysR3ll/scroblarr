@@ -108,10 +108,16 @@ export function redactUrlUserinfo(url: string): string {
     return url;
   }
   const authorityStart = schemeIdx + 3;
-  const slashIdx = url.indexOf("/", authorityStart);
-  const authorityEnd = slashIdx === -1 ? url.length : slashIdx;
-  const atIdx = url.indexOf("@", authorityStart);
-  if (atIdx === -1 || atIdx >= authorityEnd) {
+  let authorityEnd = url.length;
+  for (let i = authorityStart; i < url.length; i++) {
+    const c = url[i];
+    if (c === "/" || c === "?" || c === "#") {
+      authorityEnd = i;
+      break;
+    }
+  }
+  const atIdx = url.lastIndexOf("@", authorityEnd - 1);
+  if (atIdx === -1 || atIdx < authorityStart) {
     return url;
   }
   return `${url.slice(0, authorityStart)}***${url.slice(atIdx)}`;
