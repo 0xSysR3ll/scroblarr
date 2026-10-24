@@ -1,3 +1,4 @@
+import { useAuth } from "@contexts/AuthContext";
 import {
   getBingersStatus,
   getSimklAuthorizeUrl,
@@ -32,6 +33,26 @@ const oauthPopupMocks = vi.hoisted(() => ({
   navigateToUrl: vi.fn(),
   closePopup: vi.fn(),
 }));
+
+vi.mock("@contexts/AuthContext", () => ({
+  useAuth: vi.fn(),
+}));
+
+function mockAuthUser(): void {
+  vi.mocked(useAuth).mockReturnValue({
+    user: {
+      id: "user-id",
+      username: "test-user",
+      isAdmin: false,
+    },
+    loading: false,
+    logout: vi.fn(),
+    checkAuth: vi.fn(),
+    setUserFromLogin: vi.fn(),
+    isAuthenticated: true,
+    isAdmin: false,
+  });
+}
 
 vi.mock("@utils/OAuthPopup", () => ({
   OAuthPopup: class {
@@ -141,22 +162,13 @@ async function fillTraktCredentials(
   );
 }
 
-async function fillSimklClientId(
-  user: ReturnType<typeof userEvent.setup>
-): Promise<void> {
-  await expandSimklSection(user);
-  await user.type(
-    await screen.findByPlaceholderText("Enter your Simkl Client ID"),
-    "client-id"
-  );
-}
-
 describe("IntegrationsTab", () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     oauthPopupMocks.preparePopup.mockReset();
     oauthPopupMocks.navigateToUrl.mockReset();
     oauthPopupMocks.closePopup.mockReset();
+    mockAuthUser();
 
     vi.mocked(getTraktStatus).mockResolvedValue({
       linked: false,
@@ -168,7 +180,8 @@ describe("IntegrationsTab", () => {
       linked: false,
       username: null,
       image: null,
-      hasCredentials: false,
+      hasCredentials: true,
+      needsReconnect: false,
     });
     vi.mocked(getBingersStatus).mockResolvedValue({
       linked: false,
@@ -261,7 +274,7 @@ describe("IntegrationsTab", () => {
       screen.queryByPlaceholderText("Enter your Trakt Client ID")
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByPlaceholderText("Enter your Simkl Client ID")
+      screen.queryByRole("button", { name: "Authorize" })
     ).not.toBeInTheDocument();
   });
 
@@ -498,6 +511,7 @@ describe("IntegrationsTab Trakt integration", () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.clearAllMocks();
+    mockAuthUser();
     vi.mocked(getTraktStatus).mockResolvedValue({
       linked: false,
       username: null,
@@ -508,7 +522,8 @@ describe("IntegrationsTab Trakt integration", () => {
       linked: false,
       username: null,
       image: null,
-      hasCredentials: false,
+      hasCredentials: true,
+      needsReconnect: false,
     });
     vi.mocked(getBingersStatus).mockResolvedValue({
       linked: false,
@@ -1134,6 +1149,8 @@ describe("IntegrationsTab Simkl integration", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
+    mockAuthUser();
     vi.mocked(getTraktStatus).mockResolvedValue({
       linked: false,
       username: null,
@@ -1144,7 +1161,8 @@ describe("IntegrationsTab Simkl integration", () => {
       linked: false,
       username: null,
       image: null,
-      hasCredentials: false,
+      hasCredentials: true,
+      needsReconnect: false,
     });
     vi.mocked(getBingersStatus).mockResolvedValue({
       linked: false,
@@ -1165,13 +1183,15 @@ describe("IntegrationsTab Simkl integration", () => {
         linked: false,
         username: null,
         image: null,
-        hasCredentials: false,
+        hasCredentials: true,
+        needsReconnect: false,
       })
       .mockResolvedValueOnce({
         linked: true,
         username: "simkl-user",
         image: "https://img.example/simkl.png",
         hasCredentials: true,
+        needsReconnect: false,
       });
     vi.mocked(getSimklAuthorizeUrl).mockResolvedValue({
       userCode: "ABCDE",
@@ -1185,7 +1205,6 @@ describe("IntegrationsTab Simkl integration", () => {
       <IntegrationsTab onProfileUpdated={onProfileUpdated} />
     );
 
-    await fillSimklClientId(user);
     await clickSimklAuthorize(user);
 
     expect(
@@ -1200,12 +1219,93 @@ describe("IntegrationsTab Simkl integration", () => {
     );
 
     await waitFor(() => {
-      expect(linkSimkl).toHaveBeenCalledWith("ABCDE", "client-id");
+      expect(linkSimkl).toHaveBeenCalledWith("ABCDE");
       expect(showSuccess).toHaveBeenCalledWith(
         "Simkl account linked successfully"
       );
       expect(onProfileUpdated).toHaveBeenCalled();
     });
+  });
+
+  it("shows a dismissible reconnect note for legacy Client IDs", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getSimklStatus).mockResolvedValue({
+      linked: true,
+      username: "simkl-user",
+      image: "https://img.example/simkl.png",
+      hasCredentials: true,
+      needsReconnect: true,
+    });
+
+    renderWithProviders(<IntegrationsTab />);
+
+    expect(await screen.findByText("Reconnect recommended")).toBeVisible();
+    expect(
+      screen.getByText(/Reconnect once to use Scroblarr's official Simkl app/)
+    ).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Dismiss" }));
+
+    expect(
+      screen.queryByText(/Reconnect once to use Scroblarr's official Simkl app/)
+    ).not.toBeInTheDocument();
+    expect(localStorage.getItem("simkl-reconnect-dismissed:user-id")).toBe("1");
+  });
+
+  it("starts the Simkl PIN panel from the reconnect note", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getSimklStatus).mockResolvedValue({
+      linked: true,
+      username: "simkl-user",
+      image: "https://img.example/simkl.png",
+      hasCredentials: true,
+      needsReconnect: true,
+    });
+    vi.mocked(getSimklAuthorizeUrl).mockResolvedValue({
+      userCode: "RECON",
+      verificationUrl: "https://simkl.com/pin/?user_code=RECON",
+      expiresIn: 900,
+      interval: 5,
+    });
+
+    renderWithProviders(<IntegrationsTab />);
+
+    expect(await screen.findByText("Reconnect recommended")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Reconnect" }));
+
+    expect(
+      await screen.findByText("RECON", {}, { timeout: 2500 })
+    ).toBeVisible();
+    expect(getSimklAuthorizeUrl).toHaveBeenCalledWith();
+    expect(oauthPopupMocks.navigateToUrl).toHaveBeenCalledWith(
+      "https://simkl.com/pin/?user_code=RECON"
+    );
+  });
+
+  it("clears reconnect dismiss state when no authenticated user id is available", async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: null,
+      loading: false,
+      logout: vi.fn(),
+      checkAuth: vi.fn(),
+      setUserFromLogin: vi.fn(),
+      isAuthenticated: false,
+      isAdmin: false,
+    });
+    vi.mocked(getSimklStatus).mockResolvedValue({
+      linked: true,
+      username: "simkl-user",
+      image: null,
+      hasCredentials: true,
+      needsReconnect: true,
+    });
+
+    renderWithProviders(<IntegrationsTab />);
+
+    expect(await screen.findByText("Reconnect recommended")).toBeVisible();
+    expect(
+      screen.getByText(/Reconnect once to use Scroblarr's official Simkl app/)
+    ).toBeVisible();
   });
 
   it("unlinks a linked Simkl account", async () => {
@@ -1216,12 +1316,14 @@ describe("IntegrationsTab Simkl integration", () => {
         username: "simkl-user",
         image: "https://img.example/simkl.png",
         hasCredentials: true,
+        needsReconnect: false,
       })
       .mockResolvedValueOnce({
         linked: false,
         username: null,
         image: null,
-        hasCredentials: false,
+        hasCredentials: true,
+        needsReconnect: false,
       });
     vi.mocked(unlinkSimkl).mockResolvedValue({ success: true });
 
@@ -1325,7 +1427,6 @@ describe("IntegrationsTab Simkl integration", () => {
       <IntegrationsTab onProfileUpdated={onProfileUpdated} />
     );
 
-    await fillSimklClientId(user);
     await clickSimklAuthorize(user);
 
     expect(await screen.findByText("Popup blocked")).toBeVisible();
@@ -1342,7 +1443,6 @@ describe("IntegrationsTab Simkl integration", () => {
       <IntegrationsTab onProfileUpdated={onProfileUpdated} />
     );
 
-    await fillSimklClientId(user);
     await clickSimklAuthorize(user);
 
     expect(
@@ -1363,7 +1463,6 @@ describe("IntegrationsTab Simkl integration", () => {
       <IntegrationsTab onProfileUpdated={onProfileUpdated} />
     );
 
-    await fillSimklClientId(user);
     await clickSimklAuthorize(user);
 
     expect(
@@ -1380,7 +1479,6 @@ describe("IntegrationsTab Simkl integration", () => {
       <IntegrationsTab onProfileUpdated={onProfileUpdated} />
     );
 
-    await fillSimklClientId(user);
     await clickSimklAuthorize(user);
 
     expect(
@@ -1407,12 +1505,11 @@ describe("IntegrationsTab Simkl integration", () => {
       <IntegrationsTab onProfileUpdated={onProfileUpdated} />
     );
 
-    await fillSimklClientId(user);
     await clickSimklAuthorize(user);
 
     await waitFor(
       () => {
-        expect(linkSimkl).toHaveBeenCalledWith("ABCDE", "client-id");
+        expect(linkSimkl).toHaveBeenCalledWith("ABCDE");
         expect(screen.getByText("Invalid PIN")).toBeVisible();
       },
       { timeout: 10000 }
@@ -1437,7 +1534,6 @@ describe("IntegrationsTab Simkl integration", () => {
       <IntegrationsTab onProfileUpdated={onProfileUpdated} />
     );
 
-    await fillSimklClientId(user);
     await clickSimklAuthorize(user);
 
     expect(
@@ -1464,7 +1560,6 @@ describe("IntegrationsTab Simkl integration", () => {
       <IntegrationsTab onProfileUpdated={onProfileUpdated} />
     );
 
-    await fillSimklClientId(user);
     await clickSimklAuthorize(user);
 
     expect(
@@ -1512,7 +1607,6 @@ describe("IntegrationsTab Simkl integration", () => {
         <IntegrationsTab onProfileUpdated={onProfileUpdated} />
       );
 
-      await fillSimklClientId(user);
       await clickSimklAuthorize(user);
       await act(async () => {
         await vi.advanceTimersByTimeAsync(1500);
@@ -1568,7 +1662,6 @@ describe("IntegrationsTab Simkl integration", () => {
         <IntegrationsTab onProfileUpdated={onProfileUpdated} />
       );
 
-      await fillSimklClientId(user);
       await clickSimklAuthorize(user);
       await act(async () => {
         await vi.advanceTimersByTimeAsync(1500);
@@ -1615,7 +1708,6 @@ describe("IntegrationsTab Simkl integration", () => {
         <IntegrationsTab onProfileUpdated={onProfileUpdated} />
       );
 
-      await fillSimklClientId(user);
       await clickSimklAuthorize(user);
       await act(async () => {
         await vi.advanceTimersByTimeAsync(1500);
@@ -1658,7 +1750,6 @@ describe("IntegrationsTab Simkl integration", () => {
         <IntegrationsTab onProfileUpdated={onProfileUpdated} />
       );
 
-      await fillSimklClientId(user);
       await clickSimklAuthorize(user);
       await act(async () => {
         await vi.advanceTimersByTimeAsync(1500);
@@ -1702,7 +1793,6 @@ describe("IntegrationsTab Simkl integration", () => {
         <IntegrationsTab onProfileUpdated={onProfileUpdated} />
       );
 
-      await fillSimklClientId(user);
       await clickSimklAuthorize(user);
       await act(async () => {
         await vi.advanceTimersByTimeAsync(1500);
@@ -1760,7 +1850,7 @@ describe("IntegrationsTab Simkl integration", () => {
       });
 
       await waitFor(() => {
-        expect(getSimklAuthorizeUrl).toHaveBeenCalledWith(undefined);
+        expect(getSimklAuthorizeUrl).toHaveBeenCalledWith();
       });
       expect(await screen.findByText("ABCDE")).toBeVisible();
 
@@ -1777,7 +1867,7 @@ describe("IntegrationsTab Simkl integration", () => {
       );
 
       await waitFor(() => {
-        expect(linkSimkl).toHaveBeenCalledWith("ABCDE", undefined);
+        expect(linkSimkl).toHaveBeenCalledWith("ABCDE");
         expect(showSuccess).toHaveBeenCalledWith(
           "Simkl account linked successfully"
         );
@@ -1793,6 +1883,7 @@ describe("IntegrationsTab Bingers integration", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAuthUser();
     vi.mocked(getTraktStatus).mockResolvedValue({
       linked: false,
       username: null,
@@ -1803,7 +1894,8 @@ describe("IntegrationsTab Bingers integration", () => {
       linked: false,
       username: null,
       image: null,
-      hasCredentials: false,
+      hasCredentials: true,
+      needsReconnect: false,
     });
     vi.mocked(getBingersStatus).mockResolvedValue({
       linked: false,

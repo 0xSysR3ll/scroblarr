@@ -638,11 +638,13 @@
     "profile": {
       "username": "Username"
     },
-    "docsHint": "Create a Simkl app and enter its Client ID below. PIN authorization does not require a client secret.",
-    "clientId": "Client ID",
-    "clientIdPlaceholder": "Enter your Simkl Client ID",
-    "oauthInstructions": "Click 'Authorize' to get a Simkl PIN code, then enter that code on Simkl's PIN page.",
+    "docsHint": "Link your Simkl account with a one-time PIN.",
+    "learnMore": "Learn more",
     "authorize": "Authorize",
+    "reconnect": "Reconnect",
+    "reconnectRecommended": "Reconnect recommended",
+    "needsReconnect": "Reconnect once to use Scroblarr's official Simkl app. Your existing link still works until you do.",
+    "dismissReconnect": "Dismiss",
     "authorizationCode": "PIN Code",
     "openPinPage": "Open Simkl PIN page",
     "pinWaiting": "Waiting for approval on Simkl...",

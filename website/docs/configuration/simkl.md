@@ -6,29 +6,23 @@ sidebar_position: 5
 
 Link your Simkl account to sync watch history. Each user on your media server needs to link their own Simkl account.
 
-## Create a Simkl application
-
-Before linking your account, create a Simkl application to get a Client ID:
-
-1. Go to https://simkl.com/settings/developer/new/
-2. Create a new application for Scroblarr
-3. If Simkl asks for an app type, choose **TV, devices & command line** (PIN flow; Client ID only, no secret or redirect URL)
-4. Copy the **Client ID** from the application settings
-
-Scroblarr uses Simkl PIN authorization, so it does not receive an OAuth callback and does not require a client secret.
-
-If you previously linked Simkl with an older Client ID and linking fails after an update, create a new application and use that Client ID — older app registrations may no longer work for new authorizations. Already-linked accounts keep syncing until you reconnect.
+Scroblarr ships with an official Simkl application Client ID, so you do **not** need to create your own Simkl developer app or paste a Client ID. Scroblarr uses Simkl PIN authorization (no client secret or OAuth callback URL).
 
 ## Link your account
 
 1. Go to **Profile > Integrations** in Scroblarr
-2. In the Simkl section, enter your Simkl Client ID
-3. Click **Authorize**
-4. A popup will open the Simkl PIN page (with the code pre-filled when possible), and Scroblarr will display a PIN code
-5. Approve access on Simkl
-6. Scroblarr will detect the approval automatically, or you can click **Check approval now**
+2. In the Simkl section, click **Authorize**
+3. A popup will open the Simkl PIN page (with the code pre-filled when possible), and Scroblarr will display a PIN code
+4. Approve access on Simkl
+5. Scroblarr will detect the approval automatically, or you can click **Check approval now**
 
 Your Simkl account is now linked!
+
+## Reconnect (legacy links)
+
+If you linked Simkl before Scroblarr shipped its official Client ID (or you are still on an older AUTH V1 token), Profile → Simkl may show a dismissible **Reconnect recommended** note. Your existing link keeps working until you reconnect.
+
+Click **Reconnect** and complete the PIN flow once to move onto Scroblarr's official Simkl app. Dismiss hides the note for this browser; sync continues either way.
 
 ## Metadata requirements
 
@@ -68,8 +62,8 @@ Your watch history will stop syncing to Simkl, but existing synced data remains 
 
 If you're having trouble linking or syncing:
 
-- Confirm the Client ID matches your Simkl developer application
-- If linking fails after an update, create a new Simkl application and try again with the new Client ID
 - Generate a fresh PIN if the previous PIN expired
+- Allow popups so Scroblarr can open the Simkl PIN page
+- If you previously used a personal Client ID, reconnect once with **Reconnect** (your old link still works until then)
 - Refresh metadata in Plex or Jellyfin if items fail to match
 - Check the sync history and Settings → Logs for Simkl-specific errors

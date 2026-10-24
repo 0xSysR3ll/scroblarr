@@ -1,5 +1,10 @@
 import { User } from "@entities/User";
+import { isSimklV2AccessToken } from "@integrations/simkl/SimklApi";
 import { SimklClient } from "@integrations/simkl/SimklClient";
+import {
+  getSimklClientId,
+  isOfficialSimklClientId,
+} from "@integrations/simkl/simklConfig";
 import {
   clearSimklDevice,
   rememberSimklDevice,
@@ -18,28 +23,20 @@ import { auth } from "../middleware/auth";
 const router = Router();
 const userRepository = new UserRepository();
 
-const authorizeSimklSchema = z.object({
-  clientId: z.string().optional(),
-});
-
 const linkSimklSchema = z.object({
   userCode: z.string().min(1),
-  clientId: z.string().optional(),
 });
 
 router.use(auth);
 
-function getSimklCredentials(
-  validated: {
-    clientId?: string;
-  },
-  user: User
-): {
-  clientId?: string;
-} {
-  return {
-    clientId: validated.clientId || user.simklClientId,
-  };
+function userNeedsSimklReconnect(user: User): boolean {
+  if (!user.simklAccessToken) {
+    return false;
+  }
+  if (!isSimklV2AccessToken(user.simklAccessToken)) {
+    return true;
+  }
+  return !isOfficialSimklClientId(user.simklClientId);
 }
 
 router.get("/authorize", async (req: Request, res: Response) => {
@@ -49,18 +46,7 @@ router.get("/authorize", async (req: Request, res: Response) => {
       return;
     }
 
-    const validated = authorizeSimklSchema.parse({
-      clientId: req.query.clientId as string | undefined,
-    });
-    const { clientId } = getSimklCredentials(validated, freshUser);
-
-    if (!clientId) {
-      return res.status(400).json({
-        error:
-          "Simkl client ID is required. Please provide it in the request or configure it in your profile settings.",
-      });
-    }
-
+    const clientId = getSimklClientId();
     const simklOAuth = new SimklOAuth(clientId);
     const pin = await simklOAuth.requestPinCode();
     rememberSimklDevice(freshUser.id, pin);
@@ -72,12 +58,6 @@ router.get("/authorize", async (req: Request, res: Response) => {
       interval: pin.interval,
     });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
-        error: "Validation error",
-        details: error.issues,
-      });
-    }
     logger.simkl.error({ error }, "Error getting Simkl authorization URL");
     const errorMessage =
       error instanceof Error
@@ -96,19 +76,30 @@ router.post("/link", async (req: Request, res: Response) => {
     const user = freshUser;
 
     const validated = linkSimklSchema.parse(req.body);
-    const { clientId } = getSimklCredentials(validated, freshUser);
-
-    if (!clientId) {
-      return res.status(400).json({
-        error:
-          "Simkl client ID is required. Please provide it when linking or configure it in your profile settings first.",
-      });
-    }
+    const clientId = getSimklClientId();
+    const previousClientId = user.simklClientId;
+    const previousRefreshToken = user.simklRefreshToken;
 
     const deviceCode = resolveSimklDeviceCode(user.id, validated.userCode);
     const simklOAuth = new SimklOAuth(clientId);
     const tokens = await simklOAuth.exchangePinForToken(deviceCode);
     clearSimklDevice(user.id);
+
+    if (
+      previousRefreshToken &&
+      previousClientId &&
+      previousClientId !== clientId
+    ) {
+      try {
+        const previousOAuth = new SimklOAuth(previousClientId);
+        await previousOAuth.revokeToken(previousRefreshToken);
+      } catch (error) {
+        logger.simkl.warn(
+          { error, userId: user.id },
+          "Failed to revoke previous Simkl token during reconnect"
+        );
+      }
+    }
 
     let username: string | undefined;
     let avatar: string | undefined;
@@ -121,19 +112,14 @@ router.post("/link", async (req: Request, res: Response) => {
       logger.simkl.warn({ error }, "Failed to fetch Simkl profile");
     }
 
-    const updateData = {
+    await userRepository.update(user.id, {
       simklAccessToken: tokens.accessToken,
       simklRefreshToken: tokens.refreshToken ?? null,
       simklTokenExpiresAt: tokens.expiresAt ?? null,
       simklUsername: username,
       simklThumb: avatar,
-    } as unknown as Partial<User>;
-
-    if (validated.clientId) {
-      updateData.simklClientId = validated.clientId;
-    }
-
-    await userRepository.update(user.id, updateData);
+      simklClientId: clientId,
+    } as unknown as Partial<User>);
 
     logger.simkl.info(
       {
@@ -230,7 +216,8 @@ router.get("/status", async (req: Request, res: Response) => {
       linked: !!freshUser.simklAccessToken,
       username: freshUser.simklUsername || null,
       image: freshUser.simklThumb || null,
-      hasCredentials: !!freshUser.simklClientId,
+      hasCredentials: true,
+      needsReconnect: userNeedsSimklReconnect(freshUser),
     });
   } catch (error) {
     const user = req.user;

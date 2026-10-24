@@ -87,6 +87,8 @@ vi.mock("@utils/logger", () => ({
   },
 }));
 
+import { SCROBLARR_SIMKL_CLIENT_ID } from "@integrations/simkl/simklConfig";
+
 import { simklRoutes } from "./simkl";
 
 describe("simkl routes", () => {
@@ -155,17 +157,23 @@ describe("simkl routes", () => {
     expect(response.body.verificationUrl).toBe("https://simkl.com/pin");
   });
 
-  it("requires a client ID when requesting authorization", async () => {
+  it("authorizes with the official Client ID when the user has none stored", async () => {
     userRepositoryMocks.findById.mockResolvedValueOnce({
       id: "user-id",
       plexUsername: "plex-user",
       simklClientId: null,
     });
+    simklOAuthMocks.requestPinCode.mockResolvedValue({
+      device_code: "device-code",
+      user_code: "BDWP-HQPK",
+      verification_uri: "https://simkl.com/pin",
+      expires_in: 900,
+      interval: 5,
+    });
 
-    const response = await request(app).get("/simkl/authorize").expect(400);
+    await request(app).get("/simkl/authorize").expect(200);
 
-    expect(response.body.error).toContain("Simkl client ID is required");
-    expect(simklOAuthMocks.requestPinCode).not.toHaveBeenCalled();
+    expect(simklOAuthMocks.requestPinCode).toHaveBeenCalledOnce();
   });
 
   it("links a Simkl account", async () => {
@@ -205,6 +213,7 @@ describe("simkl routes", () => {
         simklTokenExpiresAt: 1_700_000_000_000,
         simklUsername: "alice",
         simklThumb: "https://img.example/alice.png",
+        simklClientId: SCROBLARR_SIMKL_CLIENT_ID,
       })
     );
   });
@@ -232,10 +241,18 @@ describe("simkl routes", () => {
       simklTokenExpiresAt: null,
       simklUsername: "alice",
       simklThumb: "https://img.example/alice.png",
+      simklClientId: SCROBLARR_SIMKL_CLIENT_ID,
     });
   });
 
-  it("stores a provided client ID when linking", async () => {
+  it("stores the official Client ID and revokes a previous personal grant on reconnect", async () => {
+    userRepositoryMocks.findById.mockResolvedValueOnce({
+      id: "user-id",
+      plexUsername: "plex-user",
+      simklClientId: "personal-client-id",
+      simklAccessToken: "simkl_at_old",
+      simklRefreshToken: "simkl_rt_old",
+    });
     simklDeviceStoreMocks.resolveSimklDeviceCode.mockReturnValue("device-code");
     simklOAuthMocks.exchangePinForToken.mockResolvedValue({
       accessToken: "simkl_at_new",
@@ -245,17 +262,56 @@ describe("simkl routes", () => {
     simklClientMocks.getUserProfile.mockRejectedValue(
       new Error("profile down")
     );
+    simklOAuthMocks.revokeToken.mockResolvedValue(undefined);
 
     await request(app)
       .post("/simkl/link")
-      .send({ userCode: "BDWP-HQPK", clientId: "provided-client-id" })
+      .send({ userCode: "BDWP-HQPK" })
       .expect(200);
 
+    expect(simklOAuthMocks.revokeToken).toHaveBeenCalledWith("simkl_rt_old");
     expect(userRepositoryMocks.update).toHaveBeenCalledWith(
       "user-id",
       expect.objectContaining({
         simklAccessToken: "simkl_at_new",
-        simklClientId: "provided-client-id",
+        simklClientId: SCROBLARR_SIMKL_CLIENT_ID,
+      })
+    );
+  });
+
+  it("still reconnects when revoking the previous personal grant fails", async () => {
+    userRepositoryMocks.findById.mockResolvedValueOnce({
+      id: "user-id",
+      plexUsername: "plex-user",
+      simklClientId: "personal-client-id",
+      simklAccessToken: "simkl_at_old",
+      simklRefreshToken: "simkl_rt_old",
+    });
+    simklDeviceStoreMocks.resolveSimklDeviceCode.mockReturnValue("device-code");
+    simklOAuthMocks.exchangePinForToken.mockResolvedValue({
+      accessToken: "simkl_at_new",
+      refreshToken: "simkl_rt_new",
+      expiresAt: 1_700_000_000_000,
+    });
+    simklClientMocks.getUserProfile.mockResolvedValue({
+      id: 51,
+      username: "alice",
+      image: "https://img.example/alice.png",
+    });
+    simklOAuthMocks.revokeToken.mockRejectedValue(new Error("revoke down"));
+
+    const response = await request(app)
+      .post("/simkl/link")
+      .send({ userCode: "BDWP-HQPK" })
+      .expect(200);
+
+    expect(response.body).toEqual({ success: true });
+    expect(simklOAuthMocks.revokeToken).toHaveBeenCalledWith("simkl_rt_old");
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith(
+      "user-id",
+      expect.objectContaining({
+        simklAccessToken: "simkl_at_new",
+        simklClientId: SCROBLARR_SIMKL_CLIENT_ID,
       })
     );
   });
@@ -371,6 +427,28 @@ describe("simkl routes", () => {
       username: "stored-user",
       image: "https://img.example/stored.png",
       hasCredentials: true,
+      needsReconnect: true,
+    });
+  });
+
+  it("does not request reconnect when linked with the official V2 Client ID", async () => {
+    userRepositoryMocks.findById.mockResolvedValueOnce({
+      id: "user-id",
+      plexUsername: "plex-user",
+      simklClientId: SCROBLARR_SIMKL_CLIENT_ID,
+      simklAccessToken: "simkl_at_official_token_value_here_",
+      simklUsername: "stored-user",
+      simklThumb: "https://img.example/stored.png",
+    });
+
+    const response = await request(app).get("/simkl/status").expect(200);
+
+    expect(response.body).toEqual({
+      linked: true,
+      username: "stored-user",
+      image: "https://img.example/stored.png",
+      hasCredentials: true,
+      needsReconnect: false,
     });
   });
 
@@ -417,22 +495,6 @@ describe("simkl routes", () => {
     const response = await request(app).get("/simkl/authorize").expect(500);
 
     expect(response.body).toEqual({ error: "Simkl down" });
-  });
-
-  it("requires a client ID when linking without stored credentials", async () => {
-    userRepositoryMocks.findById.mockResolvedValueOnce({
-      id: "user-id",
-      plexUsername: "plex-user",
-      simklClientId: null,
-    });
-
-    const response = await request(app)
-      .post("/simkl/link")
-      .send({ userCode: "ABCDE" })
-      .expect(400);
-
-    expect(response.body.error).toContain("Simkl client ID is required");
-    expect(simklOAuthMocks.exchangePinForToken).not.toHaveBeenCalled();
   });
 
   it("returns 500 for unexpected link failures", async () => {
@@ -543,14 +605,6 @@ describe("simkl routes", () => {
     expect(response.body).toEqual({ error: "User not found" });
   });
 
-  it("returns validation errors for invalid authorize query values", async () => {
-    const response = await request(app)
-      .get("/simkl/authorize?clientId=a&clientId=b")
-      .expect(400);
-
-    expect(response.body.error).toBe("Validation error");
-  });
-
   it("returns a generic authorize error for non-Error failures", async () => {
     simklOAuthMocks.requestPinCode.mockRejectedValue("boom");
 
@@ -651,7 +705,8 @@ describe("simkl routes", () => {
       linked: false,
       username: null,
       image: null,
-      hasCredentials: false,
+      hasCredentials: true,
+      needsReconnect: false,
     });
   });
 

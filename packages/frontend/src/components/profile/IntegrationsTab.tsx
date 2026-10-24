@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from "@components/ui/dialog";
 import { Spinner } from "@components/ui/spinner";
+import { useAuth } from "@contexts/AuthContext";
 import {
   getTraktStatus,
   getTraktAuthorizeUrl,
@@ -27,7 +28,7 @@ import {
 } from "@services/api";
 import { OAuthPopup } from "@utils/OAuthPopup";
 import { showSuccess } from "@utils/toast";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   FaCheckCircle,
@@ -42,6 +43,11 @@ const DOCS_URL =
   (import.meta as { env?: { VITE_DOCS_URL?: string } }).env?.VITE_DOCS_URL ||
   "https://0xsysr3ll.github.io/scroblarr/docs";
 const TRAKT_DOCS_URL = `${DOCS_URL}/configuration/trakt`;
+const SIMKL_DOCS_URL = `${DOCS_URL}/configuration/simkl`;
+
+function simklReconnectDismissKey(userId: string): string {
+  return `simkl-reconnect-dismissed:${userId}`;
+}
 
 function isPinAuthPendingMessage(message: string): boolean {
   return /authorization pending/i.test(message);
@@ -55,6 +61,121 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function IntegrationErrorBanner({
+  message,
+  detail,
+}: {
+  message: string;
+  detail?: ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3">
+      <div className="flex items-start gap-2">
+        <FaTimesCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+        {detail ? (
+          <div className="flex-1">
+            <p className="mb-2 text-sm text-destructive">{message}</p>
+            {detail}
+          </div>
+        ) : (
+          <p className="text-sm text-destructive">{message}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LinkedStatusBadge({
+  warning,
+  warningLabel,
+  linkedLabel,
+}: {
+  warning?: boolean;
+  warningLabel: string;
+  linkedLabel: string;
+}) {
+  if (warning) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-sm font-medium text-warning-600 dark:text-warning-400">
+        <FaExclamationTriangle className="h-4 w-4" />
+        {warningLabel}
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-success-600 dark:text-success-400">
+      <FaCheckCircle className="h-4 w-4" />
+      {linkedLabel}
+    </span>
+  );
+}
+
+function SimklPinPanel({
+  code,
+  authUrl,
+  pinMessage,
+  pinPolling,
+  saving,
+  onCheck,
+}: {
+  code: string;
+  authUrl: string;
+  pinMessage: string | null;
+  pinPolling: boolean;
+  saving: boolean;
+  onCheck: () => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 dark:border-emerald-900 dark:bg-emerald-950/30">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-emerald-800 dark:text-emerald-200">
+            {t("simkl.authorizationCode", {
+              defaultValue: "PIN Code",
+            })}
+          </p>
+          <p className="mt-1 font-mono text-2xl font-semibold tracking-[0.25em] text-foreground">
+            {code}
+          </p>
+        </div>
+        <a
+          href={authUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex w-fit cursor-pointer items-center rounded-md border border-emerald-300 bg-background px-2.5 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950"
+        >
+          {t("simkl.openPinPage", {
+            defaultValue: "Open Simkl PIN page",
+          })}
+        </a>
+      </div>
+      {pinMessage && (
+        <div className="mt-3 flex items-center gap-2 text-xs text-emerald-800 dark:text-emerald-200">
+          {pinPolling && <Spinner size="sm" />}
+          <span>{pinMessage}</span>
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={onCheck}
+        disabled={saving || !code.trim()}
+        className="mt-3 w-full cursor-pointer rounded-md border border-emerald-300 bg-background px-2.5 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950"
+      >
+        {saving
+          ? t("simkl.checkingPin", {
+              defaultValue: "Checking...",
+            })
+          : t("simkl.checkPin", {
+              defaultValue: "Check approval now",
+            })}
+      </button>
+    </div>
+  );
+}
+
 type PinPollResult = "linked" | "pending" | "slow_down" | "failed";
 
 interface IntegrationsTabProps {
@@ -63,6 +184,7 @@ interface IntegrationsTabProps {
 
 export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [traktStatus, setTraktStatus] = useState<TraktStatus | null>(null);
   const [traktLoading, setTraktLoading] = useState(true);
   const [traktSaving, setTraktSaving] = useState(false);
@@ -81,10 +203,10 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
   const [simklSaving, setSimklSaving] = useState(false);
   const [simklError, setSimklError] = useState<string | null>(null);
   const [simklCode, setSimklCode] = useState("");
-  const [simklClientId, setSimklClientId] = useState("");
   const [simklAuthUrl, setSimklAuthUrl] = useState<string | null>(null);
   const [simklPinPolling, setSimklPinPolling] = useState(false);
   const [simklPinMessage, setSimklPinMessage] = useState<string | null>(null);
+  const [simklReconnectDismissed, setSimklReconnectDismissed] = useState(false);
   const [showSimklUnlinkModal, setShowSimklUnlinkModal] = useState(false);
   const [simklOAuthPopup] = useState(() => new OAuthPopup());
   const [bingersStatus, setBingersStatus] = useState<BingersStatus | null>(
@@ -144,6 +266,16 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
 
     loadSimklStatus();
   }, []);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setSimklReconnectDismissed(false);
+      return;
+    }
+    setSimklReconnectDismissed(
+      localStorage.getItem(simklReconnectDismissKey(user.id)) === "1"
+    );
+  }, [user?.id]);
 
   useEffect(() => {
     const requestId = ++bingersStatusRequestIdRef.current;
@@ -348,7 +480,6 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
 
   async function completeSimklLink(
     userCode: string,
-    clientId: string | undefined,
     showPendingError = true
   ): Promise<PinPollResult> {
     let result: PinPollResult = "failed";
@@ -357,14 +488,17 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         setSimklSaving(true);
       }
       setSimklError(null);
-      await linkSimkl(userCode.trim(), clientId);
+      await linkSimkl(userCode.trim());
       simklPinPollIdRef.current += 1;
       setSimklPinPolling(false);
       setSimklPinMessage(null);
       setSimklCode("");
-      setSimklClientId("");
       setSimklAuthUrl(null);
       simklOAuthPopup.closePopup();
+      if (user?.id) {
+        localStorage.removeItem(simklReconnectDismissKey(user.id));
+        setSimklReconnectDismissed(false);
+      }
       const status = await getSimklStatus();
       setSimklStatus(status);
       showSuccess(
@@ -402,7 +536,6 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
 
   async function startSimklPinPolling(
     userCode: string,
-    clientId: string | undefined,
     interval: number,
     expiresIn: number,
     pollId: number
@@ -423,7 +556,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         return;
       }
 
-      const result = await completeSimklLink(userCode, clientId, false);
+      const result = await completeSimklLink(userCode, false);
       if (result === "linked" || result === "failed") {
         return;
       }
@@ -572,9 +705,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
 
     setTimeout(async () => {
       try {
-        const clientId = simklClientId.trim() || undefined;
-
-        const response = await getSimklAuthorizeUrl(clientId);
+        const response = await getSimklAuthorizeUrl();
         if (pollId !== simklPinPollIdRef.current) {
           return;
         }
@@ -585,7 +716,6 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         simklOAuthPopup.navigateToUrl(response.verificationUrl);
         void startSimklPinPolling(
           response.userCode,
-          clientId,
           response.interval,
           response.expiresIn,
           pollId
@@ -611,8 +741,14 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
   }
 
   async function handleLinkSimkl() {
-    const clientId = simklClientId.trim() || undefined;
-    await completeSimklLink(simklCode.trim(), clientId);
+    await completeSimklLink(simklCode.trim());
+  }
+
+  function dismissSimklReconnectNote() {
+    if (user?.id) {
+      localStorage.setItem(simklReconnectDismissKey(user.id), "1");
+    }
+    setSimklReconnectDismissed(true);
   }
 
   async function handleUnlinkSimkl() {
@@ -631,7 +767,6 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
       await unlinkSimkl();
       setSimklCode("");
       setSimklAuthUrl(null);
-      setSimklClientId("");
       const status = await getSimklStatus();
       setSimklStatus(status);
       showSuccess(
@@ -831,34 +966,21 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         defaultOpen={!!traktStatus?.needsReauthorization}
         headerMeta={
           traktStatus?.linked ? (
-            traktStatus.needsReauthorization ? (
-              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-warning-600 dark:text-warning-400">
-                <FaExclamationTriangle className="h-4 w-4" />
-                {t("profile.linkedAccounts.reauthRequired", {
-                  defaultValue: "Re-authorization required",
-                })}
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-success-600 dark:text-success-400">
-                <FaCheckCircle className="h-4 w-4" />
-                {t("profile.linkedAccounts.linked", {
-                  defaultValue: "Linked",
-                })}
-              </span>
-            )
+            <LinkedStatusBadge
+              warning={traktStatus.needsReauthorization}
+              warningLabel={t("profile.linkedAccounts.reauthRequired", {
+                defaultValue: "Re-authorization required",
+              })}
+              linkedLabel={t("profile.linkedAccounts.linked", {
+                defaultValue: "Linked",
+              })}
+            />
           ) : undefined
         }
       >
         {traktStatus?.linked ? (
           <div className="space-y-4">
-            {traktError && (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3">
-                <div className="flex items-start gap-2">
-                  <FaTimesCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
-                  <p className="text-sm text-destructive">{traktError}</p>
-                </div>
-              </div>
-            )}
+            {traktError && <IntegrationErrorBanner message={traktError} />}
             {traktStatus.needsReauthorization && (
               <div className="flex items-start gap-2 rounded-lg border border-warning-500/30 bg-warning-500/10 px-3 py-2 text-warning-700 dark:text-warning-300">
                 <FaExclamationTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -931,26 +1053,21 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
               })}
             </p>
             {traktError && (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3">
-                <div className="flex items-start gap-2">
-                  <FaTimesCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
-                  <div className="flex-1">
-                    <p className="mb-2 text-sm text-destructive">
-                      {traktError}
-                    </p>
-                    {traktAuthUrl && (
-                      <a
-                        href={traktAuthUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="break-all text-sm text-destructive underline hover:text-destructive/80"
-                      >
-                        {traktAuthUrl}
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <IntegrationErrorBanner
+                message={traktError}
+                detail={
+                  traktAuthUrl ? (
+                    <a
+                      href={traktAuthUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="break-all text-sm text-destructive underline hover:text-destructive/80"
+                    >
+                      {traktAuthUrl}
+                    </a>
+                  ) : undefined
+                }
+              />
             )}
 
             <div className="space-y-4">
@@ -1091,6 +1208,11 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
 
       {/* Simkl Integration */}
       <CollapsibleSettingsCard
+        key={
+          simklStatus?.linked && simklStatus.needsReconnect
+            ? "simkl-reconnect"
+            : "simkl"
+        }
         title="Simkl"
         description={t("simkl.description", {
           defaultValue:
@@ -1106,26 +1228,75 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
             }}
           />
         }
+        defaultOpen={!!(simklStatus?.linked && simklStatus.needsReconnect)}
         headerMeta={
           simklStatus?.linked ? (
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-success-600 dark:text-success-400">
-              <FaCheckCircle className="h-4 w-4" />
-              {t("profile.linkedAccounts.linked", {
+            <LinkedStatusBadge
+              warning={simklStatus.needsReconnect}
+              warningLabel={t("simkl.reconnectRecommended", {
+                defaultValue: "Reconnect recommended",
+              })}
+              linkedLabel={t("profile.linkedAccounts.linked", {
                 defaultValue: "Linked",
               })}
-            </span>
+            />
           ) : undefined
         }
       >
         {simklStatus?.linked ? (
           <div className="space-y-4">
-            {simklError && (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3">
+            {simklError && <IntegrationErrorBanner message={simklError} />}
+            {simklStatus.needsReconnect && !simklReconnectDismissed && (
+              <div className="rounded-lg border border-warning-500/30 bg-warning-500/10 px-3 py-2 text-warning-700 dark:text-warning-300">
                 <div className="flex items-start gap-2">
-                  <FaTimesCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
-                  <p className="text-sm text-destructive">{simklError}</p>
+                  <FaExclamationTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <p className="text-sm">
+                      {t("simkl.needsReconnect", {
+                        defaultValue:
+                          "Reconnect once to use Scroblarr's official Simkl app. Your existing link still works until you do.",
+                      })}{" "}
+                      <a
+                        href={SIMKL_DOCS_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline hover:no-underline"
+                      >
+                        {t("simkl.learnMore", { defaultValue: "Learn more" })}
+                      </a>
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={handleGetSimklAuthUrl}
+                        disabled={simklSaving || simklLoading}
+                        className="cursor-pointer rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {t("simkl.reconnect", { defaultValue: "Reconnect" })}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={dismissSimklReconnectNote}
+                        className="cursor-pointer rounded-lg px-3 py-1.5 text-sm font-medium text-warning-800 hover:bg-warning-500/20 dark:text-warning-200"
+                      >
+                        {t("simkl.dismissReconnect", {
+                          defaultValue: "Dismiss",
+                        })}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
+            )}
+            {simklAuthUrl && simklStatus.needsReconnect && (
+              <SimklPinPanel
+                code={simklCode}
+                authUrl={simklAuthUrl}
+                pinMessage={simklPinMessage}
+                pinPolling={simklPinPolling}
+                saving={simklSaving}
+                onCheck={handleLinkSimkl}
+              />
             )}
             <div className="flex items-start gap-4">
               {simklStatus.image && (
@@ -1171,68 +1342,41 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               {t("simkl.docsHint", {
-                defaultValue:
-                  "Create a Simkl app and enter its Client ID below. PIN authorization does not require a client secret.",
-              })}
+                defaultValue: "Link your Simkl account with a one-time PIN.",
+              })}{" "}
+              <a
+                href={SIMKL_DOCS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:no-underline"
+              >
+                {t("simkl.learnMore", { defaultValue: "Learn more" })}
+              </a>
             </p>
             {simklError && (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3">
-                <div className="flex items-start gap-2">
-                  <FaTimesCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
-                  <div className="flex-1">
-                    <p className="mb-2 text-sm text-destructive">
-                      {simklError}
-                    </p>
-                    {simklAuthUrl && (
-                      <a
-                        href={simklAuthUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="break-all text-sm text-destructive underline hover:text-destructive/80"
-                      >
-                        {simklAuthUrl}
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <IntegrationErrorBanner
+                message={simklError}
+                detail={
+                  simklAuthUrl ? (
+                    <a
+                      href={simklAuthUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="break-all text-sm text-destructive underline hover:text-destructive/80"
+                    >
+                      {simklAuthUrl}
+                    </a>
+                  ) : undefined
+                }
+              />
             )}
 
             <div className="space-y-4">
-              {!simklStatus?.hasCredentials && (
-                <div className="space-y-3 border-b border-border pb-4">
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-foreground/90">
-                      {t("simkl.clientId", { defaultValue: "Client ID" })}
-                    </label>
-                    <input
-                      type="text"
-                      value={simklClientId}
-                      onChange={(e) => setSimklClientId(e.target.value)}
-                      placeholder={t("simkl.clientIdPlaceholder", {
-                        defaultValue: "Enter your Simkl Client ID",
-                      })}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
-                    />
-                  </div>
-                </div>
-              )}
-
               <div>
-                <p className="mb-2 text-sm text-foreground/90">
-                  {t("simkl.oauthInstructions", {
-                    defaultValue:
-                      "Click 'Authorize' to get a Simkl PIN code, then enter that code on Simkl's PIN page.",
-                  })}
-                </p>
                 <button
                   type="button"
                   onClick={handleGetSimklAuthUrl}
-                  disabled={
-                    simklSaving ||
-                    simklLoading ||
-                    (!simklStatus?.hasCredentials && !simklClientId.trim())
-                  }
+                  disabled={simklSaving || simklLoading}
                   className="w-full cursor-pointer rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                 >
                   {t("simkl.authorize", { defaultValue: "Authorize" })}
@@ -1240,54 +1384,14 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
               </div>
 
               {simklAuthUrl && (
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 dark:border-emerald-900 dark:bg-emerald-950/30">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-emerald-800 dark:text-emerald-200">
-                        {t("simkl.authorizationCode", {
-                          defaultValue: "PIN Code",
-                        })}
-                      </p>
-                      <p className="mt-1 font-mono text-2xl font-semibold tracking-[0.25em] text-foreground">
-                        {simklCode}
-                      </p>
-                    </div>
-                    <a
-                      href={simklAuthUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex w-fit cursor-pointer items-center rounded-md border border-emerald-300 bg-background px-2.5 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950"
-                    >
-                      {t("simkl.openPinPage", {
-                        defaultValue: "Open Simkl PIN page",
-                      })}
-                    </a>
-                  </div>
-                  {simklPinMessage && (
-                    <div className="mt-3 flex items-center gap-2 text-xs text-emerald-800 dark:text-emerald-200">
-                      {simklPinPolling && <Spinner size="sm" />}
-                      <span>{simklPinMessage}</span>
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleLinkSimkl}
-                    disabled={
-                      simklSaving ||
-                      !simklCode.trim() ||
-                      (!simklStatus?.hasCredentials && !simklClientId.trim())
-                    }
-                    className="mt-3 w-full cursor-pointer rounded-md border border-emerald-300 bg-background px-2.5 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950"
-                  >
-                    {simklSaving
-                      ? t("simkl.checkingPin", {
-                          defaultValue: "Checking...",
-                        })
-                      : t("simkl.checkPin", {
-                          defaultValue: "Check approval now",
-                        })}
-                  </button>
-                </div>
+                <SimklPinPanel
+                  code={simklCode}
+                  authUrl={simklAuthUrl}
+                  pinMessage={simklPinMessage}
+                  pinPolling={simklPinPolling}
+                  saving={simklSaving}
+                  onCheck={handleLinkSimkl}
+                />
               )}
             </div>
           </div>
@@ -1313,32 +1417,30 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         defaultOpen={!!bingersStatus?.needsReauthorization}
         headerMeta={
           bingersStatus?.linked ? (
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-success-600 dark:text-success-400">
-              <FaCheckCircle className="h-4 w-4" />
-              {t("profile.linkedAccounts.linked", {
+            <LinkedStatusBadge
+              linkedLabel={t("profile.linkedAccounts.linked", {
                 defaultValue: "Linked",
               })}
-            </span>
-          ) : bingersStatus?.needsReauthorization ? (
-            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-warning-600 dark:text-warning-400">
-              <FaExclamationTriangle className="h-4 w-4" />
-              {t("profile.linkedAccounts.reauthRequired", {
+              warningLabel={t("profile.linkedAccounts.reauthRequired", {
                 defaultValue: "Re-authorization required",
               })}
-            </span>
+            />
+          ) : bingersStatus?.needsReauthorization ? (
+            <LinkedStatusBadge
+              warning
+              linkedLabel={t("profile.linkedAccounts.linked", {
+                defaultValue: "Linked",
+              })}
+              warningLabel={t("profile.linkedAccounts.reauthRequired", {
+                defaultValue: "Re-authorization required",
+              })}
+            />
           ) : undefined
         }
       >
         {bingersStatus?.linked ? (
           <div className="space-y-4">
-            {bingersError && (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3">
-                <div className="flex items-start gap-2">
-                  <FaTimesCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
-                  <p className="text-sm text-destructive">{bingersError}</p>
-                </div>
-              </div>
-            )}
+            {bingersError && <IntegrationErrorBanner message={bingersError} />}
             <div className="flex items-start gap-4">
               {bingersStatus.image && (
                 <img
@@ -1487,14 +1589,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                   "Open Bingers sign-in to email yourself a magic link, then paste that link below.",
               })}
             </p>
-            {bingersError && (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3">
-                <div className="flex items-start gap-2">
-                  <FaTimesCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
-                  <p className="text-sm text-destructive">{bingersError}</p>
-                </div>
-              </div>
-            )}
+            {bingersError && <IntegrationErrorBanner message={bingersError} />}
             {bingersStatus?.needsReauthorization && (
               <div className="flex items-start gap-2 rounded-lg border border-warning-500/30 bg-warning-500/10 px-3 py-2 text-warning-700 dark:text-warning-300">
                 <FaExclamationTriangle className="mt-0.5 h-4 w-4 shrink-0" />
