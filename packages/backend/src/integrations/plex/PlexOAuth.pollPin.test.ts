@@ -1,4 +1,5 @@
 import { getAppVersionForClients } from "@utils/appVersion";
+import { logger } from "@utils/logger";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -385,6 +386,9 @@ describe("PlexOAuth.getServerUsers", () => {
   });
 
   it("rejects failed server user fetches and redacts credentials in logs", async () => {
+    const errorSpy = vi
+      .spyOn(logger.plex, "error")
+      .mockImplementation(() => {});
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: false,
       status: 403,
@@ -398,5 +402,12 @@ describe("PlexOAuth.getServerUsers", () => {
         "https://user:secret@plex.local:32400"
       )
     ).rejects.toThrow("Failed to get server users: 403 Forbidden - denied");
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        serverUrl: "https://***@plex.local:32400",
+      }),
+      "Failed to get Plex server users"
+    );
   });
 });
