@@ -25,7 +25,7 @@ describe("simkl api", () => {
     invalidateSimklCache();
   });
 
-  it("requests a PIN authorization payload with client ID", async () => {
+  it("requests a PIN authorization payload", async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({
         userCode: "ABCDE",
@@ -35,17 +35,14 @@ describe("simkl api", () => {
       })
     );
 
-    await expect(getSimklAuthorizeUrl("client id")).resolves.toEqual({
+    await expect(getSimklAuthorizeUrl()).resolves.toEqual({
       userCode: "ABCDE",
       verificationUrl: "https://simkl.com/pin/",
       expiresIn: 900,
       interval: 5,
     });
 
-    const actualUrl = new URL(String(fetchMock.mock.calls[0][0]), "http://app");
-    expect(actualUrl.pathname).toBe("/api/v1/simkl/authorize");
-    expect(actualUrl.searchParams.get("clientId")).toBe("client id");
-    expect(fetchMock).toHaveBeenCalledWith(expect.any(String), {
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/simkl/authorize", {
       headers: expectedHeaders,
     });
   });
@@ -58,6 +55,7 @@ describe("simkl api", () => {
           username: null,
           image: null,
           hasCredentials: true,
+          needsReconnect: false,
         })
       )
       .mockResolvedValueOnce(jsonResponse({ success: true }))
@@ -67,11 +65,12 @@ describe("simkl api", () => {
           username: "alice",
           image: "https://img.example/alice.png",
           hasCredentials: true,
+          needsReconnect: false,
         })
       );
 
     await getSimklStatus();
-    await expect(linkSimkl("ABCDE", "id")).resolves.toEqual({
+    await expect(linkSimkl("ABCDE")).resolves.toEqual({
       success: true,
     });
     await expect(getSimklStatus()).resolves.toMatchObject({
@@ -84,7 +83,6 @@ describe("simkl api", () => {
       headers: expectedHeaders,
       body: JSON.stringify({
         userCode: "ABCDE",
-        clientId: "id",
       }),
     });
     expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -147,12 +145,10 @@ describe("simkl api", () => {
 
   it("surfaces authorization errors from the backend", async () => {
     fetchMock.mockResolvedValueOnce(
-      jsonResponse({ error: "Simkl client ID is required" }, false, 400)
+      jsonResponse({ error: "Simkl down" }, false, 500)
     );
 
-    await expect(getSimklAuthorizeUrl()).rejects.toThrow(
-      "Simkl client ID is required"
-    );
+    await expect(getSimklAuthorizeUrl()).rejects.toThrow("Simkl down");
   });
 
   it("surfaces link errors from the backend", async () => {
@@ -214,5 +210,38 @@ describe("simkl api", () => {
     await expect(getSimklAuthorizeUrl()).rejects.toThrow("proxy failed");
     await expect(linkSimkl("ABCDE")).rejects.toThrow("link proxy failed");
     await expect(unlinkSimkl()).rejects.toThrow("unlink proxy failed");
+  });
+
+  it("returns cached Simkl status without refetching", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        linked: true,
+        username: "alice",
+        image: null,
+        hasCredentials: true,
+        needsReconnect: false,
+      })
+    );
+
+    await expect(getSimklStatus()).resolves.toMatchObject({ linked: true });
+    await expect(getSimklStatus()).resolves.toMatchObject({
+      username: "alice",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to the plain error message when status metadata is empty", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 0,
+      statusText: "",
+      clone: undefined,
+      json: vi.fn().mockRejectedValue(new Error("invalid json")),
+      text: vi.fn().mockResolvedValue("   "),
+    });
+
+    await expect(getSimklAuthorizeUrl()).rejects.toThrow(
+      "Failed to get Simkl PIN code"
+    );
   });
 });

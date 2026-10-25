@@ -9,6 +9,7 @@ export interface SimklStatus {
   username: string | null;
   image: string | null;
   hasCredentials: boolean;
+  needsReconnect?: boolean;
 }
 
 export interface SimklProfile {
@@ -58,17 +59,8 @@ async function getErrorMessage(
   return status ? `${fallback} (${status})` : fallback;
 }
 
-export async function getSimklAuthorizeUrl(
-  clientId?: string
-): Promise<SimklPinAuthorization> {
-  const params = new URLSearchParams();
-  if (clientId) params.append("clientId", clientId);
-
-  const url = `${API_BASE_URL}/simkl/authorize${
-    params.toString() ? `?${params.toString()}` : ""
-  }`;
-
-  const response = await fetch(url, {
+export async function getSimklAuthorizeUrl(): Promise<SimklPinAuthorization> {
+  const response = await fetch(`${API_BASE_URL}/simkl/authorize`, {
     headers: getAuthHeaders(),
   });
   if (!response.ok) {
@@ -80,13 +72,12 @@ export async function getSimklAuthorizeUrl(
 }
 
 export async function linkSimkl(
-  userCode: string,
-  clientId?: string
+  userCode: string
 ): Promise<{ success: boolean }> {
   const response = await fetch(`${API_BASE_URL}/simkl/link`, {
     method: "POST",
     headers: getAuthHeaders(),
-    body: JSON.stringify({ userCode, clientId }),
+    body: JSON.stringify({ userCode }),
   });
   if (!response.ok) {
     throw new Error(
