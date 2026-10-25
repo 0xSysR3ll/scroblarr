@@ -1265,27 +1265,29 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                         {t("simkl.learnMore", { defaultValue: "Learn more" })}
                       </a>
                     </p>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={handleGetSimklAuthUrl}
-                        disabled={simklSaving || simklLoading}
-                        className="cursor-pointer rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {t("simkl.reconnect", { defaultValue: "Reconnect" })}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={dismissSimklReconnectNote}
-                        className="cursor-pointer rounded-lg px-3 py-1.5 text-sm font-medium text-warning-800 hover:bg-warning-500/20 dark:text-warning-200"
-                      >
-                        {t("simkl.dismissReconnect", {
-                          defaultValue: "Dismiss",
-                        })}
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={dismissSimklReconnectNote}
+                      className="cursor-pointer rounded-lg px-3 py-1.5 text-sm font-medium text-warning-800 hover:bg-warning-500/20 dark:text-warning-200"
+                    >
+                      {t("simkl.dismissReconnect", {
+                        defaultValue: "Dismiss",
+                      })}
+                    </button>
                   </div>
                 </div>
+              </div>
+            )}
+            {simklStatus.needsReconnect && (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handleGetSimklAuthUrl}
+                  disabled={simklSaving || simklLoading}
+                  className="cursor-pointer rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {t("simkl.reconnect", { defaultValue: "Reconnect" })}
+                </button>
               </div>
             )}
             {simklAuthUrl && simklStatus.needsReconnect && (

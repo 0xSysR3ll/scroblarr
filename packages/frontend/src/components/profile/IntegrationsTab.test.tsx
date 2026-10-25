@@ -1249,6 +1249,7 @@ describe("IntegrationsTab Simkl integration", () => {
     expect(
       screen.queryByText(/Reconnect once to use Scroblarr's official Simkl app/)
     ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reconnect" })).toBeVisible();
     expect(localStorage.getItem("simkl-reconnect-dismissed:user-id")).toBe("1");
   });
 

@@ -87,7 +87,7 @@ vi.mock("@utils/logger", () => ({
   },
 }));
 
-import { SCROBLARR_SIMKL_CLIENT_ID } from "@integrations/simkl/simklConfig";
+import { getSimklClientId } from "@integrations/simkl/simklConfig";
 
 import { simklRoutes } from "./simkl";
 
@@ -213,7 +213,7 @@ describe("simkl routes", () => {
         simklTokenExpiresAt: 1_700_000_000_000,
         simklUsername: "alice",
         simklThumb: "https://img.example/alice.png",
-        simklClientId: SCROBLARR_SIMKL_CLIENT_ID,
+        simklClientId: getSimklClientId(),
       })
     );
   });
@@ -241,7 +241,7 @@ describe("simkl routes", () => {
       simklTokenExpiresAt: null,
       simklUsername: "alice",
       simklThumb: "https://img.example/alice.png",
-      simklClientId: SCROBLARR_SIMKL_CLIENT_ID,
+      simklClientId: getSimklClientId(),
     });
   });
 
@@ -269,14 +269,17 @@ describe("simkl routes", () => {
       .send({ userCode: "BDWP-HQPK" })
       .expect(200);
 
-    expect(simklOAuthMocks.revokeToken).toHaveBeenCalledWith("simkl_rt_old");
     expect(userRepositoryMocks.update).toHaveBeenCalledWith(
       "user-id",
       expect.objectContaining({
         simklAccessToken: "simkl_at_new",
-        simklClientId: SCROBLARR_SIMKL_CLIENT_ID,
+        simklClientId: getSimklClientId(),
       })
     );
+    expect(simklOAuthMocks.revokeToken).toHaveBeenCalledWith("simkl_rt_old");
+    const updateOrder = userRepositoryMocks.update.mock.invocationCallOrder[0];
+    const revokeOrder = simklOAuthMocks.revokeToken.mock.invocationCallOrder[0];
+    expect(updateOrder).toBeLessThan(revokeOrder);
   });
 
   it("still reconnects when revoking the previous personal grant fails", async () => {
@@ -311,7 +314,7 @@ describe("simkl routes", () => {
       "user-id",
       expect.objectContaining({
         simklAccessToken: "simkl_at_new",
-        simklClientId: SCROBLARR_SIMKL_CLIENT_ID,
+        simklClientId: getSimklClientId(),
       })
     );
   });
@@ -435,7 +438,7 @@ describe("simkl routes", () => {
     userRepositoryMocks.findById.mockResolvedValueOnce({
       id: "user-id",
       plexUsername: "plex-user",
-      simklClientId: SCROBLARR_SIMKL_CLIENT_ID,
+      simklClientId: getSimklClientId(),
       simklAccessToken: "simkl_at_official_token_value_here_",
       simklUsername: "stored-user",
       simklThumb: "https://img.example/stored.png",

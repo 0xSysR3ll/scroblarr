@@ -85,22 +85,6 @@ router.post("/link", async (req: Request, res: Response) => {
     const tokens = await simklOAuth.exchangePinForToken(deviceCode);
     clearSimklDevice(user.id);
 
-    if (
-      previousRefreshToken &&
-      previousClientId &&
-      previousClientId !== clientId
-    ) {
-      try {
-        const previousOAuth = new SimklOAuth(previousClientId);
-        await previousOAuth.revokeToken(previousRefreshToken);
-      } catch (error) {
-        logger.simkl.warn(
-          { error, userId: user.id },
-          "Failed to revoke previous Simkl token during reconnect"
-        );
-      }
-    }
-
     let username: string | undefined;
     let avatar: string | undefined;
     try {
@@ -120,6 +104,22 @@ router.post("/link", async (req: Request, res: Response) => {
       simklThumb: avatar,
       simklClientId: clientId,
     } as unknown as Partial<User>);
+
+    if (
+      previousRefreshToken &&
+      previousClientId &&
+      previousClientId !== clientId
+    ) {
+      try {
+        const previousOAuth = new SimklOAuth(previousClientId);
+        await previousOAuth.revokeToken(previousRefreshToken);
+      } catch (error) {
+        logger.simkl.warn(
+          { error, userId: user.id },
+          "Failed to revoke previous Simkl token during reconnect"
+        );
+      }
+    }
 
     logger.simkl.info(
       {
