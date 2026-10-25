@@ -105,7 +105,7 @@ export class JellyfinWebhookParser {
     }
 
     const media = this.parseMediaItem(
-      itemType,
+      itemType as "Movie" | "Episode",
       name,
       year,
       seriesName,
@@ -118,9 +118,6 @@ export class JellyfinWebhookParser {
       runtimeTicks,
       playbackPositionTicks
     );
-    if (!media) {
-      return null;
-    }
 
     return {
       event: status,
@@ -149,7 +146,7 @@ export class JellyfinWebhookParser {
   }
 
   private static parseMediaItem(
-    itemType: string,
+    itemType: "Movie" | "Episode",
     name: string,
     year: string | undefined,
     seriesName: string | undefined,
@@ -161,7 +158,7 @@ export class JellyfinWebhookParser {
     posterUrl: string | undefined,
     runtimeTicks: string | undefined,
     playbackPositionTicks: string | undefined
-  ): MediaItem | null {
+  ): MediaItem {
     const ticksToMs = (ticks: string | undefined): number | undefined => {
       if (!ticks) {
         return undefined;
@@ -173,17 +170,7 @@ export class JellyfinWebhookParser {
       return Math.floor(ticksNum / 10000);
     };
 
-    const extractTvdbId = (
-      provider: string | undefined
-    ): number | undefined => {
-      if (!provider || provider.trim() === "") {
-        return undefined;
-      }
-      const id = parseInt(provider, 10);
-      return isNaN(id) ? undefined : id;
-    };
-
-    const extractTmdbId = (
+    const parseProviderNumericId = (
       provider: string | undefined
     ): number | undefined => {
       if (!provider || provider.trim() === "") {
@@ -194,8 +181,8 @@ export class JellyfinWebhookParser {
     };
 
     if (itemType === "Movie") {
-      const tvdbMovieId = extractTvdbId(providerTvdb);
-      const tmdbMovieId = extractTmdbId(providerTmdb);
+      const tvdbMovieId = parseProviderNumericId(providerTvdb);
+      const tmdbMovieId = parseProviderNumericId(providerTmdb);
       const imdbMovieId =
         providerImdb && providerImdb.trim() !== "" ? providerImdb : undefined;
       const yearNum = year ? parseInt(year, 10) : undefined;
@@ -214,32 +201,26 @@ export class JellyfinWebhookParser {
       };
     }
 
-    if (itemType === "Episode") {
-      const tvdbEpisodeId = extractTvdbId(providerTvdb);
-      const imdbEpisodeId =
-        providerImdb && providerImdb.trim() !== "" ? providerImdb : undefined;
-      const yearNum = year ? parseInt(year, 10) : undefined;
-      const seasonNum = seasonNumber ? parseInt(seasonNumber, 10) : undefined;
-      const episodeNum = episodeNumber
-        ? parseInt(episodeNumber, 10)
-        : undefined;
+    const tvdbEpisodeId = parseProviderNumericId(providerTvdb);
+    const imdbEpisodeId =
+      providerImdb && providerImdb.trim() !== "" ? providerImdb : undefined;
+    const yearNum = year ? parseInt(year, 10) : undefined;
+    const seasonNum = seasonNumber ? parseInt(seasonNumber, 10) : undefined;
+    const episodeNum = episodeNumber ? parseInt(episodeNumber, 10) : undefined;
 
-      return {
-        id: `episode-${seriesName || "Unknown"}-${seasonNum || "unknown"}-${episodeNum || "unknown"}`,
-        type: "episode",
-        title: seriesName || "Unknown",
-        year: isNaN(yearNum || NaN) ? undefined : yearNum,
-        seasonNumber: isNaN(seasonNum || NaN) ? undefined : seasonNum,
-        episodeNumber: isNaN(episodeNum || NaN) ? undefined : episodeNum,
-        episodeTitle: name,
-        duration: ticksToMs(runtimeTicks),
-        watchedDuration: ticksToMs(playbackPositionTicks),
-        tvdbEpisodeId,
-        imdbEpisodeId,
-        posterUrl,
-      };
-    }
-
-    return null;
+    return {
+      id: `episode-${seriesName || "Unknown"}-${seasonNum || "unknown"}-${episodeNum || "unknown"}`,
+      type: "episode",
+      title: seriesName || "Unknown",
+      year: isNaN(yearNum || NaN) ? undefined : yearNum,
+      seasonNumber: isNaN(seasonNum || NaN) ? undefined : seasonNum,
+      episodeNumber: isNaN(episodeNum || NaN) ? undefined : episodeNum,
+      episodeTitle: name,
+      duration: ticksToMs(runtimeTicks),
+      watchedDuration: ticksToMs(playbackPositionTicks),
+      tvdbEpisodeId,
+      imdbEpisodeId,
+      posterUrl,
+    };
   }
 }

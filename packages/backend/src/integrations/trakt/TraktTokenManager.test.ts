@@ -130,6 +130,15 @@ describe("TraktTokenManager", () => {
     );
   });
 
+  it("wraps non-Error refresh failures as Unknown error", async () => {
+    traktOAuthMocks.refreshToken.mockRejectedValue("token endpoint offline");
+    const manager = new TraktTokenManager();
+
+    await expect(manager.refreshAccessToken("user-id")).rejects.toThrow(
+      "Failed to refresh Trakt token: Unknown error"
+    );
+  });
+
   it("rejects missing users when resolving a valid access token", async () => {
     userRepositoryMocks.findById.mockResolvedValue(null);
     const manager = new TraktTokenManager();

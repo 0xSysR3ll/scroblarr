@@ -39,6 +39,49 @@ export interface BingersMeProfile {
 export class BingersAuth {
   private static readonly REQUEST_TIMEOUT_MS = 15_000;
 
+  private async fetchAuthedJson(
+    url: string,
+    cookieJar: CookieJar
+  ): Promise<{ body: unknown; cookieJar: CookieJar }> {
+    const cookieHeader = cookieHeaderFromJar(cookieJar);
+    if (!cookieHeader) {
+      throw new BingersApiError(BINGERS_REAUTH_MESSAGE, 401, {
+        isAuthError: true,
+      });
+    }
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Origin: "https://bingers.app",
+        Cookie: cookieHeader,
+      },
+      signal: AbortSignal.timeout(BingersAuth.REQUEST_TIMEOUT_MS),
+    });
+
+    const mergedJar = mergeSetCookieHeaders(
+      cookieJar,
+      collectSetCookieHeaders(response)
+    );
+
+    if (response.status === 401 || response.status === 403) {
+      throw new BingersApiError(BINGERS_REAUTH_MESSAGE, response.status, {
+        isAuthError: true,
+      });
+    }
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw bingersErrorFromResponse(response.status, text);
+    }
+
+    return {
+      body: (await response.json()) as unknown,
+      cookieJar: mergedJar,
+    };
+  }
+
   async verifyMagicLink(token: string): Promise<BingersSessionInfo> {
     const url = new URL(`${BINGERS_AUTH_BASE}/magic-link/verify`);
     url.searchParams.set("token", token);
@@ -98,40 +141,12 @@ export class BingersAuth {
   }
 
   async getSession(cookieJar: CookieJar): Promise<BingersSessionInfo> {
-    const cookieHeader = cookieHeaderFromJar(cookieJar);
-    if (!cookieHeader) {
-      throw new BingersApiError(BINGERS_REAUTH_MESSAGE, 401, {
-        isAuthError: true,
-      });
-    }
-
-    const response = await fetch(`${BINGERS_AUTH_BASE}/get-session`, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        Origin: "https://bingers.app",
-        Cookie: cookieHeader,
-      },
-      signal: AbortSignal.timeout(BingersAuth.REQUEST_TIMEOUT_MS),
-    });
-
-    let mergedJar = mergeSetCookieHeaders(
-      cookieJar,
-      collectSetCookieHeaders(response)
+    const { body, cookieJar: initialJar } = await this.fetchAuthedJson(
+      `${BINGERS_AUTH_BASE}/get-session`,
+      cookieJar
     );
+    let mergedJar = initialJar;
 
-    if (response.status === 401 || response.status === 403) {
-      throw new BingersApiError(BINGERS_REAUTH_MESSAGE, response.status, {
-        isAuthError: true,
-      });
-    }
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw bingersErrorFromResponse(response.status, text);
-    }
-
-    const body = (await response.json()) as unknown;
     if (body === null) {
       throw new BingersApiError(BINGERS_REAUTH_MESSAGE, 401, {
         isAuthError: true,
@@ -168,40 +183,10 @@ export class BingersAuth {
   async getMe(
     cookieJar: CookieJar
   ): Promise<{ profile: BingersMeProfile; cookieJar: CookieJar }> {
-    const cookieHeader = cookieHeaderFromJar(cookieJar);
-    if (!cookieHeader) {
-      throw new BingersApiError(BINGERS_REAUTH_MESSAGE, 401, {
-        isAuthError: true,
-      });
-    }
-
-    const response = await fetch(`${BINGERS_API_BASE}/me`, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        Origin: "https://bingers.app",
-        Cookie: cookieHeader,
-      },
-      signal: AbortSignal.timeout(BingersAuth.REQUEST_TIMEOUT_MS),
-    });
-
-    const mergedJar = mergeSetCookieHeaders(
-      cookieJar,
-      collectSetCookieHeaders(response)
+    const { body, cookieJar: mergedJar } = await this.fetchAuthedJson(
+      `${BINGERS_API_BASE}/me`,
+      cookieJar
     );
-
-    if (response.status === 401 || response.status === 403) {
-      throw new BingersApiError(BINGERS_REAUTH_MESSAGE, response.status, {
-        isAuthError: true,
-      });
-    }
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw bingersErrorFromResponse(response.status, text);
-    }
-
-    const body = (await response.json()) as unknown;
     return {
       profile: normalizeMePayload(body),
       cookieJar: mergedJar,
