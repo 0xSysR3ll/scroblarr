@@ -12,6 +12,7 @@ import {
   SimklOAuth,
 } from "@integrations/simkl/SimklOAuth";
 import {
+  clearSimklRewatchSessionCacheForUser,
   isSimklRewatchPlan,
   type SimklAccountType,
 } from "@integrations/simkl/simklRewatch";
@@ -172,6 +173,12 @@ router.post("/link", async (req: Request, res: Response) => {
       simklThumb: avatar,
       simklClientId: clientId,
       simklAccountType: accountType,
+      ...(accountType && !isSimklRewatchPlan(accountType)
+        ? {
+            simklMarkMoviesAsRewatched: false,
+            simklMarkEpisodesAsRewatched: false,
+          }
+        : {}),
     } as unknown as Partial<User>);
 
     if (
@@ -255,6 +262,7 @@ router.post("/unlink", async (req: Request, res: Response) => {
       simklMarkMoviesAsRewatched: false,
       simklMarkEpisodesAsRewatched: false,
     } as unknown as Partial<User>);
+    clearSimklRewatchSessionCacheForUser(user.id);
 
     logger.simkl.info(
       {
@@ -284,11 +292,11 @@ router.get("/status", async (req: Request, res: Response) => {
       return;
     }
 
-    // One-time backfill for accounts linked before accountType was cached.
+    // Refresh plan when unknown or free so upgrades become eligible without a settings save.
     if (
       freshUser.simklAccessToken &&
       freshUser.simklClientId &&
-      !freshUser.simklAccountType
+      !isSimklRewatchPlan(freshUser.simklAccountType)
     ) {
       try {
         const tokenManager = new SimklTokenManager();
@@ -303,7 +311,7 @@ router.get("/status", async (req: Request, res: Response) => {
       } catch (error) {
         logger.simkl.warn(
           { error, userId: freshUser.id },
-          "Failed to backfill Simkl account type"
+          "Failed to refresh Simkl account type"
         );
       }
     }
@@ -342,7 +350,17 @@ router.patch("/settings", async (req: Request, res: Response) => {
     if (enablingRewatch) {
       const tokenManager = new SimklTokenManager();
       const accessToken = await tokenManager.getValidAccessToken(freshUser.id);
-      await refreshAndStoreSimklAccountType(freshUser, accessToken);
+      try {
+        await refreshAndStoreSimklAccountType(freshUser, accessToken);
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          /^User .+ not found$/.test(error.message)
+        ) {
+          return res.status(404).json({ error: "User not found" });
+        }
+        throw error;
+      }
       const reloaded = await userRepository.findById(freshUser.id);
       if (!reloaded) {
         return res.status(404).json({ error: "User not found" });

@@ -417,6 +417,13 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
               defaultValue: "Failed to save Simkl settings",
             })
       );
+      try {
+        const status = await getSimklStatus({ force: true });
+        setSimklStatus(status);
+        applySimklRewatchSettings(status);
+      } catch {
+        // Keep the original save error; status refresh is best-effort.
+      }
     } finally {
       setSimklSavingSettings(false);
     }
@@ -1482,7 +1489,9 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                     <CustomCheckbox
                       checked={simklMarkMoviesAsRewatched}
                       disabled={
-                        simklSavingSettings || !simklStatus.canTrackRewatches
+                        simklSavingSettings ||
+                        (!simklStatus.canTrackRewatches &&
+                          !simklMarkMoviesAsRewatched)
                       }
                       onChange={() =>
                         setSimklMarkMoviesAsRewatched(
@@ -1514,7 +1523,9 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                     <CustomCheckbox
                       checked={simklMarkEpisodesAsRewatched}
                       disabled={
-                        simklSavingSettings || !simklStatus.canTrackRewatches
+                        simklSavingSettings ||
+                        (!simklStatus.canTrackRewatches &&
+                          !simklMarkEpisodesAsRewatched)
                       }
                       onChange={() =>
                         setSimklMarkEpisodesAsRewatched(
@@ -1545,7 +1556,10 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
               {simklHasSettingsChanges && (
                 <SettingsSaveButton
                   saving={simklSavingSettings}
-                  disabled={!simklStatus.canTrackRewatches}
+                  disabled={
+                    !simklStatus.canTrackRewatches &&
+                    (simklMarkMoviesAsRewatched || simklMarkEpisodesAsRewatched)
+                  }
                   onClick={handleSaveSimklSettings}
                 />
               )}

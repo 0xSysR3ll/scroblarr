@@ -1270,6 +1270,57 @@ describe("SyncService", () => {
     );
   });
 
+  it("persists Simkl wasRewatched when a failed history item succeeds on retry", async () => {
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    simklTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "simkl-valid-token"
+    );
+    simklClientMocks.scrobble.mockResolvedValue({
+      wasRewatched: true,
+      simklRewatchId: 55,
+    });
+
+    const service = new SyncService();
+    const result = await service.retryHistoryItem({
+      id: "sync-history-id",
+      userId: "u1",
+      user: {
+        id: "u1",
+        enabled: true,
+        plexUsername: "plex-user",
+        simklClientId: "simkl-client-id",
+        simklAccessToken: "simkl-token",
+        simklAccountType: "pro",
+        simklMarkMoviesAsRewatched: true,
+      },
+      mediaType: "movie",
+      mediaTitle: "Interstellar",
+      source: "plex",
+      originalMediaId: "plex-media-id",
+      imdbMovieId: "tt0816692",
+      destinations: JSON.stringify([]),
+      success: false,
+      wasRewatched: false,
+      errorMessage: "Simkl: temporary failure",
+      syncedAt: new Date("2026-01-01T00:00:00.000Z"),
+    } as never);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        destinations: ["Simkl"],
+        wasRewatched: true,
+      })
+    );
+    expect(syncHistoryRepositoryMocks.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "sync-history-id",
+        success: true,
+        wasRewatched: true,
+      })
+    );
+  });
+
   it("retries Trakt sync once after an auth error", async () => {
     userRepositoryMocks.findBySourceUsername.mockResolvedValue({
       id: "u1",

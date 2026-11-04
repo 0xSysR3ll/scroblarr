@@ -229,6 +229,35 @@ describe("simkl routes", () => {
     );
   });
 
+  it("clears rewatch toggles when linking a free Simkl account", async () => {
+    simklDeviceStoreMocks.resolveSimklDeviceCode.mockReturnValue("device-code");
+    simklOAuthMocks.exchangePinForToken.mockResolvedValue({
+      accessToken: "simkl_at_new",
+      refreshToken: "simkl_rt_new",
+      expiresAt: 1_700_000_000_000,
+    });
+    simklClientMocks.getUserProfile.mockResolvedValue({
+      id: 51,
+      username: "alice",
+      image: null,
+      accountType: "free",
+    });
+
+    await request(app)
+      .post("/simkl/link")
+      .send({ userCode: "BDWP-HQPK" })
+      .expect(200);
+
+    expect(userRepositoryMocks.update).toHaveBeenCalledWith(
+      "user-id",
+      expect.objectContaining({
+        simklAccountType: "free",
+        simklMarkMoviesAsRewatched: false,
+        simklMarkEpisodesAsRewatched: false,
+      })
+    );
+  });
+
   it("clears refresh token and expiry when the link response omits them", async () => {
     simklDeviceStoreMocks.resolveSimklDeviceCode.mockReturnValue("device-code");
     simklOAuthMocks.exchangePinForToken.mockResolvedValue({
@@ -715,6 +744,104 @@ describe("simkl routes", () => {
       .expect(404);
 
     expect(response.body).toEqual({ error: "User not found" });
+  });
+
+  it("returns 404 when plan refresh update finds the user deleted", async () => {
+    userRepositoryMocks.findById.mockResolvedValueOnce({
+      id: "user-id",
+      simklAccessToken: "simkl_at_token",
+      simklClientId: getSimklClientId(),
+      simklAccountType: "pro",
+      simklMarkMoviesAsRewatched: false,
+      simklMarkEpisodesAsRewatched: false,
+    });
+    simklClientMocks.getUserProfile.mockResolvedValue({
+      id: 51,
+      username: "alice",
+      image: null,
+      accountType: "vip",
+    });
+    userRepositoryMocks.update.mockRejectedValueOnce(
+      new Error("User user-id not found")
+    );
+
+    const response = await request(app)
+      .patch("/simkl/settings")
+      .send({
+        markMoviesAsRewatched: true,
+        markEpisodesAsRewatched: false,
+      })
+      .expect(404);
+
+    expect(response.body).toEqual({ error: "User not found" });
+  });
+
+  it("returns 500 when plan refresh fails for a non-missing-user reason", async () => {
+    userRepositoryMocks.findById.mockResolvedValueOnce({
+      id: "user-id",
+      simklAccessToken: "simkl_at_token",
+      simklClientId: getSimklClientId(),
+      simklAccountType: "pro",
+      simklMarkMoviesAsRewatched: false,
+      simklMarkEpisodesAsRewatched: false,
+    });
+    simklClientMocks.getUserProfile.mockRejectedValueOnce(
+      new Error("Simkl profile down")
+    );
+
+    const response = await request(app)
+      .patch("/simkl/settings")
+      .send({
+        markMoviesAsRewatched: true,
+        markEpisodesAsRewatched: false,
+      })
+      .expect(500);
+
+    expect(response.body).toEqual({
+      error: "Failed to update Simkl settings",
+    });
+  });
+
+  it("refreshes a cached free plan on status so upgrades become eligible", async () => {
+    userRepositoryMocks.findById
+      .mockResolvedValueOnce({
+        id: "user-id",
+        plexUsername: "plex-user",
+        simklClientId: getSimklClientId(),
+        simklAccessToken: "simkl_at_official_token_value_here_",
+        simklUsername: "stored-user",
+        simklThumb: "https://img.example/stored.png",
+        simklAccountType: "free",
+        simklMarkMoviesAsRewatched: false,
+        simklMarkEpisodesAsRewatched: false,
+      })
+      .mockResolvedValueOnce({
+        id: "user-id",
+        plexUsername: "plex-user",
+        simklClientId: getSimklClientId(),
+        simklAccessToken: "simkl_at_official_token_value_here_",
+        simklUsername: "stored-user",
+        simklThumb: "https://img.example/stored.png",
+        simklAccountType: "pro",
+        simklMarkMoviesAsRewatched: false,
+        simklMarkEpisodesAsRewatched: false,
+      });
+    simklClientMocks.getUserProfile.mockResolvedValue({
+      id: 51,
+      username: "stored-user",
+      image: "https://img.example/stored.png",
+      accountType: "pro",
+    });
+
+    const response = await request(app).get("/simkl/status").expect(200);
+
+    expect(simklTokenManagerMocks.getValidAccessToken).toHaveBeenCalledWith(
+      "user-id"
+    );
+    expect(response.body).toMatchObject({
+      accountType: "pro",
+      canTrackRewatches: true,
+    });
   });
 
   it("rejects invalid Simkl settings payloads", async () => {

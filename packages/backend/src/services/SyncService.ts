@@ -20,10 +20,9 @@ import {
 } from "@integrations/jellyfin/jellyfinAccess";
 import { SimklClient } from "@integrations/simkl/SimklClient";
 import {
-  buildSimklRewatchCacheKey,
-  getCachedSimklRewatchId,
+  getCachedSimklRewatchIdForEvent,
   isSimklRewatchPlan,
-  setCachedSimklRewatchId,
+  setCachedSimklRewatchIdForEvent,
 } from "@integrations/simkl/simklRewatch";
 import { SimklTokenManager } from "@integrations/simkl/SimklTokenManager";
 import { TmdbClient } from "@integrations/tmdb/TmdbClient";
@@ -258,6 +257,9 @@ export class SyncService {
 
     if (result.success) {
       mergeRetryAttemptIntoHistory(historyItem, result.destinationResults);
+      if (result.wasRewatched) {
+        historyItem.wasRewatched = true;
+      }
       historyItem.retriedAt = new Date();
       await this.syncHistoryRepository.save(historyItem);
     }
@@ -450,9 +452,8 @@ export class SyncService {
             (event.media.type === "movie"
               ? !!user.simklMarkMoviesAsRewatched
               : !!user.simklMarkEpisodesAsRewatched);
-          const cacheKey = buildSimklRewatchCacheKey(user.id, event);
           const pinnedRewatchId = allowRewatch
-            ? getCachedSimklRewatchId(cacheKey)
+            ? getCachedSimklRewatchIdForEvent(user.id, event)
             : undefined;
 
           options = {
@@ -481,8 +482,9 @@ export class SyncService {
             simklWasRewatch = true;
           }
           if (typeof scrobbleResult?.simklRewatchId === "number") {
-            setCachedSimklRewatchId(
-              buildSimklRewatchCacheKey(user.id, event),
+            setCachedSimklRewatchIdForEvent(
+              user.id,
+              event,
               scrobbleResult.simklRewatchId
             );
           }
@@ -539,11 +541,12 @@ export class SyncService {
     }
 
     const attemptResult = buildAttemptResult(syncResults);
+    const wasRewatched =
+      (bingersWasRewatch && attemptResult.destinations.includes("Bingers")) ||
+      (simklWasRewatch && attemptResult.destinations.includes("Simkl"));
+    attemptResult.wasRewatched = wasRewatched;
 
     if (saveFailedHistory) {
-      const wasRewatched =
-        (bingersWasRewatch && attemptResult.destinations.includes("Bingers")) ||
-        (simklWasRewatch && attemptResult.destinations.includes("Simkl"));
       await this.saveSyncHistory(user.id, event, attemptResult, wasRewatched);
     }
 

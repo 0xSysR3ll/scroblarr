@@ -501,7 +501,7 @@ components:
         accountType:
           type: string
           nullable: true
-          enum: [free, pro, vip]
+          enum: [free, pro, vip, null]
           description: Cached Simkl plan from /users/settings
         canTrackRewatches:
           type: boolean
@@ -528,7 +528,7 @@ components:
         accountType:
           type: string
           nullable: true
-          enum: [free, pro, vip]
+          enum: [free, pro, vip, null]
         canTrackRewatches:
           type: boolean
 
@@ -547,7 +547,7 @@ components:
         accountType:
           type: string
           nullable: true
-          enum: [free, pro, vip]
+          enum: [free, pro, vip, null]
 
     BingersStatus:
       type: object
