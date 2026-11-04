@@ -18,6 +18,8 @@ import {
   getSimklAuthorizeUrl,
   linkSimkl,
   unlinkSimkl,
+  updateSimklSettings,
+  SIMKL_VIP_URL,
   type SimklStatus,
   getBingersStatus,
   linkBingers,
@@ -108,6 +110,41 @@ function LinkedStatusBadge({
       <FaCheckCircle className="h-4 w-4" />
       {linkedLabel}
     </span>
+  );
+}
+
+function SettingsSaveButton({
+  saving,
+  disabled = false,
+  onClick,
+}: {
+  saving: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="mt-4 flex justify-end">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={saving || disabled}
+        className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {saving ? (
+          <>
+            <Spinner size="md" variant="onPrimary" />
+            <span>{t("common.saving", { defaultValue: "Saving..." })}</span>
+          </>
+        ) : (
+          <>
+            <FaCheckCircle className="h-4 w-4" />
+            <span>{t("common.save", { defaultValue: "Save" })}</span>
+          </>
+        )}
+      </button>
+    </div>
   );
 }
 
@@ -209,6 +246,17 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
   const [simklReconnectDismissed, setSimklReconnectDismissed] = useState(false);
   const [showSimklUnlinkModal, setShowSimklUnlinkModal] = useState(false);
   const [simklOAuthPopup] = useState(() => new OAuthPopup());
+  const [simklMarkMoviesAsRewatched, setSimklMarkMoviesAsRewatched] =
+    useState(false);
+  const [simklMarkEpisodesAsRewatched, setSimklMarkEpisodesAsRewatched] =
+    useState(false);
+  const [simklSavedMarkMoviesAsRewatched, setSimklSavedMarkMoviesAsRewatched] =
+    useState(false);
+  const [
+    simklSavedMarkEpisodesAsRewatched,
+    setSimklSavedMarkEpisodesAsRewatched,
+  ] = useState(false);
+  const [simklSavingSettings, setSimklSavingSettings] = useState(false);
   const [bingersStatus, setBingersStatus] = useState<BingersStatus | null>(
     null
   );
@@ -251,12 +299,22 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
     loadTraktStatus();
   }, []);
 
+  function applySimklRewatchSettings(status: SimklStatus) {
+    const movies = !!status.markMoviesAsRewatched;
+    const episodes = !!status.markEpisodesAsRewatched;
+    setSimklMarkMoviesAsRewatched(movies);
+    setSimklMarkEpisodesAsRewatched(episodes);
+    setSimklSavedMarkMoviesAsRewatched(movies);
+    setSimklSavedMarkEpisodesAsRewatched(episodes);
+  }
+
   useEffect(() => {
     async function loadSimklStatus() {
       try {
         setSimklLoading(true);
-        const status = await getSimklStatus();
+        const status = await getSimklStatus({ force: true });
         setSimklStatus(status);
+        applySimklRewatchSettings(status);
       } catch {
         // Error handled by UI state
       } finally {
@@ -318,6 +376,50 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
     setBingersMarkEpisodesAsRewatched(episodes);
     setBingersSavedMarkMoviesAsRewatched(movies);
     setBingersSavedMarkEpisodesAsRewatched(episodes);
+  }
+
+  const simklHasSettingsChanges =
+    simklMarkMoviesAsRewatched !== simklSavedMarkMoviesAsRewatched ||
+    simklMarkEpisodesAsRewatched !== simklSavedMarkEpisodesAsRewatched;
+
+  async function handleSaveSimklSettings() {
+    try {
+      setSimklSavingSettings(true);
+      setSimklError(null);
+      const updated = await updateSimklSettings({
+        markMoviesAsRewatched: simklMarkMoviesAsRewatched,
+        markEpisodesAsRewatched: simklMarkEpisodesAsRewatched,
+      });
+      setSimklSavedMarkMoviesAsRewatched(updated.markMoviesAsRewatched);
+      setSimklSavedMarkEpisodesAsRewatched(updated.markEpisodesAsRewatched);
+      setSimklMarkMoviesAsRewatched(updated.markMoviesAsRewatched);
+      setSimklMarkEpisodesAsRewatched(updated.markEpisodesAsRewatched);
+      setSimklStatus((prev) =>
+        prev
+          ? {
+              ...prev,
+              markMoviesAsRewatched: updated.markMoviesAsRewatched,
+              markEpisodesAsRewatched: updated.markEpisodesAsRewatched,
+              accountType: updated.accountType,
+              canTrackRewatches: updated.canTrackRewatches,
+            }
+          : prev
+      );
+      showSuccess(
+        t("profile.saved", { defaultValue: "Settings saved successfully!" })
+      );
+      onProfileUpdated?.();
+    } catch (err) {
+      setSimklError(
+        err instanceof Error
+          ? err.message
+          : t("simkl.settingsSaveFailed", {
+              defaultValue: "Failed to save Simkl settings",
+            })
+      );
+    } finally {
+      setSimklSavingSettings(false);
+    }
   }
 
   const bingersHasSettingsChanges =
@@ -499,8 +601,9 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
         localStorage.removeItem(simklReconnectDismissKey(user.id));
         setSimklReconnectDismissed(false);
       }
-      const status = await getSimklStatus();
+      const status = await getSimklStatus({ force: true });
       setSimklStatus(status);
+      applySimklRewatchSettings(status);
       showSuccess(
         t("simkl.linked", {
           defaultValue: "Simkl account linked successfully",
@@ -1326,7 +1429,7 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
             <button
               type="button"
               onClick={handleUnlinkSimkl}
-              disabled={simklSaving}
+              disabled={simklSaving || simklSavingSettings}
               className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
               title={t("simkl.unlink", {
                 defaultValue: "Unlink",
@@ -1339,6 +1442,114 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
                 })}
               </span>
             </button>
+
+            <div className="mt-4 border-t border-border pt-4">
+              <h4 className="mb-3 text-sm font-semibold text-foreground">
+                {t("simkl.settings.title", {
+                  defaultValue: "Sync Settings",
+                })}
+              </h4>
+              <p className="mb-4 text-xs text-muted-foreground">
+                {t("simkl.settings.description", {
+                  defaultValue:
+                    "Log each rewatch as its own Simkl viewing session, with separate dates and episode progress. Requires Simkl PRO or VIP. Default off.",
+                })}
+              </p>
+              {!simklStatus.canTrackRewatches && (
+                <div className="mb-4 rounded-lg border border-warning-500/30 bg-warning-500/10 px-3 py-2 text-warning-700 dark:text-warning-300">
+                  <p className="text-sm">
+                    {t("simkl.settings.proRequired", {
+                      defaultValue:
+                        "Rewatch tracking requires Simkl PRO or VIP.",
+                    })}{" "}
+                    <a
+                      href={SIMKL_VIP_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline hover:no-underline"
+                    >
+                      {t("simkl.settings.upgrade", {
+                        defaultValue: "Upgrade",
+                      })}
+                    </a>
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <div className="mt-0.5">
+                    <CustomCheckbox
+                      checked={simklMarkMoviesAsRewatched}
+                      disabled={
+                        simklSavingSettings || !simklStatus.canTrackRewatches
+                      }
+                      onChange={() =>
+                        setSimklMarkMoviesAsRewatched(
+                          !simklMarkMoviesAsRewatched
+                        )
+                      }
+                      ariaLabel={t("simkl.settings.markMoviesAsRewatched", {
+                        defaultValue: "Track movie rewatches",
+                      })}
+                    />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-foreground/90">
+                      {t("simkl.settings.markMoviesAsRewatched", {
+                        defaultValue: "Track movie rewatches",
+                      })}
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t("simkl.settings.markMoviesAsRewatchedDescription", {
+                        defaultValue:
+                          "When enabled, finishing a movie you already completed on Simkl creates a separate rewatch session.",
+                      })}
+                    </p>
+                  </div>
+                </label>
+
+                <label className="flex cursor-pointer items-start gap-3">
+                  <div className="mt-0.5">
+                    <CustomCheckbox
+                      checked={simklMarkEpisodesAsRewatched}
+                      disabled={
+                        simklSavingSettings || !simklStatus.canTrackRewatches
+                      }
+                      onChange={() =>
+                        setSimklMarkEpisodesAsRewatched(
+                          !simklMarkEpisodesAsRewatched
+                        )
+                      }
+                      ariaLabel={t("simkl.settings.markEpisodesAsRewatched", {
+                        defaultValue: "Track episode rewatches",
+                      })}
+                    />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-foreground/90">
+                      {t("simkl.settings.markEpisodesAsRewatched", {
+                        defaultValue: "Track episode rewatches",
+                      })}
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t("simkl.settings.markEpisodesAsRewatchedDescription", {
+                        defaultValue:
+                          "When enabled, finishing an episode you already watched on Simkl adds it to a rewatch session (sessions are pinned across episodes).",
+                      })}
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {simklHasSettingsChanges && (
+                <SettingsSaveButton
+                  saving={simklSavingSettings}
+                  disabled={!simklStatus.canTrackRewatches}
+                  onClick={handleSaveSimklSettings}
+                />
+              )}
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
@@ -1486,100 +1697,57 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
               <p className="mb-4 text-xs text-muted-foreground">
                 {t("bingers.settings.description", {
                   defaultValue:
-                    "Mark media as rewatched when it was synced before or is already watched in Bingers. Rewatches increment the play count in Bingers (Watched x2, etc.).",
+                    "Increment play counts when you watch something again.",
                 })}
               </p>
 
-              <div className="space-y-4">
-                <label className="flex cursor-pointer items-start gap-3">
-                  <div className="mt-0.5">
-                    <CustomCheckbox
-                      checked={bingersMarkMoviesAsRewatched}
-                      disabled={bingersSavingSettings}
-                      onChange={() =>
-                        setBingersMarkMoviesAsRewatched(
-                          !bingersMarkMoviesAsRewatched
-                        )
-                      }
-                      ariaLabel={t("bingers.settings.markMoviesAsRewatched", {
-                        defaultValue: "Mark movies as rewatched",
-                      })}
-                    />
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium text-foreground/90">
-                      {t("bingers.settings.markMoviesAsRewatched", {
-                        defaultValue: "Mark movies as rewatched",
-                      })}
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {t("bingers.settings.markMoviesAsRewatchedDescription", {
-                        defaultValue:
-                          "When enabled, movies already watched in Bingers (via Scroblarr sync, manual tracking, or import) will increment the play count on the next sync.",
-                      })}
-                    </p>
-                  </div>
+              <div className="space-y-3">
+                <label className="flex cursor-pointer items-center gap-3">
+                  <CustomCheckbox
+                    checked={bingersMarkMoviesAsRewatched}
+                    disabled={bingersSavingSettings}
+                    onChange={() =>
+                      setBingersMarkMoviesAsRewatched(
+                        !bingersMarkMoviesAsRewatched
+                      )
+                    }
+                    ariaLabel={t("bingers.settings.markMoviesAsRewatched", {
+                      defaultValue: "Movies",
+                    })}
+                  />
+                  <span className="text-sm font-medium text-foreground/90">
+                    {t("bingers.settings.markMoviesAsRewatched", {
+                      defaultValue: "Movies",
+                    })}
+                  </span>
                 </label>
 
-                <label className="flex cursor-pointer items-start gap-3">
-                  <div className="mt-0.5">
-                    <CustomCheckbox
-                      checked={bingersMarkEpisodesAsRewatched}
-                      disabled={bingersSavingSettings}
-                      onChange={() =>
-                        setBingersMarkEpisodesAsRewatched(
-                          !bingersMarkEpisodesAsRewatched
-                        )
-                      }
-                      ariaLabel={t("bingers.settings.markEpisodesAsRewatched", {
-                        defaultValue: "Mark episodes as rewatched",
-                      })}
-                    />
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium text-foreground/90">
-                      {t("bingers.settings.markEpisodesAsRewatched", {
-                        defaultValue: "Mark episodes as rewatched",
-                      })}
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {t(
-                        "bingers.settings.markEpisodesAsRewatchedDescription",
-                        {
-                          defaultValue:
-                            "When enabled, episodes already watched in Bingers (via Scroblarr sync, manual tracking, or import) will increment the play count on the next sync.",
-                        }
-                      )}
-                    </p>
-                  </div>
+                <label className="flex cursor-pointer items-center gap-3">
+                  <CustomCheckbox
+                    checked={bingersMarkEpisodesAsRewatched}
+                    disabled={bingersSavingSettings}
+                    onChange={() =>
+                      setBingersMarkEpisodesAsRewatched(
+                        !bingersMarkEpisodesAsRewatched
+                      )
+                    }
+                    ariaLabel={t("bingers.settings.markEpisodesAsRewatched", {
+                      defaultValue: "Episodes",
+                    })}
+                  />
+                  <span className="text-sm font-medium text-foreground/90">
+                    {t("bingers.settings.markEpisodesAsRewatched", {
+                      defaultValue: "Episodes",
+                    })}
+                  </span>
                 </label>
               </div>
 
               {bingersHasSettingsChanges && (
-                <div className="mt-4 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={handleSaveBingersSettings}
-                    disabled={bingersSavingSettings}
-                    className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {bingersSavingSettings ? (
-                      <>
-                        <Spinner size="md" variant="onPrimary" />
-                        <span>
-                          {t("common.saving", { defaultValue: "Saving..." })}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <FaCheckCircle className="h-4 w-4" />
-                        <span>
-                          {t("common.save", { defaultValue: "Save" })}
-                        </span>
-                      </>
-                    )}
-                  </button>
-                </div>
+                <SettingsSaveButton
+                  saving={bingersSavingSettings}
+                  onClick={handleSaveBingersSettings}
+                />
               )}
             </div>
           </div>

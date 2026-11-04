@@ -2401,9 +2401,7 @@ describe("IntegrationsTab Bingers integration", () => {
     );
     await expandBingersSection(user);
 
-    await user.click(
-      screen.getByRole("checkbox", { name: "Mark movies as rewatched" })
-    );
+    await user.click(screen.getByRole("checkbox", { name: "Movies" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
@@ -2436,9 +2434,7 @@ describe("IntegrationsTab Bingers integration", () => {
     renderWithProviders(<IntegrationsTab />);
     await expandBingersSection(user);
 
-    await user.click(
-      screen.getByRole("checkbox", { name: "Mark episodes as rewatched" })
-    );
+    await user.click(screen.getByRole("checkbox", { name: "Episodes" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     expect(await screen.findByText("Settings unavailable")).toBeVisible();
@@ -2460,9 +2456,7 @@ describe("IntegrationsTab Bingers integration", () => {
     renderWithProviders(<IntegrationsTab />);
     await expandBingersSection(user);
 
-    await user.click(
-      screen.getByRole("checkbox", { name: "Mark episodes as rewatched" })
-    );
+    await user.click(screen.getByRole("checkbox", { name: "Episodes" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     expect(

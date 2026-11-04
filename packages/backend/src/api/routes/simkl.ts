@@ -11,6 +11,10 @@ import {
   resolveSimklDeviceCode,
   SimklOAuth,
 } from "@integrations/simkl/SimklOAuth";
+import {
+  isSimklRewatchPlan,
+  type SimklAccountType,
+} from "@integrations/simkl/simklRewatch";
 import { SimklTokenManager } from "@integrations/simkl/SimklTokenManager";
 import { UserRepository } from "@repositories/UserRepository";
 import { logger } from "@utils/logger";
@@ -22,9 +26,15 @@ import { auth } from "../middleware/auth";
 
 const router = Router();
 const userRepository = new UserRepository();
+const SIMKL_VIP_URL = "https://simkl.com/vip/";
 
 const linkSimklSchema = z.object({
   userCode: z.string().min(1),
+});
+
+const settingsSchema = z.object({
+  markMoviesAsRewatched: z.boolean(),
+  markEpisodesAsRewatched: z.boolean(),
 });
 
 router.use(auth);
@@ -37,6 +47,62 @@ function userNeedsSimklReconnect(user: User): boolean {
     return true;
   }
   return !isOfficialSimklClientId(user.simklClientId);
+}
+
+function buildSimklStatusPayload(user: User) {
+  const accountType =
+    (user.simklAccountType as SimklAccountType | null) || null;
+  const canTrackRewatches = isSimklRewatchPlan(accountType);
+  return {
+    linked: !!user.simklAccessToken,
+    username: user.simklUsername || null,
+    image: user.simklThumb || null,
+    hasCredentials: true,
+    needsReconnect: userNeedsSimklReconnect(user),
+    accountType,
+    canTrackRewatches,
+    markMoviesAsRewatched: !!user.simklMarkMoviesAsRewatched,
+    markEpisodesAsRewatched: !!user.simklMarkEpisodesAsRewatched,
+  };
+}
+
+export async function refreshAndStoreSimklAccountType(
+  user: User,
+  accessToken: string
+): Promise<SimklAccountType | null> {
+  if (!user.simklClientId) {
+    return null;
+  }
+  const simklClient = new SimklClient(user.simklClientId);
+  const profile = await simklClient.getUserProfile(accessToken);
+  const accountType = profile.accountType;
+
+  const updateData: Partial<User> = {};
+  if (accountType !== user.simklAccountType) {
+    updateData.simklAccountType = accountType;
+  }
+  if (profile.username && profile.username !== user.simklUsername) {
+    updateData.simklUsername = profile.username;
+  }
+  if (profile.image && profile.image !== user.simklThumb) {
+    updateData.simklThumb = profile.image;
+  }
+
+  // Downgrade: stop sending allow_rewatch by clearing the opt-in toggles.
+  if (accountType && !isSimklRewatchPlan(accountType)) {
+    if (user.simklMarkMoviesAsRewatched) {
+      updateData.simklMarkMoviesAsRewatched = false;
+    }
+    if (user.simklMarkEpisodesAsRewatched) {
+      updateData.simklMarkEpisodesAsRewatched = false;
+    }
+  }
+
+  if (Object.keys(updateData).length > 0) {
+    await userRepository.update(user.id, updateData);
+  }
+
+  return accountType;
 }
 
 router.get("/authorize", async (req: Request, res: Response) => {
@@ -87,11 +153,13 @@ router.post("/link", async (req: Request, res: Response) => {
 
     let username: string | undefined;
     let avatar: string | undefined;
+    let accountType: SimklAccountType | null = null;
     try {
       const simklClient = new SimklClient(clientId);
       const profile = await simklClient.getUserProfile(tokens.accessToken);
       username = profile.username || undefined;
       avatar = profile.image || undefined;
+      accountType = profile.accountType;
     } catch (error) {
       logger.simkl.warn({ error }, "Failed to fetch Simkl profile");
     }
@@ -103,6 +171,7 @@ router.post("/link", async (req: Request, res: Response) => {
       simklUsername: username,
       simklThumb: avatar,
       simklClientId: clientId,
+      simklAccountType: accountType,
     } as unknown as Partial<User>);
 
     if (
@@ -182,6 +251,9 @@ router.post("/unlink", async (req: Request, res: Response) => {
       simklUsername: null,
       simklThumb: null,
       simklClientId: null,
+      simklAccountType: null,
+      simklMarkMoviesAsRewatched: false,
+      simklMarkEpisodesAsRewatched: false,
     } as unknown as Partial<User>);
 
     logger.simkl.info(
@@ -207,18 +279,36 @@ router.post("/unlink", async (req: Request, res: Response) => {
 
 router.get("/status", async (req: Request, res: Response) => {
   try {
-    const freshUser = await requireFreshUser(req, res, userRepository);
+    let freshUser = await requireFreshUser(req, res, userRepository);
     if (!freshUser) {
       return;
     }
 
-    return res.json({
-      linked: !!freshUser.simklAccessToken,
-      username: freshUser.simklUsername || null,
-      image: freshUser.simklThumb || null,
-      hasCredentials: true,
-      needsReconnect: userNeedsSimklReconnect(freshUser),
-    });
+    // One-time backfill for accounts linked before accountType was cached.
+    if (
+      freshUser.simklAccessToken &&
+      freshUser.simklClientId &&
+      !freshUser.simklAccountType
+    ) {
+      try {
+        const tokenManager = new SimklTokenManager();
+        const accessToken = await tokenManager.getValidAccessToken(
+          freshUser.id
+        );
+        await refreshAndStoreSimklAccountType(freshUser, accessToken);
+        const reloaded = await userRepository.findById(freshUser.id);
+        if (reloaded) {
+          freshUser = reloaded;
+        }
+      } catch (error) {
+        logger.simkl.warn(
+          { error, userId: freshUser.id },
+          "Failed to backfill Simkl account type"
+        );
+      }
+    }
+
+    return res.json(buildSimklStatusPayload(freshUser));
   } catch (error) {
     const user = req.user;
     logger.simkl.error(
@@ -228,6 +318,71 @@ router.get("/status", async (req: Request, res: Response) => {
     const errorMessage =
       error instanceof Error ? error.message : "Failed to get Simkl status";
     return res.status(500).json({ error: errorMessage });
+  }
+});
+
+router.patch("/settings", async (req: Request, res: Response) => {
+  try {
+    const user = requireRequestUser(req, res);
+    if (!user) {
+      return;
+    }
+
+    let freshUser = await userRepository.findById(user.id);
+    if (!freshUser?.simklAccessToken || !freshUser.simklClientId) {
+      return res.status(400).json({
+        error: "Link your Simkl account before changing sync settings",
+      });
+    }
+
+    const validated = settingsSchema.parse(req.body);
+    const enablingRewatch =
+      validated.markMoviesAsRewatched || validated.markEpisodesAsRewatched;
+
+    if (enablingRewatch) {
+      const tokenManager = new SimklTokenManager();
+      const accessToken = await tokenManager.getValidAccessToken(freshUser.id);
+      await refreshAndStoreSimklAccountType(freshUser, accessToken);
+      const reloaded = await userRepository.findById(freshUser.id);
+      if (!reloaded) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      freshUser = reloaded;
+
+      if (!isSimklRewatchPlan(freshUser.simklAccountType)) {
+        return res.status(403).json({
+          error: "Rewatch tracking requires Simkl PRO or VIP",
+          code: "simkl_pro_required",
+          upgradeUrl: SIMKL_VIP_URL,
+        });
+      }
+    }
+
+    const updated = await userRepository.update(user.id, {
+      simklMarkMoviesAsRewatched: validated.markMoviesAsRewatched,
+      simklMarkEpisodesAsRewatched: validated.markEpisodesAsRewatched,
+    });
+
+    return res.json({
+      success: true,
+      markMoviesAsRewatched: !!updated.simklMarkMoviesAsRewatched,
+      markEpisodesAsRewatched: !!updated.simklMarkEpisodesAsRewatched,
+      accountType: updated.simklAccountType || null,
+      canTrackRewatches: isSimklRewatchPlan(updated.simklAccountType),
+    });
+  } catch (error) {
+    const user = req.user;
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        error: "Validation error",
+        details: error.issues,
+      });
+    }
+    logger.simkl.error(
+      { error, userId: user?.id },
+      "Error updating Simkl settings"
+    );
+    return res.status(500).json({ error: "Failed to update Simkl settings" });
   }
 });
 
@@ -255,6 +410,17 @@ router.get("/profile", async (req: Request, res: Response) => {
     if (profile.image && profile.image !== freshUser.simklThumb) {
       updateData.simklThumb = profile.image;
     }
+    if (profile.accountType !== freshUser.simklAccountType) {
+      updateData.simklAccountType = profile.accountType;
+    }
+    if (profile.accountType && !isSimklRewatchPlan(profile.accountType)) {
+      if (freshUser.simklMarkMoviesAsRewatched) {
+        updateData.simklMarkMoviesAsRewatched = false;
+      }
+      if (freshUser.simklMarkEpisodesAsRewatched) {
+        updateData.simklMarkEpisodesAsRewatched = false;
+      }
+    }
     if (Object.keys(updateData).length > 0) {
       await userRepository.update(user.id, updateData);
     }
@@ -263,6 +429,7 @@ router.get("/profile", async (req: Request, res: Response) => {
       id: profile.id,
       username: profile.username || freshUser.simklUsername || null,
       image: profile.image || freshUser.simklThumb || null,
+      accountType: profile.accountType,
     });
   } catch (error) {
     const user = req.user;

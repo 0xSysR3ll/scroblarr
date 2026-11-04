@@ -19,6 +19,12 @@ import {
   resolveJellyfinAccessToken,
 } from "@integrations/jellyfin/jellyfinAccess";
 import { SimklClient } from "@integrations/simkl/SimklClient";
+import {
+  buildSimklRewatchCacheKey,
+  getCachedSimklRewatchId,
+  isSimklRewatchPlan,
+  setCachedSimklRewatchId,
+} from "@integrations/simkl/simklRewatch";
 import { SimklTokenManager } from "@integrations/simkl/SimklTokenManager";
 import { TmdbClient } from "@integrations/tmdb/TmdbClient";
 import { getTmdbAccessToken } from "@integrations/tmdb/tmdbConfig";
@@ -384,6 +390,7 @@ export class SyncService {
     }> = [];
 
     let bingersWasRewatch = false;
+    let simklWasRewatch = false;
 
     for (const destination of availableDestinations) {
       try {
@@ -436,6 +443,27 @@ export class SyncService {
           };
         }
 
+        if (destination.name === "Simkl") {
+          const planAllowsRewatch = isSimklRewatchPlan(user.simklAccountType);
+          const allowRewatch =
+            planAllowsRewatch &&
+            (event.media.type === "movie"
+              ? !!user.simklMarkMoviesAsRewatched
+              : !!user.simklMarkEpisodesAsRewatched);
+          const cacheKey = buildSimklRewatchCacheKey(user.id, event);
+          const pinnedRewatchId = allowRewatch
+            ? getCachedSimklRewatchId(cacheKey)
+            : undefined;
+
+          options = {
+            ...options,
+            markMoviesAsRewatched: allowRewatch && event.media.type === "movie",
+            markEpisodesAsRewatched:
+              allowRewatch && event.media.type === "episode",
+            simklRewatchId: pinnedRewatchId,
+          };
+        }
+
         const scrobbleResult = await this.scrobbleWithOptionalAuthRetry(
           destination,
           user,
@@ -446,6 +474,18 @@ export class SyncService {
 
         if (destination.name === "Bingers" && scrobbleResult?.wasRewatched) {
           bingersWasRewatch = true;
+        }
+
+        if (destination.name === "Simkl") {
+          if (scrobbleResult?.wasRewatched) {
+            simklWasRewatch = true;
+          }
+          if (typeof scrobbleResult?.simklRewatchId === "number") {
+            setCachedSimklRewatchId(
+              buildSimklRewatchCacheKey(user.id, event),
+              scrobbleResult.simklRewatchId
+            );
+          }
         }
 
         const mediaInfo =
@@ -502,7 +542,8 @@ export class SyncService {
 
     if (saveFailedHistory) {
       const wasRewatched =
-        bingersWasRewatch && attemptResult.destinations.includes("Bingers");
+        (bingersWasRewatch && attemptResult.destinations.includes("Bingers")) ||
+        (simklWasRewatch && attemptResult.destinations.includes("Simkl"));
       await this.saveSyncHistory(user.id, event, attemptResult, wasRewatched);
     }
 

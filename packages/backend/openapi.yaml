@@ -498,6 +498,39 @@ components:
         needsReconnect:
           type: boolean
           description: True when linked with a personal or legacy Client ID / AUTH V1 token
+        accountType:
+          type: string
+          nullable: true
+          enum: [free, pro, vip]
+          description: Cached Simkl plan from /users/settings
+        canTrackRewatches:
+          type: boolean
+          description: True when accountType is pro or vip
+        markMoviesAsRewatched:
+          type: boolean
+        markEpisodesAsRewatched:
+          type: boolean
+
+    SimklSettingsResponse:
+      type: object
+      required:
+        - success
+        - markMoviesAsRewatched
+        - markEpisodesAsRewatched
+        - canTrackRewatches
+      properties:
+        success:
+          type: boolean
+        markMoviesAsRewatched:
+          type: boolean
+        markEpisodesAsRewatched:
+          type: boolean
+        accountType:
+          type: string
+          nullable: true
+          enum: [free, pro, vip]
+        canTrackRewatches:
+          type: boolean
 
     SimklProfile:
       type: object
@@ -511,6 +544,10 @@ components:
         image:
           type: string
           nullable: true
+        accountType:
+          type: string
+          nullable: true
+          enum: [free, pro, vip]
 
     BingersStatus:
       type: object
@@ -2149,7 +2186,7 @@ paths:
   /api/v1/simkl/profile:
     get:
       summary: Get Simkl user profile
-      description: Fetches the live Simkl profile and refreshes stored username/avatar when they change.
+      description: Fetches the live Simkl profile and refreshes stored username/avatar/account type when they change.
       tags: [Simkl]
       security:
         - sessionAuth: []
@@ -2162,6 +2199,63 @@ paths:
                 $ref: '#/components/schemas/SimklProfile'
         '400':
           description: Simkl account not linked
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/v1/simkl/settings:
+    patch:
+      summary: Update Simkl sync settings
+      description: |
+        Updates opt-in rewatch tracking. Requires a linked Simkl account.
+        Enabling either toggle refreshes the plan from Simkl and returns 403
+        with code `simkl_pro_required` when the account is free.
+      tags: [Simkl]
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - markMoviesAsRewatched
+                - markEpisodesAsRewatched
+              properties:
+                markMoviesAsRewatched:
+                  type: boolean
+                markEpisodesAsRewatched:
+                  type: boolean
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimklSettingsResponse'
+        '400':
+          description: Not linked or validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Simkl PRO or VIP required to enable rewatch tracking
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  code:
+                    type: string
+                    example: simkl_pro_required
+                  upgradeUrl:
+                    type: string
+                    format: uri
         '401':
           description: Unauthorized
         '500':

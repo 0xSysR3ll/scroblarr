@@ -8,6 +8,7 @@ import {
   invalidateSimklCache,
   linkSimkl,
   unlinkSimkl,
+  updateSimklSettings,
 } from "./simkl";
 
 const expectedHeaders = { "Content-Type": "application/json" };
@@ -230,6 +231,34 @@ describe("simkl api", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("bypasses the status cache when force is set", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          linked: true,
+          username: "alice",
+          image: null,
+          hasCredentials: true,
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          linked: true,
+          username: "bob",
+          image: null,
+          hasCredentials: true,
+        })
+      );
+
+    await expect(getSimklStatus()).resolves.toMatchObject({
+      username: "alice",
+    });
+    await expect(getSimklStatus({ force: true })).resolves.toMatchObject({
+      username: "bob",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("falls back to the plain error message when status metadata is empty", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: false,
@@ -243,5 +272,84 @@ describe("simkl api", () => {
     await expect(getSimklAuthorizeUrl()).rejects.toThrow(
       "Failed to get Simkl PIN code"
     );
+  });
+
+  it("surfaces Simkl settings update failures", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        { error: "Rewatch tracking requires Simkl PRO or VIP" },
+        false,
+        403
+      )
+    );
+
+    await expect(
+      updateSimklSettings({
+        markMoviesAsRewatched: true,
+        markEpisodesAsRewatched: false,
+      })
+    ).rejects.toThrow("Rewatch tracking requires Simkl PRO or VIP");
+  });
+
+  it("updates rewatch settings and invalidates cached status", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({
+          linked: true,
+          username: "alice",
+          image: null,
+          hasCredentials: true,
+          canTrackRewatches: true,
+          markMoviesAsRewatched: false,
+          markEpisodesAsRewatched: false,
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          success: true,
+          markMoviesAsRewatched: true,
+          markEpisodesAsRewatched: false,
+          accountType: "pro",
+          canTrackRewatches: true,
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          linked: true,
+          username: "alice",
+          image: null,
+          hasCredentials: true,
+          canTrackRewatches: true,
+          markMoviesAsRewatched: true,
+          markEpisodesAsRewatched: false,
+        })
+      );
+
+    await getSimklStatus();
+    await expect(
+      updateSimklSettings({
+        markMoviesAsRewatched: true,
+        markEpisodesAsRewatched: false,
+      })
+    ).resolves.toEqual({
+      success: true,
+      markMoviesAsRewatched: true,
+      markEpisodesAsRewatched: false,
+      accountType: "pro",
+      canTrackRewatches: true,
+    });
+    await expect(getSimklStatus()).resolves.toMatchObject({
+      markMoviesAsRewatched: true,
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/v1/simkl/settings", {
+      method: "PATCH",
+      headers: expectedHeaders,
+      body: JSON.stringify({
+        markMoviesAsRewatched: true,
+        markEpisodesAsRewatched: false,
+      }),
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });
