@@ -1993,6 +1993,33 @@ describe("IntegrationsTab Simkl integration", () => {
     expect(await screen.findByText("Settings unavailable")).toBeVisible();
   });
 
+  it("shows a default error when saving Simkl settings fails with non-Error", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getSimklStatus).mockResolvedValue({
+      linked: true,
+      username: "simkl-user",
+      image: null,
+      hasCredentials: true,
+      accountType: "pro",
+      canTrackRewatches: true,
+      markMoviesAsRewatched: false,
+      markEpisodesAsRewatched: false,
+    });
+    vi.mocked(updateSimklSettings).mockRejectedValue("network down");
+
+    renderWithProviders(<IntegrationsTab />);
+    await expandSimklSection(user);
+
+    await user.click(
+      screen.getByRole("checkbox", { name: "Track episode rewatches" })
+    );
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(
+      await screen.findByText("Failed to save Simkl settings")
+    ).toBeVisible();
+  });
+
   it("allows clearing Simkl rewatch toggles when the plan no longer allows tracking", async () => {
     const user = userEvent.setup();
     vi.mocked(getSimklStatus).mockResolvedValue({

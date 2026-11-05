@@ -394,17 +394,13 @@ export function IntegrationsTab({ onProfileUpdated }: IntegrationsTabProps) {
       setSimklSavedMarkEpisodesAsRewatched(updated.markEpisodesAsRewatched);
       setSimklMarkMoviesAsRewatched(updated.markMoviesAsRewatched);
       setSimklMarkEpisodesAsRewatched(updated.markEpisodesAsRewatched);
-      setSimklStatus((prev) =>
-        prev
-          ? {
-              ...prev,
-              markMoviesAsRewatched: updated.markMoviesAsRewatched,
-              markEpisodesAsRewatched: updated.markEpisodesAsRewatched,
-              accountType: updated.accountType,
-              canTrackRewatches: updated.canTrackRewatches,
-            }
-          : prev
-      );
+      setSimklStatus((prev) => ({
+        ...prev!,
+        markMoviesAsRewatched: updated.markMoviesAsRewatched,
+        markEpisodesAsRewatched: updated.markEpisodesAsRewatched,
+        accountType: updated.accountType,
+        canTrackRewatches: updated.canTrackRewatches,
+      }));
       showSuccess(
         t("profile.saved", { defaultValue: "Settings saved successfully!" })
       );
