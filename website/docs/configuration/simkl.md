@@ -18,6 +18,10 @@ Scroblarr ships with an official Simkl application Client ID, so you do **not** 
 
 Your Simkl account is now linked!
 
+## Rewatch tracking (PRO / VIP)
+
+Optional and off by default. Enable under Profile → Integrations → Simkl to log rewatches as separate sessions. Requires Simkl [PRO or VIP](https://simkl.com/vip/).
+
 ## Reconnect (legacy links)
 
 If you linked Simkl before Scroblarr shipped its official Client ID (or you are still on an older AUTH V1 token), Profile → Simkl may show a dismissible **Reconnect recommended** note. Your existing link keeps working until you reconnect.

@@ -4,18 +4,25 @@ import { API_BASE_URL, getAuthHeaders } from "./common";
 const CACHE_KEY_STATUS = "simkl-status";
 const CACHE_KEY_PROFILE = "simkl-profile";
 
+export const SIMKL_VIP_URL = "https://simkl.com/vip/";
+
 export interface SimklStatus {
   linked: boolean;
   username: string | null;
   image: string | null;
   hasCredentials: boolean;
   needsReconnect?: boolean;
+  accountType?: "free" | "pro" | "vip" | null;
+  canTrackRewatches?: boolean;
+  markMoviesAsRewatched?: boolean;
+  markEpisodesAsRewatched?: boolean;
 }
 
 export interface SimklProfile {
   id: number | null;
   username: string | null;
   image: string | null;
+  accountType?: "free" | "pro" | "vip" | null;
 }
 
 export interface SimklPinAuthorization {
@@ -102,9 +109,13 @@ export async function unlinkSimkl(): Promise<{ success: boolean }> {
   return response.json();
 }
 
-export async function getSimklStatus(): Promise<SimklStatus> {
-  const cached = getCached<SimklStatus>(CACHE_KEY_STATUS);
-  if (cached) return cached;
+export async function getSimklStatus(options?: {
+  force?: boolean;
+}): Promise<SimklStatus> {
+  if (!options?.force) {
+    const cached = getCached<SimklStatus>(CACHE_KEY_STATUS);
+    if (cached) return cached;
+  }
 
   const response = await fetch(`${API_BASE_URL}/simkl/status`, {
     headers: getAuthHeaders(),
@@ -115,6 +126,30 @@ export async function getSimklStatus(): Promise<SimklStatus> {
   const data = (await response.json()) as SimklStatus;
   setCached(CACHE_KEY_STATUS, data);
   return data;
+}
+
+export async function updateSimklSettings(settings: {
+  markMoviesAsRewatched: boolean;
+  markEpisodesAsRewatched: boolean;
+}): Promise<{
+  success: boolean;
+  markMoviesAsRewatched: boolean;
+  markEpisodesAsRewatched: boolean;
+  accountType: "free" | "pro" | "vip" | null;
+  canTrackRewatches: boolean;
+}> {
+  const response = await fetch(`${API_BASE_URL}/simkl/settings`, {
+    method: "PATCH",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(settings),
+  });
+  if (!response.ok) {
+    throw new Error(
+      await getErrorMessage(response, "Failed to update Simkl settings")
+    );
+  }
+  invalidateSimklCache();
+  return response.json();
 }
 
 export async function getSimklProfile(): Promise<SimklProfile> {

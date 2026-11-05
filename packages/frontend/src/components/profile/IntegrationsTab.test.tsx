@@ -12,6 +12,7 @@ import {
   unlinkSimkl,
   unlinkTrakt,
   updateBingersSettings,
+  updateSimklSettings,
   type BingersStatus,
 } from "@services/api";
 import { renderWithProviders } from "@test/render";
@@ -76,6 +77,8 @@ vi.mock("@services/api", () => ({
   getSimklAuthorizeUrl: vi.fn(),
   linkSimkl: vi.fn(),
   unlinkSimkl: vi.fn(),
+  updateSimklSettings: vi.fn(),
+  SIMKL_VIP_URL: "https://simkl.com/vip/",
   getBingersStatus: vi.fn(),
   linkBingers: vi.fn(),
   unlinkBingers: vi.fn(),
@@ -1877,6 +1880,188 @@ describe("IntegrationsTab Simkl integration", () => {
       vi.useRealTimers();
     }
   });
+
+  it("saves Simkl rewatch settings with the correct movie/episode payload", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getSimklStatus).mockResolvedValue({
+      linked: true,
+      username: "simkl-user",
+      image: null,
+      hasCredentials: true,
+      accountType: "pro",
+      canTrackRewatches: true,
+      markMoviesAsRewatched: false,
+      markEpisodesAsRewatched: false,
+    });
+    vi.mocked(updateSimklSettings).mockResolvedValue({
+      success: true,
+      markMoviesAsRewatched: false,
+      markEpisodesAsRewatched: true,
+      accountType: "pro",
+      canTrackRewatches: true,
+    });
+
+    renderWithProviders(
+      <IntegrationsTab onProfileUpdated={onProfileUpdated} />
+    );
+    await expandSimklSection(user);
+
+    await user.click(
+      screen.getByRole("checkbox", { name: "Track episode rewatches" })
+    );
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(updateSimklSettings).toHaveBeenCalledWith({
+        markMoviesAsRewatched: false,
+        markEpisodesAsRewatched: true,
+      });
+      expect(showSuccess).toHaveBeenCalledWith("Settings saved successfully!");
+      expect(onProfileUpdated).toHaveBeenCalled();
+    });
+  });
+
+  it("refreshes Simkl status after a failed settings save", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getSimklStatus)
+      .mockResolvedValueOnce({
+        linked: true,
+        username: "simkl-user",
+        image: null,
+        hasCredentials: true,
+        accountType: "pro",
+        canTrackRewatches: true,
+        markMoviesAsRewatched: false,
+        markEpisodesAsRewatched: false,
+      })
+      .mockResolvedValueOnce({
+        linked: true,
+        username: "simkl-user",
+        image: null,
+        hasCredentials: true,
+        accountType: "free",
+        canTrackRewatches: false,
+        markMoviesAsRewatched: false,
+        markEpisodesAsRewatched: false,
+      });
+    vi.mocked(updateSimklSettings).mockRejectedValue(
+      new Error("Rewatch tracking requires Simkl PRO or VIP")
+    );
+
+    renderWithProviders(<IntegrationsTab />);
+    await expandSimklSection(user);
+
+    await user.click(
+      screen.getByRole("checkbox", { name: "Track episode rewatches" })
+    );
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(
+      await screen.findByText("Rewatch tracking requires Simkl PRO or VIP")
+    ).toBeVisible();
+    await waitFor(() => {
+      expect(getSimklStatus).toHaveBeenCalledWith({ force: true });
+    });
+  });
+
+  it("keeps the Simkl save error when the follow-up status refresh fails", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getSimklStatus)
+      .mockResolvedValueOnce({
+        linked: true,
+        username: "simkl-user",
+        image: null,
+        hasCredentials: true,
+        accountType: "pro",
+        canTrackRewatches: true,
+        markMoviesAsRewatched: false,
+        markEpisodesAsRewatched: false,
+      })
+      .mockRejectedValueOnce(new Error("status down"));
+    vi.mocked(updateSimklSettings).mockRejectedValue(
+      new Error("Settings unavailable")
+    );
+
+    renderWithProviders(<IntegrationsTab />);
+    await expandSimklSection(user);
+
+    await user.click(
+      screen.getByRole("checkbox", { name: "Track movie rewatches" })
+    );
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Settings unavailable")).toBeVisible();
+  });
+
+  it("shows a default error when saving Simkl settings fails with non-Error", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getSimklStatus).mockResolvedValue({
+      linked: true,
+      username: "simkl-user",
+      image: null,
+      hasCredentials: true,
+      accountType: "pro",
+      canTrackRewatches: true,
+      markMoviesAsRewatched: false,
+      markEpisodesAsRewatched: false,
+    });
+    vi.mocked(updateSimklSettings).mockRejectedValue("network down");
+
+    renderWithProviders(<IntegrationsTab />);
+    await expandSimklSection(user);
+
+    await user.click(
+      screen.getByRole("checkbox", { name: "Track episode rewatches" })
+    );
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(
+      await screen.findByText("Failed to save Simkl settings")
+    ).toBeVisible();
+  });
+
+  it("allows clearing Simkl rewatch toggles when the plan no longer allows tracking", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getSimklStatus).mockResolvedValue({
+      linked: true,
+      username: "simkl-user",
+      image: null,
+      hasCredentials: true,
+      accountType: "free",
+      canTrackRewatches: false,
+      markMoviesAsRewatched: true,
+      markEpisodesAsRewatched: false,
+    });
+    vi.mocked(updateSimklSettings).mockResolvedValue({
+      success: true,
+      markMoviesAsRewatched: false,
+      markEpisodesAsRewatched: false,
+      accountType: "free",
+      canTrackRewatches: false,
+    });
+
+    renderWithProviders(<IntegrationsTab />);
+    await expandSimklSection(user);
+
+    const movieToggle = screen.getByRole("checkbox", {
+      name: "Track movie rewatches",
+    });
+    expect(movieToggle).toBeChecked();
+    expect(movieToggle).toBeEnabled();
+    expect(
+      screen.getByRole("checkbox", { name: "Track episode rewatches" })
+    ).toBeDisabled();
+
+    await user.click(movieToggle);
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(updateSimklSettings).toHaveBeenCalledWith({
+        markMoviesAsRewatched: false,
+        markEpisodesAsRewatched: false,
+      });
+    });
+  });
 });
 
 describe("IntegrationsTab Bingers integration", () => {
@@ -2401,9 +2586,7 @@ describe("IntegrationsTab Bingers integration", () => {
     );
     await expandBingersSection(user);
 
-    await user.click(
-      screen.getByRole("checkbox", { name: "Mark movies as rewatched" })
-    );
+    await user.click(screen.getByRole("checkbox", { name: "Movies" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
@@ -2436,9 +2619,7 @@ describe("IntegrationsTab Bingers integration", () => {
     renderWithProviders(<IntegrationsTab />);
     await expandBingersSection(user);
 
-    await user.click(
-      screen.getByRole("checkbox", { name: "Mark episodes as rewatched" })
-    );
+    await user.click(screen.getByRole("checkbox", { name: "Episodes" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     expect(await screen.findByText("Settings unavailable")).toBeVisible();
@@ -2460,9 +2641,7 @@ describe("IntegrationsTab Bingers integration", () => {
     renderWithProviders(<IntegrationsTab />);
     await expandBingersSection(user);
 
-    await user.click(
-      screen.getByRole("checkbox", { name: "Mark episodes as rewatched" })
-    );
+    await user.click(screen.getByRole("checkbox", { name: "Episodes" }));
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     expect(

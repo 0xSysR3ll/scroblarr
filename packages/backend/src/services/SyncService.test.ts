@@ -1,4 +1,5 @@
 import { BingersApiError } from "@integrations/bingers/BingersApiError";
+import { clearSimklRewatchSessionCache } from "@integrations/simkl/simklRewatch";
 import { TraktApiError } from "@integrations/trakt/TraktApiError";
 import type { MediaEvent } from "@scroblarr/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -200,6 +201,7 @@ describe("SyncService", () => {
     );
     mediaIdEnricherMocks.enrich.mockImplementation(async (media) => media);
     jellyfinClientMocks.getSeasonPosterUrl.mockReset();
+    clearSimklRewatchSessionCache();
   });
 
   it("ignores non-scrobble events", async () => {
@@ -309,6 +311,166 @@ describe("SyncService", () => {
         originalMediaId: "m1",
         success: true,
         destinations: JSON.stringify(["Simkl"]),
+      })
+    );
+  });
+
+  it("passes Simkl rewatch options for PRO accounts and marks history", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktAccessToken: null,
+      simklClientId: "simkl-client-id",
+      simklAccessToken: "simkl-token",
+      simklAccountType: "pro",
+      simklMarkMoviesAsRewatched: true,
+      simklMarkEpisodesAsRewatched: false,
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(true);
+    simklTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "simkl-valid-token"
+    );
+    simklClientMocks.scrobble.mockResolvedValue({
+      wasRewatched: true,
+      simklRewatchId: 21284,
+    });
+
+    const service = new SyncService();
+    await service.syncEvent(makeEvent());
+
+    expect(simklClientMocks.scrobble).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "scrobble" }),
+      "simkl-valid-token",
+      expect.objectContaining({
+        markMoviesAsRewatched: true,
+        markEpisodesAsRewatched: false,
+      })
+    );
+    expect(syncHistoryRepositoryMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        destinations: JSON.stringify(["Simkl"]),
+        wasRewatched: true,
+      })
+    );
+  });
+
+  it("passes Simkl episode rewatch options for PRO accounts", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktAccessToken: null,
+      simklClientId: "simkl-client-id",
+      simklAccessToken: "simkl-token",
+      simklAccountType: "vip",
+      simklMarkMoviesAsRewatched: false,
+      simklMarkEpisodesAsRewatched: true,
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(true);
+    simklTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "simkl-valid-token"
+    );
+    simklClientMocks.scrobble.mockResolvedValue({
+      wasRewatched: true,
+      simklRewatchId: 88,
+    });
+
+    const service = new SyncService();
+    await service.syncEvent(
+      makeEvent({
+        media: {
+          id: "ep-1",
+          type: "episode",
+          title: "Example Show",
+          seasonNumber: 1,
+          episodeNumber: 2,
+          tvdbEpisodeId: 99,
+        },
+      })
+    );
+
+    expect(simklClientMocks.scrobble).toHaveBeenCalledWith(
+      expect.objectContaining({
+        media: expect.objectContaining({ type: "episode" }),
+      }),
+      "simkl-valid-token",
+      expect.objectContaining({
+        markMoviesAsRewatched: false,
+        markEpisodesAsRewatched: true,
+      })
+    );
+  });
+
+  it("does not enable Simkl allow_rewatch for free-tier accounts", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktAccessToken: null,
+      simklClientId: "simkl-client-id",
+      simklAccessToken: "simkl-token",
+      simklAccountType: "free",
+      simklMarkMoviesAsRewatched: true,
+      simklMarkEpisodesAsRewatched: true,
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(true);
+    simklTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "simkl-valid-token"
+    );
+    simklClientMocks.scrobble.mockResolvedValue({ wasRewatched: false });
+
+    const service = new SyncService();
+    await service.syncEvent(makeEvent());
+
+    expect(simklClientMocks.scrobble).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "scrobble" }),
+      "simkl-valid-token",
+      expect.objectContaining({
+        markMoviesAsRewatched: false,
+        markEpisodesAsRewatched: false,
+      })
+    );
+  });
+
+  it("pins Simkl rewatch_id on subsequent syncs for the same title", async () => {
+    userRepositoryMocks.findBySourceUsername.mockResolvedValue({
+      id: "u1",
+      enabled: true,
+      plexUsername: "plex-user",
+      traktAccessToken: null,
+      simklClientId: "simkl-client-id",
+      simklAccessToken: "simkl-token",
+      simklAccountType: "pro",
+      simklMarkMoviesAsRewatched: true,
+      simklMarkEpisodesAsRewatched: false,
+    });
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(true);
+    simklTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "simkl-valid-token"
+    );
+    simklClientMocks.scrobble
+      .mockResolvedValueOnce({
+        wasRewatched: true,
+        simklRewatchId: 21284,
+      })
+      .mockResolvedValueOnce({
+        wasRewatched: true,
+        simklRewatchId: 21284,
+      });
+
+    const service = new SyncService();
+    await service.syncEvent(makeEvent());
+    await service.syncEvent(makeEvent());
+
+    expect(simklClientMocks.scrobble).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ event: "scrobble" }),
+      "simkl-valid-token",
+      expect.objectContaining({
+        markMoviesAsRewatched: true,
+        simklRewatchId: 21284,
       })
     );
   });
@@ -1104,6 +1266,57 @@ describe("SyncService", () => {
         success: true,
         errorMessage: null,
         destinations: expect.stringMatching(/Simkl.*Trakt|Trakt.*Simkl/),
+      })
+    );
+  });
+
+  it("persists Simkl wasRewatched when a failed history item succeeds on retry", async () => {
+    syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+    simklTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+      "simkl-valid-token"
+    );
+    simklClientMocks.scrobble.mockResolvedValue({
+      wasRewatched: true,
+      simklRewatchId: 55,
+    });
+
+    const service = new SyncService();
+    const result = await service.retryHistoryItem({
+      id: "sync-history-id",
+      userId: "u1",
+      user: {
+        id: "u1",
+        enabled: true,
+        plexUsername: "plex-user",
+        simklClientId: "simkl-client-id",
+        simklAccessToken: "simkl-token",
+        simklAccountType: "pro",
+        simklMarkMoviesAsRewatched: true,
+      },
+      mediaType: "movie",
+      mediaTitle: "Interstellar",
+      source: "plex",
+      originalMediaId: "plex-media-id",
+      imdbMovieId: "tt0816692",
+      destinations: JSON.stringify([]),
+      success: false,
+      wasRewatched: false,
+      errorMessage: "Simkl: temporary failure",
+      syncedAt: new Date("2026-01-01T00:00:00.000Z"),
+    } as never);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        destinations: ["Simkl"],
+        wasRewatched: true,
+      })
+    );
+    expect(syncHistoryRepositoryMocks.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "sync-history-id",
+        success: true,
+        wasRewatched: true,
       })
     );
   });
