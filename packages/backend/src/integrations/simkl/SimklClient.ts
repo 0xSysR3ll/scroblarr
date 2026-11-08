@@ -1,4 +1,8 @@
-import { ISyncClient, SyncOptions } from "@integrations/common/ISyncClient";
+import {
+  ISyncClient,
+  ScrobbleResult,
+  SyncOptions,
+} from "@integrations/common/ISyncClient";
 import { MediaEvent } from "@scroblarr/shared";
 import { logger } from "@utils/logger";
 
@@ -7,6 +11,11 @@ import {
   SIMKL_API_BASE_URL,
   withSimklQueryParams,
 } from "./SimklApi";
+import {
+  isSuccessfulSimklRewatchStatus,
+  normalizeSimklAccountType,
+  type SimklAccountType,
+} from "./simklRewatch";
 
 type SimklIds = {
   imdb?: string;
@@ -19,18 +28,21 @@ interface SimklMovie {
   year?: number;
   watched_at?: string;
   ids: SimklIds;
+  rewatch_id?: number;
 }
 
 interface SimklEpisode {
   number?: number;
   watched_at: string;
   ids?: Pick<SimklIds, "tvdb">;
+  rewatch_id?: number;
 }
 
 interface SimklShow {
   title: string;
   year?: number;
   ids?: SimklIds;
+  rewatch_id?: number;
   seasons?: Array<{
     number: number;
     episodes: SimklEpisode[];
@@ -48,6 +60,14 @@ interface SimklHistoryResponse {
     movies?: number;
     shows?: number;
     episodes?: number;
+    statuses?: Array<{
+      response?: {
+        rewatch_id?: number;
+        rewatch_status?: string;
+      };
+      rewatch_id?: number;
+      rewatch_status?: string;
+    }>;
   };
   not_found?: {
     movies?: unknown[];
@@ -71,21 +91,22 @@ export class SimklClient implements ISyncClient {
   async scrobble(
     event: MediaEvent,
     accessToken: string,
-    _options?: SyncOptions
-  ): Promise<void> {
+    options?: SyncOptions
+  ): Promise<ScrobbleResult> {
     if (event.media.type === "episode") {
-      await this.addEpisodeToHistory(event, accessToken);
-    } else if (event.media.type === "movie") {
-      await this.addMovieToHistory(event, accessToken);
-    } else {
-      throw new Error(`Unsupported media type: ${event.media.type}`);
+      return this.addEpisodeToHistory(event, accessToken, options);
     }
+    if (event.media.type === "movie") {
+      return this.addMovieToHistory(event, accessToken, options);
+    }
+    throw new Error(`Unsupported media type: ${event.media.type}`);
   }
 
   async getUserProfile(accessToken: string): Promise<{
     id: number | null;
     username: string | null;
     image: string | null;
+    accountType: SimklAccountType | null;
   }> {
     const response = await this.post(
       "/users/settings",
@@ -96,20 +117,22 @@ export class SimklClient implements ISyncClient {
 
     const settings = (await response.json()) as {
       user?: { name?: string; avatar?: string };
-      account?: { id?: number };
+      account?: { id?: number; type?: string };
     };
 
     return {
       id: settings.account?.id ?? null,
       username: settings.user?.name ?? null,
       image: settings.user?.avatar ?? null,
+      accountType: normalizeSimklAccountType(settings.account?.type),
     };
   }
 
   private async addMovieToHistory(
     event: MediaEvent,
-    accessToken: string
-  ): Promise<void> {
+    accessToken: string,
+    options?: SyncOptions
+  ): Promise<ScrobbleResult> {
     const ids: SimklIds = {};
     if (event.media.imdbMovieId) {
       ids.imdb = event.media.imdbMovieId;
@@ -138,14 +161,18 @@ export class SimklClient implements ISyncClient {
     if (event.media.year) {
       movie.year = event.media.year;
     }
+    if (options?.simklRewatchId) {
+      movie.rewatch_id = options.simklRewatchId;
+    }
 
-    await this.addToHistory({ movies: [movie] }, accessToken, event);
+    return this.addToHistory({ movies: [movie] }, accessToken, event, options);
   }
 
   private async addEpisodeToHistory(
     event: MediaEvent,
-    accessToken: string
-  ): Promise<void> {
+    accessToken: string,
+    options?: SyncOptions
+  ): Promise<ScrobbleResult> {
     const showIds: SimklIds = {};
     if (event.media.tmdbSeriesId) {
       showIds.tmdb = event.media.tmdbSeriesId;
@@ -166,19 +193,19 @@ export class SimklClient implements ISyncClient {
     }
 
     if (event.media.tvdbEpisodeId) {
-      await this.addToHistory(
-        {
-          episodes: [
-            {
-              watched_at: this.formatWatchedAt(event.timestamp),
-              ids: episodeIds,
-            },
-          ],
-        },
+      const episode: SimklEpisode = {
+        watched_at: this.formatWatchedAt(event.timestamp),
+        ids: episodeIds,
+      };
+      if (options?.simklRewatchId) {
+        episode.rewatch_id = options.simklRewatchId;
+      }
+      return this.addToHistory(
+        { episodes: [episode] },
         accessToken,
-        event
+        event,
+        options
       );
-      return;
     }
 
     const episode: SimklEpisode = {
@@ -201,16 +228,33 @@ export class SimklClient implements ISyncClient {
         },
       ],
     };
+    if (options?.simklRewatchId) {
+      show.rewatch_id = options.simklRewatchId;
+    }
 
-    await this.addToHistory({ shows: [show] }, accessToken, event);
+    return this.addToHistory({ shows: [show] }, accessToken, event, options);
+  }
+
+  private allowRewatchForEvent(
+    event: MediaEvent,
+    options?: SyncOptions
+  ): boolean {
+    return event.media.type === "movie"
+      ? !!options?.markMoviesAsRewatched
+      : !!options?.markEpisodesAsRewatched;
   }
 
   private async addToHistory(
     payload: SimklHistoryPayload,
     accessToken: string,
-    event: MediaEvent
-  ): Promise<void> {
-    const response = await this.post("/sync/history", accessToken, payload);
+    event: MediaEvent,
+    options?: SyncOptions
+  ): Promise<ScrobbleResult> {
+    const allowRewatch = this.allowRewatchForEvent(event, options);
+    const endpoint = allowRewatch
+      ? "/sync/history?allow_rewatch=yes"
+      : "/sync/history";
+    const response = await this.post(endpoint, accessToken, payload);
     const result = (await response.json()) as SimklHistoryResponse;
 
     const notFound =
@@ -230,6 +274,37 @@ export class SimklClient implements ISyncClient {
       );
       throw new Error("Simkl could not match the media item");
     }
+
+    const rewatch = this.extractRewatchFields(result);
+    return {
+      wasRewatched: isSuccessfulSimklRewatchStatus(rewatch.rewatchStatus),
+      simklRewatchId: rewatch.rewatchId,
+    };
+  }
+
+  private extractRewatchFields(result: SimklHistoryResponse): {
+    rewatchId?: number;
+    rewatchStatus?: string;
+  } {
+    const statuses = result.added?.statuses;
+    if (!Array.isArray(statuses)) {
+      return {};
+    }
+
+    for (const status of statuses) {
+      const nested = status.response;
+      const rewatchId = nested?.rewatch_id ?? status.rewatch_id;
+      const rewatchStatus = nested?.rewatch_status ?? status.rewatch_status;
+      if (typeof rewatchId === "number" || typeof rewatchStatus === "string") {
+        return {
+          rewatchId: typeof rewatchId === "number" ? rewatchId : undefined,
+          rewatchStatus:
+            typeof rewatchStatus === "string" ? rewatchStatus : undefined,
+        };
+      }
+    }
+
+    return {};
   }
 
   private async post(
