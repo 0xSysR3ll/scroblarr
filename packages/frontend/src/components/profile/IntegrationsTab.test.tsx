@@ -1960,8 +1960,15 @@ describe("IntegrationsTab Simkl integration", () => {
       await screen.findByText("Rewatch tracking requires Simkl PRO or VIP")
     ).toBeVisible();
     await waitFor(() => {
-      expect(getSimklStatus).toHaveBeenCalledWith({ force: true });
+      expect(getSimklStatus).toHaveBeenCalledTimes(2);
+      expect(getSimklStatus).toHaveBeenLastCalledWith({ force: true });
     });
+
+    const episodeRewatches = screen.getByRole("checkbox", {
+      name: "Track episode rewatches",
+    });
+    expect(episodeRewatches).not.toBeChecked();
+    expect(episodeRewatches).toBeDisabled();
   });
 
   it("keeps the Simkl save error when the follow-up status refresh fails", async () => {
