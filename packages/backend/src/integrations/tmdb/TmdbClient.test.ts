@@ -933,4 +933,20 @@ describe("TmdbClient", () => {
       client.findSeriesIdByEpisodeExternalId("missing", "tvdb_id")
     ).resolves.toBeNull();
   });
+
+  it("surfaces TMDB API request timeouts from apiGet", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockRejectedValue(
+          Object.assign(new Error("aborted"), { name: "AbortError" })
+        )
+    );
+
+    const client = new TmdbClient("test-token");
+    await expect(client.searchTv("Berlin")).rejects.toThrow(
+      "TMDB API request timed out"
+    );
+  });
 });

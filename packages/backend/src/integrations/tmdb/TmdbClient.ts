@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from "@utils/fetchWithTimeout";
+
 import { TmdbRateLimitError } from "./TmdbApiError";
 import { buildTmdbImageUrl } from "./tmdbConfig";
 import {
@@ -7,6 +9,7 @@ import {
 } from "./TmdbPosterCache";
 
 const TMDB_API_BASE = "https://api.themoviedb.org/3";
+const TMDB_API_TIMEOUT_MS = 10_000;
 
 interface TmdbMediaDetails {
   poster_path: string | null;
@@ -418,12 +421,17 @@ export class TmdbClient {
   }
 
   private async apiGet<T>(path: string): Promise<T | null> {
-    const response = await fetch(`${TMDB_API_BASE}${path}`, {
-      headers: {
-        Authorization: `Bearer ${this.accessToken}`,
-        Accept: "application/json",
+    const response = await fetchWithTimeout(
+      `${TMDB_API_BASE}${path}`,
+      {
+        headers: {
+          Authorization: `Bearer ${this.accessToken}`,
+          Accept: "application/json",
+        },
       },
-    });
+      "TMDB API request",
+      TMDB_API_TIMEOUT_MS
+    );
 
     if (response.status === 404) {
       return null;

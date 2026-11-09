@@ -27,6 +27,17 @@ function episode(overrides: Partial<MediaItem> = {}): MediaItem {
   };
 }
 
+function episodeWithKnownImdb(overrides: Partial<MediaItem> = {}): MediaItem {
+  return episode({
+    title: "Berlin",
+    tmdbSeriesId: 146176,
+    imdbEpisodeId: "tt-known-episode",
+    seasonNumber: 1,
+    episodeNumber: 1,
+    ...overrides,
+  });
+}
+
 describe("needsMediaIdEnrichment", () => {
   it("is true when an episode or movie has no external IDs", () => {
     expect(needsMediaIdEnrichment(episode())).toBe(true);
@@ -931,11 +942,69 @@ describe("MediaIdEnricher", () => {
       searchMovie: vi.fn(),
     } as unknown as TmdbClient;
     const enricher = new MediaIdEnricher(client);
-    const media = episode({ tmdbSeriesId: 146176 });
+    const media = episode({
+      tmdbSeriesId: 146176,
+      tvdbEpisodeId: 8865290,
+      year: 2023,
+    });
 
     await expect(enricher.enrich(media)).resolves.toBe(media);
     expect(client.searchTv).not.toHaveBeenCalled();
     expect(client.searchMovie).not.toHaveBeenCalled();
+  });
+
+  it("rejects a TVDB episode ID when TMDB IMDb conflicts with the known IMDb", async () => {
+    const client = {
+      getEpisodeExternalIds: vi.fn().mockResolvedValue({
+        imdbId: "tt-other-episode",
+        tvdbId: 999001,
+      }),
+      hasTvSeason: vi.fn().mockResolvedValue(true),
+      findSeriesIdByEpisodeExternalId: vi.fn().mockResolvedValue(146176),
+      searchTv: vi.fn().mockResolvedValue([]),
+    } as unknown as TmdbClient;
+
+    const media = episodeWithKnownImdb();
+    const enricher = new MediaIdEnricher(client);
+    const enriched = await enricher.enrich(media);
+
+    expect(enriched).toBe(media);
+    expect(enriched.tvdbEpisodeId).toBeUndefined();
+    expect(client.findSeriesIdByEpisodeExternalId).toHaveBeenCalledWith(
+      "tt-known-episode",
+      "imdb_id"
+    );
+  });
+
+  it("resolves via known IMDb when the TMDB series S/E mapping conflicts", async () => {
+    const client = {
+      getEpisodeExternalIds: vi
+        .fn()
+        .mockResolvedValueOnce({
+          imdbId: "tt-other-episode",
+          tvdbId: 999001,
+        })
+        .mockResolvedValueOnce({
+          imdbId: "tt-known-episode",
+          tvdbId: 888002,
+        }),
+      hasTvSeason: vi.fn().mockResolvedValue(true),
+      findSeriesIdByEpisodeExternalId: vi.fn().mockResolvedValue(99999),
+      searchTv: vi.fn(),
+    } as unknown as TmdbClient;
+
+    const enricher = new MediaIdEnricher(client);
+    const enriched = await enricher.enrich(episodeWithKnownImdb());
+
+    expect(enriched.tmdbSeriesId).toBe(99999);
+    expect(enriched.tvdbEpisodeId).toBe(888002);
+    expect(enriched.imdbEpisodeId).toBe("tt-known-episode");
+    expect(client.getEpisodeExternalIds).toHaveBeenNthCalledWith(
+      2,
+      99999,
+      1,
+      1
+    );
   });
 
   it("reuses season-existence lookups within a single enrichment run", async () => {

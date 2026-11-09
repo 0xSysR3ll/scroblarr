@@ -367,12 +367,7 @@ export class SyncService {
     event = await this.enrichMediaIds(event);
 
     const mediaIdentifiers = {
-      tvdbEpisodeId: event.media.tvdbEpisodeId?.toString(),
-      tvdbMovieId: event.media.tvdbMovieId?.toString(),
-      imdbMovieId: event.media.imdbMovieId,
-      imdbEpisodeId: event.media.imdbEpisodeId,
-      tmdbMovieId: event.media.tmdbMovieId?.toString(),
-      tmdbSeriesId: event.media.tmdbSeriesId?.toString(),
+      ...this.mediaExternalIds(event.media),
       seasonNumber: event.media.seasonNumber,
       episodeNumber: event.media.episodeNumber,
       mediaTitle: event.media.title,
@@ -608,12 +603,7 @@ export class SyncService {
         mediaTitle: event.media.title,
         source: event.source,
         originalMediaId: event.media.id,
-        tvdbEpisodeId: event.media.tvdbEpisodeId?.toString(),
-        tvdbMovieId: event.media.tvdbMovieId?.toString(),
-        imdbMovieId: event.media.imdbMovieId,
-        imdbEpisodeId: event.media.imdbEpisodeId,
-        tmdbMovieId: event.media.tmdbMovieId?.toString(),
-        tmdbSeriesId: event.media.tmdbSeriesId?.toString(),
+        ...this.mediaExternalIds(event.media),
         posterUrl,
         seasonNumber: event.media.seasonNumber,
         episodeNumber: event.media.episodeNumber,
@@ -667,6 +657,17 @@ export class SyncService {
       const refreshedToken = await destination.refreshAccessToken(user);
       return await destination.client.scrobble(event, refreshedToken, options);
     }
+  }
+
+  private mediaExternalIds(media: MediaEvent["media"]) {
+    return {
+      tvdbEpisodeId: media.tvdbEpisodeId?.toString(),
+      tvdbMovieId: media.tvdbMovieId?.toString(),
+      imdbMovieId: media.imdbMovieId,
+      imdbEpisodeId: media.imdbEpisodeId,
+      tmdbMovieId: media.tmdbMovieId?.toString(),
+      tmdbSeriesId: media.tmdbSeriesId?.toString(),
+    };
   }
 
   private async enrichMediaIds(event: MediaEvent): Promise<MediaEvent> {
