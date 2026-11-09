@@ -205,6 +205,58 @@ export class SyncService {
 
   async retryHistoryItem(historyItem: SyncHistory): Promise<SyncAttemptResult> {
     const user = historyItem.user;
+    if (!user) {
+      throw new Error("User not found for sync history item");
+    }
+
+    const retryEvent = this.buildRetryEvent(historyItem);
+    const result = await this.syncEventForUser(user, retryEvent, {
+      saveFailedHistory: false,
+      destinationNames: getRetryDestinationNamesFromHistory(historyItem),
+    });
+
+    if (result.success) {
+      mergeRetryAttemptIntoHistory(historyItem, result.destinationResults);
+      if (result.wasRewatched) {
+        historyItem.wasRewatched = true;
+      }
+      historyItem.retriedAt = new Date();
+      await this.syncHistoryRepository.save(historyItem);
+    }
+
+    return result;
+  }
+
+  /**
+   * Retry many history rows. When every selected failure is Simkl-only,
+   * items are sent in one (or two, if rewatch modes differ) /sync/history call.
+   */
+  async retryHistoryItems(
+    historyItems: SyncHistory[]
+  ): Promise<Array<{ id: string } & SyncAttemptResult>> {
+    if (historyItems.length === 0) {
+      return [];
+    }
+
+    if (
+      historyItems.length > 1 &&
+      (await this.canBatchSimklRetries(historyItems))
+    ) {
+      return this.retrySimklHistoryItemsBatch(historyItems);
+    }
+
+    const results: Array<{ id: string } & SyncAttemptResult> = [];
+    for (const historyItem of historyItems) {
+      results.push({
+        id: historyItem.id,
+        ...(await this.retryHistoryItem(historyItem)),
+      });
+    }
+    return results;
+  }
+
+  private buildRetryEvent(historyItem: SyncHistory): MediaEvent {
+    const user = historyItem.user;
     const source = historyItem.source;
     const mediaType = historyItem.mediaType;
 
@@ -228,7 +280,7 @@ export class SyncService {
       throw new Error("User is missing the linked media server account");
     }
 
-    const retryEvent: MediaEvent = {
+    return {
       event: "scrobble",
       source,
       userId: sourceUserId,
@@ -249,22 +301,151 @@ export class SyncService {
         posterUrl: historyItem.posterUrl,
       },
     };
+  }
 
-    const result = await this.syncEventForUser(user, retryEvent, {
-      saveFailedHistory: false,
-      destinationNames: getRetryDestinationNamesFromHistory(historyItem),
-    });
-
-    if (result.success) {
-      mergeRetryAttemptIntoHistory(historyItem, result.destinationResults);
-      if (result.wasRewatched) {
-        historyItem.wasRewatched = true;
-      }
-      historyItem.retriedAt = new Date();
-      await this.syncHistoryRepository.save(historyItem);
+  private async canBatchSimklRetries(
+    historyItems: SyncHistory[]
+  ): Promise<boolean> {
+    const user = historyItems[0]?.user;
+    if (!user?.simklAccessToken || !user.simklClientId || !user.enabled) {
+      return false;
     }
 
-    return result;
+    let activeDestinations: string[] | undefined;
+
+    for (const historyItem of historyItems) {
+      if (!historyItem.user || historyItem.user.id !== user.id) {
+        return false;
+      }
+
+      const destinationNames = getRetryDestinationNamesFromHistory(historyItem);
+      if (destinationNames) {
+        if (destinationNames.length !== 1 || destinationNames[0] !== "Simkl") {
+          return false;
+        }
+        continue;
+      }
+
+      if (!activeDestinations) {
+        const destinations = await this.getSyncDestinations(user);
+        activeDestinations = destinations
+          .filter((destination) => destination.hasToken(user))
+          .map((destination) => destination.name);
+      }
+      if (
+        activeDestinations.length !== 1 ||
+        activeDestinations[0] !== "Simkl"
+      ) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  private async retrySimklHistoryItemsBatch(
+    historyItems: SyncHistory[]
+  ): Promise<Array<{ id: string } & SyncAttemptResult>> {
+    const user = historyItems[0]!.user!;
+    if (!user.enabled) {
+      return historyItems.map((historyItem) => ({
+        id: historyItem.id,
+        ...buildGlobalFailureResult("User account is disabled"),
+      }));
+    }
+
+    const simklClient = new SimklClient(user.simklClientId!);
+    const accessToken = await this.simklTokenManager.getValidAccessToken(
+      user.id
+    );
+
+    const prepared: Array<{
+      historyItem: SyncHistory;
+      event: MediaEvent;
+      options: SyncOptions;
+    }> = [];
+
+    for (const historyItem of historyItems) {
+      let event = this.buildRetryEvent(historyItem);
+      event = await this.enrichMediaIds(event);
+
+      const planAllowsRewatch = isSimklRewatchPlan(user.simklAccountType);
+      const allowRewatch =
+        planAllowsRewatch &&
+        (event.media.type === "movie"
+          ? !!user.simklMarkMoviesAsRewatched
+          : !!user.simklMarkEpisodesAsRewatched);
+      const pinnedRewatchId = allowRewatch
+        ? getCachedSimklRewatchIdForEvent(user.id, event)
+        : undefined;
+
+      prepared.push({
+        historyItem,
+        event,
+        options: {
+          markMoviesAsRewatched: allowRewatch && event.media.type === "movie",
+          markEpisodesAsRewatched:
+            allowRewatch && event.media.type === "episode",
+          simklRewatchId: pinnedRewatchId,
+        },
+      });
+    }
+
+    const batchResults = await simklClient.scrobbleMany(
+      prepared.map((item) => ({
+        event: item.event,
+        options: item.options,
+      })),
+      accessToken
+    );
+
+    const results: Array<{ id: string } & SyncAttemptResult> = [];
+
+    for (let index = 0; index < prepared.length; index++) {
+      const item = prepared[index]!;
+      const batchResult = batchResults[index];
+      const syncResults =
+        batchResult?.success === true
+          ? [{ destination: "Simkl", success: true as const }]
+          : [
+              {
+                destination: "Simkl",
+                success: false as const,
+                error:
+                  batchResult?.success === false
+                    ? batchResult.error.message
+                    : "Unknown Simkl error",
+              },
+            ];
+
+      const attemptResult = buildAttemptResult(syncResults);
+      if (batchResult?.success === true) {
+        attemptResult.wasRewatched = batchResult.result.wasRewatched;
+        if (typeof batchResult.result.simklRewatchId === "number") {
+          setCachedSimklRewatchIdForEvent(
+            user.id,
+            item.event,
+            batchResult.result.simklRewatchId
+          );
+        }
+      }
+
+      if (attemptResult.success) {
+        mergeRetryAttemptIntoHistory(
+          item.historyItem,
+          attemptResult.destinationResults
+        );
+        if (attemptResult.wasRewatched) {
+          item.historyItem.wasRewatched = true;
+        }
+        item.historyItem.retriedAt = new Date();
+        await this.syncHistoryRepository.save(item.historyItem);
+      }
+
+      results.push({ id: item.historyItem.id, ...attemptResult });
+    }
+
+    return results;
   }
 
   private getRetryTimestamp(historyItem: SyncHistory): Date {

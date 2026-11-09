@@ -17,22 +17,30 @@ const settingsRepository = new SettingsRepository();
 const syncService = new SyncService();
 const posterService = new PosterService(syncHistoryRepository);
 
-async function retryHistoryItemForUser(
+type RetryHistoryResponseBody = {
+  id: string;
+  success: boolean;
+  destinations: string[];
+  errorMessage?: string;
+  error?: string;
+};
+
+async function loadRetryableHistoryItem(
   id: string,
   userId: string
-): Promise<{
-  status: number;
-  body: {
-    id: string;
-    success: boolean;
-    destinations: string[];
-    errorMessage?: string;
-    error?: string;
-  };
-}> {
+): Promise<
+  | {
+      ok: true;
+      historyItem: NonNullable<
+        Awaited<ReturnType<typeof syncHistoryRepository.findById>>
+      >;
+    }
+  | { ok: false; status: number; body: RetryHistoryResponseBody }
+> {
   const historyItem = await syncHistoryRepository.findById(id, userId);
   if (!historyItem) {
     return {
+      ok: false,
       status: 404,
       body: {
         id,
@@ -45,6 +53,7 @@ async function retryHistoryItemForUser(
 
   if (historyItem.success && !historyItem.errorMessage) {
     return {
+      ok: false,
       status: 400,
       body: {
         id,
@@ -62,6 +71,7 @@ async function retryHistoryItemForUser(
     historyItem.source !== "emby"
   ) {
     return {
+      ok: false,
       status: 400,
       body: {
         id,
@@ -77,6 +87,7 @@ async function retryHistoryItemForUser(
     historyItem.mediaType !== "movie"
   ) {
     return {
+      ok: false,
       status: 400,
       body: {
         id,
@@ -89,6 +100,7 @@ async function retryHistoryItemForUser(
 
   if (!historyItem.user) {
     return {
+      ok: false,
       status: 404,
       body: {
         id,
@@ -105,6 +117,7 @@ async function retryHistoryItemForUser(
       : historyItem.user.plexUsername;
   if (!linkedMediaUser) {
     return {
+      ok: false,
       status: 400,
       body: {
         id,
@@ -115,7 +128,22 @@ async function retryHistoryItemForUser(
     };
   }
 
-  const result = await syncService.retryHistoryItem(historyItem);
+  return { ok: true, historyItem };
+}
+
+async function retryHistoryItemForUser(
+  id: string,
+  userId: string
+): Promise<{
+  status: number;
+  body: RetryHistoryResponseBody;
+}> {
+  const loaded = await loadRetryableHistoryItem(id, userId);
+  if (!loaded.ok) {
+    return { status: loaded.status, body: loaded.body };
+  }
+
+  const result = await syncService.retryHistoryItem(loaded.historyItem);
   return {
     status: 200,
     body: {
@@ -301,11 +329,34 @@ router.post("/history/retry", auth, async (req: Request, res: Response) => {
       return res.status(400).json({ error: "At least one id is required" });
     }
 
-    const results = [];
+    const resultsById = new Map<string, RetryHistoryResponseBody>();
+    const retryableItems = [];
+
     for (const id of uniqueIds) {
-      const result = await retryHistoryItemForUser(id, user.id);
-      results.push(result.body);
+      const loaded = await loadRetryableHistoryItem(id, user.id);
+      if (!loaded.ok) {
+        resultsById.set(id, loaded.body);
+        continue;
+      }
+      retryableItems.push(loaded.historyItem);
     }
+
+    if (retryableItems.length > 0) {
+      const retryResults = await syncService.retryHistoryItems(retryableItems);
+      for (const result of retryResults) {
+        resultsById.set(result.id, result);
+      }
+    }
+
+    const results = uniqueIds.map(
+      (id) =>
+        resultsById.get(id) ?? {
+          id,
+          success: false,
+          destinations: [],
+          error: "Missing retry result",
+        }
+    );
 
     const retried = results.filter((result) => result.success).length;
     const failed = results.length - retried;

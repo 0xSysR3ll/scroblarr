@@ -17,6 +17,7 @@ const syncHistoryRepositoryMocks = vi.hoisted(() => ({
 
 const syncServiceMocks = vi.hoisted(() => ({
   retryHistoryItem: vi.fn(),
+  retryHistoryItems: vi.fn(),
 }));
 
 vi.mock("@repositories/SettingsRepository", () => ({
@@ -41,6 +42,7 @@ vi.mock("@repositories/SyncHistoryRepository", () => ({
 vi.mock("@services/SyncService", () => ({
   SyncService: class {
     retryHistoryItem = syncServiceMocks.retryHistoryItem;
+    retryHistoryItems = syncServiceMocks.retryHistoryItems;
   },
 }));
 
@@ -188,16 +190,19 @@ describe("sync retry route", () => {
     syncHistoryRepositoryMocks.findById
       .mockResolvedValueOnce(firstHistoryItem)
       .mockResolvedValueOnce(secondHistoryItem);
-    syncServiceMocks.retryHistoryItem
-      .mockResolvedValueOnce({
+    syncServiceMocks.retryHistoryItems.mockResolvedValue([
+      {
+        id: "sync-id-1",
         success: true,
         destinations: ["TVTime"],
-      })
-      .mockResolvedValueOnce({
+      },
+      {
+        id: "sync-id-2",
         success: false,
         destinations: [],
         errorMessage: "TVTime: Too Many Requests - Rate limit exceeded",
-      });
+      },
+    ]);
 
     const response = await request(makeApp())
       .post("/api/v1/sync/history/retry")
@@ -223,7 +228,11 @@ describe("sync retry route", () => {
         },
       ],
     });
-    expect(syncServiceMocks.retryHistoryItem).toHaveBeenCalledTimes(2);
+    expect(syncServiceMocks.retryHistoryItems).toHaveBeenCalledWith([
+      firstHistoryItem,
+      secondHistoryItem,
+    ]);
+    expect(syncServiceMocks.retryHistoryItem).not.toHaveBeenCalled();
   });
 
   it("retries a failed Emby sync history item for the authenticated user", async () => {
