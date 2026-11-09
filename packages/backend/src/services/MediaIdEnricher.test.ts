@@ -43,7 +43,6 @@ describe("needsMediaIdEnrichment", () => {
     expect(
       needsMediaIdEnrichment(episode({ tvdbEpisodeId: 123, tmdbSeriesId: 1 }))
     ).toBe(false);
-    expect(needsMediaIdEnrichment(episode({ tmdbSeriesId: 99 }))).toBe(false);
     expect(
       needsMediaIdEnrichment({
         id: "m1",
@@ -54,16 +53,21 @@ describe("needsMediaIdEnrichment", () => {
     ).toBe(false);
   });
 
-  it("enriches episodes missing TMDB series IDs only when year is unavailable", () => {
-    expect(needsMediaIdEnrichment(episode({ tvdbEpisodeId: 123 }))).toBe(true);
+  it("enriches episodes missing a TVDB episode ID even when TMDB/year exist", () => {
+    expect(needsMediaIdEnrichment(episode({ tmdbSeriesId: 99 }))).toBe(true);
+    expect(needsMediaIdEnrichment(episode({ year: 2020 }))).toBe(true);
     expect(needsMediaIdEnrichment(episode({ imdbEpisodeId: "tt1" }))).toBe(
       true
     );
     expect(
-      needsMediaIdEnrichment(episode({ tvdbEpisodeId: 123, year: 2020 }))
-    ).toBe(false);
-    expect(
       needsMediaIdEnrichment(episode({ imdbEpisodeId: "tt1", year: 2020 }))
+    ).toBe(true);
+  });
+
+  it("enriches episodes missing TMDB series IDs only when year is unavailable", () => {
+    expect(needsMediaIdEnrichment(episode({ tvdbEpisodeId: 123 }))).toBe(true);
+    expect(
+      needsMediaIdEnrichment(episode({ tvdbEpisodeId: 123, year: 2020 }))
     ).toBe(false);
     expect(needsMediaIdEnrichment(episode({ year: Number.NaN }))).toBe(true);
     expect(

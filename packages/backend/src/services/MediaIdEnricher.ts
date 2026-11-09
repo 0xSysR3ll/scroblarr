@@ -27,6 +27,9 @@ export function needsMediaIdEnrichment(media: MediaItem): boolean {
   }
 
   if (media.type === "episode") {
+    if (!media.tvdbEpisodeId) {
+      return true;
+    }
     return !media.tmdbSeriesId && !Number.isFinite(media.year);
   }
 
@@ -168,9 +171,9 @@ export class MediaIdEnricher {
     media: MediaItem,
     cache: ReturnType<MediaIdEnricher["createLookupCache"]>
   ): Promise<MediaItem | null> {
-    let seriesId: number | null = null;
+    let seriesId: number | null = media.tmdbSeriesId ?? null;
 
-    if (media.tvdbSeriesId) {
+    if (!seriesId && media.tvdbSeriesId) {
       seriesId = await this.tmdbClient.findSeriesIdByExternalId(
         String(media.tvdbSeriesId),
         "tvdb_id"
