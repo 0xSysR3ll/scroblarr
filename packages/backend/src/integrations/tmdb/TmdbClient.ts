@@ -1,5 +1,3 @@
-import { fetchWithTimeout } from "@utils/fetchWithTimeout";
-
 import { TmdbRateLimitError } from "./TmdbApiError";
 import { buildTmdbImageUrl } from "./tmdbConfig";
 import {
@@ -421,30 +419,42 @@ export class TmdbClient {
   }
 
   private async apiGet<T>(path: string): Promise<T | null> {
-    const response = await fetchWithTimeout(
-      `${TMDB_API_BASE}${path}`,
-      {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, TMDB_API_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(`${TMDB_API_BASE}${path}`, {
         headers: {
           Authorization: `Bearer ${this.accessToken}`,
           Accept: "application/json",
         },
-      },
-      "TMDB API request",
-      TMDB_API_TIMEOUT_MS
-    );
+        signal: controller.signal,
+      });
 
-    if (response.status === 404) {
-      return null;
+      if (response.status === 404) {
+        clearTimeout(timeoutId);
+        return null;
+      }
+
+      if (response.status === 429) {
+        throw new TmdbRateLimitError();
+      }
+
+      if (!response.ok) {
+        throw new Error(`TMDB API error: ${response.status}`);
+      }
+
+      const body = (await response.json()) as T;
+      clearTimeout(timeoutId);
+      return body;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (controller.signal.aborted) {
+        throw new Error("TMDB API request timed out");
+      }
+      throw error;
     }
-
-    if (response.status === 429) {
-      throw new TmdbRateLimitError();
-    }
-
-    if (!response.ok) {
-      throw new Error(`TMDB API error: ${response.status}`);
-    }
-
-    return response.json() as Promise<T>;
   }
 }
