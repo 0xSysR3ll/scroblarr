@@ -200,23 +200,34 @@ export class PlexWebhookParser {
 
     if (metadata.type === "episode") {
       const { tvdbId, imdbId } = extractIds();
-      const extractSeriesTmdbId = (): number | undefined => {
+      const extractSeriesIds = (): {
+        tmdbSeriesId?: number;
+        tvdbSeriesId?: number;
+      } => {
         const sources = [
           metadata.grandparentPrimaryGuid,
           metadata.grandparentGuid,
         ].filter((guid): guid is string => typeof guid === "string");
 
+        const seriesIds: { tmdbSeriesId?: number; tvdbSeriesId?: number } = {};
         for (const guid of sources) {
-          if (guid.startsWith("tmdb://")) {
+          if (!seriesIds.tmdbSeriesId && guid.startsWith("tmdb://")) {
             const match = guid.match(/tmdb:\/\/(\d+)/);
             if (match) {
-              return parseInt(match[1], 10);
+              seriesIds.tmdbSeriesId = parseInt(match[1], 10);
+            }
+          } else if (!seriesIds.tvdbSeriesId && guid.startsWith("tvdb://")) {
+            const match = guid.match(/tvdb:\/\/(\d+)/);
+            if (match) {
+              seriesIds.tvdbSeriesId = parseInt(match[1], 10);
             }
           }
         }
 
-        return undefined;
+        return seriesIds;
       };
+
+      const { tmdbSeriesId, tvdbSeriesId } = extractSeriesIds();
 
       return {
         id: `${metadata.type}-${metadata.grandparentTitle}-${metadata.parentIndex}-${metadata.index}`,
@@ -228,8 +239,9 @@ export class PlexWebhookParser {
         duration: metadata.duration,
         watchedDuration: metadata.viewOffset,
         tvdbEpisodeId: tvdbId,
+        tvdbSeriesId,
         imdbEpisodeId: imdbId,
-        tmdbSeriesId: extractSeriesTmdbId(),
+        tmdbSeriesId,
         posterUrl,
       };
     }

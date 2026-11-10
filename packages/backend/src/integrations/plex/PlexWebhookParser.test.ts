@@ -95,6 +95,31 @@ describe("PlexWebhookParser", () => {
     });
   });
 
+  it("extracts series TVDB id from grandparent guids", () => {
+    const event = PlexWebhookParser.parse(
+      {
+        event: "media.scrobble",
+        user: { username: "plex-user" },
+        Metadata: {
+          type: "episode",
+          grandparentTitle: "Example Show",
+          parentIndex: 1,
+          index: 1,
+          Guid: [{ id: "tvdb://12345" }],
+          grandparentPrimaryGuid: "tvdb://361594",
+          grandparentGuid: "tmdb://1399",
+        },
+      },
+      "https://plex.local:32400/"
+    );
+
+    expect(event?.media).toMatchObject({
+      tvdbEpisodeId: 12345,
+      tvdbSeriesId: 361594,
+      tmdbSeriesId: 1399,
+    });
+  });
+
   it("parses string Guid entries and omits series TMDB id when unavailable", () => {
     const event = PlexWebhookParser.parse(
       {
