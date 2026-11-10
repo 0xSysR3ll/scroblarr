@@ -72,6 +72,20 @@ function hasExternalIds(syncHistory: SyncHistory): boolean {
   );
 }
 
+function sameEnrichedIdFields(
+  left: Pick<SyncHistory, keyof EnrichedIdFields>,
+  right: Pick<SyncHistory, keyof EnrichedIdFields>
+): boolean {
+  return (
+    left.tmdbMovieId === right.tmdbMovieId &&
+    left.tmdbSeriesId === right.tmdbSeriesId &&
+    left.imdbMovieId === right.imdbMovieId &&
+    left.imdbEpisodeId === right.imdbEpisodeId &&
+    left.tvdbMovieId === right.tvdbMovieId &&
+    left.tvdbEpisodeId === right.tvdbEpisodeId
+  );
+}
+
 function isEnrichmentCoolingDown(
   syncHistoryId: string,
   now = Date.now()
@@ -205,19 +219,26 @@ export class PosterService {
       let lookup = this.applyCachedEnrichment(syncHistory);
 
       const mediaItem = toMediaItem(lookup);
-      if (mediaItem && needsMediaIdEnrichment(mediaItem)) {
-        if (isEnrichmentCoolingDown(syncHistory.id)) {
-          return null;
-        }
-
+      if (
+        mediaItem &&
+        needsMediaIdEnrichment(mediaItem) &&
+        !isEnrichmentCoolingDown(syncHistory.id)
+      ) {
         const enriched = await new MediaIdEnricher(client).enrich(mediaItem);
-        lookup = this.mergeEnrichedIds(lookup, enriched);
+        const nextLookup = this.mergeEnrichedIds(lookup, enriched);
+        const idsChanged = !sameEnrichedIdFields(lookup, nextLookup);
+        lookup = nextLookup;
 
-        if (hasExternalIds(lookup)) {
+        const enrichedMedia = toMediaItem(lookup);
+        if (enrichedMedia && !needsMediaIdEnrichment(enrichedMedia)) {
           this.rememberSuccessfulEnrichment(syncHistory.id, lookup);
-          await this.persistEnrichedIds(syncHistory, lookup);
         } else {
+          // Missing TVDB (or other required IDs) must back off even when an
+          // existing tmdbSeriesId would otherwise look like a successful enrich.
           this.rememberFailedTitleSearch(syncHistory.id);
+        }
+        if (idsChanged) {
+          await this.persistEnrichedIds(syncHistory, lookup);
         }
       }
 

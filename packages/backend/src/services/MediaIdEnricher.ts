@@ -21,12 +21,19 @@ function titlesMatch(left: string, right: string): boolean {
   return normalizeTitle(left) === normalizeTitle(right);
 }
 
+/**
+ * Whether TMDB enrichment should run for this media item.
+ * Episodes missing a TVDB episode ID always qualify so sync can prefer TVDB matching.
+ */
 export function needsMediaIdEnrichment(media: MediaItem): boolean {
   if (media.type === "movie") {
     return !(media.tmdbMovieId || media.imdbMovieId || media.tvdbMovieId);
   }
 
   if (media.type === "episode") {
+    if (!media.tvdbEpisodeId) {
+      return true;
+    }
     return !media.tmdbSeriesId && !Number.isFinite(media.year);
   }
 
@@ -168,9 +175,9 @@ export class MediaIdEnricher {
     media: MediaItem,
     cache: ReturnType<MediaIdEnricher["createLookupCache"]>
   ): Promise<MediaItem | null> {
-    let seriesId: number | null = null;
+    let seriesId: number | null = media.tmdbSeriesId ?? null;
 
-    if (media.tvdbSeriesId) {
+    if (!seriesId && media.tvdbSeriesId) {
       seriesId = await this.tmdbClient.findSeriesIdByExternalId(
         String(media.tvdbSeriesId),
         "tvdb_id"
@@ -317,13 +324,16 @@ export class MediaIdEnricher {
           continue;
         }
 
-        const enriched: MediaItem = {
-          ...media,
-          seasonNumber: trySeason,
-          tmdbSeriesId: recommendation.id,
-          imdbEpisodeId: media.imdbEpisodeId ?? episodeIds?.imdbId,
-          tvdbEpisodeId: media.tvdbEpisodeId ?? episodeIds?.tvdbId,
-        };
+        if (this.episodeIdsConflictWithKnownImdb(media, episodeIds)) {
+          continue;
+        }
+
+        const enriched = this.buildEnrichedEpisode(
+          media,
+          recommendation.id,
+          trySeason,
+          episodeIds
+        );
 
         logger.sync.info(
           {
@@ -347,10 +357,37 @@ export class MediaIdEnricher {
     return null;
   }
 
+  private episodeIdsConflictWithKnownImdb(
+    media: MediaItem,
+    episodeIds: { imdbId?: string; tvdbId?: number } | null
+  ): boolean {
+    return Boolean(
+      media.imdbEpisodeId &&
+      episodeIds?.imdbId &&
+      media.imdbEpisodeId !== episodeIds.imdbId
+    );
+  }
+
+  private buildEnrichedEpisode(
+    media: MediaItem,
+    seriesId: number,
+    seasonNumber: number,
+    episodeIds: { imdbId?: string; tvdbId?: number } | null
+  ): MediaItem {
+    return {
+      ...media,
+      seasonNumber,
+      tmdbSeriesId: seriesId,
+      imdbEpisodeId: media.imdbEpisodeId ?? episodeIds?.imdbId,
+      tvdbEpisodeId: media.tvdbEpisodeId ?? episodeIds?.tvdbId,
+    };
+  }
+
   private async resolveEpisodeAgainstShow(
     media: MediaItem,
     seriesId: number,
-    cache: ReturnType<MediaIdEnricher["createLookupCache"]>
+    cache: ReturnType<MediaIdEnricher["createLookupCache"]>,
+    options?: { skipImdbFallback?: boolean }
   ): Promise<MediaItem | null> {
     const seasonNumber = media.seasonNumber!;
     const episodeNumber = media.episodeNumber!;
@@ -410,13 +447,42 @@ export class MediaIdEnricher {
       }
     }
 
-    const enriched: MediaItem = {
-      ...media,
-      seasonNumber: effectiveSeason,
-      tmdbSeriesId: seriesId,
-      imdbEpisodeId: media.imdbEpisodeId ?? episodeIds?.imdbId,
-      tvdbEpisodeId: media.tvdbEpisodeId ?? episodeIds?.tvdbId,
-    };
+    if (this.episodeIdsConflictWithKnownImdb(media, episodeIds)) {
+      logger.sync.warn(
+        {
+          mediaTitle: media.title,
+          seasonNumber: effectiveSeason,
+          episodeNumber,
+          tmdbSeriesId: seriesId,
+          knownImdbEpisodeId: media.imdbEpisodeId,
+          tmdbImdbEpisodeId: episodeIds?.imdbId,
+          rejectedTvdbEpisodeId: episodeIds?.tvdbId,
+        },
+        "Rejecting TMDB TVDB episode ID that conflicts with known IMDb episode ID"
+      );
+
+      if (!options?.skipImdbFallback && media.imdbEpisodeId) {
+        const imdbSeriesId =
+          await this.tmdbClient.findSeriesIdByEpisodeExternalId(
+            media.imdbEpisodeId,
+            "imdb_id"
+          );
+        if (imdbSeriesId != null && imdbSeriesId !== seriesId) {
+          return this.resolveEpisodeAgainstShow(media, imdbSeriesId, cache, {
+            skipImdbFallback: true,
+          });
+        }
+      }
+
+      return null;
+    }
+
+    const enriched = this.buildEnrichedEpisode(
+      media,
+      seriesId,
+      effectiveSeason,
+      episodeIds
+    );
 
     logger.sync.info(
       {
