@@ -328,12 +328,19 @@ export class MediaIdEnricher {
           continue;
         }
 
-        const enriched = this.buildEnrichedEpisode(
-          media,
-          recommendation.id,
-          trySeason,
-          episodeIds
+        const sequelExternalIds = await this.tmdbClient.getTvExternalIds(
+          recommendation.id
         );
+        const enriched = {
+          ...this.buildEnrichedEpisode(
+            media,
+            recommendation.id,
+            trySeason,
+            episodeIds
+          ),
+          // Parent TVDB series IDs must not travel with a remapped sequel.
+          tvdbSeriesId: sequelExternalIds?.tvdbId,
+        };
 
         logger.sync.info(
           {
@@ -344,6 +351,7 @@ export class MediaIdEnricher {
             remappedSeason: trySeason,
             episodeNumber,
             tmdbSeriesId: enriched.tmdbSeriesId,
+            tvdbSeriesId: enriched.tvdbSeriesId,
             imdbEpisodeId: enriched.imdbEpisodeId,
             tvdbEpisodeId: enriched.tvdbEpisodeId,
           },
