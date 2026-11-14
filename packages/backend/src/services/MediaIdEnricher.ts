@@ -328,9 +328,24 @@ export class MediaIdEnricher {
           continue;
         }
 
-        const sequelExternalIds = await this.tmdbClient.getTvExternalIds(
-          recommendation.id
-        );
+        let sequelTvdbSeriesId: number | undefined;
+        try {
+          const sequelExternalIds = await this.tmdbClient.getTvExternalIds(
+            recommendation.id
+          );
+          sequelTvdbSeriesId = sequelExternalIds?.tvdbId;
+        } catch (error) {
+          // Keep the sequel remap; only the optional TVDB series id is lost.
+          logger.sync.warn(
+            {
+              error,
+              mediaTitle: media.title,
+              sequelSeriesId: recommendation.id,
+            },
+            "Failed to fetch sequel TVDB series ID; clearing parent tvdbSeriesId"
+          );
+        }
+
         const enriched = {
           ...this.buildEnrichedEpisode(
             media,
@@ -339,7 +354,7 @@ export class MediaIdEnricher {
             episodeIds
           ),
           // Parent TVDB series IDs must not travel with a remapped sequel.
-          tvdbSeriesId: sequelExternalIds?.tvdbId,
+          tvdbSeriesId: sequelTvdbSeriesId,
         };
 
         logger.sync.info(
