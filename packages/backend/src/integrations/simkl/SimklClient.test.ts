@@ -129,6 +129,39 @@ describe("SimklClient", () => {
     });
   });
 
+  it("includes series TVDB and TMDB ids on season-based show payloads", async () => {
+    mockOkJson({ added: { episodes: 1 } });
+    const client = new SimklClient("client-id");
+    const event = makeEpisodeEvent();
+    event.media.tvdbEpisodeId = undefined;
+    event.media.tvdbSeriesId = 361594;
+    event.media.tmdbSeriesId = 1399;
+
+    await client.scrobble(event, "access-token");
+
+    const [, request] = fetchMock.mock.calls[0] as [string, { body: string }];
+    expect(JSON.parse(request.body)).toEqual({
+      shows: [
+        {
+          title: "Example Show",
+          year: 2024,
+          ids: { tmdb: 1399, tvdb: 361594 },
+          seasons: [
+            {
+              number: 2,
+              episodes: [
+                {
+                  number: 3,
+                  watched_at: "2026-06-04T17:00:00Z",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+  });
+
   it("sends top-level episode history when only a TVDB episode ID is available", async () => {
     mockOkJson({ added: { episodes: 1 } });
     const client = new SimklClient("client-id");
