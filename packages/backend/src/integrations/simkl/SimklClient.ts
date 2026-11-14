@@ -229,13 +229,8 @@ export class SimklClient implements ISyncClient {
       }
     }
 
-    return results.map(
-      (result) =>
-        result ?? {
-          success: false,
-          error: new Error("Missing Simkl batch result"),
-        }
-    );
+    // Every index is assigned by prepare catch or group processing.
+    return results as SimklBatchItemResult[];
   }
 
   async getUserProfile(accessToken: string): Promise<{
