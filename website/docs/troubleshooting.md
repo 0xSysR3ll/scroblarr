@@ -124,7 +124,7 @@ pnpm --filter @scroblarr/backend migrate:sqlite-to-postgres --help
 ```
 
 - **`POSTGRES_HOST` required**: the script targets Postgres only when that env var is set
-- **Target not empty**: add `--force` to truncate and replace existing rows, or `--dry-run` first
+- **Target not empty**: add `--force` to truncate and replace existing rows (back up Postgres first), or `--dry-run` first
 - **Stop the app** while copying so SQLite is not written mid-migration
 
 ## Performance issues

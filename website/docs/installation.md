@@ -178,14 +178,16 @@ POSTGRES_HOST=localhost POSTGRES_USER=scroblarr POSTGRES_PASSWORD=your_password 
   pnpm --filter @scroblarr/backend migrate:sqlite-to-postgres \
   --sqlite /path/to/scroblarr.db --dry-run
 
-# Apply schema + copy data (use --force if the target already has rows)
+# Apply schema + copy data into an empty Postgres target
 POSTGRES_HOST=localhost POSTGRES_USER=scroblarr POSTGRES_PASSWORD=your_password \
   POSTGRES_DATABASE=scroblarr \
   pnpm --filter @scroblarr/backend migrate:sqlite-to-postgres \
-  --sqlite /path/to/scroblarr.db --force
+  --sqlite /path/to/scroblarr.db
 ```
 
 Without `--dry-run`, the script applies TypeORM schema migrations on Postgres, then copies `users`, `settings`, `sessions`, and `sync_history`. It verifies row counts inside the import transaction before committing.
+
+If the Postgres target already has rows, add `--force` to truncate and replace them. **Warning:** `--force` destroys existing PostgreSQL data in those tables — back up the Postgres target first.
 
 4. Keep `POSTGRES_*` set, start Scroblarr, and confirm login / sync history. You can keep the SQLite file as a fallback backup.
 

@@ -88,7 +88,7 @@ Usage:
 Options:
   --sqlite <path>   SQLite database file (default: ${sqlite})
   --dry-run         Compare row counts only; no schema or data writes
-  --force           Truncate existing Postgres data tables before import
+  --force           Truncate and replace existing Postgres data tables
   -h, --help        Show this help
 
 Requires POSTGRES_HOST (and usually POSTGRES_USER / POSTGRES_PASSWORD /
@@ -199,6 +199,34 @@ async function ensurePostgresSchema(): Promise<void> {
   }
 }
 
+async function insertBatch(
+  client: Client,
+  table: DataTable,
+  columns: string[],
+  batch: Record<string, unknown>[]
+): Promise<void> {
+  if (batch.length === 0) {
+    return;
+  }
+
+  const colList = columns.map((c) => `"${c}"`).join(", ");
+  const values: unknown[] = [];
+  const valueGroups: string[] = [];
+
+  batch.forEach((row, rowIndex) => {
+    const placeholders = columns.map((_, colIndex) => {
+      values.push(coerceValue(columns[colIndex]!, row[columns[colIndex]!]));
+      return `$${rowIndex * columns.length + colIndex + 1}`;
+    });
+    valueGroups.push(`(${placeholders.join(", ")})`);
+  });
+
+  await client.query(
+    `INSERT INTO "${table}" (${colList}) VALUES ${valueGroups.join(", ")}`,
+    values
+  );
+}
+
 async function copyTable(
   sqlite: Database.Database,
   client: Client,
@@ -220,38 +248,29 @@ async function copyTable(
     );
   }
 
-  const rows = sqlite
-    .prepare(
-      `SELECT ${columns.map((c) => `"${c}"`).join(", ")} FROM "${table}"`
-    )
-    .all() as Record<string, unknown>[];
+  const stmt = sqlite.prepare(
+    `SELECT ${columns.map((c) => `"${c}"`).join(", ")} FROM "${table}"`
+  );
+  const batch: Record<string, unknown>[] = [];
+  let copied = 0;
 
-  if (rows.length === 0) {
-    return 0;
+  for (const row of stmt.iterate() as IterableIterator<
+    Record<string, unknown>
+  >) {
+    batch.push(row);
+    if (batch.length >= INSERT_BATCH_SIZE) {
+      await insertBatch(client, table, columns, batch);
+      copied += batch.length;
+      batch.length = 0;
+    }
   }
 
-  const colList = columns.map((c) => `"${c}"`).join(", ");
-
-  for (let offset = 0; offset < rows.length; offset += INSERT_BATCH_SIZE) {
-    const batch = rows.slice(offset, offset + INSERT_BATCH_SIZE);
-    const values: unknown[] = [];
-    const valueGroups: string[] = [];
-
-    batch.forEach((row, rowIndex) => {
-      const placeholders = columns.map((_, colIndex) => {
-        values.push(coerceValue(columns[colIndex]!, row[columns[colIndex]!]));
-        return `$${rowIndex * columns.length + colIndex + 1}`;
-      });
-      valueGroups.push(`(${placeholders.join(", ")})`);
-    });
-
-    await client.query(
-      `INSERT INTO "${table}" (${colList}) VALUES ${valueGroups.join(", ")}`,
-      values
-    );
+  if (batch.length > 0) {
+    await insertBatch(client, table, columns, batch);
+    copied += batch.length;
   }
 
-  return rows.length;
+  return copied;
 }
 
 async function migrate(args: MigrateArgs): Promise<void> {
@@ -327,8 +346,10 @@ async function migrate(args: MigrateArgs): Promise<void> {
 
     await client.query("BEGIN");
     try {
-      for (const table of [...DATA_TABLES].reverse()) {
-        await client.query(`TRUNCATE TABLE "${table}" CASCADE`);
+      if (args.force) {
+        for (const table of [...DATA_TABLES].reverse()) {
+          await client.query(`TRUNCATE TABLE "${table}" CASCADE`);
+        }
       }
 
       for (const table of DATA_TABLES) {
