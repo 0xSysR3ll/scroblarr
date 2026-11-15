@@ -163,6 +163,39 @@ POSTGRES_SSL=false
 If the DB doesn't exist yet, Scroblarr can create it on startup **if** the Postgres user can create databases (`CREATEDB`). Otherwise create `scroblarr` yourself once and you're good.
 :::
 
+#### Migrating from SQLite to PostgreSQL
+
+If you already have a SQLite database and want to move to Postgres:
+
+1. **Stop Scroblarr** and back up the SQLite file (`data/db/scroblarr.db`, or your `DATABASE_PATH`).
+2. Start Postgres and set `POSTGRES_*` in the environment (see above).
+3. From a checkout with dependencies installed, run:
+
+```bash
+# Inspect only (no schema or data writes)
+POSTGRES_HOST=localhost POSTGRES_USER=scroblarr POSTGRES_PASSWORD=your_password \
+  POSTGRES_DATABASE=scroblarr \
+  pnpm --filter @scroblarr/backend migrate:sqlite-to-postgres \
+  --sqlite /path/to/scroblarr.db --dry-run
+
+# Apply schema + copy data (use --force if the target already has rows)
+POSTGRES_HOST=localhost POSTGRES_USER=scroblarr POSTGRES_PASSWORD=your_password \
+  POSTGRES_DATABASE=scroblarr \
+  pnpm --filter @scroblarr/backend migrate:sqlite-to-postgres \
+  --sqlite /path/to/scroblarr.db --force
+```
+
+Without `--dry-run`, the script applies TypeORM schema migrations on Postgres, then copies `users`, `settings`, `sessions`, and `sync_history`. It verifies row counts inside the import transaction before committing.
+
+4. Keep `POSTGRES_*` set, start Scroblarr, and confirm login / sync history. You can keep the SQLite file as a fallback backup.
+
+**Docker:** copy the SQLite file out of the volume, run the script from a checkout against your Postgres host/port, then restart the stack with `POSTGRES_*` env vars. Example restore check:
+
+```bash
+docker exec scroblarr-postgres psql -U scroblarr -d scroblarr \
+  -c 'SELECT COUNT(*) FROM users;'
+```
+
 ### 3. Development (`pnpm dev`)
 
 ```bash

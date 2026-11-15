@@ -115,6 +115,18 @@ This usually happens if multiple instances are running or if the database file h
 - **Check logs**: Migration errors will be in the startup logs
 - **Manual migration**: You can run migrations manually with `pnpm --filter @scroblarr/backend migration:run`
 
+### Moving from SQLite to PostgreSQL
+
+Use the built-in data migrator (see [Installation → Migrating from SQLite to PostgreSQL](./installation.md#migrating-from-sqlite-to-postgresql)):
+
+```bash
+pnpm --filter @scroblarr/backend migrate:sqlite-to-postgres --help
+```
+
+- **`POSTGRES_HOST` required**: the script targets Postgres only when that env var is set
+- **Target not empty**: add `--force` to truncate and replace existing rows, or `--dry-run` first
+- **Stop the app** while copying so SQLite is not written mid-migration
+
 ## Performance issues
 
 ### Slow syncs
