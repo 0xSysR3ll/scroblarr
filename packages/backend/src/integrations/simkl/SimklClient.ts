@@ -147,8 +147,8 @@ export class SimklClient implements ISyncClient {
     }
 
     const groups = [
-      prepared.filter((item) => item.entry.allowRewatch),
       prepared.filter((item) => !item.entry.allowRewatch),
+      prepared.filter((item) => item.entry.allowRewatch),
     ];
 
     for (const group of groups) {
