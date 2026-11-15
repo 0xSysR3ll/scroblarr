@@ -355,6 +355,71 @@ describe("SimklClient", () => {
     ]);
   });
 
+  it("does not assign movie rewatch ids across colliding title/year items", async () => {
+    mockOkJson({
+      added: {
+        movies: 2,
+        statuses: [
+          {
+            request: {
+              watched_at: "2026-06-04T17:00:00Z",
+              title: "Example Movie",
+              year: 2024,
+              ids: { imdb: "tt111" },
+              type: "movie",
+            },
+            response: { rewatch_id: 11, rewatch_status: "active" },
+          },
+          {
+            request: {
+              watched_at: "2026-06-04T17:00:00Z",
+              title: "Example Movie",
+              year: 2024,
+              ids: { imdb: "tt222" },
+              type: "movie",
+            },
+            response: { rewatch_id: 22, rewatch_status: "active" },
+          },
+        ],
+      },
+      not_found: { movies: [], shows: [], episodes: [] },
+    });
+    const client = new SimklClient("client-id");
+
+    const results = await client.scrobbleMany(
+      [
+        {
+          event: makeMovieEvent({
+            imdbMovieId: "tt111",
+            title: "Example Movie",
+            year: 2024,
+          }),
+          options: { markMoviesAsRewatched: true },
+        },
+        {
+          event: makeMovieEvent({
+            imdbMovieId: "tt222",
+            title: "Example Movie",
+            year: 2024,
+          }),
+          options: { markMoviesAsRewatched: true },
+        },
+      ],
+      "access-token"
+    );
+
+    expect(results).toEqual([
+      {
+        success: true,
+        result: { wasRewatched: true, simklRewatchId: 11 },
+      },
+      {
+        success: true,
+        result: { wasRewatched: true, simklRewatchId: 22 },
+      },
+    ]);
+  });
+
   it("returns an empty array when scrobbleMany receives no items", async () => {
     const client = new SimklClient("client-id");
     await expect(client.scrobbleMany([], "access-token")).resolves.toEqual([]);
@@ -528,6 +593,48 @@ describe("SimklClient", () => {
     );
   });
 
+  it("matches show not_found by series ids when titles collide", async () => {
+    mockOkJson({
+      added: { episodes: 1 },
+      not_found: {
+        shows: [
+          {
+            title: "Example Show",
+            year: 1999,
+            ids: { tmdb: 999 },
+            seasons: [
+              {
+                number: 2,
+                episodes: [{ number: 3, watched_at: "2026-06-04T17:00:00Z" }],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const client = new SimklClient("client-id");
+    const matched = makeEpisodeEvent();
+    matched.media.tmdbSeriesId = 999;
+    matched.media.year = 1999;
+    const other = makeEpisodeEvent();
+    other.media.tmdbSeriesId = 1399;
+    other.media.year = 2024;
+
+    const results = await client.scrobbleMany(
+      [{ event: other }, { event: matched }],
+      "access-token"
+    );
+
+    expect(results[0]).toEqual({
+      success: true,
+      result: { wasRewatched: false },
+    });
+    expect(results[1]?.success).toBe(false);
+    expect((results[1] as { error: Error }).error.message).toBe(
+      "Simkl could not match the media item"
+    );
+  });
+
   it("matches show status echoes by title, year, and series ids", async () => {
     mockOkJson({
       added: {
@@ -560,6 +667,79 @@ describe("SimklClient", () => {
       {
         success: true,
         result: { wasRewatched: true, simklRewatchId: 88 },
+      },
+    ]);
+  });
+
+  it("distinguishes same-show status echoes by pinned rewatch_id", async () => {
+    mockOkJson({
+      added: {
+        episodes: 2,
+        statuses: [
+          {
+            request: {
+              title: "Example Show",
+              year: 2024,
+              type: "show",
+              ids: { tmdb: "1399" },
+              rewatch_id: 55,
+              seasons: [
+                {
+                  number: 2,
+                  episodes: [{ number: 3, watched_at: "2026-06-04T17:00:00Z" }],
+                },
+              ],
+            },
+            response: { rewatch_id: 55, rewatch_status: "active" },
+          },
+          {
+            request: {
+              title: "Example Show",
+              year: 2024,
+              type: "show",
+              ids: { tmdb: "1399" },
+              rewatch_id: 66,
+              seasons: [
+                {
+                  number: 2,
+                  episodes: [{ number: 3, watched_at: "2026-06-04T17:00:00Z" }],
+                },
+              ],
+            },
+            response: { rewatch_id: 66, rewatch_status: "active" },
+          },
+        ],
+      },
+      not_found: { movies: [], shows: [], episodes: [] },
+    });
+    const client = new SimklClient("client-id");
+    const eventA = makeEpisodeEvent();
+    eventA.media.tmdbSeriesId = 1399;
+    const eventB = makeEpisodeEvent();
+    eventB.media.tmdbSeriesId = 1399;
+
+    const results = await client.scrobbleMany(
+      [
+        {
+          event: eventA,
+          options: { markEpisodesAsRewatched: true, simklRewatchId: 55 },
+        },
+        {
+          event: eventB,
+          options: { markEpisodesAsRewatched: true, simklRewatchId: 66 },
+        },
+      ],
+      "access-token"
+    );
+
+    expect(results).toEqual([
+      {
+        success: true,
+        result: { wasRewatched: true, simklRewatchId: 55 },
+      },
+      {
+        success: true,
+        result: { wasRewatched: true, simklRewatchId: 66 },
       },
     ]);
   });

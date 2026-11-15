@@ -506,11 +506,16 @@ export class SimklClient implements ISyncClient {
     const receivedIds = receivedMovie.ids
       ? this.normalizeIds(receivedMovie.ids)
       : undefined;
+    if (this.idsOverlap(sent.ids, receivedIds)) {
+      return true;
+    }
+    if (this.idsConflict(sent.ids, receivedIds)) {
+      return false;
+    }
     return (
-      this.idsOverlap(sent.ids, receivedIds) ||
-      (!!sent.title &&
-        sent.title === receivedMovie.title &&
-        sent.year === receivedMovie.year)
+      !!sent.title &&
+      sent.title === receivedMovie.title &&
+      sent.year === receivedMovie.year
     );
   }
 
@@ -543,14 +548,35 @@ export class SimklClient implements ISyncClient {
       return false;
     }
 
-    const receivedShow = received as SimklShow;
+    const receivedShow = received as SimklShow & {
+      ids?: Record<string, unknown>;
+    };
     const sentEpisode = sent.seasons?.[0]?.episodes?.[0];
     const receivedEpisode = receivedShow.seasons?.[0]?.episodes?.[0];
+    if (
+      sent.seasons?.[0]?.number !== receivedShow.seasons?.[0]?.number ||
+      sentEpisode?.number !== receivedEpisode?.number ||
+      sentEpisode?.watched_at !== receivedEpisode?.watched_at
+    ) {
+      return false;
+    }
+
+    const receivedIds = receivedShow.ids
+      ? this.normalizeIds(receivedShow.ids)
+      : undefined;
+    if (this.idsOverlap(sent.ids, receivedIds)) {
+      return true;
+    }
+    if (this.idsConflict(sent.ids, receivedIds)) {
+      return false;
+    }
+
     return (
+      !!sent.title &&
       sent.title === receivedShow.title &&
-      sent.seasons?.[0]?.number === receivedShow.seasons?.[0]?.number &&
-      sentEpisode?.number === receivedEpisode?.number &&
-      sentEpisode?.watched_at === receivedEpisode?.watched_at
+      (sent.year == null ||
+        receivedShow.year == null ||
+        sent.year === receivedShow.year)
     );
   }
 
@@ -570,6 +596,40 @@ export class SimklClient implements ISyncClient {
       return true;
     }
     if (sentFull.imdb != null && sentFull.imdb === receivedFull.imdb) {
+      return true;
+    }
+    return false;
+  }
+
+  /** True when both sides expose the same id key with different values. */
+  private idsConflict(
+    sent?: SimklIds | Pick<SimklIds, "tvdb">,
+    received?: SimklIds | Pick<SimklIds, "tvdb">
+  ): boolean {
+    if (!sent || !received) {
+      return false;
+    }
+    if (
+      sent.tvdb != null &&
+      received.tvdb != null &&
+      sent.tvdb !== received.tvdb
+    ) {
+      return true;
+    }
+    const sentFull = sent as SimklIds;
+    const receivedFull = received as SimklIds;
+    if (
+      sentFull.tmdb != null &&
+      receivedFull.tmdb != null &&
+      sentFull.tmdb !== receivedFull.tmdb
+    ) {
+      return true;
+    }
+    if (
+      sentFull.imdb != null &&
+      receivedFull.imdb != null &&
+      sentFull.imdb !== receivedFull.imdb
+    ) {
       return true;
     }
     return false;
@@ -609,7 +669,8 @@ export class SimklClient implements ISyncClient {
       return {};
     }
 
-    for (const status of statuses) {
+    for (let index = 0; index < statuses.length; index++) {
+      const status = statuses[index]!;
       if (
         status.request === undefined ||
         !this.statusRequestMatchesEntry(entry, status.request)
@@ -621,6 +682,7 @@ export class SimklClient implements ISyncClient {
       const rewatchId = nested?.rewatch_id ?? status.rewatch_id;
       const rewatchStatus = nested?.rewatch_status ?? status.rewatch_status;
       if (typeof rewatchId === "number" || typeof rewatchStatus === "string") {
+        statuses.splice(index, 1);
         return {
           rewatchId: typeof rewatchId === "number" ? rewatchId : undefined,
           rewatchStatus:
@@ -655,13 +717,40 @@ export class SimklClient implements ISyncClient {
     const received = request as {
       title?: string;
       year?: number;
-      ids?: SimklIds;
+      ids?: Record<string, unknown>;
       type?: string;
+      rewatch_id?: number;
+      seasons?: SimklShow["seasons"];
     };
     if (received.type && received.type !== "show") {
       return false;
     }
-    if (entry.show.title !== received.title) {
+
+    if (
+      entry.show.rewatch_id != null &&
+      typeof received.rewatch_id === "number" &&
+      entry.show.rewatch_id !== received.rewatch_id
+    ) {
+      return false;
+    }
+
+    if (received.seasons != null && received.seasons.length > 0) {
+      const sentEpisode = entry.show.seasons?.[0]?.episodes?.[0];
+      const receivedEpisode = received.seasons[0]?.episodes?.[0];
+      if (
+        entry.show.seasons?.[0]?.number !== received.seasons[0]?.number ||
+        sentEpisode?.number !== receivedEpisode?.number ||
+        sentEpisode?.watched_at !== receivedEpisode?.watched_at
+      ) {
+        return false;
+      }
+    }
+
+    if (
+      entry.show.title != null &&
+      received.title != null &&
+      entry.show.title !== received.title
+    ) {
       return false;
     }
     if (
@@ -671,8 +760,12 @@ export class SimklClient implements ISyncClient {
     ) {
       return false;
     }
-    if (entry.show.ids && received.ids) {
-      return this.idsOverlap(entry.show.ids, this.normalizeIds(received.ids));
+
+    const receivedIds = received.ids
+      ? this.normalizeIds(received.ids)
+      : undefined;
+    if (entry.show.ids && receivedIds) {
+      return this.idsOverlap(entry.show.ids, receivedIds);
     }
     return !entry.show.ids;
   }
