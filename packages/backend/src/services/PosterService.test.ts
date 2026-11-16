@@ -668,6 +668,89 @@ describe("PosterService", () => {
     ).toBe(true);
   });
 
+  it("backs off when episode still lacks TVDB after enrichment but still fetches poster", async () => {
+    vi.useFakeTimers();
+    tmdbClientMocks.getEpisodeExternalIds.mockResolvedValue({
+      imdbId: "tt123",
+    });
+    tmdbClientMocks.hasTvSeason.mockResolvedValue(true);
+    tmdbClientMocks.resolvePosterPath.mockResolvedValue("/series.jpg");
+    tmdbClientMocks.fetchPosterImage.mockResolvedValue({
+      buffer: new Uint8Array([1, 2]).buffer,
+      contentType: "image/jpeg",
+    });
+
+    const save = vi.fn().mockResolvedValue(undefined);
+    const service = new PosterService({ save });
+    const history = createSyncHistory({
+      id: "sync-missing-tvdb",
+      mediaType: "episode",
+      mediaTitle: "Berlin",
+      posterUrl: undefined,
+      tmdbSeriesId: "146176",
+      tvdbEpisodeId: undefined,
+      seasonNumber: 1,
+      episodeNumber: 1,
+    });
+
+    const result = await service.fetchPoster(history, createUser(), {
+      tmdbAccessToken: "tmdb-token",
+    });
+
+    expect(result).toEqual({
+      buffer: Buffer.from(new Uint8Array([1, 2])),
+      contentType: "image/jpeg",
+    });
+    // Existing tmdbSeriesId alone is not "successful" enrichment; persist only on ID changes.
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tmdbSeriesId: "146176",
+        imdbEpisodeId: "tt123",
+        tvdbEpisodeId: undefined,
+      })
+    );
+
+    tmdbClientMocks.getEpisodeExternalIds.mockClear();
+    await service.fetchPoster(history, createUser(), {
+      tmdbAccessToken: "tmdb-token",
+    });
+    expect(tmdbClientMocks.getEpisodeExternalIds).not.toHaveBeenCalled();
+    expect(tmdbClientMocks.resolvePosterPath).toHaveBeenCalledTimes(2);
+
+    vi.useRealTimers();
+  });
+
+  it("does not persist enrichment when IDs are unchanged", async () => {
+    tmdbClientMocks.getEpisodeExternalIds.mockResolvedValue(null);
+    tmdbClientMocks.hasTvSeason.mockResolvedValue(true);
+    tmdbClientMocks.resolvePosterPath.mockResolvedValue("/series.jpg");
+    tmdbClientMocks.fetchPosterImage.mockResolvedValue({
+      buffer: new Uint8Array([3]).buffer,
+      contentType: "image/jpeg",
+    });
+
+    const save = vi.fn().mockResolvedValue(undefined);
+    const service = new PosterService({ save });
+    await service.fetchPoster(
+      createSyncHistory({
+        id: "sync-unchanged-ids",
+        mediaType: "episode",
+        mediaTitle: "Berlin",
+        posterUrl: undefined,
+        tmdbSeriesId: "146176",
+        tvdbEpisodeId: undefined,
+        seasonNumber: 1,
+        episodeNumber: 1,
+      }),
+      createUser(),
+      { tmdbAccessToken: "tmdb-token" }
+    );
+
+    expect(save).not.toHaveBeenCalled();
+    expect(tmdbClientMocks.resolvePosterPath).toHaveBeenCalled();
+  });
+
   it("caches successful title enrichment and skips repeated TMDB searches", async () => {
     const imageBytes = new Uint8Array([4, 5, 6]).buffer;
     tmdbClientMocks.searchMovie.mockResolvedValue([

@@ -139,7 +139,8 @@ export function shouldShowRewatchedBadge(item: SyncHistoryItem): boolean {
     item.success &&
     item.wasRewatched &&
     (item.destinations?.includes("TVTime") ||
-      item.destinations?.includes("Bingers"))
+      item.destinations?.includes("Bingers") ||
+      item.destinations?.includes("Simkl"))
   );
 }
 

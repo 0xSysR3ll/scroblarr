@@ -654,7 +654,18 @@
     "unlinkTitle": "Unlink Simkl Account",
     "unlinkMessage": "Are you sure you want to unlink your Simkl account? This will stop syncing to Simkl.",
     "cancel": "Cancel",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "settingsSaveFailed": "Failed to save Simkl settings",
+    "settings": {
+      "title": "Sync Settings",
+      "description": "Log each rewatch as its own Simkl viewing session, with separate dates and episode progress. Requires Simkl PRO or VIP. Default off.",
+      "proRequired": "Rewatch tracking requires Simkl PRO or VIP.",
+      "upgrade": "Upgrade",
+      "markMoviesAsRewatched": "Track movie rewatches",
+      "markMoviesAsRewatchedDescription": "When enabled, finishing a movie you already completed on Simkl creates a separate rewatch session.",
+      "markEpisodesAsRewatched": "Track episode rewatches",
+      "markEpisodesAsRewatchedDescription": "When enabled, finishing an episode you already watched on Simkl adds it to a rewatch session (sessions are pinned across episodes)."
+    }
   },
   "bingers": {
     "openSignInFailed": "Failed to open sign-in window. Please allow popups and try again.",
@@ -681,11 +692,9 @@
     "settingsSaveFailed": "Failed to save Bingers settings",
     "settings": {
       "title": "Sync Settings",
-      "description": "Mark media as rewatched when it was synced before or is already watched in Bingers. Rewatches increment the play count in Bingers (Watched x2, etc.).",
-      "markMoviesAsRewatched": "Mark movies as rewatched",
-      "markMoviesAsRewatchedDescription": "When enabled, movies already watched in Bingers (via Scroblarr sync, manual tracking, or import) will increment the play count on the next sync.",
-      "markEpisodesAsRewatched": "Mark episodes as rewatched",
-      "markEpisodesAsRewatchedDescription": "When enabled, episodes already watched in Bingers (via Scroblarr sync, manual tracking, or import) will increment the play count on the next sync."
+      "description": "Increment play counts when you watch something again.",
+      "markMoviesAsRewatched": "Movies",
+      "markEpisodesAsRewatched": "Episodes"
     }
   }
 }

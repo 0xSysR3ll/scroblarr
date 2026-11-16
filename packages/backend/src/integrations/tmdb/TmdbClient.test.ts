@@ -933,4 +933,76 @@ describe("TmdbClient", () => {
       client.findSeriesIdByEpisodeExternalId("missing", "tvdb_id")
     ).resolves.toBeNull();
   });
+
+  it("surfaces TMDB API request timeouts from apiGet", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          (_url: string, init?: RequestInit) =>
+            new Promise((_resolve, reject) => {
+              init?.signal?.addEventListener(
+                "abort",
+                () => {
+                  reject(
+                    Object.assign(new Error("aborted"), { name: "AbortError" })
+                  );
+                },
+                { once: true }
+              );
+            })
+        )
+      );
+
+      const client = new TmdbClient("test-token");
+      const pending = client.searchTv("Berlin");
+      const expectation = expect(pending).rejects.toThrow(
+        "TMDB API request timed out"
+      );
+      await vi.advanceTimersByTimeAsync(10_000);
+      await expectation;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("times out when TMDB headers arrive but the JSON body stalls", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((_url: string, init?: RequestInit) =>
+          Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () =>
+              new Promise((_resolve, reject) => {
+                init?.signal?.addEventListener(
+                  "abort",
+                  () => {
+                    reject(
+                      Object.assign(new Error("aborted"), {
+                        name: "AbortError",
+                      })
+                    );
+                  },
+                  { once: true }
+                );
+              }),
+          })
+        )
+      );
+
+      const client = new TmdbClient("test-token");
+      const pending = client.searchTv("Berlin");
+      const expectation = expect(pending).rejects.toThrow(
+        "TMDB API request timed out"
+      );
+      await vi.advanceTimersByTimeAsync(10_000);
+      await expectation;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

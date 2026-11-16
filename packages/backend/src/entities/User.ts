@@ -105,6 +105,16 @@ export class User {
   @Column({ type: "varchar", length: 500, nullable: true })
   simklThumb?: string;
 
+  @Column({ type: "boolean", default: false })
+  simklMarkMoviesAsRewatched!: boolean;
+
+  @Column({ type: "boolean", default: false })
+  simklMarkEpisodesAsRewatched!: boolean;
+
+  /** Cached from Simkl /users/settings — `free`, `pro`, or `vip`. */
+  @Column({ type: "varchar", length: 32, nullable: true })
+  simklAccountType?: string | null;
+
   @Column({ type: "text", nullable: true })
   bingersCookieJar?: string | null;
 

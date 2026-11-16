@@ -14,6 +14,7 @@ export interface SyncAttemptResult {
   destinations: string[];
   errorMessage?: string;
   destinationResults: SyncDestinationResults;
+  wasRewatched?: boolean;
 }
 
 export function attemptsFromSyncResults(

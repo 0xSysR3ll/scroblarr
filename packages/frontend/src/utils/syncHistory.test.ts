@@ -218,10 +218,20 @@ describe("sync history utils", () => {
     ]);
   });
 
-  it("only shows rewatched badges for successful TVTime syncs", () => {
+  it("only shows rewatched badges for successful TVTime, Bingers, or Simkl syncs", () => {
     expect(shouldShowRewatchedBadge(syncItem({ wasRewatched: true }))).toBe(
       true
     );
+    expect(
+      shouldShowRewatchedBadge(
+        syncItem({ destinations: ["Bingers"], wasRewatched: true })
+      )
+    ).toBe(true);
+    expect(
+      shouldShowRewatchedBadge(
+        syncItem({ destinations: ["Simkl"], wasRewatched: true })
+      )
+    ).toBe(true);
     expect(
       shouldShowRewatchedBadge(
         syncItem({ destinations: ["Trakt"], wasRewatched: true })

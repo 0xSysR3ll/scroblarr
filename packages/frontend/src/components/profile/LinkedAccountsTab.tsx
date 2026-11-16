@@ -19,6 +19,51 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FaCheckCircle, FaUnlink } from "react-icons/fa";
 
+function LinkedBadge() {
+  const { t } = useTranslation();
+
+  return (
+    <div className="flex items-center gap-2 text-success-600 dark:text-success-400">
+      <FaCheckCircle className="w-5 h-5" />
+      <span className="text-sm font-medium">
+        {t("profile.linkedAccounts.linked", {
+          defaultValue: "Linked",
+        })}
+      </span>
+    </div>
+  );
+}
+
+function UnlinkAccountButton({
+  onClick,
+  disabled,
+  titleDefault,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+  titleDefault: string;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
+      title={t("profile.linkedAccounts.unlink", {
+        defaultValue: titleDefault,
+      })}
+    >
+      <FaUnlink className="w-3.5 h-3.5" />
+      <span className="hidden sm:inline">
+        {t("profile.linkedAccounts.unlink", {
+          defaultValue: "Unlink",
+        })}
+      </span>
+    </button>
+  );
+}
+
 interface LinkedAccountsTabProps {
   plexUsername?: string;
   jellyfinUsername?: string;
@@ -222,30 +267,13 @@ export function LinkedAccountsTab({
                 </div>
                 {plexUsername ? (
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 text-success-600 dark:text-success-400">
-                      <FaCheckCircle className="w-5 h-5" />
-                      <span className="text-sm font-medium">
-                        {t("profile.linkedAccounts.linked", {
-                          defaultValue: "Linked",
-                        })}
-                      </span>
-                    </div>
+                    <LinkedBadge />
                     {canUnlinkPlex && (
-                      <button
+                      <UnlinkAccountButton
                         onClick={handleUnlinkPlex}
                         disabled={unlinkingPlex}
-                        className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
-                        title={t("profile.linkedAccounts.unlink", {
-                          defaultValue: "Unlink Plex Account",
-                        })}
-                      >
-                        <FaUnlink className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">
-                          {t("profile.linkedAccounts.unlink", {
-                            defaultValue: "Unlink",
-                          })}
-                        </span>
-                      </button>
+                        titleDefault="Unlink Plex Account"
+                      />
                     )}
                   </div>
                 ) : (
@@ -294,30 +322,13 @@ export function LinkedAccountsTab({
                 </div>
                 {jellyfinUsername ? (
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 text-success-600 dark:text-success-400">
-                      <FaCheckCircle className="w-5 h-5" />
-                      <span className="text-sm font-medium">
-                        {t("profile.linkedAccounts.linked", {
-                          defaultValue: "Linked",
-                        })}
-                      </span>
-                    </div>
+                    <LinkedBadge />
                     {canUnlinkMediaBrowser && (
-                      <button
+                      <UnlinkAccountButton
                         onClick={handleUnlinkJellyfin}
                         disabled={unlinkingJellyfin}
-                        className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
-                        title={t("profile.linkedAccounts.unlink", {
-                          defaultValue: `Unlink ${mediaBrowserName} Account`,
-                        })}
-                      >
-                        <FaUnlink className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">
-                          {t("profile.linkedAccounts.unlink", {
-                            defaultValue: "Unlink",
-                          })}
-                        </span>
-                      </button>
+                        titleDefault={`Unlink ${mediaBrowserName} Account`}
+                      />
                     )}
                   </div>
                 ) : (
