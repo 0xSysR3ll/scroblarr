@@ -21,10 +21,14 @@ describe("usePlexLogin", () => {
     plexMocks.login.mockReset();
     plexMocks.PlexOAuth.mockReset();
     plexMocks.preparePopup.mockReset();
-    plexMocks.PlexOAuth.mockReturnValue({
-      closePopup: plexMocks.closePopup,
-      login: plexMocks.login,
-      preparePopup: plexMocks.preparePopup,
+    plexMocks.PlexOAuth.mockImplementation(function PlexOAuth(this: {
+      closePopup: typeof plexMocks.closePopup;
+      login: typeof plexMocks.login;
+      preparePopup: typeof plexMocks.preparePopup;
+    }) {
+      this.closePopup = plexMocks.closePopup;
+      this.login = plexMocks.login;
+      this.preparePopup = plexMocks.preparePopup;
     });
   });
 
