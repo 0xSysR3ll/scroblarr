@@ -52,10 +52,17 @@ function renderJellyfin(
     settings: Settings;
     mediaBrowserType: "jellyfin" | "emby";
     formOpen?: boolean;
-    onFormOpenChange?: ReturnType<typeof vi.fn>;
+    onFormOpenChange?: (open: boolean) => void;
     webhookApiKey?: string;
-    onJellyfinSettingsChange?: ReturnType<typeof vi.fn>;
-    onSettingsUpdated?: ReturnType<typeof vi.fn>;
+    onJellyfinSettingsChange?: (settings: {
+      hostname: string;
+      port: number;
+      useSsl: boolean;
+      urlBase: string;
+      apiKey: string;
+      mediaBrowserType: "jellyfin" | "emby";
+    }) => void;
+    onSettingsUpdated?: () => void;
   }> = {}
 ) {
   return renderWithProviders(
