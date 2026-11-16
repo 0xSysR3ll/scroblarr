@@ -1,8 +1,10 @@
-ARG NODE_IMAGE=node:24.22.2-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9
+ARG NODE_IMAGE=node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68
 
 FROM ${NODE_IMAGE} AS base
 
-RUN corepack enable
+# Node slim images no longer ship corepack; install pnpm directly.
+ARG PNPM_VERSION=10.34.9
+RUN npm install -g "pnpm@${PNPM_VERSION}"
 
 WORKDIR /app
 
