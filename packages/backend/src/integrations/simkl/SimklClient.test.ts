@@ -677,7 +677,7 @@ describe("SimklClient", () => {
 
   it("does not match show not_found when title years conflict", async () => {
     mockOkJson({
-      added: { episodes: 1 },
+      added: { episodes: 1, movies: 1 },
       not_found: {
         shows: [
           {
@@ -696,12 +696,21 @@ describe("SimklClient", () => {
     const client = new SimklClient("client-id");
 
     const results = await client.scrobbleMany(
-      [{ event: makeEpisodeEvent() }],
+      [
+        { event: makeEpisodeEvent() },
+        {
+          event: makeMovieEvent({
+            imdbMovieId: "tt2222222",
+            title: "Accepted Sibling",
+            year: 2023,
+          }),
+        },
+      ],
       "access-token"
     );
 
-    // Year mismatch leaves the not_found entry unmatched → group fails.
     expect(results[0]?.success).toBe(false);
+    expect(results[1]?.success).toBe(false);
   });
 
   it("rejects movie not_found when TVDB ids conflict despite matching titles", async () => {
@@ -729,11 +738,20 @@ describe("SimklClient", () => {
             tvdbMovieId: 1,
           }),
         },
+        {
+          event: makeMovieEvent({
+            imdbMovieId: "tt2222222",
+            title: "Accepted Sibling",
+            year: 2023,
+          }),
+        },
       ],
       "access-token"
     );
 
+    // Conflict leaves not_found unmatched → leftover fails the whole group.
     expect(results[0]?.success).toBe(false);
+    expect(results[1]?.success).toBe(false);
   });
 
   it("falls back to title match when movie id namespaces do not overlap", async () => {
@@ -761,6 +779,13 @@ describe("SimklClient", () => {
             tmdbMovieId: 123,
           }),
         },
+        {
+          event: makeMovieEvent({
+            imdbMovieId: "tt2222222",
+            title: "Accepted Sibling",
+            year: 2023,
+          }),
+        },
       ],
       "access-token"
     );
@@ -769,6 +794,10 @@ describe("SimklClient", () => {
     expect((results[0] as { error: Error }).error.message).toBe(
       "Simkl could not match the media item"
     );
+    expect(results[1]).toEqual({
+      success: true,
+      result: { wasRewatched: false },
+    });
   });
 
   it("matches show not_found by series ids when titles collide", async () => {
@@ -1294,7 +1323,16 @@ describe("SimklClient", () => {
     const client = new SimklClient("client-id");
 
     const results = await client.scrobbleMany(
-      [{ event: makeMovieEvent({ imdbMovieId: "tt999" }) }],
+      [
+        { event: makeMovieEvent({ imdbMovieId: "tt999" }) },
+        {
+          event: makeMovieEvent({
+            imdbMovieId: "tt2222222",
+            title: "Accepted Sibling",
+            year: 2023,
+          }),
+        },
+      ],
       "access-token"
     );
 
@@ -1302,6 +1340,10 @@ describe("SimklClient", () => {
     expect((results[0] as { error: Error }).error.message).toBe(
       "Simkl could not match the media item"
     );
+    expect(results[1]).toEqual({
+      success: true,
+      result: { wasRewatched: false },
+    });
   });
 
   it("skips non-object and non-overlapping not_found echoes for movies and shows", async () => {

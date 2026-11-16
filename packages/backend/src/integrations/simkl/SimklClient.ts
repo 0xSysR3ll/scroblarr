@@ -718,8 +718,11 @@ export class SimklClient implements ISyncClient {
 
   private statusRequestIsSessionAmbiguous(
     entry: PreparedHistoryEntry,
-    request: object
+    request: unknown
   ): boolean {
+    if (!request || typeof request !== "object") {
+      return true;
+    }
     const received = request as {
       rewatch_id?: number;
       seasons?: unknown[];
