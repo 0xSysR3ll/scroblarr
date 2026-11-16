@@ -669,6 +669,8 @@ export class SimklClient implements ISyncClient {
       return {};
     }
 
+    const pinnedRewatchId = this.pinnedRewatchId(entry);
+
     for (let index = 0; index < statuses.length; index++) {
       const status = statuses[index]!;
       if (
@@ -681,6 +683,15 @@ export class SimklClient implements ISyncClient {
       const nested = status.response;
       const rewatchId = nested?.rewatch_id ?? status.rewatch_id;
       const rewatchStatus = nested?.rewatch_status ?? status.rewatch_status;
+
+      if (
+        pinnedRewatchId != null &&
+        this.statusRequestIsSessionAmbiguous(entry, status.request) &&
+        rewatchId !== pinnedRewatchId
+      ) {
+        continue;
+      }
+
       if (typeof rewatchId === "number" || typeof rewatchStatus === "string") {
         statuses.splice(index, 1);
         return {
@@ -693,6 +704,40 @@ export class SimklClient implements ISyncClient {
 
     // Do not fall back to another item's status in a batch.
     return {};
+  }
+
+  private pinnedRewatchId(entry: PreparedHistoryEntry): number | undefined {
+    if (entry.kind === "movie") {
+      return entry.movie.rewatch_id;
+    }
+    if (entry.kind === "episode") {
+      return entry.episode.rewatch_id;
+    }
+    return entry.show.rewatch_id;
+  }
+
+  private statusRequestIsSessionAmbiguous(
+    entry: PreparedHistoryEntry,
+    request: unknown
+  ): boolean {
+    if (!request || typeof request !== "object") {
+      return true;
+    }
+    const received = request as {
+      rewatch_id?: number;
+      seasons?: unknown[];
+    };
+    if (typeof received.rewatch_id === "number") {
+      return false;
+    }
+    if (
+      entry.kind === "show" &&
+      Array.isArray(received.seasons) &&
+      received.seasons.length > 0
+    ) {
+      return false;
+    }
+    return true;
   }
 
   /**
