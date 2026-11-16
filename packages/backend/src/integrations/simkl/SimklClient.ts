@@ -718,11 +718,8 @@ export class SimklClient implements ISyncClient {
 
   private statusRequestIsSessionAmbiguous(
     entry: PreparedHistoryEntry,
-    request: unknown
+    request: object
   ): boolean {
-    if (!request || typeof request !== "object") {
-      return true;
-    }
     const received = request as {
       rewatch_id?: number;
       seasons?: unknown[];
@@ -752,6 +749,16 @@ export class SimklClient implements ISyncClient {
       return false;
     }
 
+    const pinnedRewatchId = this.pinnedRewatchId(entry);
+    const receivedRewatchId = (request as { rewatch_id?: number }).rewatch_id;
+    if (
+      pinnedRewatchId != null &&
+      typeof receivedRewatchId === "number" &&
+      pinnedRewatchId !== receivedRewatchId
+    ) {
+      return false;
+    }
+
     if (entry.kind === "movie") {
       return this.movieMatch(entry.movie, request);
     }
@@ -768,14 +775,6 @@ export class SimklClient implements ISyncClient {
       seasons?: SimklShow["seasons"];
     };
     if (received.type && received.type !== "show") {
-      return false;
-    }
-
-    if (
-      entry.show.rewatch_id != null &&
-      typeof received.rewatch_id === "number" &&
-      entry.show.rewatch_id !== received.rewatch_id
-    ) {
       return false;
     }
 

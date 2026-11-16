@@ -269,7 +269,7 @@ describe("SimklClient", () => {
   it("matches title-only not_found echoes that add rating: null", async () => {
     mockOkJson({
       added: {
-        movies: 0,
+        movies: 1,
         shows: 0,
         episodes: 0,
         statuses: [],
@@ -296,15 +296,26 @@ describe("SimklClient", () => {
             year: 9999,
           }),
         },
+        {
+          event: makeMovieEvent({
+            imdbMovieId: "tt1234567",
+            title: "Example Movie",
+            year: 2024,
+          }),
+        },
       ],
       "access-token"
     );
 
-    expect(results).toHaveLength(1);
+    expect(results).toHaveLength(2);
     expect(results[0]?.success).toBe(false);
     expect((results[0] as { error: Error }).error.message).toBe(
       "Simkl could not match the media item"
     );
+    expect(results[1]).toEqual({
+      success: true,
+      result: { wasRewatched: false },
+    });
   });
 
   it("matches batch status echoes that add type/rating and stringify ids", async () => {
@@ -1020,6 +1031,117 @@ describe("SimklClient", () => {
       {
         success: true,
         result: { wasRewatched: true, simklRewatchId: 66 },
+      },
+    ]);
+  });
+
+  it("distinguishes identical movie status echoes by pinned rewatch_id", async () => {
+    mockOkJson({
+      added: {
+        movies: 2,
+        statuses: [
+          {
+            request: {
+              watched_at: "2026-06-04T17:00:00Z",
+              title: "Example Movie",
+              year: 2024,
+              ids: { imdb: "tt1234567" },
+              type: "movie",
+              rewatch_id: 66,
+            },
+            response: { rewatch_id: 66, rewatch_status: "active" },
+          },
+          {
+            request: {
+              watched_at: "2026-06-04T17:00:00Z",
+              title: "Example Movie",
+              year: 2024,
+              ids: { imdb: "tt1234567" },
+              type: "movie",
+              rewatch_id: 55,
+            },
+            response: { rewatch_id: 55, rewatch_status: "active" },
+          },
+        ],
+      },
+      not_found: { movies: [], shows: [], episodes: [] },
+    });
+    const client = new SimklClient("client-id");
+
+    const results = await client.scrobbleMany(
+      [
+        {
+          event: makeMovieEvent({
+            imdbMovieId: "tt1234567",
+            year: 2024,
+          }),
+          options: { markMoviesAsRewatched: true, simklRewatchId: 55 },
+        },
+        {
+          event: makeMovieEvent({
+            imdbMovieId: "tt1234567",
+            year: 2024,
+          }),
+          options: { markMoviesAsRewatched: true, simklRewatchId: 66 },
+        },
+      ],
+      "access-token"
+    );
+
+    expect(results).toEqual([
+      {
+        success: true,
+        result: { wasRewatched: true, simklRewatchId: 55 },
+      },
+      {
+        success: true,
+        result: { wasRewatched: true, simklRewatchId: 66 },
+      },
+    ]);
+  });
+
+  it("treats season coordinates as enough to disambiguate show status rows", async () => {
+    mockOkJson({
+      added: {
+        episodes: 1,
+        statuses: [
+          {
+            request: {
+              title: "Example Show",
+              year: 2024,
+              type: "show",
+              ids: { tmdb: "1399" },
+              seasons: [
+                {
+                  number: 2,
+                  episodes: [{ number: 3, watched_at: "2026-06-04T17:00:00Z" }],
+                },
+              ],
+            },
+            response: { rewatch_id: 55, rewatch_status: "active" },
+          },
+        ],
+      },
+      not_found: { movies: [], shows: [], episodes: [] },
+    });
+    const client = new SimklClient("client-id");
+    const event = makeEpisodeEvent();
+    event.media.tmdbSeriesId = 1399;
+
+    const results = await client.scrobbleMany(
+      [
+        {
+          event,
+          options: { markEpisodesAsRewatched: true, simklRewatchId: 55 },
+        },
+      ],
+      "access-token"
+    );
+
+    expect(results).toEqual([
+      {
+        success: true,
+        result: { wasRewatched: true, simklRewatchId: 55 },
       },
     ]);
   });
