@@ -349,9 +349,18 @@ export class SyncService {
     // Caller must only invoke this after canBatchSimklRetries() returns true.
     const user = historyItems[0]!.user!;
     const simklClient = new SimklClient(user.simklClientId!);
-    const accessToken = await this.simklTokenManager.getValidAccessToken(
-      user.id
-    );
+
+    let accessToken: string;
+    try {
+      accessToken = await this.simklTokenManager.getValidAccessToken(user.id);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unknown Simkl token error";
+      return historyItems.map((historyItem) => ({
+        id: historyItem.id,
+        ...buildGlobalFailureResult(`Simkl: ${message}`),
+      }));
+    }
 
     const prepared: Array<{
       historyItem: SyncHistory;
@@ -433,7 +442,21 @@ export class SyncService {
           item.historyItem.wasRewatched = true;
         }
         item.historyItem.retriedAt = new Date();
-        await this.syncHistoryRepository.save(item.historyItem);
+        try {
+          await this.syncHistoryRepository.save(item.historyItem);
+        } catch (error) {
+          // Simkl already accepted the write; keep returning success so the
+          // client does not retry and create duplicate history entries.
+          logger.sync.error(
+            {
+              error,
+              userId: user.id,
+              historyId: item.historyItem.id,
+              mediaTitle: item.event.media.title,
+            },
+            "Failed to save Simkl batch retry history - data loss risk"
+          );
+        }
       }
 
       results.push({ id: item.historyItem.id, ...attemptResult });

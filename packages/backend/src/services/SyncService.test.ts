@@ -2542,5 +2542,89 @@ describe("SyncService", () => {
         expect.objectContaining({ id: "sync-2", success: true }),
       ]);
     });
+
+    it("returns per-item failures when Simkl token refresh fails in a batch", async () => {
+      simklTokenManagerMocks.getValidAccessToken.mockRejectedValue(
+        new Error("refresh failed")
+      );
+
+      const service = new SyncService();
+      const results = await service.retryHistoryItems([
+        makeSimklFailedHistory({ id: "sync-1" }),
+        makeSimklFailedHistory({
+          id: "sync-2",
+          originalMediaId: "plex-media-2",
+        }),
+      ]);
+
+      expect(simklClientMocks.scrobbleMany).not.toHaveBeenCalled();
+      expect(results).toEqual([
+        expect.objectContaining({
+          id: "sync-1",
+          success: false,
+          errorMessage: "Simkl: refresh failed",
+        }),
+        expect.objectContaining({
+          id: "sync-2",
+          success: false,
+          errorMessage: "Simkl: refresh failed",
+        }),
+      ]);
+    });
+
+    it("keeps successful batch results when history save fails mid-loop", async () => {
+      simklTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+        "simkl-valid-token"
+      );
+      simklClientMocks.scrobbleMany.mockResolvedValue([
+        { success: true, result: { wasRewatched: false } },
+        { success: true, result: { wasRewatched: false } },
+      ]);
+      syncHistoryRepositoryMocks.save
+        .mockRejectedValueOnce(new Error("db down"))
+        .mockResolvedValueOnce(undefined);
+
+      const service = new SyncService();
+      const results = await service.retryHistoryItems([
+        makeSimklFailedHistory({ id: "sync-1" }),
+        makeSimklFailedHistory({
+          id: "sync-2",
+          originalMediaId: "plex-media-2",
+        }),
+      ]);
+
+      expect(results).toEqual([
+        expect.objectContaining({ id: "sync-1", success: true }),
+        expect.objectContaining({ id: "sync-2", success: true }),
+      ]);
+      expect(syncHistoryRepositoryMocks.save).toHaveBeenCalledTimes(2);
+    });
+
+    it("falls back to sequential retries when the user is disabled", async () => {
+      const service = new SyncService();
+      const disabledUser = { ...simklOnlyUser, enabled: false };
+      const results = await service.retryHistoryItems([
+        makeSimklFailedHistory({ id: "sync-1", user: disabledUser }),
+        makeSimklFailedHistory({
+          id: "sync-2",
+          originalMediaId: "plex-media-2",
+          user: disabledUser,
+        }),
+      ]);
+
+      expect(simklClientMocks.scrobbleMany).not.toHaveBeenCalled();
+      expect(results).toEqual([
+        expect.objectContaining({
+          id: "sync-1",
+          success: false,
+          errorMessage: "User account is disabled",
+        }),
+        expect.objectContaining({
+          id: "sync-2",
+          success: false,
+          errorMessage: "User account is disabled",
+        }),
+      ]);
+    });
   });
 });
