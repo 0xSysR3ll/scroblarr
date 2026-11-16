@@ -177,6 +177,9 @@ export class SimklClient implements ISyncClient {
     if (event.media.tmdbSeriesId) {
       showIds.tmdb = event.media.tmdbSeriesId;
     }
+    if (event.media.tvdbSeriesId) {
+      showIds.tvdb = event.media.tvdbSeriesId;
+    }
     const episodeIds: Pick<SimklIds, "tvdb"> = {};
     if (event.media.tvdbEpisodeId) {
       episodeIds.tvdb = event.media.tvdbEpisodeId;

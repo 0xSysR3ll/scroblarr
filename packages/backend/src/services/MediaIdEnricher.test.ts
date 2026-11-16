@@ -504,9 +504,16 @@ describe("MediaIdEnricher", () => {
           popularity: 20,
         },
       ]),
+      findSeriesIdByExternalId: vi.fn().mockResolvedValue(null),
       getEpisodeExternalIds: vi.fn().mockImplementation(async (id: number) => {
         if (id === 308014) {
           return { imdbId: "tt31397887", tvdbId: 10597958 };
+        }
+        return null;
+      }),
+      getTvExternalIds: vi.fn().mockImplementation(async (id: number) => {
+        if (id === 308014) {
+          return { tvdbId: 449521 };
         }
         return null;
       }),
@@ -541,6 +548,7 @@ describe("MediaIdEnricher", () => {
         title: "Berlin",
         seasonNumber: 2,
         episodeNumber: 1,
+        tvdbSeriesId: 413033,
       })
     );
 
@@ -550,10 +558,120 @@ describe("MediaIdEnricher", () => {
         seasonNumber: 1,
         episodeNumber: 1,
         tmdbSeriesId: 308014,
+        tvdbSeriesId: 449521,
         imdbEpisodeId: "tt31397887",
         tvdbEpisodeId: 10597958,
       })
     );
+  });
+
+  it("clears parent tvdbSeriesId when sequel external IDs omit TVDB", async () => {
+    const client = {
+      searchTv: vi.fn().mockResolvedValue([
+        {
+          id: 146176,
+          name: "Berlin",
+          firstAirDate: "2023-12-29",
+          popularity: 20,
+        },
+      ]),
+      findSeriesIdByExternalId: vi.fn().mockResolvedValue(null),
+      getEpisodeExternalIds: vi.fn().mockImplementation(async (id: number) => {
+        if (id === 308014) {
+          return { imdbId: "tt31397887", tvdbId: 10597958 };
+        }
+        return null;
+      }),
+      getTvExternalIds: vi.fn().mockResolvedValue({ imdbId: "tt-sequel" }),
+      hasTvSeason: vi
+        .fn()
+        .mockImplementation(async (id: number, season: number) => {
+          return id === 308014 && season === 1;
+        }),
+      getTvShowDetails: vi.fn().mockResolvedValue({
+        id: 146176,
+        numberOfSeasons: 1,
+      }),
+      getTvRecommendations: vi.fn().mockResolvedValue([
+        {
+          id: 308014,
+          name: "Berlin and the Lady with an Ermine",
+          firstAirDate: "2026-05-15",
+          popularity: 5,
+        },
+      ]),
+    } as unknown as TmdbClient;
+
+    const enricher = new MediaIdEnricher(client);
+    const enriched = await enricher.enrich(
+      episode({
+        title: "Berlin",
+        seasonNumber: 2,
+        episodeNumber: 1,
+        tvdbSeriesId: 413033,
+      })
+    );
+
+    expect(enriched.tmdbSeriesId).toBe(308014);
+    expect(enriched.tvdbSeriesId).toBeUndefined();
+  });
+
+  it("keeps sequel remapping when getTvExternalIds fails", async () => {
+    const client = {
+      searchTv: vi.fn().mockResolvedValue([
+        {
+          id: 146176,
+          name: "Berlin",
+          firstAirDate: "2023-12-29",
+          popularity: 20,
+        },
+      ]),
+      findSeriesIdByExternalId: vi.fn().mockResolvedValue(null),
+      getEpisodeExternalIds: vi.fn().mockImplementation(async (id: number) => {
+        if (id === 308014) {
+          return { imdbId: "tt31397887", tvdbId: 10597958 };
+        }
+        return null;
+      }),
+      getTvExternalIds: vi.fn().mockRejectedValue(new Error("TMDB down")),
+      hasTvSeason: vi
+        .fn()
+        .mockImplementation(async (id: number, season: number) => {
+          return id === 308014 && season === 1;
+        }),
+      getTvShowDetails: vi.fn().mockResolvedValue({
+        id: 146176,
+        numberOfSeasons: 1,
+      }),
+      getTvRecommendations: vi.fn().mockResolvedValue([
+        {
+          id: 308014,
+          name: "Berlin and the Lady with an Ermine",
+          firstAirDate: "2026-05-15",
+          popularity: 5,
+        },
+      ]),
+    } as unknown as TmdbClient;
+
+    const enricher = new MediaIdEnricher(client);
+    const enriched = await enricher.enrich(
+      episode({
+        title: "Berlin",
+        seasonNumber: 2,
+        episodeNumber: 1,
+        tvdbSeriesId: 413033,
+      })
+    );
+
+    expect(enriched).toEqual(
+      expect.objectContaining({
+        seasonNumber: 1,
+        tmdbSeriesId: 308014,
+        imdbEpisodeId: "tt31397887",
+        tvdbEpisodeId: 10597958,
+      })
+    );
+    expect(enriched.tvdbSeriesId).toBeUndefined();
   });
 
   it("skips sequel matches whose IMDb conflicts with the known episode IMDb", async () => {
