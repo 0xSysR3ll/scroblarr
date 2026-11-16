@@ -346,14 +346,8 @@ export class SyncService {
   private async retrySimklHistoryItemsBatch(
     historyItems: SyncHistory[]
   ): Promise<Array<{ id: string } & SyncAttemptResult>> {
+    // Caller must only invoke this after canBatchSimklRetries() returns true.
     const user = historyItems[0]!.user!;
-    if (!user.enabled) {
-      return historyItems.map((historyItem) => ({
-        id: historyItem.id,
-        ...buildGlobalFailureResult("User account is disabled"),
-      }));
-    }
-
     const simklClient = new SimklClient(user.simklClientId!);
     const accessToken = await this.simklTokenManager.getValidAccessToken(
       user.id
