@@ -2318,12 +2318,14 @@ describe("SyncService", () => {
         id: "sync-1",
         destinationResults: null,
         destinations: null,
+        errorMessage: null,
       });
       const second = makeSimklFailedHistory({
         id: "sync-2",
         originalMediaId: "plex-media-2",
         destinationResults: null,
         destinations: null,
+        errorMessage: null,
       });
 
       const results = await service.retryHistoryItems([first, second]);
@@ -2625,6 +2627,185 @@ describe("SyncService", () => {
           errorMessage: "User account is disabled",
         }),
       ]);
+    });
+
+    it("falls back when the only active destination is not Simkl", async () => {
+      syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+      traktTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+        "trakt-valid-token"
+      );
+      traktClientMocks.scrobble.mockResolvedValue(undefined);
+
+      const traktOnlyUser = {
+        id: "u1",
+        enabled: true,
+        plexUsername: "plex-user",
+        simklClientId: "simkl-client-id",
+        simklAccessToken: "simkl-token",
+        traktClientId: "trakt-client-id",
+        traktClientSecret: "trakt-secret",
+        traktAccessToken: "trakt-token",
+      };
+      const service = new SyncService();
+      const results = await service.retryHistoryItems([
+        makeSimklFailedHistory({
+          id: "sync-1",
+          user: traktOnlyUser,
+          destinationResults: JSON.stringify({
+            Trakt: { status: "failed", error: "trakt failed" },
+          }),
+          errorMessage: "Trakt: trakt failed",
+        }),
+        makeSimklFailedHistory({
+          id: "sync-2",
+          originalMediaId: "plex-media-2",
+          user: traktOnlyUser,
+          destinationResults: JSON.stringify({
+            Trakt: { status: "failed", error: "trakt failed" },
+          }),
+          errorMessage: "Trakt: trakt failed",
+        }),
+      ]);
+
+      expect(simklClientMocks.scrobbleMany).not.toHaveBeenCalled();
+      expect(traktClientMocks.scrobble).toHaveBeenCalled();
+      expect(results).toHaveLength(2);
+    });
+
+    it("falls back when active destinations resolve to a single non-Simkl target", async () => {
+      syncHistoryRepositoryMocks.hasExistingSync.mockResolvedValue(false);
+      traktTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+        "trakt-valid-token"
+      );
+      traktClientMocks.scrobble.mockResolvedValue(undefined);
+
+      const service = new SyncService();
+      vi.spyOn(
+        service as unknown as {
+          getSyncDestinations: (user: unknown) => Promise<unknown>;
+        },
+        "getSyncDestinations"
+      ).mockResolvedValue([
+        {
+          name: "Trakt",
+          hasToken: () => true,
+          getAccessToken: async () => "trakt-valid-token",
+          client: { scrobble: traktClientMocks.scrobble },
+        },
+      ]);
+
+      const results = await service.retryHistoryItems([
+        makeSimklFailedHistory({
+          id: "sync-1",
+          destinationResults: null,
+          destinations: null,
+          errorMessage: null,
+        }),
+        makeSimklFailedHistory({
+          id: "sync-2",
+          originalMediaId: "plex-media-2",
+          destinationResults: null,
+          destinations: null,
+          errorMessage: null,
+        }),
+      ]);
+
+      expect(simklClientMocks.scrobbleMany).not.toHaveBeenCalled();
+      expect(results).toHaveLength(2);
+    });
+
+    it("maps non-Error token failures to a generic Simkl message", async () => {
+      simklTokenManagerMocks.getValidAccessToken.mockRejectedValue(
+        "token blew up"
+      );
+
+      const service = new SyncService();
+      const results = await service.retryHistoryItems([
+        makeSimklFailedHistory({ id: "sync-1" }),
+        makeSimklFailedHistory({
+          id: "sync-2",
+          originalMediaId: "plex-media-2",
+        }),
+      ]);
+
+      expect(results).toEqual([
+        expect.objectContaining({
+          id: "sync-1",
+          errorMessage: "Simkl: Unknown Simkl token error",
+        }),
+        expect.objectContaining({
+          id: "sync-2",
+          errorMessage: "Simkl: Unknown Simkl token error",
+        }),
+      ]);
+    });
+
+    it("buildRetryEvent rejects history items without a user relation", async () => {
+      const service = new SyncService();
+      const buildRetryEvent = (
+        service as unknown as {
+          buildRetryEvent: (item: unknown) => unknown;
+        }
+      ).buildRetryEvent.bind(service);
+
+      expect(() =>
+        buildRetryEvent({
+          id: "sync-1",
+          source: "plex",
+          mediaType: "movie",
+          mediaTitle: "Interstellar",
+          user: undefined,
+        })
+      ).toThrow("User not found for sync history item");
+    });
+
+    it("falls back when a later history item is missing its user relation", async () => {
+      const service = new SyncService();
+      const canBatchSimklRetries = (
+        service as unknown as {
+          canBatchSimklRetries: (items: unknown[]) => Promise<boolean>;
+        }
+      ).canBatchSimklRetries.bind(service);
+
+      await expect(
+        canBatchSimklRetries([
+          makeSimklFailedHistory({ id: "sync-1" }),
+          makeSimklFailedHistory({
+            id: "sync-2",
+            originalMediaId: "plex-media-2",
+            user: undefined,
+          }),
+        ])
+      ).resolves.toBe(false);
+    });
+
+    it("uses a fresh timestamp when syncedAt is missing or invalid", async () => {
+      simklTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+        "simkl-valid-token"
+      );
+      simklClientMocks.scrobbleMany.mockResolvedValue([
+        { success: true, result: { wasRewatched: false } },
+        { success: true, result: { wasRewatched: false } },
+      ]);
+
+      const service = new SyncService();
+      const results = await service.retryHistoryItems([
+        makeSimklFailedHistory({ id: "sync-1", syncedAt: undefined }),
+        makeSimklFailedHistory({
+          id: "sync-2",
+          originalMediaId: "plex-media-2",
+          syncedAt: "not-a-date",
+        }),
+      ]);
+
+      expect(simklClientMocks.scrobbleMany).toHaveBeenCalledTimes(1);
+      const payload = simklClientMocks.scrobbleMany.mock.calls[0]![0] as Array<{
+        event: { timestamp: Date };
+      }>;
+      expect(payload[0]!.event.timestamp).toBeInstanceOf(Date);
+      expect(payload[1]!.event.timestamp).toBeInstanceOf(Date);
+      expect(Number.isFinite(payload[1]!.event.timestamp.getTime())).toBe(true);
+      expect(results).toHaveLength(2);
     });
   });
 });
