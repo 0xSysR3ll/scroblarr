@@ -18,6 +18,12 @@ describe("SimklClient", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal("fetch", fetchMock);
+    const clientType = SimklClient as unknown as {
+      postQueue: Promise<void>;
+      lastPostAt: number;
+    };
+    clientType.postQueue = Promise.resolve();
+    clientType.lastPostAt = 0;
   });
 
   it("reports its destination name", () => {
@@ -269,7 +275,7 @@ describe("SimklClient", () => {
   it("matches title-only not_found echoes that add rating: null", async () => {
     mockOkJson({
       added: {
-        movies: 1,
+        movies: 2,
         shows: 0,
         episodes: 0,
         statuses: [],
@@ -279,6 +285,11 @@ describe("SimklClient", () => {
           {
             title: "ZZZ-Definitely-Not-A-Real-Movie-Title-XYZ",
             year: 9999,
+            rating: null,
+          },
+          {
+            title: "Shared Collision Movie",
+            year: 2024,
             rating: null,
           },
         ],
@@ -303,11 +314,24 @@ describe("SimklClient", () => {
             year: 2024,
           }),
         },
+        {
+          event: makeMovieEvent({
+            imdbMovieId: "tt9990001",
+            title: "Shared Collision Movie",
+            year: 2024,
+          }),
+        },
+        {
+          event: makeMovieEvent({
+            title: "Shared Collision Movie",
+            year: 2024,
+          }),
+        },
       ],
       "access-token"
     );
 
-    expect(results).toHaveLength(2);
+    expect(results).toHaveLength(4);
     expect(results[0]?.success).toBe(false);
     expect((results[0] as { error: Error }).error.message).toBe(
       "Simkl could not match the media item"
@@ -316,6 +340,11 @@ describe("SimklClient", () => {
       success: true,
       result: { wasRewatched: false },
     });
+    expect(results[2]).toEqual({
+      success: true,
+      result: { wasRewatched: false },
+    });
+    expect(results[3]?.success).toBe(false);
   });
 
   it("matches batch status echoes that add type/rating and stringify ids", async () => {
@@ -1861,6 +1890,188 @@ describe("SimklClient", () => {
     ).rejects.toThrow("Simkl API request timed out");
   });
 
+  it("aborts in-flight Simkl fetches when the request timeout fires", async () => {
+    const timeoutHandlers: Array<() => void> = [];
+    const originalSetTimeout = globalThis.setTimeout.bind(globalThis);
+    const setTimeoutSpy = vi
+      .spyOn(globalThis, "setTimeout")
+      .mockImplementation(((
+        handler: (...handlerArgs: unknown[]) => void,
+        ms?: number,
+        ...args: unknown[]
+      ) => {
+        if (typeof handler === "function" && ms === 30_000) {
+          timeoutHandlers.push(() => handler(...args));
+          return 0 as unknown as ReturnType<typeof setTimeout>;
+        }
+        return originalSetTimeout(
+          handler as Parameters<typeof setTimeout>[0],
+          ms,
+          ...(args as [])
+        );
+      }) as typeof setTimeout);
+
+    fetchMock.mockImplementation(
+      (_url: string, init?: { signal?: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+          });
+        })
+    );
+
+    try {
+      const client = new SimklClient("client-id");
+      const pending = client.scrobble(makeEpisodeEvent(), "access-token");
+      await vi.waitFor(() => {
+        expect(timeoutHandlers.length).toBeGreaterThan(0);
+      });
+      for (const handler of timeoutHandlers) {
+        handler();
+      }
+      await expect(pending).rejects.toThrow("Simkl API request timed out");
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
+  });
+
+  it("does not let title-only show not_found claim an ID-backed sibling", async () => {
+    mockOkJson({
+      added: { episodes: 1 },
+      not_found: {
+        shows: [
+          {
+            title: "Example Show",
+            year: 2024,
+            seasons: [
+              {
+                number: 2,
+                episodes: [{ number: 3, watched_at: "2026-06-04T17:00:00Z" }],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const client = new SimklClient("client-id");
+    const idBacked = makeEpisodeEvent();
+    idBacked.media.tmdbSeriesId = 1399;
+    const titleOnly = makeEpisodeEvent();
+    titleOnly.media.tvdbEpisodeId = undefined;
+
+    const results = await client.scrobbleMany(
+      [{ event: idBacked }, { event: titleOnly }],
+      "access-token"
+    );
+
+    expect(results[0]).toEqual({
+      success: true,
+      result: { wasRewatched: false },
+    });
+    expect(results[1]?.success).toBe(false);
+  });
+
+  it("keeps already-failed batch items failed when leftover not_found remains", async () => {
+    mockOkJson({
+      added: { movies: 1, episodes: 1 },
+      not_found: {
+        movies: [
+          {
+            title: "Example Movie",
+            year: 2024,
+            watched_at: "2026-06-04T17:00:00Z",
+            ids: { imdb: "tt1234567" },
+          },
+        ],
+        shows: [{ title: "Unrelated Leftover Show", seasons: [{ number: 1 }] }],
+      },
+    });
+    const client = new SimklClient("client-id");
+
+    const results = await client.scrobbleMany(
+      [
+        {
+          event: makeMovieEvent({
+            imdbMovieId: "tt1234567",
+            year: 2024,
+          }),
+        },
+        { event: makeEpisodeEvent() },
+      ],
+      "access-token"
+    );
+
+    expect(results.every((result) => result.success === false)).toBe(true);
+  });
+
+  it("scrobbles movies that only have an IMDB id and no title", async () => {
+    mockOkJson({ added: { movies: 1 } });
+    const client = new SimklClient("client-id");
+    const event = makeMovieEvent({ imdbMovieId: "tt1234567" });
+    event.media.title = undefined as never;
+
+    await client.scrobble(event, "access-token");
+
+    const [, request] = fetchMock.mock.calls[0] as [string, { body: string }];
+    expect(JSON.parse(request.body)).toEqual({
+      movies: [
+        {
+          watched_at: "2026-06-04T17:00:00Z",
+          ids: { imdb: "tt1234567" },
+        },
+      ],
+    });
+  });
+
+  it("ignores non-finite id coercions while matching status echoes", async () => {
+    mockOkJson({
+      added: {
+        movies: 1,
+        statuses: [
+          {
+            request: {
+              watched_at: "2026-06-04T17:00:00Z",
+              title: "Example Movie",
+              year: 2024,
+              ids: { imdb: "tt1234567", tmdb: "nope", tvdb: "also-nope" },
+              type: "movie",
+            },
+            response: { status: "completed" },
+          },
+          {
+            request: {
+              watched_at: "2026-06-04T17:00:00Z",
+              title: "Example Movie",
+              year: 2024,
+              ids: { imdb: "tt1234567" },
+              type: "movie",
+            },
+            rewatch_status: "active",
+          },
+        ],
+      },
+      not_found: { movies: [], shows: [], episodes: [] },
+    });
+    const client = new SimklClient("client-id");
+
+    const results = await client.scrobbleMany(
+      [
+        {
+          event: makeMovieEvent({
+            imdbMovieId: "tt1234567",
+            year: 2024,
+          }),
+          options: { markMoviesAsRewatched: true },
+        },
+      ],
+      "access-token"
+    );
+
+    expect(results).toEqual([
+      { success: true, result: { wasRewatched: true } },
+    ]);
+  });
+
   it("rejects unmatched Simkl history responses", async () => {
     mockOkJson({
       added: { movies: 0 },
@@ -1957,6 +2168,18 @@ describe("SimklClient", () => {
     await expect(
       client.scrobble(makeEpisodeEvent(), "access-token")
     ).rejects.toThrow("Simkl API error: 503 - busy");
+
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 502,
+      text: vi.fn().mockResolvedValue(JSON.stringify({ code: 502 })),
+    });
+
+    await expect(
+      client.scrobble(makeEpisodeEvent(), "access-token")
+    ).rejects.toThrow(
+      `Simkl API error: 502 - ${JSON.stringify({ code: 502 })}`
+    );
 
     fetchMock.mockResolvedValueOnce({
       ok: false,

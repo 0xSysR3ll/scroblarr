@@ -172,21 +172,28 @@ export class SimklClient implements ISyncClient {
           episodes: [...(result.not_found?.episodes ?? [])],
         };
 
+        const rejected = new Set<number>();
         for (const item of group) {
-          if (this.consumeNotFoundMatch(item.entry, notFound)) {
-            logger.simkl.error(
-              {
-                payload: this.payloadFromEntries([item.entry]),
-                result,
-                mediaType: item.event.media.type,
-                mediaTitle: item.event.media.title,
-              },
-              "Simkl could not match history payload"
-            );
-            results[item.index] = {
-              success: false,
-              error: new Error("Simkl could not match the media item"),
-            };
+          if (
+            this.consumeNotFoundMatch(item.entry, notFound, {
+              allowTitleFallback: false,
+            })
+          ) {
+            this.markNotFound(results, item, result);
+            rejected.add(item.index);
+          }
+        }
+        for (const item of group) {
+          if (rejected.has(item.index)) {
+            continue;
+          }
+          if (
+            this.consumeNotFoundMatch(item.entry, notFound, {
+              allowTitleFallback: true,
+              rejectTitleOnlyForIdBacked: true,
+            })
+          ) {
+            this.markNotFound(results, item, result);
             continue;
           }
 
@@ -450,22 +457,50 @@ export class SimklClient implements ISyncClient {
     };
   }
 
+  private markNotFound(
+    results: Array<SimklBatchItemResult | undefined>,
+    item: {
+      event: MediaEvent;
+      entry: PreparedHistoryEntry;
+      index: number;
+    },
+    result: SimklHistoryResponse
+  ): void {
+    logger.simkl.error(
+      {
+        payload: this.payloadFromEntries([item.entry]),
+        result,
+        mediaType: item.event.media.type,
+        mediaTitle: item.event.media.title,
+      },
+      "Simkl could not match history payload"
+    );
+    results[item.index] = {
+      success: false,
+      error: new Error("Simkl could not match the media item"),
+    };
+  }
+
   private consumeNotFoundMatch(
     entry: PreparedHistoryEntry,
     notFound: {
       movies: unknown[];
       shows: unknown[];
       episodes: unknown[];
-    }
+    },
+    options: {
+      allowTitleFallback: boolean;
+      rejectTitleOnlyForIdBacked?: boolean;
+    } = { allowTitleFallback: true }
   ): boolean {
     if (entry.kind === "movie") {
       return this.consumeMatch(notFound.movies, (item) =>
-        this.movieMatch(entry.movie, item)
+        this.movieMatch(entry.movie, item, options)
       );
     }
     if (entry.kind === "show") {
       return this.consumeMatch(notFound.shows, (item) =>
-        this.showMatch(entry.show, item)
+        this.showMatch(entry.show, item, options)
       );
     }
     return this.consumeMatch(notFound.episodes, (item) =>
@@ -485,7 +520,14 @@ export class SimklClient implements ISyncClient {
     return true;
   }
 
-  private movieMatch(sent: SimklMovie, received: unknown): boolean {
+  private movieMatch(
+    sent: SimklMovie,
+    received: unknown,
+    options: {
+      allowTitleFallback: boolean;
+      rejectTitleOnlyForIdBacked?: boolean;
+    } = { allowTitleFallback: true }
+  ): boolean {
     if (!received || typeof received !== "object") {
       return false;
     }
@@ -510,6 +552,16 @@ export class SimklClient implements ISyncClient {
       return true;
     }
     if (this.idsConflict(sent.ids, receivedIds)) {
+      return false;
+    }
+    if (!options.allowTitleFallback) {
+      return false;
+    }
+    if (
+      options.rejectTitleOnlyForIdBacked &&
+      this.hasAnyId(sent.ids) &&
+      !this.hasAnyId(receivedIds)
+    ) {
       return false;
     }
     return (
@@ -543,7 +595,14 @@ export class SimklClient implements ISyncClient {
     return this.idsOverlap(sent.ids, receivedIds);
   }
 
-  private showMatch(sent: SimklShow, received: unknown): boolean {
+  private showMatch(
+    sent: SimklShow,
+    received: unknown,
+    options: {
+      allowTitleFallback: boolean;
+      rejectTitleOnlyForIdBacked?: boolean;
+    } = { allowTitleFallback: true }
+  ): boolean {
     if (!received || typeof received !== "object") {
       return false;
     }
@@ -570,6 +629,16 @@ export class SimklClient implements ISyncClient {
     if (this.idsConflict(sent.ids, receivedIds)) {
       return false;
     }
+    if (!options.allowTitleFallback) {
+      return false;
+    }
+    if (
+      options.rejectTitleOnlyForIdBacked &&
+      this.hasAnyId(sent.ids) &&
+      !this.hasAnyId(receivedIds)
+    ) {
+      return false;
+    }
 
     return (
       !!sent.title &&
@@ -578,6 +647,14 @@ export class SimklClient implements ISyncClient {
         receivedShow.year == null ||
         sent.year === receivedShow.year)
     );
+  }
+
+  private hasAnyId(ids?: SimklIds | Pick<SimklIds, "tvdb">): boolean {
+    if (!ids) {
+      return false;
+    }
+    const full = ids as SimklIds;
+    return full.tvdb != null || full.tmdb != null || full.imdb != null;
   }
 
   private idsOverlap(
@@ -686,7 +763,7 @@ export class SimklClient implements ISyncClient {
 
       if (
         pinnedRewatchId != null &&
-        this.statusRequestIsSessionAmbiguous(entry, status.request) &&
+        this.statusRequestIsSessionAmbiguous(entry, status.request as object) &&
         rewatchId !== pinnedRewatchId
       ) {
         continue;
@@ -718,11 +795,8 @@ export class SimklClient implements ISyncClient {
 
   private statusRequestIsSessionAmbiguous(
     entry: PreparedHistoryEntry,
-    request: unknown
+    request: object
   ): boolean {
-    if (!request || typeof request !== "object") {
-      return true;
-    }
     const received = request as {
       rewatch_id?: number;
       seasons?: unknown[];
