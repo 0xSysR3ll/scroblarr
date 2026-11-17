@@ -484,8 +484,7 @@ export class SyncService {
 
       return {
         id: historyItem.id,
-        ...(batchResultsById.get(historyItem.id) ??
-          buildGlobalFailureResult("Missing Simkl batch result")),
+        ...batchResultsById.get(historyItem.id)!,
       };
     });
   }

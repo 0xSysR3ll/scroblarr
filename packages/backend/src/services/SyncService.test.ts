@@ -2417,6 +2417,83 @@ describe("SyncService", () => {
       expect(syncHistoryRepositoryMocks.save).toHaveBeenCalledTimes(1);
     });
 
+    it("maps non-Error preparation failures to a generic message", async () => {
+      simklTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+        "simkl-valid-token"
+      );
+      simklClientMocks.scrobbleMany.mockResolvedValue([
+        { success: true, result: { wasRewatched: false } },
+      ]);
+
+      const service = new SyncService();
+      vi.spyOn(
+        service as unknown as {
+          enrichMediaIds: (event: unknown) => Promise<unknown>;
+        },
+        "enrichMediaIds"
+      ).mockRejectedValueOnce("prep blew up");
+
+      const results = await service.retryHistoryItems([
+        makeSimklFailedHistory({ id: "sync-bad" }),
+        makeSimklFailedHistory({
+          id: "sync-good",
+          originalMediaId: "plex-media-2",
+        }),
+      ]);
+
+      expect(results).toEqual([
+        expect.objectContaining({
+          id: "sync-bad",
+          success: false,
+          errorMessage: "Unknown retry preparation error",
+        }),
+        expect.objectContaining({
+          id: "sync-good",
+          success: true,
+        }),
+      ]);
+    });
+
+    it("skips scrobbleMany when every item fails preparation", async () => {
+      simklTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+        "simkl-valid-token"
+      );
+
+      const service = new SyncService();
+      const results = await service.retryHistoryItems([
+        makeSimklFailedHistory({
+          id: "sync-1",
+          originalMediaId: undefined,
+          imdbMovieId: undefined,
+          tvdbMovieId: undefined,
+          tvdbEpisodeId: undefined,
+          imdbEpisodeId: undefined,
+        }),
+        makeSimklFailedHistory({
+          id: "sync-2",
+          originalMediaId: undefined,
+          imdbMovieId: undefined,
+          tvdbMovieId: undefined,
+          tvdbEpisodeId: undefined,
+          imdbEpisodeId: undefined,
+        }),
+      ]);
+
+      expect(simklClientMocks.scrobbleMany).not.toHaveBeenCalled();
+      expect(results).toEqual([
+        expect.objectContaining({
+          id: "sync-1",
+          success: false,
+          errorMessage: "Sync history item original media id is unavailable",
+        }),
+        expect.objectContaining({
+          id: "sync-2",
+          success: false,
+          errorMessage: "Sync history item original media id is unavailable",
+        }),
+      ]);
+    });
+
     it("batches episode retries with episode rewatch options", async () => {
       simklTokenManagerMocks.getValidAccessToken.mockResolvedValue(
         "simkl-valid-token"
