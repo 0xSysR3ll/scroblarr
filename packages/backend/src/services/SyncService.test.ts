@@ -2365,6 +2365,58 @@ describe("SyncService", () => {
       expect(syncHistoryRepositoryMocks.save).toHaveBeenCalledTimes(1);
     });
 
+    it("keeps submitting healthy rows when one item fails preparation", async () => {
+      simklTokenManagerMocks.getValidAccessToken.mockResolvedValue(
+        "simkl-valid-token"
+      );
+      simklClientMocks.scrobbleMany.mockResolvedValue([
+        { success: true, result: { wasRewatched: false } },
+      ]);
+
+      const service = new SyncService();
+      const results = await service.retryHistoryItems([
+        makeSimklFailedHistory({
+          id: "sync-bad",
+          originalMediaId: undefined,
+          imdbMovieId: undefined,
+          tvdbMovieId: undefined,
+          tvdbEpisodeId: undefined,
+          imdbEpisodeId: undefined,
+          // Route may allow tmdb-only rows; batch prep still needs a media id.
+          tmdbMovieId: "123",
+        }),
+        makeSimklFailedHistory({
+          id: "sync-good",
+          originalMediaId: "plex-media-2",
+        }),
+      ]);
+
+      expect(simklClientMocks.scrobbleMany).toHaveBeenCalledTimes(1);
+      expect(simklClientMocks.scrobbleMany).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({
+            event: expect.objectContaining({
+              media: expect.objectContaining({ id: "plex-media-2" }),
+            }),
+          }),
+        ],
+        "simkl-valid-token"
+      );
+      expect(results).toEqual([
+        expect.objectContaining({
+          id: "sync-bad",
+          success: false,
+          errorMessage: "Sync history item original media id is unavailable",
+        }),
+        expect.objectContaining({
+          id: "sync-good",
+          success: true,
+          destinations: ["Simkl"],
+        }),
+      ]);
+      expect(syncHistoryRepositoryMocks.save).toHaveBeenCalledTimes(1);
+    });
+
     it("batches episode retries with episode rewatch options", async () => {
       simklTokenManagerMocks.getValidAccessToken.mockResolvedValue(
         "simkl-valid-token"

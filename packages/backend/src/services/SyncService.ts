@@ -367,102 +367,127 @@ export class SyncService {
       event: MediaEvent;
       options: SyncOptions;
     }> = [];
+    const preparationFailures = new Map<string, SyncAttemptResult>();
 
     for (const historyItem of historyItems) {
-      let event = this.buildRetryEvent(historyItem);
-      event = await this.enrichMediaIds(event);
+      try {
+        let event = this.buildRetryEvent(historyItem);
+        event = await this.enrichMediaIds(event);
 
-      const planAllowsRewatch = isSimklRewatchPlan(user.simklAccountType);
-      const allowRewatch =
-        planAllowsRewatch &&
-        (event.media.type === "movie"
-          ? !!user.simklMarkMoviesAsRewatched
-          : !!user.simklMarkEpisodesAsRewatched);
-      const pinnedRewatchId = allowRewatch
-        ? getCachedSimklRewatchIdForEvent(user.id, event)
-        : undefined;
+        const planAllowsRewatch = isSimklRewatchPlan(user.simklAccountType);
+        const allowRewatch =
+          planAllowsRewatch &&
+          (event.media.type === "movie"
+            ? !!user.simklMarkMoviesAsRewatched
+            : !!user.simklMarkEpisodesAsRewatched);
+        const pinnedRewatchId = allowRewatch
+          ? getCachedSimklRewatchIdForEvent(user.id, event)
+          : undefined;
 
-      prepared.push({
-        historyItem,
-        event,
-        options: {
-          markMoviesAsRewatched: allowRewatch && event.media.type === "movie",
-          markEpisodesAsRewatched:
-            allowRewatch && event.media.type === "episode",
-          simklRewatchId: pinnedRewatchId,
-        },
-      });
-    }
-
-    const batchResults = await simklClient.scrobbleMany(
-      prepared.map((item) => ({
-        event: item.event,
-        options: item.options,
-      })),
-      accessToken
-    );
-
-    const results: Array<{ id: string } & SyncAttemptResult> = [];
-
-    for (let index = 0; index < prepared.length; index++) {
-      const item = prepared[index]!;
-      const batchResult = batchResults[index];
-      const syncResults =
-        batchResult?.success === true
-          ? [{ destination: "Simkl", success: true as const }]
-          : [
-              {
-                destination: "Simkl",
-                success: false as const,
-                error:
-                  batchResult?.success === false
-                    ? batchResult.error.message
-                    : "Unknown Simkl error",
-              },
-            ];
-
-      const attemptResult = buildAttemptResult(syncResults);
-      if (batchResult?.success === true) {
-        attemptResult.wasRewatched = batchResult.result.wasRewatched;
-        if (typeof batchResult.result.simklRewatchId === "number") {
-          setCachedSimklRewatchIdForEvent(
-            user.id,
-            item.event,
-            batchResult.result.simklRewatchId
-          );
-        }
-      }
-
-      if (attemptResult.success) {
-        mergeRetryAttemptIntoHistory(
-          item.historyItem,
-          attemptResult.destinationResults
+        prepared.push({
+          historyItem,
+          event,
+          options: {
+            markMoviesAsRewatched: allowRewatch && event.media.type === "movie",
+            markEpisodesAsRewatched:
+              allowRewatch && event.media.type === "episode",
+            simklRewatchId: pinnedRewatchId,
+          },
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unknown retry preparation error";
+        preparationFailures.set(
+          historyItem.id,
+          buildGlobalFailureResult(message)
         );
-        if (attemptResult.wasRewatched) {
-          item.historyItem.wasRewatched = true;
-        }
-        item.historyItem.retriedAt = new Date();
-        try {
-          await this.syncHistoryRepository.save(item.historyItem);
-        } catch (error) {
-          // Simkl already accepted the write; keep returning success so the
-          // client does not retry and create duplicate history entries.
-          logger.sync.error(
-            {
-              error,
-              userId: user.id,
-              historyId: item.historyItem.id,
-              mediaTitle: item.event.media.title,
-            },
-            "Failed to save Simkl batch retry history - data loss risk"
-          );
-        }
       }
-
-      results.push({ id: item.historyItem.id, ...attemptResult });
     }
 
-    return results;
+    const batchResultsById = new Map<string, SyncAttemptResult>();
+
+    if (prepared.length > 0) {
+      const batchResults = await simklClient.scrobbleMany(
+        prepared.map((item) => ({
+          event: item.event,
+          options: item.options,
+        })),
+        accessToken
+      );
+
+      for (let index = 0; index < prepared.length; index++) {
+        const item = prepared[index]!;
+        const batchResult = batchResults[index];
+        const syncResults =
+          batchResult?.success === true
+            ? [{ destination: "Simkl", success: true as const }]
+            : [
+                {
+                  destination: "Simkl",
+                  success: false as const,
+                  error:
+                    batchResult?.success === false
+                      ? batchResult.error.message
+                      : "Unknown Simkl error",
+                },
+              ];
+
+        const attemptResult = buildAttemptResult(syncResults);
+        if (batchResult?.success === true) {
+          attemptResult.wasRewatched = batchResult.result.wasRewatched;
+          if (typeof batchResult.result.simklRewatchId === "number") {
+            setCachedSimklRewatchIdForEvent(
+              user.id,
+              item.event,
+              batchResult.result.simklRewatchId
+            );
+          }
+        }
+
+        if (attemptResult.success) {
+          mergeRetryAttemptIntoHistory(
+            item.historyItem,
+            attemptResult.destinationResults
+          );
+          if (attemptResult.wasRewatched) {
+            item.historyItem.wasRewatched = true;
+          }
+          item.historyItem.retriedAt = new Date();
+          try {
+            await this.syncHistoryRepository.save(item.historyItem);
+          } catch (error) {
+            // Simkl already accepted the write; keep returning success so the
+            // client does not retry and create duplicate history entries.
+            logger.sync.error(
+              {
+                error,
+                userId: user.id,
+                historyId: item.historyItem.id,
+                mediaTitle: item.event.media.title,
+              },
+              "Failed to save Simkl batch retry history - data loss risk"
+            );
+          }
+        }
+
+        batchResultsById.set(item.historyItem.id, attemptResult);
+      }
+    }
+
+    return historyItems.map((historyItem) => {
+      const preparationFailure = preparationFailures.get(historyItem.id);
+      if (preparationFailure) {
+        return { id: historyItem.id, ...preparationFailure };
+      }
+
+      return {
+        id: historyItem.id,
+        ...(batchResultsById.get(historyItem.id) ??
+          buildGlobalFailureResult("Missing Simkl batch result")),
+      };
+    });
   }
 
   private getRetryTimestamp(historyItem: SyncHistory): Date {
