@@ -17,12 +17,14 @@
     "migration:run": "tsx src/scripts/runMigrations.ts",
     "migration:generate": "tsx ../../node_modules/typeorm/cli.js migration:generate -d typeorm.config.ts",
     "migration:revert": "tsx ../../node_modules/typeorm/cli.js migration:revert -d typeorm.config.ts",
+    "migrate:sqlite-to-postgres": "tsx src/scripts/migrateSqliteToPostgres.ts",
     "seed": "tsx src/scripts/seedDatabase.ts",
     "test": "vitest run --config vitest.config.ts",
     "test:coverage": "vitest run --config vitest.config.ts --coverage"
   },
   "dependencies": {
     "@scroblarr/shared": "workspace:*",
+    "better-sqlite3": "^13.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "express": "^5.0.0",
@@ -33,7 +35,6 @@
     "node-cron": "^4.2.1",
     "pg": "^8.11.3",
     "reflect-metadata": "^0.2.0",
-    "better-sqlite3": "^13.0.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "typeorm": "^1.0.0",
@@ -43,6 +44,7 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.0",
     "@types/js-yaml": "^4.0.9",
