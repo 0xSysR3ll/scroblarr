@@ -17,6 +17,7 @@ const syncHistoryRepositoryMocks = vi.hoisted(() => ({
 
 const syncServiceMocks = vi.hoisted(() => ({
   retryHistoryItem: vi.fn(),
+  retryHistoryItems: vi.fn(),
 }));
 
 vi.mock("@repositories/SettingsRepository", () => ({
@@ -41,6 +42,7 @@ vi.mock("@repositories/SyncHistoryRepository", () => ({
 vi.mock("@services/SyncService", () => ({
   SyncService: class {
     retryHistoryItem = syncServiceMocks.retryHistoryItem;
+    retryHistoryItems = syncServiceMocks.retryHistoryItems;
   },
 }));
 
@@ -188,16 +190,19 @@ describe("sync retry route", () => {
     syncHistoryRepositoryMocks.findById
       .mockResolvedValueOnce(firstHistoryItem)
       .mockResolvedValueOnce(secondHistoryItem);
-    syncServiceMocks.retryHistoryItem
-      .mockResolvedValueOnce({
+    syncServiceMocks.retryHistoryItems.mockResolvedValue([
+      {
+        id: "sync-id-1",
         success: true,
         destinations: ["TVTime"],
-      })
-      .mockResolvedValueOnce({
+      },
+      {
+        id: "sync-id-2",
         success: false,
         destinations: [],
         errorMessage: "TVTime: Too Many Requests - Rate limit exceeded",
-      });
+      },
+    ]);
 
     const response = await request(makeApp())
       .post("/api/v1/sync/history/retry")
@@ -223,7 +228,126 @@ describe("sync retry route", () => {
         },
       ],
     });
-    expect(syncServiceMocks.retryHistoryItem).toHaveBeenCalledTimes(2);
+    expect(syncServiceMocks.retryHistoryItems).toHaveBeenCalledWith([
+      firstHistoryItem,
+      secondHistoryItem,
+    ]);
+    expect(syncServiceMocks.retryHistoryItem).not.toHaveBeenCalled();
+  });
+
+  it("bulk retries keep validation failures and only batch retryable items", async () => {
+    const retryableItem = {
+      id: "sync-id-1",
+      userId: "user-id",
+      success: false,
+      source: "plex",
+      mediaType: "movie",
+      user: { id: "user-id", plexUsername: "plex-user" },
+    };
+    syncHistoryRepositoryMocks.findById
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(retryableItem);
+    syncServiceMocks.retryHistoryItems.mockResolvedValue([
+      {
+        id: "sync-id-1",
+        success: true,
+        destinations: ["Simkl"],
+      },
+    ]);
+
+    const response = await request(makeApp())
+      .post("/api/v1/sync/history/retry")
+      .set("authorization", "Bearer valid-user-token")
+      .send({ ids: ["missing-id", "sync-id-1"] });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      retried: 1,
+      failed: 1,
+      results: [
+        {
+          id: "missing-id",
+          success: false,
+          destinations: [],
+          error: "Sync history item not found",
+        },
+        {
+          id: "sync-id-1",
+          success: true,
+          destinations: ["Simkl"],
+        },
+      ],
+    });
+    expect(syncServiceMocks.retryHistoryItems).toHaveBeenCalledWith([
+      retryableItem,
+    ]);
+    expect(syncServiceMocks.retryHistoryItem).not.toHaveBeenCalled();
+  });
+
+  it("bulk retries surface a missing service result fallback", async () => {
+    const historyItem = {
+      id: "sync-id-1",
+      userId: "user-id",
+      success: false,
+      source: "plex",
+      mediaType: "movie",
+      user: { id: "user-id", plexUsername: "plex-user" },
+    };
+    syncHistoryRepositoryMocks.findById.mockResolvedValue(historyItem);
+    syncServiceMocks.retryHistoryItems.mockResolvedValue([]);
+
+    const response = await request(makeApp())
+      .post("/api/v1/sync/history/retry")
+      .set("authorization", "Bearer valid-user-token")
+      .send({ ids: ["sync-id-1"] });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: false,
+      retried: 0,
+      failed: 1,
+      results: [
+        {
+          id: "sync-id-1",
+          success: false,
+          destinations: [],
+          error: "Missing retry result",
+        },
+      ],
+    });
+  });
+
+  it("bulk retries skip the service when every id fails validation", async () => {
+    syncHistoryRepositoryMocks.findById.mockResolvedValue(null);
+
+    const response = await request(makeApp())
+      .post("/api/v1/sync/history/retry")
+      .set("authorization", "Bearer valid-user-token")
+      .send({ ids: ["missing-1", "missing-2"] });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: false,
+      retried: 0,
+      failed: 2,
+      results: [
+        {
+          id: "missing-1",
+          success: false,
+          destinations: [],
+          error: "Sync history item not found",
+        },
+        {
+          id: "missing-2",
+          success: false,
+          destinations: [],
+          error: "Sync history item not found",
+        },
+      ],
+    });
+    expect(syncServiceMocks.retryHistoryItems).not.toHaveBeenCalled();
+    expect(syncServiceMocks.retryHistoryItem).not.toHaveBeenCalled();
   });
 
   it("retries a failed Emby sync history item for the authenticated user", async () => {
