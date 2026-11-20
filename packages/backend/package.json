@@ -58,6 +58,6 @@
     "@vitest/coverage-v8": "^5.0.0",
     "tsc-alias": "^1.8.16",
     "tsx": "^4.7.0",
-    "typescript": "^6.0.0"
+    "typescript": "^7.0.0"
   }
 }
