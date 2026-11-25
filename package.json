@@ -62,7 +62,7 @@
     "node": ">=24.22.1",
     "pnpm": ">=8.0.0"
   },
-  "packageManager": "pnpm@10.34.9+sha512.f49b5a8ea0fdedb44bb3c0c1d6575092a53c2950d95b7ad15df11f17974877a2de3a01c07e934e9b28ce716e51c09a94962c7306d09be2e1e4b18a8c8762fd32",
+  "packageManager": "pnpm@12.22.0+sha512.894940a3d9a57dfa6fd373990fb4e41e09c2f2d76d982ed1d75275d39267f988fb4e2d40900cbe9921c68d97c67aa1a1096d276633db248f7b34927ac9ddb7a4",
   "pnpm": {
     "onlyBuiltDependencies": [
       "better-sqlite3"
